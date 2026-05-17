@@ -80812,7 +80812,8 @@ async function proxyPaidApiRequest(req, res, apiBase, payFetch, getActualPayment
   const isBlockrunExa = req.url?.startsWith("/v1/exa/") ?? false;
   const isModalSandbox = req.url?.startsWith("/v1/modal/") ?? false;
   const isPhone = (req.url?.startsWith("/v1/phone/") ?? false) || (req.url?.startsWith("/v1/voice/") ?? false);
-  const requestLabel = isBlockrunExa ? "BlockRun Exa" : isModalSandbox ? "Modal Sandbox" : isPhone ? "Phone/Voice" : "Partner";
+  const isSurf = req.url?.startsWith("/v1/surf/") ?? false;
+  const requestLabel = isBlockrunExa ? "BlockRun Exa" : isModalSandbox ? "Modal Sandbox" : isPhone ? "Phone/Voice" : isSurf ? "Surf" : "Partner";
   const bodyChunks = [];
   for await (const chunk of req) {
     bodyChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
@@ -80858,14 +80859,14 @@ async function proxyPaidApiRequest(req, res, apiBase, payFetch, getActualPayment
   });
   logUsage({
     timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-    model: isBlockrunExa ? "blockrun-exa" : isModalSandbox ? "modal-sandbox" : isPhone ? (req.url ?? "").replace(/^\/v1\//, "").split("?")[0] : "partner",
-    tier: isPhone ? "PHONE" : "PARTNER",
+    model: isBlockrunExa ? "blockrun-exa" : isModalSandbox ? "modal-sandbox" : isPhone ? (req.url ?? "").replace(/^\/v1\//, "").split("?")[0] : isSurf ? (req.url ?? "").replace(/^\/v1\//, "").split("?")[0] : "partner",
+    tier: isPhone ? "PHONE" : isSurf ? "SURF" : "PARTNER",
     cost: requestCost,
     baselineCost: requestCost,
     savings: 0,
     latencyMs,
     partnerId: (req.url?.split("?")[0] ?? "").replace(/^\/v1\//, "").replace(/\//g, "_") || "unknown",
-    service: isBlockrunExa ? "web_search" : isModalSandbox ? "modal" : isPhone ? "phone" : "partner"
+    service: isBlockrunExa ? "web_search" : isModalSandbox ? "modal" : isPhone ? "phone" : isSurf ? "surf" : "partner"
   }).catch(() => {
   });
 }
@@ -81804,7 +81805,7 @@ async function startProxy(options) {
         return;
       }
       if (req.url?.match(
-        /^\/v1\/(?:partner|pm|exa|modal|stocks|usstock|crypto|fx|commodity|phone|voice)\//
+        /^\/v1\/(?:partner|pm|exa|modal|stocks|usstock|crypto|fx|commodity|phone|voice|surf)\//
       )) {
         try {
           await proxyPaidApiRequest(

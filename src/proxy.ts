@@ -1580,9 +1580,10 @@ function estimateImageCost(model: string, size?: string, n: number = 1): number 
  *
  * Used for partner endpoints (/v1/partner/*, /v1/pm/*), market data
  * (/v1/stocks/*, /v1/usstock/*, /v1/crypto/*, /v1/fx/*, /v1/commodity/*),
- * and wallet-backed data tools such as BlockRun Exa (/v1/exa/*). No smart routing,
- * SSE, compression, or sessions — just collect body, forward via payFetch
- * (which handles 402 automatically), and stream back.
+ * wallet-backed data tools such as BlockRun Exa (/v1/exa/*), and the Surf
+ * unified crypto data API (/v1/surf/*). No smart routing, SSE, compression,
+ * or sessions — just collect body, forward via payFetch (which handles 402
+ * automatically), and stream back.
  */
 async function proxyPaidApiRequest(
   req: IncomingMessage,
@@ -1597,13 +1598,16 @@ async function proxyPaidApiRequest(
   const isModalSandbox = req.url?.startsWith("/v1/modal/") ?? false;
   const isPhone =
     (req.url?.startsWith("/v1/phone/") ?? false) || (req.url?.startsWith("/v1/voice/") ?? false);
+  const isSurf = req.url?.startsWith("/v1/surf/") ?? false;
   const requestLabel = isBlockrunExa
     ? "BlockRun Exa"
     : isModalSandbox
       ? "Modal Sandbox"
       : isPhone
         ? "Phone/Voice"
-        : "Partner";
+        : isSurf
+          ? "Surf"
+          : "Partner";
 
   // Collect request body
   const bodyChunks: Buffer[] = [];
@@ -1676,8 +1680,10 @@ async function proxyPaidApiRequest(
         ? "modal-sandbox"
         : isPhone
           ? (req.url ?? "").replace(/^\/v1\//, "").split("?")[0] // e.g. "phone/lookup", "voice/call"
-          : "partner",
-    tier: isPhone ? "PHONE" : "PARTNER",
+          : isSurf
+            ? (req.url ?? "").replace(/^\/v1\//, "").split("?")[0] // e.g. "surf/onchain/sql"
+            : "partner",
+    tier: isPhone ? "PHONE" : isSurf ? "SURF" : "PARTNER",
     cost: requestCost,
     baselineCost: requestCost,
     savings: 0,
@@ -1690,7 +1696,9 @@ async function proxyPaidApiRequest(
         ? "modal"
         : isPhone
           ? "phone"
-          : "partner",
+          : isSurf
+            ? "surf"
+            : "partner",
   }).catch(() => {});
 }
 
@@ -2863,10 +2871,12 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
       // --- Handle paid API paths (/v1/partner/*, /v1/pm/*, /v1/exa/*, /v1/modal/*,
       // /v1/stocks/*, /v1/usstock/*, /v1/crypto/*, /v1/fx/*, /v1/commodity/*,
       // /v1/phone/* (Twilio number intelligence + provisioning),
-      // /v1/voice/* (Bland.ai outbound AI voice calls)) ---
+      // /v1/voice/* (Bland.ai outbound AI voice calls),
+      // /v1/surf/* (Surf unified crypto data API: 84 endpoints across CEX/DEX,
+      //   on-chain SQL, wallet intelligence, prediction markets, social, news)) ---
       if (
         req.url?.match(
-          /^\/v1\/(?:partner|pm|exa|modal|stocks|usstock|crypto|fx|commodity|phone|voice)\//,
+          /^\/v1\/(?:partner|pm|exa|modal|stocks|usstock|crypto|fx|commodity|phone|voice|surf)\//,
         )
       ) {
         try {

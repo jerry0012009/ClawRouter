@@ -1,7 +1,7 @@
 {
   "id": "clawrouter",
   "name": "ClawRouter",
-  "description": "Smart LLM router — 55+ models, x402 micropayments, 92% cost savings. Now with phone lookup + AI voice calls (Twilio + Bland.ai).",
+  "description": "Smart LLM router — 55+ models, x402 micropayments, 92% cost savings. Phone lookup + AI voice calls (Twilio + Bland.ai). Surf crypto-data API (84 endpoints, on-chain SQL, 100M+ labeled wallets) via skill.",
   "skills": ["./skills"],
   "configSchema": {
     "type": "object",

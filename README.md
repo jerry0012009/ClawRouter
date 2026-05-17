@@ -336,6 +336,37 @@ LLM agents discover all eight operations as `blockrun_phone_*` / `blockrun_voice
 
 ---
 
+## Crypto Data (Surf)
+
+Surf is BlockRun's unified crypto data API — **84 endpoints across 13 domains**: CEX/DEX markets, on-chain SQL over 80+ ClickHouse tables (Ethereum, Base, Arbitrum, BSC, TRON, HyperEVM, Tempo), 100M+ labeled wallets, prediction markets (Polymarket + Kalshi), social/CT mindshare, news, project/DeFi metrics, token analytics, unified search, VC fund intelligence. The killer feature is ad-hoc `POST /surf/onchain/sql` — agents query the warehouse directly without running an indexer.
+
+ClawRouter ships Surf as a **skill, not as typed wrappers**. The proxy whitelists `/v1/surf/*` so any call through the local proxy is paid x402 from the same wallet; the agent reads `skills/surf/SKILL.md` for the endpoint catalog and crafts the HTTP call. No `blockrun_surf_*` tool definitions to maintain; a new Surf endpoint requires zero ClawRouter release.
+
+| Tier | Cost      | Examples                                                      |
+| ---- | --------: | ------------------------------------------------------------- |
+| 1    | **$0.001**| prices, rankings, lists, news                                 |
+| 2    | **$0.005**| orderbooks, candles, search, wallet details, social mindshare |
+| 3    | **$0.020**| on-chain SQL / query / schema, chat completions               |
+
+**Usage (HTTP):**
+
+```bash
+# Aggregated BTC spot price (Tier 1, $0.001)
+curl 'http://localhost:8402/v1/surf/market/price?symbol=BTC'
+
+# Bulk wallet labels over 100M+ labeled wallets (Tier 2, $0.005)
+curl 'http://localhost:8402/v1/surf/wallet/labels/batch?addresses=0xabc,0xdef,0x123'
+
+# Ad-hoc on-chain SQL (Tier 3, $0.020)
+curl -X POST 'http://localhost:8402/v1/surf/onchain/sql' \
+  -H 'content-type: application/json' \
+  -d '{"sql":"SELECT count() FROM ethereum.transactions WHERE block_timestamp >= now() - INTERVAL 1 HOUR"}'
+```
+
+No Surf account, no API key — settles directly to Surf's Base treasury in USDC via the same wallet as LLM calls. Full endpoint reference: [`skills/surf/SKILL.md`](skills/surf/SKILL.md). Upstream marketplace: <https://blockrun.ai/marketplace/surf>.
+
+---
+
 ## Models & Pricing
 
 55+ models across 9 providers, one wallet. **Starting at $0.0002/request.**

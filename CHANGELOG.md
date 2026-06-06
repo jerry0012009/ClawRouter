@@ -4,6 +4,12 @@ All notable changes to ClawRouter.
 
 ---
 
+## v0.12.202 — June 6, 2026
+
+- **Upstream delistings mirrored (gateway health probe 2026-06-06).** `openai/o1-mini` 404s at OpenAI and `google/gemini-3-pro-preview` 404s at Google; the gateway hid both and redirects them (`o1-mini` → `o4-mini`, `gemini-3-pro-preview` → `gemini-3.1-pro`). ClawRouter mirrors the redirects in `MODEL_ALIASES` (pinned callers land on the successor instead of an upstream error), drops gemini-3-pro-preview from the picker, and removes it from the AUTO COMPLEX fallback chain (it would have silently resolved to the tier primary anyway).
+
+---
+
 ## v0.12.201 — June 5, 2026
 
 - **Catalog sync with BlockRun backend (2026-06-04/05 model drops + repricing).**

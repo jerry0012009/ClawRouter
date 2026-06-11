@@ -80518,6 +80518,19 @@ function safeWrite(res, data) {
   }
   return res.write(data);
 }
+function sanitizeHeaderValue(value) {
+  return value.replace(/[^\t\x20-\x7E]/gu, (c) => {
+    try {
+      return encodeURIComponent(c);
+    } catch {
+      return "?";
+    }
+  });
+}
+function debugHeadersEnabledFromEnv(env = process.env) {
+  const value = (env.CLAWROUTER_DEBUG_HEADERS ?? "").toLowerCase();
+  return value !== "0" && value !== "false" && value !== "off";
+}
 function getProxyPort() {
   return PROXY_PORT;
 }
@@ -82273,7 +82286,7 @@ async function proxyRequest(req, res, apiBase, payFetch, options, routerOpts, de
   }
   let body = Buffer.concat(bodyChunks);
   const originalContextSizeKB = Math.ceil(body.length / 1024);
-  const debugMode = req.headers["x-clawrouter-debug"] !== "false";
+  const debugMode = debugHeadersEnabledFromEnv() && req.headers["x-clawrouter-debug"] !== "false";
   let routingDecision;
   let hasTools = false;
   let hasVision = false;
@@ -84031,7 +84044,7 @@ data: [DONE]
         responseHeaders["x-clawrouter-tier"] = routingDecision.tier;
         responseHeaders["x-clawrouter-model"] = actualModelUsed;
         responseHeaders["x-clawrouter-confidence"] = routingDecision.confidence.toFixed(2);
-        responseHeaders["x-clawrouter-reasoning"] = routingDecision.reasoning;
+        responseHeaders["x-clawrouter-reasoning"] = sanitizeHeaderValue(routingDecision.reasoning);
         if (routingDecision.agenticScore !== void 0) {
           responseHeaders["x-clawrouter-agentic-score"] = routingDecision.agenticScore.toFixed(2);
         }
@@ -84131,7 +84144,17 @@ data: [DONE]
         budgetDowngradeHeaderMode = void 0;
       }
       responseHeaders["content-length"] = String(responseBody.length);
-      res.writeHead(upstream.status, responseHeaders);
+      try {
+        res.writeHead(upstream.status, responseHeaders);
+      } catch (headerError) {
+        console.error(
+          `[ClawRouter] Invalid response header, sanitizing all values: ${String(headerError)}`
+        );
+        for (const [key, value] of Object.entries(responseHeaders)) {
+          responseHeaders[key] = sanitizeHeaderValue(value);
+        }
+        res.writeHead(upstream.status, responseHeaders);
+      }
       safeWrite(res, responseBody);
       responseChunks.push(responseBody);
       res.end();

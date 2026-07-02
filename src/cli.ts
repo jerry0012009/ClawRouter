@@ -13,7 +13,7 @@
 
 import { startProxy, getProxyPort } from "./proxy.js";
 import { VERSION } from "./version.js";
-import { resolveApiKey, saveApiKey } from "./auth.js";
+import { resolveApiKey, resolveProxyApiKey, resolveProxyBaseUrl, saveApiKey } from "./auth.js";
 import { BLOCKRUN_MODELS, MODEL_ALIASES } from "./models.js";
 
 function printHelp(): void {
@@ -189,7 +189,7 @@ async function startDirect(): Promise<void> {
     process.exit(1);
   }
 
-  const proxy = await startProxy({ apiKey, port });
+  const proxy = await startProxy({ apiKey, proxyApiKey: resolveProxyApiKey(), proxyBaseUrl: resolveProxyBaseUrl(), port });
 
   // Graceful shutdown
   const shutdown = async () => {

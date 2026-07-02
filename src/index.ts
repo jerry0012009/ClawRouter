@@ -12,7 +12,7 @@
 
 import { startProxy, getProxyPort, buildProxyModelList } from "./proxy.js";
 import { blockrunProvider, setActiveProxy } from "./provider.js";
-import { resolveApiKey, saveApiKey } from "./auth.js";
+import { resolveApiKey, resolveProxyApiKey, resolveProxyBaseUrl, saveApiKey } from "./auth.js";
 import { BLOCKRUN_MODELS, OPENCLAW_MODELS, resolveModelAlias, MODEL_ALIASES } from "./models.js";
 import { route, DEFAULT_ROUTING_CONFIG, getFallbackChain, calculateModelCost } from "./router/index.js";
 import type { RoutingDecision, RoutingConfig, Tier } from "./router/index.js";
@@ -99,6 +99,8 @@ const plugin: OpenClawPluginDefinition = {
     // Start proxy
     const proxy = await startProxy({
       apiKey,
+      proxyApiKey: resolveProxyApiKey(),
+      proxyBaseUrl: resolveProxyBaseUrl(),
       onRouted: (decision) => {
         api.logger.info(`Routed → ${decision.model} (${decision.tier}, ${(decision.savings * 100).toFixed(0)}% savings)`);
       },

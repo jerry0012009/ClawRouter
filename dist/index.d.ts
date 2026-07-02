@@ -744,6 +744,8 @@ declare function hashRequestContent(lastUserContent: string, toolCallNames?: str
 type ProxyOptions = {
     apiKey: string;
     port?: number;
+    proxyApiKey?: string;
+    proxyBaseUrl?: string;
     routingConfig?: Partial<RoutingConfig>;
     cacheConfig?: Partial<ResponseCacheConfig>;
     sessionConfig?: Partial<SessionConfig>;
@@ -762,19 +764,11 @@ declare function startProxy(options: ProxyOptions): Promise<ProxyHandle>;
 declare function getProxyPort(): number;
 
 /**
- * OpenRouter Authentication
+ * Authentication — Dual Upstream
  *
- * Resolves the OpenRouter API key from environment variable or config file.
- * No wallet management — OpenRouter handles billing via API key.
- */
-/**
- * Resolve OpenRouter API key.
- * Priority: env var → config file → error.
+ * Resolves API keys for both upstream providers.
  */
 declare function resolveApiKey(): string;
-/**
- * Save API key to config file.
- */
 declare function saveApiKey(key: string): void;
 
 /**
@@ -788,17 +782,21 @@ declare function saveApiKey(key: string): void;
 declare const blockrunProvider: ProviderPlugin;
 
 /**
- * OpenRouter Model Definitions
+ * Model Definitions — Dual Upstream
  *
- * Only includes models verified working with the current API key.
- * Tested 2026-07-02 against openrouter.ai/api/v1.
- *
- * @see https://openrouter.ai/models
+ * Models are routed to one of two upstream providers:
+ *   - "proxy": api.openai-proxy.org (OpenAI, Anthropic, Google)
+ *   - "openrouter": openrouter.ai (DeepSeek, Llama, Qwen, free models)
  */
 
-declare const BLOCKRUN_MODELS: ModelDefinitionConfig[];
-/** Alias for backward compatibility */
-declare const OPENCLAW_MODELS: ModelDefinitionConfig[];
+type UpstreamProvider = "proxy" | "openrouter";
+type ExtendedModelDefinition = ModelDefinitionConfig & {
+    upstream: UpstreamProvider;
+    /** Use max_completion_tokens instead of max_tokens (required for o-series) */
+    useMaxCompletionTokens?: boolean;
+};
+declare const BLOCKRUN_MODELS: ExtendedModelDefinition[];
+declare const OPENCLAW_MODELS: ExtendedModelDefinition[];
 declare const MODEL_ALIASES: Record<string, string>;
 declare function resolveModelAlias(model: string): string;
 declare function buildProviderModels(baseUrl: string): ModelProviderConfig;

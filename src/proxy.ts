@@ -35,6 +35,8 @@ import {
   getModelContextWindow,
   isReasoningModel,
   supportsToolCalling as modelSupportsToolCalling,
+  getUpstream,
+  usesMaxCompletionTokens,
   supportsVision as modelSupportsVision,
 } from "./models.js";
 import { logUsage, type UsageEntry } from "./logger.js";
@@ -149,6 +151,8 @@ function categorizeError(status: number, body: string): ErrorCategory | null {
 export type ProxyOptions = {
   apiKey: string;
   port?: number;
+  proxyApiKey?: string;
+  proxyBaseUrl?: string;
   routingConfig?: Partial<RoutingConfig>;
   cacheConfig?: Partial<ResponseCacheConfig>;
   sessionConfig?: Partial<SessionConfig>;
@@ -250,7 +254,7 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
   const server = createServer(async (req, res) => {
     try {
       await handleRequest(req, res, {
-        apiKey, routerOpts, deduplicator, responseCache, sessionStore,
+        apiKey, proxyApiKey: options.proxyApiKey, proxyBaseUrl: options.proxyBaseUrl, routerOpts, deduplicator, responseCache, sessionStore,
         sessionJournal, excludeList, onRouted: options.onRouted,
       });
     } catch (err) {
@@ -301,6 +305,8 @@ async function handleRequest(
   ctx: {
     apiKey: string;
     routerOpts: RouterOptions;
+  proxyApiKey?: string;
+  proxyBaseUrl?: string;
     deduplicator: RequestDeduplicator;
     responseCache: ResponseCache;
     sessionStore: SessionStore;
@@ -633,28 +639,41 @@ async function handleRequest(
     const combinedSignal = AbortSignal.any([globalController.signal, modelController.signal]);
 
     try {
-      const upstreamUrl = `${OPENROUTER_API}/chat/completions`;
+      // Dual-upstream routing
+      const upstreamProvider = getUpstream(tryModel);
+      const isOpenRouter = upstreamProvider === "openrouter";
+      const baseUrl = isOpenRouter ? "https://openrouter.ai/api/v1" : (ctx.proxyBaseUrl || "https://api.openai-proxy.org/v1");
+      const fetchApiKey = isOpenRouter ? ctx.apiKey : (ctx.proxyApiKey || ctx.apiKey);
+      const upstreamUrl = `${baseUrl}/chat/completions`;
 
       // Update model in body
       const reqParsed = JSON.parse(body.toString());
       reqParsed.model = tryModel;
+
+      // Handle max_completion_tokens for o-series models
+      if (usesMaxCompletionTokens(tryModel) && reqParsed.max_tokens) {
+        reqParsed.max_completion_tokens = reqParsed.max_tokens;
+        delete reqParsed.max_tokens;
+      }
+
       const reqBody = Buffer.from(JSON.stringify(reqParsed));
+
+      const upstreamHeaders: Record<string, string> = {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${fetchApiKey}`,
+        "User-Agent": USER_AGENT,
+      };
+      if (isOpenRouter) {
+        upstreamHeaders["HTTP-Referer"] = "http://localhost:8402";
+        upstreamHeaders["X-Title"] = "ClawRouter";
+      }
 
       const response = await fetch(upstreamUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${ctx.apiKey}`,
-          "HTTP-Referer": "http://localhost:8402",
-          "X-Title": "ClawRouter",
-          "User-Agent": USER_AGENT,
-        },
+        headers: upstreamHeaders,
         body: reqBody,
         signal: combinedSignal,
       });
-
-      clearTimeout(modelTimeoutId);
-
       if (response.status === 200) {
         upstream = response;
         actualModelUsed = tryModel;

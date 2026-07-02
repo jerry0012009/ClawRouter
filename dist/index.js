@@ -1615,19 +1615,153 @@ function route(prompt, systemPrompt, maxOutputTokens, options) {
 
 // src/models.ts
 var BLOCKRUN_MODELS = [
-  // ── Paid (cheap, verified working) ──
+  // ══════════════════════════════════════════════════
+  //  api.openai-proxy.org models
+  // ══════════════════════════════════════════════════
+  // ── OpenAI ──
+  {
+    id: "gpt-4o",
+    name: "GPT-4o",
+    upstream: "proxy",
+    reasoning: false,
+    input: ["text", "image"],
+    cost: { input: 2.5, output: 10, cacheRead: 1.25, cacheWrite: 2.5 },
+    contextWindow: 128e3,
+    maxTokens: 16384
+  },
+  {
+    id: "gpt-4o-mini",
+    name: "GPT-4o Mini",
+    upstream: "proxy",
+    reasoning: false,
+    input: ["text", "image"],
+    cost: { input: 0.15, output: 0.6, cacheRead: 0.075, cacheWrite: 0.15 },
+    contextWindow: 128e3,
+    maxTokens: 16384
+  },
+  {
+    id: "gpt-4.1",
+    name: "GPT-4.1",
+    upstream: "proxy",
+    reasoning: false,
+    input: ["text", "image"],
+    cost: { input: 2, output: 8, cacheRead: 0.5, cacheWrite: 2 },
+    contextWindow: 1048576,
+    maxTokens: 32768
+  },
+  {
+    id: "gpt-4.1-mini",
+    name: "GPT-4.1 Mini",
+    upstream: "proxy",
+    reasoning: false,
+    input: ["text", "image"],
+    cost: { input: 0.4, output: 1.6, cacheRead: 0.1, cacheWrite: 0.4 },
+    contextWindow: 1048576,
+    maxTokens: 32768
+  },
+  {
+    id: "gpt-4.1-nano",
+    name: "GPT-4.1 Nano",
+    upstream: "proxy",
+    reasoning: false,
+    input: ["text", "image"],
+    cost: { input: 0.1, output: 0.4, cacheRead: 0.025, cacheWrite: 0.1 },
+    contextWindow: 1048576,
+    maxTokens: 32768
+  },
+  {
+    id: "o3",
+    name: "o3",
+    upstream: "proxy",
+    reasoning: true,
+    useMaxCompletionTokens: true,
+    input: ["text", "image"],
+    cost: { input: 10, output: 40, cacheRead: 2.5, cacheWrite: 10 },
+    contextWindow: 2e5,
+    maxTokens: 1e5
+  },
+  {
+    id: "o4-mini",
+    name: "o4-mini",
+    upstream: "proxy",
+    reasoning: true,
+    useMaxCompletionTokens: true,
+    input: ["text", "image"],
+    cost: { input: 1.1, output: 4.4, cacheRead: 0.275, cacheWrite: 1.1 },
+    contextWindow: 2e5,
+    maxTokens: 1e5
+  },
+  {
+    id: "gpt-4-turbo",
+    name: "GPT-4 Turbo",
+    upstream: "proxy",
+    reasoning: false,
+    input: ["text", "image"],
+    cost: { input: 10, output: 30, cacheRead: 5, cacheWrite: 10 },
+    contextWindow: 128e3,
+    maxTokens: 4096
+  },
+  // ── Anthropic ──
+  {
+    id: "claude-sonnet-4-20250514",
+    name: "Claude Sonnet 4",
+    upstream: "proxy",
+    reasoning: false,
+    input: ["text", "image"],
+    cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
+    contextWindow: 2e5,
+    maxTokens: 16384
+  },
+  {
+    id: "claude-opus-4-20250514",
+    name: "Claude Opus 4",
+    upstream: "proxy",
+    reasoning: true,
+    input: ["text", "image"],
+    cost: { input: 15, output: 75, cacheRead: 1.5, cacheWrite: 18.75 },
+    contextWindow: 2e5,
+    maxTokens: 32e3
+  },
+  // ── Google ──
+  {
+    id: "gemini-2.5-flash",
+    name: "Gemini 2.5 Flash",
+    upstream: "proxy",
+    reasoning: true,
+    input: ["text", "image"],
+    cost: { input: 0.15, output: 0.6, cacheRead: 0.0375, cacheWrite: 0.15 },
+    contextWindow: 1048576,
+    maxTokens: 65536
+  },
+  {
+    id: "gemini-2.5-pro",
+    name: "Gemini 2.5 Pro",
+    upstream: "proxy",
+    reasoning: true,
+    input: ["text", "image"],
+    cost: { input: 1.25, output: 10, cacheRead: 0.3125, cacheWrite: 1.25 },
+    contextWindow: 1048576,
+    maxTokens: 65536
+  },
+  // ══════════════════════════════════════════════════
+  //  OpenRouter models
+  // ══════════════════════════════════════════════════
+  // ── DeepSeek ──
   {
     id: "deepseek/deepseek-chat-v3-0324",
     name: "DeepSeek V3",
+    upstream: "openrouter",
     reasoning: false,
     input: ["text"],
     cost: { input: 0.5, output: 1.54, cacheRead: 0.07, cacheWrite: 0.5 },
     contextWindow: 163840,
     maxTokens: 163840
   },
+  // ── Meta ──
   {
     id: "meta-llama/llama-4-maverick",
     name: "Llama 4 Maverick",
+    upstream: "openrouter",
     reasoning: false,
     input: ["text", "image"],
     cost: { input: 0.2, output: 0.6, cacheRead: 0.05, cacheWrite: 0.2 },
@@ -1637,25 +1771,29 @@ var BLOCKRUN_MODELS = [
   {
     id: "meta-llama/llama-3.3-70b-instruct",
     name: "Llama 3.3 70B",
+    upstream: "openrouter",
     reasoning: false,
     input: ["text"],
     cost: { input: 0.1, output: 0.1, cacheRead: 0.025, cacheWrite: 0.1 },
     contextWindow: 131072,
     maxTokens: 16384
   },
+  // ── Qwen ──
   {
     id: "qwen/qwen-2.5-72b-instruct",
     name: "Qwen 2.5 72B",
+    upstream: "openrouter",
     reasoning: false,
     input: ["text"],
     cost: { input: 0.25, output: 0.5, cacheRead: 0.0625, cacheWrite: 0.25 },
     contextWindow: 131072,
     maxTokens: 16384
   },
-  // ── Free (verified working) ──
+  // ── Free models (OpenRouter) ──
   {
     id: "openai/gpt-oss-20b:free",
     name: "GPT-OSS 20B (Free)",
+    upstream: "openrouter",
     reasoning: false,
     input: ["text"],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -1665,6 +1803,7 @@ var BLOCKRUN_MODELS = [
   {
     id: "nvidia/nemotron-3-super-120b-a12b:free",
     name: "Nemotron Super 120B (Free)",
+    upstream: "openrouter",
     reasoning: false,
     input: ["text"],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -1674,6 +1813,7 @@ var BLOCKRUN_MODELS = [
   {
     id: "nvidia/nemotron-nano-9b-v2:free",
     name: "Nemotron Nano 9B (Free)",
+    upstream: "openrouter",
     reasoning: false,
     input: ["text"],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -1683,6 +1823,7 @@ var BLOCKRUN_MODELS = [
   {
     id: "google/gemma-4-26b-a4b-it:free",
     name: "Gemma 4 26B (Free)",
+    upstream: "openrouter",
     reasoning: false,
     input: ["text"],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -1692,6 +1833,7 @@ var BLOCKRUN_MODELS = [
   {
     id: "google/gemma-4-31b-it:free",
     name: "Gemma 4 31B (Free)",
+    upstream: "openrouter",
     reasoning: false,
     input: ["text"],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -1700,7 +1842,8 @@ var BLOCKRUN_MODELS = [
   },
   {
     id: "liquid/lfm-2.5-1.2b-thinking:free",
-    name: "Liquid LFM 2.5 Thinking (Free)",
+    name: "Liquid LFM Thinking (Free)",
+    upstream: "openrouter",
     reasoning: true,
     input: ["text"],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -1710,35 +1853,51 @@ var BLOCKRUN_MODELS = [
 ];
 var OPENCLAW_MODELS = BLOCKRUN_MODELS;
 var MODEL_ALIASES = {
+  // OpenAI
+  gpt: "gpt-4o",
+  gpt4: "gpt-4o",
+  mini: "gpt-4o-mini",
+  o1: "o3",
+  o3: "o3",
+  o4: "o4-mini",
+  nano: "gpt-4.1-nano",
+  // Anthropic
+  claude: "claude-sonnet-4-20250514",
+  sonnet: "claude-sonnet-4-20250514",
+  opus: "claude-opus-4-20250514",
+  // Google
+  gemini: "gemini-2.5-flash",
+  flash: "gemini-2.5-flash",
+  pro: "gemini-2.5-pro",
   // DeepSeek
   deepseek: "deepseek/deepseek-chat-v3-0324",
   "deepseek-chat": "deepseek/deepseek-chat-v3-0324",
   // Meta
   llama: "meta-llama/llama-4-maverick",
   maverick: "meta-llama/llama-4-maverick",
-  "llama-3.3": "meta-llama/llama-3.3-70b-instruct",
   // Qwen
   qwen: "qwen/qwen-2.5-72b-instruct",
-  // Free models
+  // Free
   free: "nvidia/nemotron-3-super-120b-a12b:free",
   nemotron: "nvidia/nemotron-3-super-120b-a12b:free",
-  gemma: "google/gemma-4-31b-it:free",
-  gpt: "openai/gpt-oss-20b:free"
+  gemma: "google/gemma-4-31b-it:free"
 };
 function resolveModelAlias(model) {
   const lower = model.toLowerCase().trim();
   return MODEL_ALIASES[lower] ?? lower;
 }
+function getUpstream(modelId) {
+  const model = BLOCKRUN_MODELS.find((m) => m.id === modelId);
+  return model?.upstream ?? "proxy";
+}
+function usesMaxCompletionTokens(modelId) {
+  return BLOCKRUN_MODELS.find((m) => m.id === modelId)?.useMaxCompletionTokens ?? false;
+}
 function buildProviderModels(baseUrl) {
-  return {
-    baseUrl,
-    api: "openai-completions",
-    models: BLOCKRUN_MODELS.map((m) => ({ ...m, headers: {} }))
-  };
+  return { baseUrl, api: "openai-completions", models: BLOCKRUN_MODELS.map((m) => ({ ...m, headers: {} })) };
 }
 function supportsToolCalling(modelId) {
-  const noToolSupport = /* @__PURE__ */ new Set(["liquid/lfm-2.5-1.2b-thinking:free"]);
-  return !noToolSupport.has(modelId);
+  return !(/* @__PURE__ */ new Set(["liquid/lfm-2.5-1.2b-thinking:free"])).has(modelId);
 }
 function supportsVision(modelId) {
   return BLOCKRUN_MODELS.find((m) => m.id === modelId)?.input.includes("image") ?? false;
@@ -3446,7 +3605,6 @@ async function listRecent(limit) {
 }
 
 // src/proxy.ts
-var OPENROUTER_API = "https://openrouter.ai/api/v1";
 var HEARTBEAT_INTERVAL_MS = 2e3;
 var DEFAULT_REQUEST_TIMEOUT_MS = 3e5;
 var PER_MODEL_TIMEOUT_MS = 6e4;
@@ -3579,6 +3737,8 @@ async function startProxy(options) {
     try {
       await handleRequest(req, res, {
         apiKey,
+        proxyApiKey: options.proxyApiKey,
+        proxyBaseUrl: options.proxyBaseUrl,
         routerOpts,
         deduplicator,
         responseCache,
@@ -3888,23 +4048,33 @@ async function handleRequest(req, res, ctx) {
     const modelTimeoutId = setTimeout(() => modelController.abort(), perAttemptTimeout);
     const combinedSignal = AbortSignal.any([globalController.signal, modelController.signal]);
     try {
-      const upstreamUrl = `${OPENROUTER_API}/chat/completions`;
+      const upstreamProvider = getUpstream(tryModel);
+      const isOpenRouter = upstreamProvider === "openrouter";
+      const baseUrl = isOpenRouter ? "https://openrouter.ai/api/v1" : ctx.proxyBaseUrl || "https://api.openai-proxy.org/v1";
+      const fetchApiKey = isOpenRouter ? ctx.apiKey : ctx.proxyApiKey || ctx.apiKey;
+      const upstreamUrl = `${baseUrl}/chat/completions`;
       const reqParsed = JSON.parse(body.toString());
       reqParsed.model = tryModel;
+      if (usesMaxCompletionTokens(tryModel) && reqParsed.max_tokens) {
+        reqParsed.max_completion_tokens = reqParsed.max_tokens;
+        delete reqParsed.max_tokens;
+      }
       const reqBody = Buffer.from(JSON.stringify(reqParsed));
+      const upstreamHeaders = {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${fetchApiKey}`,
+        "User-Agent": USER_AGENT
+      };
+      if (isOpenRouter) {
+        upstreamHeaders["HTTP-Referer"] = "http://localhost:8402";
+        upstreamHeaders["X-Title"] = "ClawRouter";
+      }
       const response = await fetch(upstreamUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${ctx.apiKey}`,
-          "HTTP-Referer": "http://localhost:8402",
-          "X-Title": "ClawRouter",
-          "User-Agent": USER_AGENT
-        },
+        headers: upstreamHeaders,
         body: reqBody,
         signal: combinedSignal
       });
-      clearTimeout(modelTimeoutId);
       if (response.status === 200) {
         upstream = response;
         actualModelUsed = tryModel;
@@ -4107,22 +4277,26 @@ import { readFileSync, existsSync, writeFileSync, mkdirSync } from "fs";
 import { join as join4 } from "path";
 import { homedir as homedir3 } from "os";
 var CONFIG_DIR = join4(homedir3(), ".claw-router");
-var KEY_FILE = join4(CONFIG_DIR, "api-key");
 function resolveApiKey() {
   const envKey = process.env.OPENROUTER_API_KEY;
-  if (envKey && envKey.trim()) return envKey.trim();
-  if (existsSync(KEY_FILE)) {
-    const key = readFileSync(KEY_FILE, "utf-8").trim();
+  if (envKey?.trim()) return envKey.trim();
+  const keyFile = join4(CONFIG_DIR, "api-key");
+  if (existsSync(keyFile)) {
+    const key = readFileSync(keyFile, "utf-8").trim();
     if (key) return key;
   }
-  throw new Error(
-    "OpenRouter API key not found.\nSet OPENROUTER_API_KEY environment variable or save key to ~/.claw-router/api-key"
-  );
+  throw new Error("OPENROUTER_API_KEY not set. Set env var or save to ~/.claw-router/api-key");
+}
+function resolveProxyApiKey() {
+  return process.env.PROXY_API_KEY?.trim() || void 0;
+}
+function resolveProxyBaseUrl() {
+  return process.env.PROXY_BASE_URL?.trim() || void 0;
 }
 function saveApiKey(key) {
   mkdirSync(CONFIG_DIR, { recursive: true });
-  writeFileSync(KEY_FILE, key.trim() + "\n", { mode: 384 });
-  console.log(`[ClawRouter] API key saved to ${KEY_FILE}`);
+  writeFileSync(join4(CONFIG_DIR, "api-key"), key.trim() + "\n", { mode: 384 });
+  console.log(`[ClawRouter] API key saved to ${join4(CONFIG_DIR, "api-key")}`);
 }
 
 // src/index.ts
@@ -4177,6 +4351,8 @@ var plugin = {
     }
     const proxy = await startProxy({
       apiKey,
+      proxyApiKey: resolveProxyApiKey(),
+      proxyBaseUrl: resolveProxyBaseUrl(),
       onRouted: (decision) => {
         api.logger.info(`Routed \u2192 ${decision.model} (${decision.tier}, ${(decision.savings * 100).toFixed(0)}% savings)`);
       }

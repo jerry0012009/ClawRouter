@@ -1,21 +1,12 @@
 {
   "name": "@blockrun/clawrouter",
-  "version": "0.12.216",
-  "description": "Smart LLM router — save 85% on inference costs. 55+ models (8 free), one wallet, x402 micropayments.",
+  "version": "1.0.0",
+  "description": "Smart LLM router via OpenRouter \u2014 22+ models, 15-dimension routing, sub-1ms decisions.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
     "clawrouter": "./dist/cli.js"
-  },
-  "openclaw": {
-    "extensions": [
-      "./dist/index.js"
-    ],
-    "compat": {
-      "pluginApiRange": ">=2026.3.24",
-      "minGatewayVersion": "2026.5.2"
-    }
   },
   "exports": {
     ".": {
@@ -51,24 +42,20 @@
     "test:e2e:tool-ids": "npm run build && tsx test/e2e-tool-id-sanitization.ts",
     "test:docker:install": "bash test/run-docker-test.sh",
     "test:docker:edge-cases": "bash test/docker/run-edge-cases.sh",
-    "test:docker:integration": "docker compose -f test/integration/docker-compose.yml up --build --abort-on-container-exit --exit-code-from integration"
+    "test:docker:integration": "docker compose -f test/integration/docker-compose.yml up --build --abort-on-container-exit --exit-code-from integration",
+    "setup": "node dist/cli.js setup",
+    "models": "node dist/cli.js models"
   },
   "keywords": [
     "llm",
     "router",
     "smart-routing",
-    "ai",
-    "openclaw",
-    "blockrun",
-    "x402",
-    "usdc",
+    "openrouter",
     "cost-optimization",
     "openai",
     "anthropic",
     "gemini",
-    "deepseek",
-    "usdc-hackathon-winner",
-    "agentic-commerce"
+    "deepseek"
   ],
   "author": "BlockRun <hello@blockrun.ai>",
   "license": "MIT",
@@ -77,29 +64,11 @@
     "url": "git+https://github.com/BlockRunAI/ClawRouter.git"
   },
   "dependencies": {
-    "@noble/hashes": "^2.2.0",
-    "@scure/bip32": "^2.0.1",
-    "@scure/bip39": "^1.5.0",
-    "@solana/kit": "^5.0.0",
-    "@x402/core": "^2.9.0",
-    "@x402/evm": "^2.9.0",
-    "@x402/fetch": "^2.9.0",
-    "@x402/svm": "^2.9.0",
-    "undici": "^8.5.0",
-    "viem": "^2.39.3"
-  },
-  "peerDependencies": {
-    "openclaw": ">=2025.1.0"
-  },
-  "peerDependenciesMeta": {
-    "openclaw": {
-      "optional": true
-    }
+    "undici": "^8.5.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "eslint": "^10.2.0",
-    "openclaw": "^2026.5.4",
     "prettier": "^3.8.1",
     "tsup": "^8.0.0",
     "tsx": "^4.21.0",
@@ -114,6 +83,6 @@
     "esbuild": "^0.28.1"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=18"
   }
 }

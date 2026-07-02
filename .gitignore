@@ -8,3 +8,4 @@ dist-e2e/
 .worktrees/
 .gstack/
 .pytest_cache/
+.env

@@ -14,12 +14,13 @@ export type ModelPricing = {
   flatPrice?: number;
 };
 
-const BASELINE_MODEL_ID = "anthropic/claude-opus-4.7";
+export const DEFAULT_BASELINE_MODEL_ID = "claude-opus-4-7";
 
 // Hardcoded fallback: Claude Opus 4.7 pricing (per 1M tokens)
 // Used when baseline model not found in dynamic pricing map
 const BASELINE_INPUT_PRICE = 5.0;
 const BASELINE_OUTPUT_PRICE = 25.0;
+const DEFAULT_PLATFORM_MARKUP_PERCENT = 0;
 
 /**
  * Select the primary model for a tier and build the RoutingDecision.
@@ -51,7 +52,7 @@ export function selectModel(
   }
 
   // Baseline: what Claude Opus 4.5 would cost (the premium reference)
-  const opusPricing = modelPricing.get(BASELINE_MODEL_ID);
+  const opusPricing = modelPricing.get(DEFAULT_BASELINE_MODEL_ID);
   const opusInputPrice = opusPricing?.inputPrice ?? BASELINE_INPUT_PRICE;
   const opusOutputPrice = opusPricing?.outputPrice ?? BASELINE_OUTPUT_PRICE;
   const baselineInput = (estimatedInputTokens / 1_000_000) * opusInputPrice;
@@ -91,39 +92,31 @@ export function getFallbackChain(tier: Tier, tierConfigs: Record<Tier, TierConfi
  * Calculate cost for a specific model (used when fallback model is used).
  * Returns updated cost fields for RoutingDecision.
  */
-// Server-side margin applied to all x402 payments (must match blockrun server's MARGIN_PERCENT)
-const SERVER_MARGIN_PERCENT = 5;
-// Minimum payment enforced by CDP Facilitator (must match blockrun server's MIN_PAYMENT_USD)
-const MIN_PAYMENT_USD = 0.001;
-
 export function calculateModelCost(
   model: string,
   modelPricing: Map<string, ModelPricing>,
   estimatedInputTokens: number,
   maxOutputTokens: number,
   routingProfile?: "free" | "eco" | "auto" | "premium",
+  platformMarkupPercent = DEFAULT_PLATFORM_MARKUP_PERCENT,
 ): { costEstimate: number; baselineCost: number; savings: number } {
   const pricing = modelPricing.get(model);
 
   let costEstimate: number;
   if (pricing?.flatPrice !== undefined) {
-    // Active promo: fixed cost per request
-    costEstimate = Math.max(pricing.flatPrice * (1 + SERVER_MARGIN_PERCENT / 100), MIN_PAYMENT_USD);
+    costEstimate = pricing.flatPrice;
   } else {
     // Defensive: guard against undefined price fields (not just undefined pricing)
     const inputPrice = pricing?.inputPrice ?? 0;
     const outputPrice = pricing?.outputPrice ?? 0;
     const inputCost = (estimatedInputTokens / 1_000_000) * inputPrice;
     const outputCost = (maxOutputTokens / 1_000_000) * outputPrice;
-    // Include server margin + minimum payment to match actual x402 charge
-    costEstimate = Math.max(
-      (inputCost + outputCost) * (1 + SERVER_MARGIN_PERCENT / 100),
-      MIN_PAYMENT_USD,
-    );
+    costEstimate = inputCost + outputCost;
   }
+  costEstimate *= 1 + platformMarkupPercent / 100;
 
-  // Baseline: what Claude Opus 4.5 would cost (the premium reference)
-  const opusPricing = modelPricing.get(BASELINE_MODEL_ID);
+  // Baseline: what Claude Opus 4.7 would cost (the premium reference)
+  const opusPricing = modelPricing.get(DEFAULT_BASELINE_MODEL_ID);
   const opusInputPrice = opusPricing?.inputPrice ?? BASELINE_INPUT_PRICE;
   const opusOutputPrice = opusPricing?.outputPrice ?? BASELINE_OUTPUT_PRICE;
   const baselineInput = (estimatedInputTokens / 1_000_000) * opusInputPrice;

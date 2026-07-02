@@ -14,6 +14,15 @@ export type ExtendedModelDefinition = ModelDefinitionConfig & {
   useMaxCompletionTokens?: boolean;
 };
 
+export class UnknownModelError extends Error {
+  readonly code = "UNKNOWN_MODEL";
+
+  constructor(modelId: string) {
+    super(`Unknown model id: ${modelId}`);
+    this.name = "UnknownModelError";
+  }
+}
+
 export const BLOCKRUN_MODELS: ExtendedModelDefinition[] = [
   // ═══════════════════════════════════════════
   //  api.openai-proxy.org
@@ -159,12 +168,23 @@ export const MODEL_ALIASES: Record<string, string> = {
   gpt: "gpt-4o", gpt4: "gpt-4o", mini: "gpt-4o-mini",
   o1: "o3", o3: "o3", o4: "o4-mini", nano: "gpt-4.1-nano",
   "gpt-5": "gpt-5.5", "gpt-5.5": "gpt-5.5",
+  "openai/gpt-4o": "gpt-4o", "openai/gpt-4o-mini": "gpt-4o-mini",
+  "openai/gpt-4.1": "gpt-4.1", "openai/gpt-4.1-mini": "gpt-4.1-mini",
+  "openai/gpt-4.1-nano": "gpt-4.1-nano", "openai/o3": "o3", "openai/o4-mini": "o4-mini",
   // Anthropic
   claude: "claude-sonnet-4-20250514", sonnet: "claude-sonnet-4-20250514",
   "claude-sonnet": "claude-sonnet-4-20250514", "claude-opus": "claude-opus-4-8",
   opus: "claude-opus-4-8", fable: "claude-fable-5",
+  "anthropic/claude-sonnet-4": "claude-sonnet-4-20250514",
+  "anthropic/claude-sonnet-4-20250514": "claude-sonnet-4-20250514",
+  "anthropic/claude-opus-4": "claude-opus-4-20250514",
+  "anthropic/claude-opus-4.7": "claude-opus-4-7",
+  "anthropic/claude-opus-4.8": "claude-opus-4-8",
+  "anthropic/claude-opus-4-7": "claude-opus-4-7",
+  "anthropic/claude-opus-4-8": "claude-opus-4-8",
   // Google
   gemini: "gemini-2.5-flash", flash: "gemini-2.5-flash", pro: "gemini-2.5-pro",
+  "google/gemini-2.5-flash": "gemini-2.5-flash", "google/gemini-2.5-pro": "gemini-2.5-pro",
   // DeepSeek
   deepseek: "deepseek-v4-flash", "deepseek-chat": "deepseek-v4-flash",
   "deepseek-pro": "deepseek-v4-pro", "deepseek-r1": "deepseek/deepseek-r1",
@@ -188,12 +208,18 @@ export function resolveModelAlias(model: string): string {
   return MODEL_ALIASES[lower] ?? lower;
 }
 
+export function getModelDefinition(modelId: string): ExtendedModelDefinition | undefined {
+  return BLOCKRUN_MODELS.find((m) => m.id === modelId);
+}
+
 export function getUpstream(modelId: string): UpstreamProvider {
-  return BLOCKRUN_MODELS.find((m) => m.id === modelId)?.upstream ?? "proxy";
+  const model = getModelDefinition(modelId);
+  if (!model) throw new UnknownModelError(modelId);
+  return model.upstream;
 }
 
 export function usesMaxCompletionTokens(modelId: string): boolean {
-  return BLOCKRUN_MODELS.find((m) => m.id === modelId)?.useMaxCompletionTokens ?? false;
+  return getModelDefinition(modelId)?.useMaxCompletionTokens ?? false;
 }
 
 export function buildProviderModels(baseUrl: string): ModelProviderConfig {
@@ -204,13 +230,13 @@ export function supportsToolCalling(modelId: string): boolean {
   return !new Set(["liquid/lfm-2.5-1.2b-thinking:free"]).has(modelId);
 }
 export function supportsVision(modelId: string): boolean {
-  return BLOCKRUN_MODELS.find((m) => m.id === modelId)?.input.includes("image") ?? false;
+  return getModelDefinition(modelId)?.input.includes("image") ?? false;
 }
 export function isReasoningModel(modelId: string): boolean {
-  return BLOCKRUN_MODELS.find((m) => m.id === modelId)?.reasoning ?? false;
+  return getModelDefinition(modelId)?.reasoning ?? false;
 }
 export function getModelContextWindow(modelId: string): number | undefined {
-  return BLOCKRUN_MODELS.find((m) => m.id === modelId)?.contextWindow;
+  return getModelDefinition(modelId)?.contextWindow;
 }
 export function isAgenticModel(modelId: string): boolean {
   return ["gpt-4o", "gpt-4.1", "claude-sonnet-4-20250514", "claude-sonnet-5", "deepseek-v4-pro", "meta-llama/llama-4-maverick"].includes(modelId);

@@ -356,6 +356,28 @@ type OpenClawPluginDefinition = {
 };
 
 /**
+ * Model Definitions — Dual Upstream (2026-07-02 updated)
+ *
+ * "proxy": api.openai-proxy.org (OpenAI, Anthropic, Google, DeepSeek, Kimi, Qwen, GLM)
+ * "openrouter": openrouter.ai (DeepSeek, Meta, Qwen, Grok, free models)
+ */
+
+type UpstreamProvider = "proxy" | "openrouter";
+type ExtendedModelDefinition = ModelDefinitionConfig & {
+    upstream: UpstreamProvider;
+    useMaxCompletionTokens?: boolean;
+};
+declare const BLOCKRUN_MODELS: ExtendedModelDefinition[];
+declare const OPENCLAW_MODELS: ExtendedModelDefinition[];
+declare const MODEL_ALIASES: Record<string, string>;
+declare function resolveModelAlias(model: string): string;
+declare function buildProviderModels(baseUrl: string): ModelProviderConfig;
+declare function supportsToolCalling(modelId: string): boolean;
+declare function supportsVision(modelId: string): boolean;
+declare function isReasoningModel(modelId: string): boolean;
+declare function getModelContextWindow(modelId: string): number | undefined;
+
+/**
  * Tier → Model Selection
  *
  * Maps a classification tier to the cheapest capable model.
@@ -372,7 +394,11 @@ type ModelPricing = {
  * Get the ordered fallback chain for a tier: [primary, ...fallbacks].
  */
 declare function getFallbackChain(tier: Tier, tierConfigs: Record<Tier, TierConfig>): string[];
-declare function calculateModelCost(model: string, modelPricing: Map<string, ModelPricing>, estimatedInputTokens: number, maxOutputTokens: number, routingProfile?: "free" | "eco" | "auto" | "premium"): {
+/**
+ * Calculate cost for a specific model (used when fallback model is used).
+ * Returns updated cost fields for RoutingDecision.
+ */
+declare function calculateModelCost(model: string, modelPricing: Map<string, ModelPricing>, estimatedInputTokens: number, maxOutputTokens: number, routingProfile?: "free" | "eco" | "auto" | "premium", platformMarkupPercent?: number): {
     costEstimate: number;
     baselineCost: number;
     savings: number;
@@ -728,19 +754,6 @@ declare function getSessionId(headers: Record<string, string | string[] | undefi
  */
 declare function hashRequestContent(lastUserContent: string, toolCallNames?: string[]): string;
 
-/**
- * OpenRouter Smart Proxy
- *
- * Local proxy that intercepts OpenAI-compatible requests, applies smart routing,
- * and forwards to OpenRouter with API key authentication.
- *
- * Flow:
- *   Client → http://localhost:8402/v1/chat/completions
- *        → smart routing picks cheapest capable model
- *        → proxy forwards to https://openrouter.ai/api/v1/chat/completions
- *        → streams response back to client
- */
-
 type ProxyOptions = {
     apiKey: string;
     port?: number;
@@ -780,28 +793,6 @@ declare function saveApiKey(key: string): void;
  */
 
 declare const blockrunProvider: ProviderPlugin;
-
-/**
- * Model Definitions — Dual Upstream (2026-07-02 updated)
- *
- * "proxy": api.openai-proxy.org (OpenAI, Anthropic, Google, DeepSeek, Kimi, Qwen, GLM)
- * "openrouter": openrouter.ai (DeepSeek, Meta, Qwen, Grok, free models)
- */
-
-type UpstreamProvider = "proxy" | "openrouter";
-type ExtendedModelDefinition = ModelDefinitionConfig & {
-    upstream: UpstreamProvider;
-    useMaxCompletionTokens?: boolean;
-};
-declare const BLOCKRUN_MODELS: ExtendedModelDefinition[];
-declare const OPENCLAW_MODELS: ExtendedModelDefinition[];
-declare const MODEL_ALIASES: Record<string, string>;
-declare function resolveModelAlias(model: string): string;
-declare function buildProviderModels(baseUrl: string): ModelProviderConfig;
-declare function supportsToolCalling(modelId: string): boolean;
-declare function supportsVision(modelId: string): boolean;
-declare function isReasoningModel(modelId: string): boolean;
-declare function getModelContextWindow(modelId: string): number | undefined;
 
 /**
  * Usage Logger

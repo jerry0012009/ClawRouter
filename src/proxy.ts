@@ -13,6 +13,7 @@
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
+import { createHash, randomUUID } from "node:crypto";
 import {
   route,
   getFallbackChain,
@@ -36,6 +37,7 @@ import {
   isReasoningModel,
   supportsToolCalling as modelSupportsToolCalling,
   getUpstream,
+  UnknownModelError,
   usesMaxCompletionTokens,
   supportsVision as modelSupportsVision,
 } from "./models.js";
@@ -55,8 +57,17 @@ import {
   listRecent,
   summarizeRequest,
 } from "./response-store.js";
+import {
+  appendLedgerEntry,
+  clearLedger,
+  getLedgerEntries,
+  getLedgerSummary,
+  type AcuLedgerEntry,
+} from "./ledger.js";
+import { validateAssistantOutput, type ValidatorResult } from "./validator/index.js";
 
-const OPENROUTER_API = "https://openrouter.ai/api/v1";
+export const DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
+export const DEFAULT_PROXY_BASE_URL = "https://api.openai-proxy.org/v1";
 
 const HEARTBEAT_INTERVAL_MS = 2_000;
 const DEFAULT_REQUEST_TIMEOUT_MS = 300_000;
@@ -66,6 +77,8 @@ const MAX_FALLBACK_ATTEMPTS = 5;
 const RATE_LIMIT_COOLDOWN_MS = 60_000;
 const OVERLOAD_COOLDOWN_MS = 15_000;
 const MAX_MESSAGES = 200;
+const ACU_PREFIX = "/acu-router";
+const DEFAULT_BASELINE_MODEL = "claude-opus-4-7";
 
 // ── Routing profile virtual models ──
 const ROUTING_PROFILES = new Set(["auto", "eco", "premium"]);
@@ -146,6 +159,183 @@ function categorizeError(status: number, body: string): ErrorCategory | null {
   return null;
 }
 
+type AcuAttemptTrace = {
+  model: string;
+  upstream: string;
+  status: "success" | "error" | "timeout" | "skipped";
+  error_category?: string;
+  latency_ms: number;
+};
+
+type AcuTrace = {
+  request_id: string;
+  profile: string;
+  tier: string;
+  score?: number;
+  confidence: number;
+  method: string;
+  signals: string[];
+  agentic_score?: number;
+  selected_model: string;
+  actual_model_used: string;
+  upstream: string;
+  fallback_chain: string[];
+  attempts: AcuAttemptTrace[];
+  estimated_input_tokens: number;
+  estimated_output_tokens: number;
+  estimated_cost: number;
+  baseline_model: string;
+  baseline_cost: number;
+  estimated_savings: number;
+  route_reasoning: string;
+  validator_result: ValidatorResult["result"];
+  validator_pass?: boolean;
+  validator_reason?: string;
+};
+
+function stripAcuPrefix(url: string | undefined): string {
+  if (!url?.startsWith(ACU_PREFIX)) return url || "/";
+  const stripped = url.slice(ACU_PREFIX.length);
+  if (!stripped) return "/";
+  if (stripped.startsWith("?")) return `/${stripped}`;
+  return stripped;
+}
+
+function getPathname(url: string): string {
+  return new URL(url, "http://localhost").pathname;
+}
+
+function hashPrompt(messages: ChatMessage[]): string {
+  const text = messages.map((message) => JSON.stringify(message.content ?? "")).join("\n");
+  return createHash("sha256").update(text).digest("hex").slice(0, 24);
+}
+
+function detectTaskType(messages: ChatMessage[]): string {
+  const text = messages.map((message) => {
+    if (typeof message.content === "string") return message.content;
+    return JSON.stringify(message.content ?? "");
+  }).join("\n").toLowerCase();
+  if (/\bjson\b|schema|extract|字段|结构化|提取/.test(text)) return "structured_extraction";
+  if (/fix|bug|error|stack trace|代码|报错|修复/.test(text)) return "code_fix";
+  if (/summary|summarize|abstract|摘要|总结/.test(text)) return "summary";
+  if (/reason|compare|prove|design|推理|比较|证明|设计/.test(text)) return "reasoning";
+  if (/email|邮件|投资人|investor/.test(text)) return "writing";
+  return "general";
+}
+
+function extractAssistantText(responseBody: string): string {
+  try {
+    const parsed = JSON.parse(responseBody) as {
+      choices?: Array<{ message?: { content?: unknown } }>;
+    };
+    const content = parsed.choices?.[0]?.message?.content;
+    return typeof content === "string" ? content : "";
+  } catch {
+    return "";
+  }
+}
+
+function parseUsage(responseBody: string, estimatedInputTokens: number, estimatedOutputTokens: number) {
+  try {
+    const parsed = JSON.parse(responseBody) as {
+      usage?: {
+        prompt_tokens?: number;
+        completion_tokens?: number;
+        input_tokens?: number;
+        output_tokens?: number;
+      };
+    };
+    return {
+      inputTokens: parsed.usage?.prompt_tokens ?? parsed.usage?.input_tokens ?? estimatedInputTokens,
+      outputTokens: parsed.usage?.completion_tokens ?? parsed.usage?.output_tokens ?? estimatedOutputTokens,
+    };
+  } catch {
+    return { inputTokens: estimatedInputTokens, outputTokens: estimatedOutputTokens };
+  }
+}
+
+function injectTraceIntoJsonResponse(responseBody: string, trace: AcuTrace): string {
+  try {
+    const parsed = JSON.parse(responseBody) as Record<string, unknown>;
+    parsed.acu_trace = trace;
+    return JSON.stringify(parsed);
+  } catch {
+    return responseBody;
+  }
+}
+
+function selectQualityFallbackModel(
+  routingDecision: RoutingDecision | undefined,
+  routingConfig: RoutingConfig,
+  actualModelUsed: string,
+  modelsTried: string[],
+): string | undefined {
+  if (!routingDecision) return undefined;
+  const premiumTiers = routingConfig.premiumTiers ?? routingConfig.tiers;
+  const premiumChain = getFallbackChain(routingDecision.tier, premiumTiers);
+  return premiumChain.find((model) => model !== actualModelUsed && !modelsTried.includes(model));
+}
+
+async function fetchUpstreamChatCompletion(args: {
+  body: Buffer;
+  model: string;
+  apiKey: string;
+  proxyApiKey?: string;
+  proxyBaseUrl?: string;
+  signal: AbortSignal;
+}): Promise<{ response: Response; upstreamProvider: string; requestBody: Buffer }> {
+  const upstreamProvider = getUpstream(args.model);
+  const isOpenRouter = upstreamProvider === "openrouter";
+  const baseUrl = isOpenRouter
+    ? process.env.OPENROUTER_BASE_URL?.trim() || DEFAULT_OPENROUTER_BASE_URL
+    : (args.proxyBaseUrl || process.env.PROXY_BASE_URL?.trim() || DEFAULT_PROXY_BASE_URL);
+  const fetchApiKey = isOpenRouter ? args.apiKey : (args.proxyApiKey || args.apiKey);
+  const upstreamUrl = `${baseUrl}/chat/completions`;
+
+  const reqParsed = JSON.parse(args.body.toString()) as Record<string, unknown>;
+  reqParsed.model = args.model;
+  if (usesMaxCompletionTokens(args.model) && reqParsed.max_tokens) {
+    reqParsed.max_completion_tokens = reqParsed.max_tokens;
+    delete reqParsed.max_tokens;
+  }
+
+  const requestBody = Buffer.from(JSON.stringify(reqParsed));
+  const upstreamHeaders: Record<string, string> = {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${fetchApiKey}`,
+    "User-Agent": USER_AGENT,
+  };
+  if (isOpenRouter) {
+    upstreamHeaders["HTTP-Referer"] = "http://localhost:8402";
+    upstreamHeaders["X-Title"] = "ClawRouter";
+  }
+
+  const response = await fetch(upstreamUrl, {
+    method: "POST",
+    headers: upstreamHeaders,
+    body: requestBody,
+    signal: args.signal,
+  });
+  return { response, upstreamProvider, requestBody };
+}
+
+async function readResponseText(response: Response): Promise<string> {
+  const chunks: Uint8Array[] = [];
+  const reader = response.body?.getReader();
+  if (reader) {
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+      }
+    } catch {
+      // Best effort; callers handle malformed/empty bodies.
+    }
+  }
+  return Buffer.concat(chunks).toString();
+}
+
 // ── Types ──
 
 export type ProxyOptions = {
@@ -184,10 +374,51 @@ function buildModelPricing(): Map<string, ModelPricing> {
 export function buildProxyModelList() {
   return BLOCKRUN_MODELS.map((m) => ({
     id: m.id,
+    name: m.name,
     object: "model" as const,
     created: 1700000000,
-    owned_by: "openrouter",
+    owned_by: m.upstream,
+    upstream: m.upstream,
+    pricing: {
+      prompt: m.cost.input,
+      completion: m.cost.output,
+      cache_read: m.cost.cacheRead,
+      cache_write: m.cost.cacheWrite,
+    },
+    context_length: m.contextWindow,
+    max_completion_tokens: m.maxTokens,
+    capabilities: {
+      reasoning: m.reasoning,
+      vision: m.input.includes("image"),
+      tool_calling: modelSupportsToolCalling(m.id),
+    },
   }));
+}
+
+export function validateRoutingConfigModels(
+  config: RoutingConfig,
+  models = BLOCKRUN_MODELS,
+): void {
+  const knownModels = new Set(models.map((m) => m.id));
+  const missing: string[] = [];
+
+  const validateTierSet = (label: string, tiers: RoutingConfig["tiers"] | null | undefined) => {
+    if (!tiers) return;
+    for (const [tier, tierConfig] of Object.entries(tiers)) {
+      for (const modelId of [tierConfig.primary, ...tierConfig.fallback]) {
+        if (!knownModels.has(modelId)) missing.push(`${label}.${tier}: ${modelId}`);
+      }
+    }
+  };
+
+  validateTierSet("tiers", config.tiers);
+  validateTierSet("ecoTiers", config.ecoTiers);
+  validateTierSet("premiumTiers", config.premiumTiers);
+  validateTierSet("agenticTiers", config.agenticTiers);
+
+  if (missing.length > 0) {
+    throw new Error(`Routing config references unknown model IDs:\n${missing.join("\n")}`);
+  }
 }
 
 // ── Merge user routing config with defaults ──
@@ -241,7 +472,9 @@ function normalizeMessagesForGoogle(messages: ChatMessage[]): ChatMessage[] {
 export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
   const apiKey = options.apiKey;
   const port = options.port ?? PROXY_PORT;
+  let boundPort = port;
   const routingConfig = mergeRoutingConfig(options.routingConfig);
+  validateRoutingConfigModels(routingConfig);
   const modelPricing = buildModelPricing();
   const routerOpts: RouterOptions = { config: routingConfig, modelPricing };
 
@@ -273,6 +506,8 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
         server.once("error", reject);
         server.listen(port, "127.0.0.1", () => {
           server.removeListener("error", reject);
+          const address = server.address() as AddressInfo | null;
+          boundPort = address?.port ?? port;
           resolve();
         });
       });
@@ -287,12 +522,12 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
     }
   }
 
-  console.log(`[ClawRouter] v${VERSION} listening on http://127.0.0.1:${port}`);
-  console.log(`[ClawRouter] Routing via OpenRouter (${BLOCKRUN_MODELS.length} models)`);
+  console.log(`[ClawRouter] v${VERSION} listening on http://127.0.0.1:${boundPort}`);
+  console.log(`[ClawRouter] Routing via dual upstreams (${BLOCKRUN_MODELS.length} models)`);
 
   return {
-    port,
-    baseUrl: `http://127.0.0.1:${port}`,
+    port: boundPort,
+    baseUrl: `http://127.0.0.1:${boundPort}`,
     close: () => new Promise((resolve) => server.close(() => resolve())),
   };
 }
@@ -315,22 +550,25 @@ async function handleRequest(
     onRouted?: (decision: RoutingDecision) => void;
   },
 ): Promise<void> {
+  req.url = stripAcuPrefix(req.url);
+  const pathname = getPathname(req.url);
+
   // ── Health check ──
-  if (req.url === "/health") {
+  if (pathname === "/health") {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ status: "ok", version: VERSION, models: BLOCKRUN_MODELS.length }));
     return;
   }
 
   // ── Cache stats ──
-  if (req.url === "/cache") {
+  if (pathname === "/cache") {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify(ctx.responseCache.getStats(), null, 2));
     return;
   }
 
   // ── Stats ──
-  if (req.url?.startsWith("/stats")) {
+  if (pathname === "/stats") {
     try {
       const url = new URL(req.url, "http://localhost");
       const days = parseInt(url.searchParams.get("days") || "7", 10);
@@ -350,15 +588,43 @@ async function handleRequest(
     return;
   }
 
+  // ── ACU Ledger ──
+  if (pathname === "/ledger" || pathname === "/ledger/summary") {
+    try {
+      const url = new URL(req.url, "http://localhost");
+      const days = Math.min(parseInt(url.searchParams.get("days") || "7", 10), 30);
+      if (req.method === "DELETE" && pathname === "/ledger") {
+        const result = await clearLedger();
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ cleared: true, deletedFiles: result.deletedFiles }));
+      } else if (req.method === "GET" && pathname === "/ledger/summary") {
+        const summary = await getLedgerSummary(days);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(summary, null, 2));
+      } else if (req.method === "GET" && pathname === "/ledger") {
+        const entries = await getLedgerEntries(days);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ object: "list", data: entries }, null, 2));
+      } else {
+        res.writeHead(405, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "method_not_allowed" }));
+      }
+    } catch (err) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: String(err) }));
+    }
+    return;
+  }
+
   // ── /v1/models ──
-  if (req.url === "/v1/models" && req.method === "GET") {
+  if (pathname === "/v1/models" && req.method === "GET") {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ object: "list", data: buildProxyModelList() }));
     return;
   }
 
   // ── Share routes ──
-  if (req.url?.startsWith("/share/") && req.method === "GET") {
+  if (pathname.startsWith("/share/") && req.method === "GET") {
     try {
       const url = new URL(req.url, "http://localhost");
       if (url.pathname === "/share/list") {
@@ -383,13 +649,15 @@ async function handleRequest(
   // ── Only handle chat completions from here ──
 
   // ── Static file serving (frontend) ──
-  if (req.method === "GET" && (req.url === "/" || req.url === "/index.html" || req.url?.startsWith("/public/"))) {
+  if (req.method === "GET" && (pathname === "/" || pathname === "/index.html" || pathname.startsWith("/public/"))) {
     const { readFileSync, existsSync } = await import("node:fs");
     const { join, dirname } = await import("node:path");
     const { fileURLToPath } = await import("node:url");
     const __dirname = dirname(fileURLToPath(import.meta.url));
     const publicDir = join(__dirname, "..", "public");
-    const filePath = req.url === "/" ? join(publicDir, "index.html") : join(publicDir, req.url!.replace("/public/", ""));
+    const filePath = pathname === "/" || pathname === "/index.html"
+      ? join(publicDir, "index.html")
+      : join(publicDir, pathname.replace("/public/", ""));
     if (existsSync(filePath)) {
       const ext = filePath.split(".").pop() || "html";
       const mime: Record<string, string> = { html: "text/html", css: "text/css", js: "application/javascript", json: "application/json", png: "image/png", svg: "image/svg+xml" };
@@ -398,14 +666,16 @@ async function handleRequest(
       return;
     }
   }
-  if (!req.url?.includes("/chat/completions")) {
+  if (!pathname.includes("/chat/completions")) {
     res.writeHead(404, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ error: { message: `Not found: ${req.url}`, type: "not_found" } }));
     return;
   }
 
   const startTime = Date.now();
-  const debugMode = req.headers["x-clawrouter-debug"] !== "false";
+  const requestId = randomUUID();
+  const debugHeader = req.headers["x-acu-debug"] ?? req.headers["x-clawrouter-debug"];
+  const debugMode = debugHeader !== "false";
 
   // Collect body
   const bodyChunks: Buffer[] = [];
@@ -440,16 +710,19 @@ async function handleRequest(
   let hasTools = false;
   let hasVision = false;
   let bodyModified = false;
-  const isChatCompletion = true;
   const sessionId = getSessionId(req.headers as Record<string, string | string[] | undefined>);
   let effectiveSessionId: string | undefined = sessionId;
   const parsedMessages: ChatMessage[] = [];
+  let responseFormat: unknown;
+  let expectedSchema: unknown;
 
   try {
     const parsed = JSON.parse(body.toString()) as Record<string, unknown>;
     isStreaming = parsed.stream === true;
     modelId = (parsed.model as string) || "";
     maxTokens = (parsed.max_tokens as number) || 4096;
+    responseFormat = parsed.response_format;
+    expectedSchema = parsed.expected_schema;
 
     const messages = Array.isArray(parsed.messages) ? (parsed.messages as ChatMessage[]) : [];
     parsedMessages.push(...messages);
@@ -626,12 +899,16 @@ async function handleRequest(
   let upstream: Response | undefined;
   let actualModelUsed = modelId;
   let lastError: { body: string; status: number } | undefined;
+  let lastErrorCategory: string | undefined;
+  let upstreamProviderUsed = "";
+  const attempts: AcuAttemptTrace[] = [];
 
   for (let i = 0; i < modelsToTry.length; i++) {
     const tryModel = modelsToTry[i];
     if (globalController.signal.aborted) break;
 
     console.log(`[ClawRouter] Trying ${i + 1}/${modelsToTry.length}: ${tryModel}`);
+    const attemptStart = Date.now();
 
     const perAttemptTimeout = timeoutForModel(tryModel);
     const modelController = new AbortController();
@@ -639,51 +916,39 @@ async function handleRequest(
     const combinedSignal = AbortSignal.any([globalController.signal, modelController.signal]);
 
     try {
-      // Dual-upstream routing
-      const upstreamProvider = getUpstream(tryModel);
-      const isOpenRouter = upstreamProvider === "openrouter";
-      const baseUrl = isOpenRouter ? "https://openrouter.ai/api/v1" : (ctx.proxyBaseUrl || "https://api.openai-proxy.org/v1");
-      const fetchApiKey = isOpenRouter ? ctx.apiKey : (ctx.proxyApiKey || ctx.apiKey);
-      const upstreamUrl = `${baseUrl}/chat/completions`;
-
-      // Update model in body
-      const reqParsed = JSON.parse(body.toString());
-      reqParsed.model = tryModel;
-
-      // Handle max_completion_tokens for o-series models
-      if (usesMaxCompletionTokens(tryModel) && reqParsed.max_tokens) {
-        reqParsed.max_completion_tokens = reqParsed.max_tokens;
-        delete reqParsed.max_tokens;
-      }
-
-      const reqBody = Buffer.from(JSON.stringify(reqParsed));
-
-      const upstreamHeaders: Record<string, string> = {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${fetchApiKey}`,
-        "User-Agent": USER_AGENT,
-      };
-      if (isOpenRouter) {
-        upstreamHeaders["HTTP-Referer"] = "http://localhost:8402";
-        upstreamHeaders["X-Title"] = "ClawRouter";
-      }
-
-      const response = await fetch(upstreamUrl, {
-        method: "POST",
-        headers: upstreamHeaders,
-        body: reqBody,
+      const { response, upstreamProvider } = await fetchUpstreamChatCompletion({
+        body,
+        model: tryModel,
+        apiKey: ctx.apiKey,
+        proxyApiKey: ctx.proxyApiKey,
+        proxyBaseUrl: ctx.proxyBaseUrl,
         signal: combinedSignal,
       });
       if (response.status === 200) {
         upstream = response;
         actualModelUsed = tryModel;
+        upstreamProviderUsed = upstreamProvider;
+        attempts.push({
+          model: tryModel,
+          upstream: upstreamProvider,
+          status: "success",
+          latency_ms: Date.now() - attemptStart,
+        });
         break;
       }
 
       // Handle errors
       const errorBody = await response.text().catch(() => "");
       const category = categorizeError(response.status, errorBody);
+      lastErrorCategory = category ?? "upstream_error";
       lastError = { body: errorBody, status: response.status };
+      attempts.push({
+        model: tryModel,
+        upstream: upstreamProvider,
+        status: "error",
+        error_category: lastErrorCategory,
+        latency_ms: Date.now() - attemptStart,
+      });
 
       if (category === "rate_limited") {
         markRateLimited(tryModel);
@@ -698,11 +963,40 @@ async function handleRequest(
     } catch (err) {
       clearTimeout(modelTimeoutId);
       if (globalController.signal.aborted) break;
+      if (err instanceof UnknownModelError) {
+        lastError = { body: err.message, status: 500 };
+        lastErrorCategory = "unknown_model";
+        attempts.push({
+          model: tryModel,
+          upstream: "unknown",
+          status: "skipped",
+          error_category: lastErrorCategory,
+          latency_ms: Date.now() - attemptStart,
+        });
+        console.error(`[ClawRouter] ${err.message}; skipping fallback candidate`);
+        continue;
+      }
       if (modelController.signal.aborted && i < modelsToTry.length - 1) {
+        lastErrorCategory = "timeout";
+        attempts.push({
+          model: tryModel,
+          upstream: "unknown",
+          status: "timeout",
+          error_category: lastErrorCategory,
+          latency_ms: Date.now() - attemptStart,
+        });
         console.log(`[ClawRouter] ${tryModel} timed out, trying fallback`);
         continue;
       }
       lastError = { body: String(err), status: 500 };
+      lastErrorCategory = "server_error";
+      attempts.push({
+        model: tryModel,
+        upstream: "unknown",
+        status: "error",
+        error_category: lastErrorCategory,
+        latency_ms: Date.now() - attemptStart,
+      });
     }
   }
 
@@ -793,6 +1087,162 @@ async function handleRequest(
     }
     responseBody = Buffer.concat(chunks).toString();
 
+    if (!isStreaming) {
+      let validator = validateAssistantOutput({
+        messages: parsedMessages,
+        assistantText: extractAssistantText(responseBody),
+        responseFormat,
+        expectedSchema,
+      });
+      let qualityFallbackUsed = false;
+
+      if (validator.result === "fail" && routingDecision) {
+        const qualityFallbackModel = selectQualityFallbackModel(
+          routingDecision,
+          ctx.routerOpts.config,
+          actualModelUsed,
+          attempts.map((attempt) => attempt.model),
+        );
+        if (qualityFallbackModel) {
+          const qualityStart = Date.now();
+          const qualityController = new AbortController();
+          const qualityTimeout = setTimeout(() => qualityController.abort(), timeoutForModel(qualityFallbackModel));
+          try {
+            const { response, upstreamProvider } = await fetchUpstreamChatCompletion({
+              body,
+              model: qualityFallbackModel,
+              apiKey: ctx.apiKey,
+              proxyApiKey: ctx.proxyApiKey,
+              proxyBaseUrl: ctx.proxyBaseUrl,
+              signal: AbortSignal.any([globalController.signal, qualityController.signal]),
+            });
+            if (response.status === 200) {
+              responseBody = await readResponseText(response);
+              actualModelUsed = qualityFallbackModel;
+              upstreamProviderUsed = upstreamProvider;
+              qualityFallbackUsed = true;
+              attempts.push({
+                model: qualityFallbackModel,
+                upstream: upstreamProvider,
+                status: "success",
+                latency_ms: Date.now() - qualityStart,
+              });
+              validator = validateAssistantOutput({
+                messages: parsedMessages,
+                assistantText: extractAssistantText(responseBody),
+                responseFormat,
+                expectedSchema,
+              });
+            } else {
+              const errorBody = await response.text().catch(() => "");
+              const category = categorizeError(response.status, errorBody) ?? "validation_fallback_error";
+              lastErrorCategory = category;
+              attempts.push({
+                model: qualityFallbackModel,
+                upstream: upstreamProvider,
+                status: "error",
+                error_category: category,
+                latency_ms: Date.now() - qualityStart,
+              });
+            }
+          } catch (err) {
+            const category = qualityController.signal.aborted ? "timeout" : "validation_fallback_error";
+            lastErrorCategory = category;
+            attempts.push({
+              model: qualityFallbackModel,
+              upstream: "unknown",
+              status: qualityController.signal.aborted ? "timeout" : "error",
+              error_category: category,
+              latency_ms: Date.now() - qualityStart,
+            });
+          } finally {
+            clearTimeout(qualityTimeout);
+          }
+        }
+      }
+
+      const latencyMs = Date.now() - startTime;
+      const estimatedInputTokens = Math.ceil(body.length / 4);
+      const usage = parseUsage(responseBody, estimatedInputTokens, maxTokens);
+      let costEstimate = 0;
+      let baselineCost = 0;
+      let savings = 0;
+
+      if (routingDecision) {
+        if (actualModelUsed !== routingDecision.model) {
+          const costs = calculateModelCost(actualModelUsed, ctx.routerOpts.modelPricing, usage.inputTokens, usage.outputTokens, routingProfile ?? undefined);
+          costEstimate = costs.costEstimate;
+          baselineCost = costs.baselineCost;
+          savings = costs.savings;
+        } else {
+          const costs = calculateModelCost(actualModelUsed, ctx.routerOpts.modelPricing, usage.inputTokens, usage.outputTokens, routingProfile ?? undefined);
+          costEstimate = costs.costEstimate;
+          baselineCost = costs.baselineCost;
+          savings = costs.savings;
+        }
+      } else {
+        const costs = calculateModelCost(actualModelUsed, ctx.routerOpts.modelPricing, usage.inputTokens, usage.outputTokens);
+        costEstimate = costs.costEstimate;
+        baselineCost = costs.baselineCost;
+        savings = costs.savings;
+      }
+
+      const trace: AcuTrace = {
+        request_id: requestId,
+        profile: routingProfile ?? "explicit",
+        tier: routingDecision?.tier ?? "EXPLICIT",
+        confidence: routingDecision?.confidence ?? 1,
+        method: routingDecision?.method ?? "explicit",
+        signals: [],
+        ...(routingDecision?.agenticScore !== undefined && { agentic_score: routingDecision.agenticScore }),
+        selected_model: routingDecision?.model ?? modelId,
+        actual_model_used: actualModelUsed,
+        upstream: upstreamProviderUsed || getUpstream(actualModelUsed),
+        fallback_chain: modelsToTry,
+        attempts,
+        estimated_input_tokens: usage.inputTokens,
+        estimated_output_tokens: usage.outputTokens,
+        estimated_cost: costEstimate,
+        baseline_model: DEFAULT_BASELINE_MODEL,
+        baseline_cost: baselineCost,
+        estimated_savings: savings,
+        route_reasoning: routingDecision?.reasoning ?? "Explicit model request",
+        validator_result: validator.result,
+        validator_pass: validator.result === "pass",
+        ...(validator.reason && { validator_reason: validator.reason }),
+        ...(qualityFallbackUsed && { validator_reason: validator.reason ?? "quality_fallback" }),
+      };
+
+      if (debugMode) responseBody = injectTraceIntoJsonResponse(responseBody, trace);
+
+      const ledgerEntry: AcuLedgerEntry = {
+        request_id: requestId,
+        timestamp: new Date().toISOString(),
+        prompt_hash: hashPrompt(parsedMessages),
+        task_type: detectTaskType(parsedMessages),
+        profile: trace.profile,
+        tier: trace.tier,
+        method: trace.method,
+        selected_model: trace.selected_model,
+        actual_model_used: actualModelUsed,
+        upstream: trace.upstream,
+        input_tokens: usage.inputTokens,
+        output_tokens: usage.outputTokens,
+        estimated_cost: costEstimate,
+        actual_cost: costEstimate,
+        baseline_model: DEFAULT_BASELINE_MODEL,
+        baseline_cost: baselineCost,
+        savings: baselineCost - costEstimate,
+        latency_ms: latencyMs,
+        fallback_attempts: Math.max(0, attempts.length - 1),
+        validator_result: validator.result,
+        ...(validator.qualityScore !== undefined && { quality_score: validator.qualityScore }),
+        cache_hit: false,
+        ...(lastErrorCategory && { error_category: lastErrorCategory }),
+      };
+      await appendLedgerEntry(ledgerEntry);
+    }
+
     if (isStreaming && canWrite(res)) {
       // Convert non-streaming response to SSE format
       const parsed = JSON.parse(responseBody);
@@ -812,6 +1262,32 @@ async function handleRequest(
       // Send finish chunk
       const finishChunk = { ...chunk, choices: chunk.choices.map((c: Record<string, unknown>) => ({ ...c, delta: {}, finish_reason: "stop" })) };
       safeWrite(res, `data: ${JSON.stringify(finishChunk)}\n\n`);
+      if (debugMode) {
+        const estimatedInputTokens = Math.ceil(body.length / 4);
+        const costs = calculateModelCost(actualModelUsed, ctx.routerOpts.modelPricing, estimatedInputTokens, maxTokens, routingProfile ?? undefined);
+        const trace: AcuTrace = {
+          request_id: requestId,
+          profile: routingProfile ?? "explicit",
+          tier: routingDecision?.tier ?? "EXPLICIT",
+          confidence: routingDecision?.confidence ?? 1,
+          method: routingDecision?.method ?? "explicit",
+          signals: [],
+          selected_model: routingDecision?.model ?? modelId,
+          actual_model_used: actualModelUsed,
+          upstream: upstreamProviderUsed || getUpstream(actualModelUsed),
+          fallback_chain: modelsToTry,
+          attempts,
+          estimated_input_tokens: estimatedInputTokens,
+          estimated_output_tokens: maxTokens,
+          estimated_cost: costs.costEstimate,
+          baseline_model: DEFAULT_BASELINE_MODEL,
+          baseline_cost: costs.baselineCost,
+          estimated_savings: costs.savings,
+          route_reasoning: routingDecision?.reasoning ?? "Explicit model request",
+          validator_result: "not_applicable",
+        };
+        safeWrite(res, `event: acu_trace\ndata: ${JSON.stringify(trace)}\n\n`);
+      }
       safeWrite(res, "data: [DONE]\n\n");
     } else if (!isStreaming) {
       res.writeHead(200, { "Content-Type": "application/json" });

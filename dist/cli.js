@@ -3,6 +3,7 @@ import { createRequire as __cjs_createRequire } from 'node:module'; const requir
 
 // src/proxy.ts
 import { createServer } from "http";
+import { createHash as createHash4, randomUUID } from "crypto";
 
 // src/router/rules.ts
 function scoreTokenCount(estimatedTokens, thresholds) {
@@ -246,9 +247,10 @@ function calibrateConfidence(distance, steepness) {
 }
 
 // src/router/selector.ts
-var BASELINE_MODEL_ID = "anthropic/claude-opus-4.7";
+var DEFAULT_BASELINE_MODEL_ID = "claude-opus-4-7";
 var BASELINE_INPUT_PRICE = 5;
 var BASELINE_OUTPUT_PRICE = 25;
+var DEFAULT_PLATFORM_MARKUP_PERCENT = 0;
 function selectModel(tier, confidence, method, reasoning, tierConfigs, modelPricing, estimatedInputTokens, maxOutputTokens, routingProfile, agenticScore) {
   const tierConfig = tierConfigs[tier];
   const model = tierConfig.primary;
@@ -261,7 +263,7 @@ function selectModel(tier, confidence, method, reasoning, tierConfigs, modelPric
     const outputPrice = pricing?.outputPrice ?? 0;
     costEstimate = estimatedInputTokens / 1e6 * inputPrice + maxOutputTokens / 1e6 * outputPrice;
   }
-  const opusPricing = modelPricing.get(BASELINE_MODEL_ID);
+  const opusPricing = modelPricing.get(DEFAULT_BASELINE_MODEL_ID);
   const opusInputPrice = opusPricing?.inputPrice ?? BASELINE_INPUT_PRICE;
   const opusOutputPrice = opusPricing?.outputPrice ?? BASELINE_OUTPUT_PRICE;
   const baselineInput = estimatedInputTokens / 1e6 * opusInputPrice;
@@ -284,24 +286,20 @@ function getFallbackChain(tier, tierConfigs) {
   const config = tierConfigs[tier];
   return [config.primary, ...config.fallback];
 }
-var SERVER_MARGIN_PERCENT = 5;
-var MIN_PAYMENT_USD = 1e-3;
-function calculateModelCost(model, modelPricing, estimatedInputTokens, maxOutputTokens, routingProfile) {
+function calculateModelCost(model, modelPricing, estimatedInputTokens, maxOutputTokens, routingProfile, platformMarkupPercent = DEFAULT_PLATFORM_MARKUP_PERCENT) {
   const pricing = modelPricing.get(model);
   let costEstimate;
   if (pricing?.flatPrice !== void 0) {
-    costEstimate = Math.max(pricing.flatPrice * (1 + SERVER_MARGIN_PERCENT / 100), MIN_PAYMENT_USD);
+    costEstimate = pricing.flatPrice;
   } else {
     const inputPrice = pricing?.inputPrice ?? 0;
     const outputPrice = pricing?.outputPrice ?? 0;
     const inputCost = estimatedInputTokens / 1e6 * inputPrice;
     const outputCost = maxOutputTokens / 1e6 * outputPrice;
-    costEstimate = Math.max(
-      (inputCost + outputCost) * (1 + SERVER_MARGIN_PERCENT / 100),
-      MIN_PAYMENT_USD
-    );
+    costEstimate = inputCost + outputCost;
   }
-  const opusPricing = modelPricing.get(BASELINE_MODEL_ID);
+  costEstimate *= 1 + platformMarkupPercent / 100;
+  const opusPricing = modelPricing.get(DEFAULT_BASELINE_MODEL_ID);
   const opusInputPrice = opusPricing?.inputPrice ?? BASELINE_INPUT_PRICE;
   const opusOutputPrice = opusPricing?.outputPrice ?? BASELINE_OUTPUT_PRICE;
   const baselineInput = estimatedInputTokens / 1e6 * opusInputPrice;
@@ -1497,12 +1495,12 @@ var DEFAULT_ROUTING_CONFIG = {
       primary: "meta-llama/llama-3.3-70b-instruct",
       fallback: [
         "openai/gpt-oss-20b:free",
-        "nvidia/nemotron-nano-9b-v2:free",
+        "nvidia/nemotron-3-super-120b-a12b:free",
         "google/gemma-4-26b-a4b-it:free"
       ]
     },
     MEDIUM: {
-      primary: "qwen/qwen-2.5-72b-instruct",
+      primary: "qwen/qwen3-235b-a22b",
       fallback: [
         "deepseek/deepseek-chat-v3-0324",
         "meta-llama/llama-3.3-70b-instruct",
@@ -1513,7 +1511,7 @@ var DEFAULT_ROUTING_CONFIG = {
       primary: "deepseek/deepseek-chat-v3-0324",
       fallback: [
         "meta-llama/llama-4-maverick",
-        "qwen/qwen-2.5-72b-instruct",
+        "qwen/qwen3-235b-a22b",
         "nvidia/nemotron-3-super-120b-a12b:free"
       ]
     },
@@ -1521,7 +1519,7 @@ var DEFAULT_ROUTING_CONFIG = {
       primary: "liquid/lfm-2.5-1.2b-thinking:free",
       fallback: [
         "deepseek/deepseek-chat-v3-0324",
-        "qwen/qwen-2.5-72b-instruct"
+        "qwen/qwen3-235b-a22b"
       ]
     }
   },
@@ -1530,7 +1528,7 @@ var DEFAULT_ROUTING_CONFIG = {
     SIMPLE: {
       primary: "openai/gpt-oss-20b:free",
       fallback: [
-        "nvidia/nemotron-nano-9b-v2:free",
+        "nvidia/nemotron-3-super-120b-a12b:free",
         "google/gemma-4-26b-a4b-it:free",
         "google/gemma-4-31b-it:free"
       ]
@@ -1545,7 +1543,7 @@ var DEFAULT_ROUTING_CONFIG = {
     COMPLEX: {
       primary: "meta-llama/llama-3.3-70b-instruct",
       fallback: [
-        "qwen/qwen-2.5-72b-instruct",
+        "qwen/qwen3-235b-a22b",
         "nvidia/nemotron-3-super-120b-a12b:free"
       ]
     },
@@ -1560,15 +1558,15 @@ var DEFAULT_ROUTING_CONFIG = {
   premiumTiers: {
     SIMPLE: {
       primary: "meta-llama/llama-4-maverick",
-      fallback: ["deepseek/deepseek-chat-v3-0324", "qwen/qwen-2.5-72b-instruct"]
+      fallback: ["deepseek/deepseek-chat-v3-0324", "qwen/qwen3-235b-a22b"]
     },
     MEDIUM: {
       primary: "deepseek/deepseek-chat-v3-0324",
-      fallback: ["meta-llama/llama-4-maverick", "qwen/qwen-2.5-72b-instruct"]
+      fallback: ["meta-llama/llama-4-maverick", "qwen/qwen3-235b-a22b"]
     },
     COMPLEX: {
       primary: "deepseek/deepseek-chat-v3-0324",
-      fallback: ["meta-llama/llama-4-maverick", "qwen/qwen-2.5-72b-instruct"]
+      fallback: ["meta-llama/llama-4-maverick", "qwen/qwen3-235b-a22b"]
     },
     REASONING: {
       primary: "liquid/lfm-2.5-1.2b-thinking:free",
@@ -1579,15 +1577,15 @@ var DEFAULT_ROUTING_CONFIG = {
   agenticTiers: {
     SIMPLE: {
       primary: "meta-llama/llama-3.3-70b-instruct",
-      fallback: ["qwen/qwen-2.5-72b-instruct"]
+      fallback: ["qwen/qwen3-235b-a22b"]
     },
     MEDIUM: {
       primary: "deepseek/deepseek-chat-v3-0324",
-      fallback: ["meta-llama/llama-4-maverick", "qwen/qwen-2.5-72b-instruct"]
+      fallback: ["meta-llama/llama-4-maverick", "qwen/qwen3-235b-a22b"]
     },
     COMPLEX: {
       primary: "meta-llama/llama-4-maverick",
-      fallback: ["deepseek/deepseek-chat-v3-0324", "qwen/qwen-2.5-72b-instruct"]
+      fallback: ["deepseek/deepseek-chat-v3-0324", "qwen/qwen3-235b-a22b"]
     },
     REASONING: {
       primary: "deepseek/deepseek-chat-v3-0324",
@@ -1609,6 +1607,13 @@ function route(prompt, systemPrompt, maxOutputTokens, options) {
 }
 
 // src/models.ts
+var UnknownModelError = class extends Error {
+  code = "UNKNOWN_MODEL";
+  constructor(modelId) {
+    super(`Unknown model id: ${modelId}`);
+    this.name = "UnknownModelError";
+  }
+};
 var BLOCKRUN_MODELS = [
   // ═══════════════════════════════════════════
   //  api.openai-proxy.org
@@ -2147,6 +2152,13 @@ var MODEL_ALIASES = {
   nano: "gpt-4.1-nano",
   "gpt-5": "gpt-5.5",
   "gpt-5.5": "gpt-5.5",
+  "openai/gpt-4o": "gpt-4o",
+  "openai/gpt-4o-mini": "gpt-4o-mini",
+  "openai/gpt-4.1": "gpt-4.1",
+  "openai/gpt-4.1-mini": "gpt-4.1-mini",
+  "openai/gpt-4.1-nano": "gpt-4.1-nano",
+  "openai/o3": "o3",
+  "openai/o4-mini": "o4-mini",
   // Anthropic
   claude: "claude-sonnet-4-20250514",
   sonnet: "claude-sonnet-4-20250514",
@@ -2154,10 +2166,19 @@ var MODEL_ALIASES = {
   "claude-opus": "claude-opus-4-8",
   opus: "claude-opus-4-8",
   fable: "claude-fable-5",
+  "anthropic/claude-sonnet-4": "claude-sonnet-4-20250514",
+  "anthropic/claude-sonnet-4-20250514": "claude-sonnet-4-20250514",
+  "anthropic/claude-opus-4": "claude-opus-4-20250514",
+  "anthropic/claude-opus-4.7": "claude-opus-4-7",
+  "anthropic/claude-opus-4.8": "claude-opus-4-8",
+  "anthropic/claude-opus-4-7": "claude-opus-4-7",
+  "anthropic/claude-opus-4-8": "claude-opus-4-8",
   // Google
   gemini: "gemini-2.5-flash",
   flash: "gemini-2.5-flash",
   pro: "gemini-2.5-pro",
+  "google/gemini-2.5-flash": "gemini-2.5-flash",
+  "google/gemini-2.5-pro": "gemini-2.5-pro",
   // DeepSeek
   deepseek: "deepseek-v4-flash",
   "deepseek-chat": "deepseek-v4-flash",
@@ -2184,23 +2205,28 @@ function resolveModelAlias(model) {
   const lower = model.toLowerCase().trim();
   return MODEL_ALIASES[lower] ?? lower;
 }
+function getModelDefinition(modelId) {
+  return BLOCKRUN_MODELS.find((m) => m.id === modelId);
+}
 function getUpstream(modelId) {
-  return BLOCKRUN_MODELS.find((m) => m.id === modelId)?.upstream ?? "proxy";
+  const model = getModelDefinition(modelId);
+  if (!model) throw new UnknownModelError(modelId);
+  return model.upstream;
 }
 function usesMaxCompletionTokens(modelId) {
-  return BLOCKRUN_MODELS.find((m) => m.id === modelId)?.useMaxCompletionTokens ?? false;
+  return getModelDefinition(modelId)?.useMaxCompletionTokens ?? false;
 }
 function supportsToolCalling(modelId) {
   return !(/* @__PURE__ */ new Set(["liquid/lfm-2.5-1.2b-thinking:free"])).has(modelId);
 }
 function supportsVision(modelId) {
-  return BLOCKRUN_MODELS.find((m) => m.id === modelId)?.input.includes("image") ?? false;
+  return getModelDefinition(modelId)?.input.includes("image") ?? false;
 }
 function isReasoningModel(modelId) {
-  return BLOCKRUN_MODELS.find((m) => m.id === modelId)?.reasoning ?? false;
+  return getModelDefinition(modelId)?.reasoning ?? false;
 }
 function getModelContextWindow(modelId) {
-  return BLOCKRUN_MODELS.find((m) => m.id === modelId)?.contextWindow;
+  return getModelDefinition(modelId)?.contextWindow;
 }
 
 // src/logger.ts
@@ -3893,7 +3919,186 @@ async function listRecent(limit) {
   return store.slice(-limit);
 }
 
+// src/ledger.ts
+import { mkdir as mkdir2, readdir as readdir2, unlink as unlink2, appendFile as appendFile2 } from "fs/promises";
+import { join as join4 } from "path";
+import { homedir as homedir3 } from "os";
+var LEDGER_DIR = join4(homedir3(), ".claw-router", "ledger");
+async function ensureLedgerDir() {
+  await mkdir2(LEDGER_DIR, { recursive: true });
+}
+function ledgerFileFor(date) {
+  return join4(LEDGER_DIR, `${date}.jsonl`);
+}
+async function getLedgerFiles() {
+  try {
+    const files = await readdir2(LEDGER_DIR);
+    return files.filter((file) => file.endsWith(".jsonl")).sort().reverse();
+  } catch {
+    return [];
+  }
+}
+async function readLedgerFile(file) {
+  try {
+    const text = await readTextFile(join4(LEDGER_DIR, file));
+    return text.trim().split("\n").filter(Boolean).flatMap((line) => {
+      try {
+        return [JSON.parse(line)];
+      } catch {
+        return [];
+      }
+    });
+  } catch {
+    return [];
+  }
+}
+async function appendLedgerEntry(entry) {
+  try {
+    await ensureLedgerDir();
+    const date = entry.timestamp.slice(0, 10);
+    await appendFile2(ledgerFileFor(date), JSON.stringify(entry) + "\n");
+  } catch {
+  }
+}
+async function getLedgerEntries(days = 7) {
+  const files = (await getLedgerFiles()).slice(0, Math.max(1, Math.min(days, 30)));
+  const entries = [];
+  for (const file of files) entries.push(...await readLedgerFile(file));
+  return entries.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+}
+function addGroup(group, key, entry) {
+  if (!group[key]) group[key] = { count: 0, cost: 0, baseline_cost: 0, savings: 0 };
+  group[key].count++;
+  group[key].cost += entry.actual_cost;
+  group[key].baseline_cost += entry.baseline_cost;
+  group[key].savings += entry.savings;
+}
+async function getLedgerSummary(days = 7) {
+  const entries = await getLedgerEntries(days);
+  const by_model = {};
+  const by_tier = {};
+  const by_task_type = {};
+  let total_cost = 0;
+  let total_baseline_cost = 0;
+  let total_latency = 0;
+  let fallback_count = 0;
+  let validator_total = 0;
+  let validator_pass = 0;
+  for (const entry of entries) {
+    total_cost += entry.actual_cost;
+    total_baseline_cost += entry.baseline_cost;
+    total_latency += entry.latency_ms;
+    if (entry.fallback_attempts > 0) fallback_count++;
+    if (entry.validator_result !== "not_applicable") {
+      validator_total++;
+      if (entry.validator_result === "pass") validator_pass++;
+    }
+    addGroup(by_model, entry.actual_model_used || "unknown", entry);
+    addGroup(by_tier, entry.tier || "UNKNOWN", entry);
+    addGroup(by_task_type, entry.task_type || "unknown", entry);
+  }
+  const total_requests = entries.length;
+  return {
+    total_requests,
+    total_cost,
+    total_baseline_cost,
+    total_savings: total_baseline_cost - total_cost,
+    avg_latency_ms: total_requests > 0 ? total_latency / total_requests : 0,
+    fallback_rate: total_requests > 0 ? fallback_count / total_requests : 0,
+    validator_pass_rate: validator_total > 0 ? validator_pass / validator_total : 0,
+    by_model,
+    by_tier,
+    by_task_type,
+    recent: entries.slice(0, 10)
+  };
+}
+async function clearLedger() {
+  const files = await getLedgerFiles();
+  let deletedFiles = 0;
+  for (const file of files) {
+    try {
+      await unlink2(join4(LEDGER_DIR, file));
+      deletedFiles++;
+    } catch {
+    }
+  }
+  return { deletedFiles };
+}
+
+// src/validator/index.ts
+function textFromContent(content) {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content.map((part) => {
+    if (part && typeof part === "object" && "text" in part) {
+      const text = part.text;
+      return typeof text === "string" ? text : "";
+    }
+    return "";
+  }).join(" ");
+}
+function promptNeedsJsonValidation(messages, responseFormat, expectedSchema) {
+  if (responseFormat || expectedSchema) return true;
+  const prompt = messages.map((message) => textFromContent(message.content)).join("\n").toLowerCase();
+  return /\bjson\b|schema|structured|fields?|字段|结构化|表格|提取/.test(prompt);
+}
+function extractJsonCandidate(text) {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1]?.trim();
+  if (fenced) return fenced;
+  const firstObject = text.indexOf("{");
+  const lastObject = text.lastIndexOf("}");
+  if (firstObject >= 0 && lastObject > firstObject) return text.slice(firstObject, lastObject + 1);
+  const firstArray = text.indexOf("[");
+  const lastArray = text.lastIndexOf("]");
+  if (firstArray >= 0 && lastArray > firstArray) return text.slice(firstArray, lastArray + 1);
+  return void 0;
+}
+function requiredFieldsFromSchema(schema) {
+  if (!schema || typeof schema !== "object") return [];
+  const required = schema.required;
+  return Array.isArray(required) ? required.filter((field) => typeof field === "string") : [];
+}
+function validateAssistantOutput(args) {
+  const requiredFields = requiredFieldsFromSchema(args.expectedSchema);
+  const needsJson = promptNeedsJsonValidation(args.messages, args.responseFormat, args.expectedSchema);
+  if (!needsJson && requiredFields.length === 0) {
+    return { result: "not_applicable", validator: "none" };
+  }
+  const candidate = extractJsonCandidate(args.assistantText);
+  if (!candidate) {
+    return { result: "fail", validator: "json_validator", reason: "No JSON object or array found" };
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(candidate);
+  } catch (err) {
+    return {
+      result: "fail",
+      validator: "json_validator",
+      reason: err instanceof Error ? err.message : "Invalid JSON"
+    };
+  }
+  if (requiredFields.length > 0) {
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { result: "fail", validator: "schema_validator", reason: "JSON root is not an object" };
+    }
+    const parsedObject = parsed;
+    const missing = requiredFields.filter((field) => !(field in parsedObject));
+    if (missing.length > 0) {
+      return {
+        result: "fail",
+        validator: "schema_validator",
+        reason: `Missing required fields: ${missing.join(", ")}`
+      };
+    }
+    return { result: "pass", validator: "schema_validator" };
+  }
+  return { result: "pass", validator: "json_validator" };
+}
+
 // src/proxy.ts
+var DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
+var DEFAULT_PROXY_BASE_URL = "https://api.openai-proxy.org/v1";
 var HEARTBEAT_INTERVAL_MS = 2e3;
 var DEFAULT_REQUEST_TIMEOUT_MS = 3e5;
 var PER_MODEL_TIMEOUT_MS = 6e4;
@@ -3902,6 +4107,8 @@ var MAX_FALLBACK_ATTEMPTS = 5;
 var RATE_LIMIT_COOLDOWN_MS = 6e4;
 var OVERLOAD_COOLDOWN_MS = 15e3;
 var MAX_MESSAGES = 200;
+var ACU_PREFIX = "/acu-router";
+var DEFAULT_BASELINE_MODEL = "claude-opus-4-7";
 var ROUTING_PROFILES = /* @__PURE__ */ new Set(["auto", "eco", "premium"]);
 var rateLimitedModels = /* @__PURE__ */ new Map();
 var overloadedModels = /* @__PURE__ */ new Map();
@@ -3959,6 +4166,112 @@ function categorizeError(status, body) {
   if (status === 400 || status === 413) return "config_error";
   return null;
 }
+function stripAcuPrefix(url) {
+  if (!url?.startsWith(ACU_PREFIX)) return url || "/";
+  const stripped = url.slice(ACU_PREFIX.length);
+  if (!stripped) return "/";
+  if (stripped.startsWith("?")) return `/${stripped}`;
+  return stripped;
+}
+function getPathname(url) {
+  return new URL(url, "http://localhost").pathname;
+}
+function hashPrompt(messages) {
+  const text = messages.map((message) => JSON.stringify(message.content ?? "")).join("\n");
+  return createHash4("sha256").update(text).digest("hex").slice(0, 24);
+}
+function detectTaskType(messages) {
+  const text = messages.map((message) => {
+    if (typeof message.content === "string") return message.content;
+    return JSON.stringify(message.content ?? "");
+  }).join("\n").toLowerCase();
+  if (/\bjson\b|schema|extract|字段|结构化|提取/.test(text)) return "structured_extraction";
+  if (/fix|bug|error|stack trace|代码|报错|修复/.test(text)) return "code_fix";
+  if (/summary|summarize|abstract|摘要|总结/.test(text)) return "summary";
+  if (/reason|compare|prove|design|推理|比较|证明|设计/.test(text)) return "reasoning";
+  if (/email|邮件|投资人|investor/.test(text)) return "writing";
+  return "general";
+}
+function extractAssistantText(responseBody) {
+  try {
+    const parsed = JSON.parse(responseBody);
+    const content = parsed.choices?.[0]?.message?.content;
+    return typeof content === "string" ? content : "";
+  } catch {
+    return "";
+  }
+}
+function parseUsage(responseBody, estimatedInputTokens, estimatedOutputTokens) {
+  try {
+    const parsed = JSON.parse(responseBody);
+    return {
+      inputTokens: parsed.usage?.prompt_tokens ?? parsed.usage?.input_tokens ?? estimatedInputTokens,
+      outputTokens: parsed.usage?.completion_tokens ?? parsed.usage?.output_tokens ?? estimatedOutputTokens
+    };
+  } catch {
+    return { inputTokens: estimatedInputTokens, outputTokens: estimatedOutputTokens };
+  }
+}
+function injectTraceIntoJsonResponse(responseBody, trace) {
+  try {
+    const parsed = JSON.parse(responseBody);
+    parsed.acu_trace = trace;
+    return JSON.stringify(parsed);
+  } catch {
+    return responseBody;
+  }
+}
+function selectQualityFallbackModel(routingDecision, routingConfig, actualModelUsed, modelsTried) {
+  if (!routingDecision) return void 0;
+  const premiumTiers = routingConfig.premiumTiers ?? routingConfig.tiers;
+  const premiumChain = getFallbackChain(routingDecision.tier, premiumTiers);
+  return premiumChain.find((model) => model !== actualModelUsed && !modelsTried.includes(model));
+}
+async function fetchUpstreamChatCompletion(args) {
+  const upstreamProvider = getUpstream(args.model);
+  const isOpenRouter = upstreamProvider === "openrouter";
+  const baseUrl = isOpenRouter ? process.env.OPENROUTER_BASE_URL?.trim() || DEFAULT_OPENROUTER_BASE_URL : args.proxyBaseUrl || process.env.PROXY_BASE_URL?.trim() || DEFAULT_PROXY_BASE_URL;
+  const fetchApiKey = isOpenRouter ? args.apiKey : args.proxyApiKey || args.apiKey;
+  const upstreamUrl = `${baseUrl}/chat/completions`;
+  const reqParsed = JSON.parse(args.body.toString());
+  reqParsed.model = args.model;
+  if (usesMaxCompletionTokens(args.model) && reqParsed.max_tokens) {
+    reqParsed.max_completion_tokens = reqParsed.max_tokens;
+    delete reqParsed.max_tokens;
+  }
+  const requestBody = Buffer.from(JSON.stringify(reqParsed));
+  const upstreamHeaders = {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${fetchApiKey}`,
+    "User-Agent": USER_AGENT
+  };
+  if (isOpenRouter) {
+    upstreamHeaders["HTTP-Referer"] = "http://localhost:8402";
+    upstreamHeaders["X-Title"] = "ClawRouter";
+  }
+  const response = await fetch(upstreamUrl, {
+    method: "POST",
+    headers: upstreamHeaders,
+    body: requestBody,
+    signal: args.signal
+  });
+  return { response, upstreamProvider, requestBody };
+}
+async function readResponseText(response) {
+  const chunks = [];
+  const reader = response.body?.getReader();
+  if (reader) {
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+      }
+    } catch {
+    }
+  }
+  return Buffer.concat(chunks).toString();
+}
 function buildModelPricing() {
   const pricing = /* @__PURE__ */ new Map();
   for (const m of BLOCKRUN_MODELS) {
@@ -3972,10 +4285,45 @@ function buildModelPricing() {
 function buildProxyModelList() {
   return BLOCKRUN_MODELS.map((m) => ({
     id: m.id,
+    name: m.name,
     object: "model",
     created: 17e8,
-    owned_by: "openrouter"
+    owned_by: m.upstream,
+    upstream: m.upstream,
+    pricing: {
+      prompt: m.cost.input,
+      completion: m.cost.output,
+      cache_read: m.cost.cacheRead,
+      cache_write: m.cost.cacheWrite
+    },
+    context_length: m.contextWindow,
+    max_completion_tokens: m.maxTokens,
+    capabilities: {
+      reasoning: m.reasoning,
+      vision: m.input.includes("image"),
+      tool_calling: supportsToolCalling(m.id)
+    }
   }));
+}
+function validateRoutingConfigModels(config, models = BLOCKRUN_MODELS) {
+  const knownModels = new Set(models.map((m) => m.id));
+  const missing = [];
+  const validateTierSet = (label, tiers) => {
+    if (!tiers) return;
+    for (const [tier, tierConfig] of Object.entries(tiers)) {
+      for (const modelId of [tierConfig.primary, ...tierConfig.fallback]) {
+        if (!knownModels.has(modelId)) missing.push(`${label}.${tier}: ${modelId}`);
+      }
+    }
+  };
+  validateTierSet("tiers", config.tiers);
+  validateTierSet("ecoTiers", config.ecoTiers);
+  validateTierSet("premiumTiers", config.premiumTiers);
+  validateTierSet("agenticTiers", config.agenticTiers);
+  if (missing.length > 0) {
+    throw new Error(`Routing config references unknown model IDs:
+${missing.join("\n")}`);
+  }
 }
 function mergeRoutingConfig(partial) {
   if (!partial) return DEFAULT_ROUTING_CONFIG;
@@ -4014,7 +4362,9 @@ function normalizeMessagesForGoogle(messages) {
 async function startProxy(options) {
   const apiKey = options.apiKey;
   const port = options.port ?? PROXY_PORT;
+  let boundPort = port;
   const routingConfig = mergeRoutingConfig(options.routingConfig);
+  validateRoutingConfigModels(routingConfig);
   const modelPricing = buildModelPricing();
   const routerOpts = { config: routingConfig, modelPricing };
   const deduplicator = new RequestDeduplicator();
@@ -4050,6 +4400,8 @@ async function startProxy(options) {
         server.once("error", reject);
         server.listen(port, "127.0.0.1", () => {
           server.removeListener("error", reject);
+          const address = server.address();
+          boundPort = address?.port ?? port;
           resolve();
         });
       });
@@ -4063,26 +4415,28 @@ async function startProxy(options) {
       }
     }
   }
-  console.log(`[ClawRouter] v${VERSION} listening on http://127.0.0.1:${port}`);
-  console.log(`[ClawRouter] Routing via OpenRouter (${BLOCKRUN_MODELS.length} models)`);
+  console.log(`[ClawRouter] v${VERSION} listening on http://127.0.0.1:${boundPort}`);
+  console.log(`[ClawRouter] Routing via dual upstreams (${BLOCKRUN_MODELS.length} models)`);
   return {
-    port,
-    baseUrl: `http://127.0.0.1:${port}`,
+    port: boundPort,
+    baseUrl: `http://127.0.0.1:${boundPort}`,
     close: () => new Promise((resolve) => server.close(() => resolve()))
   };
 }
 async function handleRequest(req, res, ctx) {
-  if (req.url === "/health") {
+  req.url = stripAcuPrefix(req.url);
+  const pathname = getPathname(req.url);
+  if (pathname === "/health") {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ status: "ok", version: VERSION, models: BLOCKRUN_MODELS.length }));
     return;
   }
-  if (req.url === "/cache") {
+  if (pathname === "/cache") {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify(ctx.responseCache.getStats(), null, 2));
     return;
   }
-  if (req.url?.startsWith("/stats")) {
+  if (pathname === "/stats") {
     try {
       const url = new URL(req.url, "http://localhost");
       const days = parseInt(url.searchParams.get("days") || "7", 10);
@@ -4101,12 +4455,38 @@ async function handleRequest(req, res, ctx) {
     }
     return;
   }
-  if (req.url === "/v1/models" && req.method === "GET") {
+  if (pathname === "/ledger" || pathname === "/ledger/summary") {
+    try {
+      const url = new URL(req.url, "http://localhost");
+      const days = Math.min(parseInt(url.searchParams.get("days") || "7", 10), 30);
+      if (req.method === "DELETE" && pathname === "/ledger") {
+        const result = await clearLedger();
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ cleared: true, deletedFiles: result.deletedFiles }));
+      } else if (req.method === "GET" && pathname === "/ledger/summary") {
+        const summary = await getLedgerSummary(days);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(summary, null, 2));
+      } else if (req.method === "GET" && pathname === "/ledger") {
+        const entries = await getLedgerEntries(days);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ object: "list", data: entries }, null, 2));
+      } else {
+        res.writeHead(405, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "method_not_allowed" }));
+      }
+    } catch (err) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: String(err) }));
+    }
+    return;
+  }
+  if (pathname === "/v1/models" && req.method === "GET") {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ object: "list", data: buildProxyModelList() }));
     return;
   }
-  if (req.url?.startsWith("/share/") && req.method === "GET") {
+  if (pathname.startsWith("/share/") && req.method === "GET") {
     try {
       const url = new URL(req.url, "http://localhost");
       if (url.pathname === "/share/list") {
@@ -4133,13 +4513,13 @@ async function handleRequest(req, res, ctx) {
     }
     return;
   }
-  if (req.method === "GET" && (req.url === "/" || req.url === "/index.html" || req.url?.startsWith("/public/"))) {
+  if (req.method === "GET" && (pathname === "/" || pathname === "/index.html" || pathname.startsWith("/public/"))) {
     const { readFileSync: readFileSync2, existsSync: existsSync2 } = await import("fs");
-    const { join: join5, dirname: dirname2 } = await import("path");
+    const { join: join6, dirname: dirname2 } = await import("path");
     const { fileURLToPath: fileURLToPath2 } = await import("url");
     const __dirname2 = dirname2(fileURLToPath2(import.meta.url));
-    const publicDir = join5(__dirname2, "..", "public");
-    const filePath = req.url === "/" ? join5(publicDir, "index.html") : join5(publicDir, req.url.replace("/public/", ""));
+    const publicDir = join6(__dirname2, "..", "public");
+    const filePath = pathname === "/" || pathname === "/index.html" ? join6(publicDir, "index.html") : join6(publicDir, pathname.replace("/public/", ""));
     if (existsSync2(filePath)) {
       const ext = filePath.split(".").pop() || "html";
       const mime = { html: "text/html", css: "text/css", js: "application/javascript", json: "application/json", png: "image/png", svg: "image/svg+xml" };
@@ -4148,13 +4528,15 @@ async function handleRequest(req, res, ctx) {
       return;
     }
   }
-  if (!req.url?.includes("/chat/completions")) {
+  if (!pathname.includes("/chat/completions")) {
     res.writeHead(404, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ error: { message: `Not found: ${req.url}`, type: "not_found" } }));
     return;
   }
   const startTime = Date.now();
-  const debugMode = req.headers["x-clawrouter-debug"] !== "false";
+  const requestId = randomUUID();
+  const debugHeader = req.headers["x-acu-debug"] ?? req.headers["x-clawrouter-debug"];
+  const debugMode = debugHeader !== "false";
   const bodyChunks = [];
   for await (const chunk of req) {
     bodyChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
@@ -4183,15 +4565,18 @@ async function handleRequest(req, res, ctx) {
   let hasTools = false;
   let hasVision = false;
   let bodyModified = false;
-  const isChatCompletion = true;
   const sessionId = getSessionId(req.headers);
   let effectiveSessionId = sessionId;
   const parsedMessages = [];
+  let responseFormat;
+  let expectedSchema;
   try {
     const parsed = JSON.parse(body.toString());
     isStreaming = parsed.stream === true;
     modelId = parsed.model || "";
     maxTokens = parsed.max_tokens || 4096;
+    responseFormat = parsed.response_format;
+    expectedSchema = parsed.expected_schema;
     const messages = Array.isArray(parsed.messages) ? parsed.messages : [];
     parsedMessages.push(...messages);
     parsed.messages = normalizeMessageRoles(messages);
@@ -4328,50 +4713,50 @@ async function handleRequest(req, res, ctx) {
   let upstream;
   let actualModelUsed = modelId;
   let lastError;
+  let lastErrorCategory;
+  let upstreamProviderUsed = "";
+  const attempts = [];
   for (let i = 0; i < modelsToTry.length; i++) {
     const tryModel = modelsToTry[i];
     if (globalController.signal.aborted) break;
     console.log(`[ClawRouter] Trying ${i + 1}/${modelsToTry.length}: ${tryModel}`);
+    const attemptStart = Date.now();
     const perAttemptTimeout = timeoutForModel(tryModel);
     const modelController = new AbortController();
     const modelTimeoutId = setTimeout(() => modelController.abort(), perAttemptTimeout);
     const combinedSignal = AbortSignal.any([globalController.signal, modelController.signal]);
     try {
-      const upstreamProvider = getUpstream(tryModel);
-      const isOpenRouter = upstreamProvider === "openrouter";
-      const baseUrl = isOpenRouter ? "https://openrouter.ai/api/v1" : ctx.proxyBaseUrl || "https://api.openai-proxy.org/v1";
-      const fetchApiKey = isOpenRouter ? ctx.apiKey : ctx.proxyApiKey || ctx.apiKey;
-      const upstreamUrl = `${baseUrl}/chat/completions`;
-      const reqParsed = JSON.parse(body.toString());
-      reqParsed.model = tryModel;
-      if (usesMaxCompletionTokens(tryModel) && reqParsed.max_tokens) {
-        reqParsed.max_completion_tokens = reqParsed.max_tokens;
-        delete reqParsed.max_tokens;
-      }
-      const reqBody = Buffer.from(JSON.stringify(reqParsed));
-      const upstreamHeaders = {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${fetchApiKey}`,
-        "User-Agent": USER_AGENT
-      };
-      if (isOpenRouter) {
-        upstreamHeaders["HTTP-Referer"] = "http://localhost:8402";
-        upstreamHeaders["X-Title"] = "ClawRouter";
-      }
-      const response = await fetch(upstreamUrl, {
-        method: "POST",
-        headers: upstreamHeaders,
-        body: reqBody,
+      const { response, upstreamProvider } = await fetchUpstreamChatCompletion({
+        body,
+        model: tryModel,
+        apiKey: ctx.apiKey,
+        proxyApiKey: ctx.proxyApiKey,
+        proxyBaseUrl: ctx.proxyBaseUrl,
         signal: combinedSignal
       });
       if (response.status === 200) {
         upstream = response;
         actualModelUsed = tryModel;
+        upstreamProviderUsed = upstreamProvider;
+        attempts.push({
+          model: tryModel,
+          upstream: upstreamProvider,
+          status: "success",
+          latency_ms: Date.now() - attemptStart
+        });
         break;
       }
       const errorBody = await response.text().catch(() => "");
       const category = categorizeError(response.status, errorBody);
+      lastErrorCategory = category ?? "upstream_error";
       lastError = { body: errorBody, status: response.status };
+      attempts.push({
+        model: tryModel,
+        upstream: upstreamProvider,
+        status: "error",
+        error_category: lastErrorCategory,
+        latency_ms: Date.now() - attemptStart
+      });
       if (category === "rate_limited") {
         markRateLimited(tryModel);
       } else if (category === "overloaded") {
@@ -4384,11 +4769,40 @@ async function handleRequest(req, res, ctx) {
     } catch (err) {
       clearTimeout(modelTimeoutId);
       if (globalController.signal.aborted) break;
+      if (err instanceof UnknownModelError) {
+        lastError = { body: err.message, status: 500 };
+        lastErrorCategory = "unknown_model";
+        attempts.push({
+          model: tryModel,
+          upstream: "unknown",
+          status: "skipped",
+          error_category: lastErrorCategory,
+          latency_ms: Date.now() - attemptStart
+        });
+        console.error(`[ClawRouter] ${err.message}; skipping fallback candidate`);
+        continue;
+      }
       if (modelController.signal.aborted && i < modelsToTry.length - 1) {
+        lastErrorCategory = "timeout";
+        attempts.push({
+          model: tryModel,
+          upstream: "unknown",
+          status: "timeout",
+          error_category: lastErrorCategory,
+          latency_ms: Date.now() - attemptStart
+        });
         console.log(`[ClawRouter] ${tryModel} timed out, trying fallback`);
         continue;
       }
       lastError = { body: String(err), status: 500 };
+      lastErrorCategory = "server_error";
+      attempts.push({
+        model: tryModel,
+        upstream: "unknown",
+        status: "error",
+        error_category: lastErrorCategory,
+        latency_ms: Date.now() - attemptStart
+      });
     }
   }
   clearTimeout(timeoutId);
@@ -4471,6 +4885,155 @@ data: [DONE]
       }
     }
     responseBody = Buffer.concat(chunks).toString();
+    if (!isStreaming) {
+      let validator = validateAssistantOutput({
+        messages: parsedMessages,
+        assistantText: extractAssistantText(responseBody),
+        responseFormat,
+        expectedSchema
+      });
+      let qualityFallbackUsed = false;
+      if (validator.result === "fail" && routingDecision) {
+        const qualityFallbackModel = selectQualityFallbackModel(
+          routingDecision,
+          ctx.routerOpts.config,
+          actualModelUsed,
+          attempts.map((attempt) => attempt.model)
+        );
+        if (qualityFallbackModel) {
+          const qualityStart = Date.now();
+          const qualityController = new AbortController();
+          const qualityTimeout = setTimeout(() => qualityController.abort(), timeoutForModel(qualityFallbackModel));
+          try {
+            const { response, upstreamProvider } = await fetchUpstreamChatCompletion({
+              body,
+              model: qualityFallbackModel,
+              apiKey: ctx.apiKey,
+              proxyApiKey: ctx.proxyApiKey,
+              proxyBaseUrl: ctx.proxyBaseUrl,
+              signal: AbortSignal.any([globalController.signal, qualityController.signal])
+            });
+            if (response.status === 200) {
+              responseBody = await readResponseText(response);
+              actualModelUsed = qualityFallbackModel;
+              upstreamProviderUsed = upstreamProvider;
+              qualityFallbackUsed = true;
+              attempts.push({
+                model: qualityFallbackModel,
+                upstream: upstreamProvider,
+                status: "success",
+                latency_ms: Date.now() - qualityStart
+              });
+              validator = validateAssistantOutput({
+                messages: parsedMessages,
+                assistantText: extractAssistantText(responseBody),
+                responseFormat,
+                expectedSchema
+              });
+            } else {
+              const errorBody = await response.text().catch(() => "");
+              const category = categorizeError(response.status, errorBody) ?? "validation_fallback_error";
+              lastErrorCategory = category;
+              attempts.push({
+                model: qualityFallbackModel,
+                upstream: upstreamProvider,
+                status: "error",
+                error_category: category,
+                latency_ms: Date.now() - qualityStart
+              });
+            }
+          } catch (err) {
+            const category = qualityController.signal.aborted ? "timeout" : "validation_fallback_error";
+            lastErrorCategory = category;
+            attempts.push({
+              model: qualityFallbackModel,
+              upstream: "unknown",
+              status: qualityController.signal.aborted ? "timeout" : "error",
+              error_category: category,
+              latency_ms: Date.now() - qualityStart
+            });
+          } finally {
+            clearTimeout(qualityTimeout);
+          }
+        }
+      }
+      const latencyMs2 = Date.now() - startTime;
+      const estimatedInputTokens2 = Math.ceil(body.length / 4);
+      const usage = parseUsage(responseBody, estimatedInputTokens2, maxTokens);
+      let costEstimate2 = 0;
+      let baselineCost2 = 0;
+      let savings2 = 0;
+      if (routingDecision) {
+        if (actualModelUsed !== routingDecision.model) {
+          const costs = calculateModelCost(actualModelUsed, ctx.routerOpts.modelPricing, usage.inputTokens, usage.outputTokens, routingProfile ?? void 0);
+          costEstimate2 = costs.costEstimate;
+          baselineCost2 = costs.baselineCost;
+          savings2 = costs.savings;
+        } else {
+          const costs = calculateModelCost(actualModelUsed, ctx.routerOpts.modelPricing, usage.inputTokens, usage.outputTokens, routingProfile ?? void 0);
+          costEstimate2 = costs.costEstimate;
+          baselineCost2 = costs.baselineCost;
+          savings2 = costs.savings;
+        }
+      } else {
+        const costs = calculateModelCost(actualModelUsed, ctx.routerOpts.modelPricing, usage.inputTokens, usage.outputTokens);
+        costEstimate2 = costs.costEstimate;
+        baselineCost2 = costs.baselineCost;
+        savings2 = costs.savings;
+      }
+      const trace = {
+        request_id: requestId,
+        profile: routingProfile ?? "explicit",
+        tier: routingDecision?.tier ?? "EXPLICIT",
+        confidence: routingDecision?.confidence ?? 1,
+        method: routingDecision?.method ?? "explicit",
+        signals: [],
+        ...routingDecision?.agenticScore !== void 0 && { agentic_score: routingDecision.agenticScore },
+        selected_model: routingDecision?.model ?? modelId,
+        actual_model_used: actualModelUsed,
+        upstream: upstreamProviderUsed || getUpstream(actualModelUsed),
+        fallback_chain: modelsToTry,
+        attempts,
+        estimated_input_tokens: usage.inputTokens,
+        estimated_output_tokens: usage.outputTokens,
+        estimated_cost: costEstimate2,
+        baseline_model: DEFAULT_BASELINE_MODEL,
+        baseline_cost: baselineCost2,
+        estimated_savings: savings2,
+        route_reasoning: routingDecision?.reasoning ?? "Explicit model request",
+        validator_result: validator.result,
+        validator_pass: validator.result === "pass",
+        ...validator.reason && { validator_reason: validator.reason },
+        ...qualityFallbackUsed && { validator_reason: validator.reason ?? "quality_fallback" }
+      };
+      if (debugMode) responseBody = injectTraceIntoJsonResponse(responseBody, trace);
+      const ledgerEntry = {
+        request_id: requestId,
+        timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+        prompt_hash: hashPrompt(parsedMessages),
+        task_type: detectTaskType(parsedMessages),
+        profile: trace.profile,
+        tier: trace.tier,
+        method: trace.method,
+        selected_model: trace.selected_model,
+        actual_model_used: actualModelUsed,
+        upstream: trace.upstream,
+        input_tokens: usage.inputTokens,
+        output_tokens: usage.outputTokens,
+        estimated_cost: costEstimate2,
+        actual_cost: costEstimate2,
+        baseline_model: DEFAULT_BASELINE_MODEL,
+        baseline_cost: baselineCost2,
+        savings: baselineCost2 - costEstimate2,
+        latency_ms: latencyMs2,
+        fallback_attempts: Math.max(0, attempts.length - 1),
+        validator_result: validator.result,
+        ...validator.qualityScore !== void 0 && { quality_score: validator.qualityScore },
+        cache_hit: false,
+        ...lastErrorCategory && { error_category: lastErrorCategory }
+      };
+      await appendLedgerEntry(ledgerEntry);
+    }
     if (isStreaming && canWrite(res)) {
       const parsed = JSON.parse(responseBody);
       const chunk = {
@@ -4491,6 +5054,35 @@ data: [DONE]
       safeWrite(res, `data: ${JSON.stringify(finishChunk)}
 
 `);
+      if (debugMode) {
+        const estimatedInputTokens2 = Math.ceil(body.length / 4);
+        const costs = calculateModelCost(actualModelUsed, ctx.routerOpts.modelPricing, estimatedInputTokens2, maxTokens, routingProfile ?? void 0);
+        const trace = {
+          request_id: requestId,
+          profile: routingProfile ?? "explicit",
+          tier: routingDecision?.tier ?? "EXPLICIT",
+          confidence: routingDecision?.confidence ?? 1,
+          method: routingDecision?.method ?? "explicit",
+          signals: [],
+          selected_model: routingDecision?.model ?? modelId,
+          actual_model_used: actualModelUsed,
+          upstream: upstreamProviderUsed || getUpstream(actualModelUsed),
+          fallback_chain: modelsToTry,
+          attempts,
+          estimated_input_tokens: estimatedInputTokens2,
+          estimated_output_tokens: maxTokens,
+          estimated_cost: costs.costEstimate,
+          baseline_model: DEFAULT_BASELINE_MODEL,
+          baseline_cost: costs.baselineCost,
+          estimated_savings: costs.savings,
+          route_reasoning: routingDecision?.reasoning ?? "Explicit model request",
+          validator_result: "not_applicable"
+        };
+        safeWrite(res, `event: acu_trace
+data: ${JSON.stringify(trace)}
+
+`);
+      }
       safeWrite(res, "data: [DONE]\n\n");
     } else if (!isStreaming) {
       res.writeHead(200, { "Content-Type": "application/json" });
@@ -4544,13 +5136,13 @@ function getProxyPort() {
 
 // src/auth.ts
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from "fs";
-import { join as join4 } from "path";
-import { homedir as homedir3 } from "os";
-var CONFIG_DIR = join4(homedir3(), ".claw-router");
+import { join as join5 } from "path";
+import { homedir as homedir4 } from "os";
+var CONFIG_DIR = join5(homedir4(), ".claw-router");
 function resolveApiKey() {
   const envKey = process.env.OPENROUTER_API_KEY;
   if (envKey?.trim()) return envKey.trim();
-  const keyFile = join4(CONFIG_DIR, "api-key");
+  const keyFile = join5(CONFIG_DIR, "api-key");
   if (existsSync(keyFile)) {
     const key = readFileSync(keyFile, "utf-8").trim();
     if (key) return key;
@@ -4565,8 +5157,8 @@ function resolveProxyBaseUrl() {
 }
 function saveApiKey(key) {
   mkdirSync(CONFIG_DIR, { recursive: true });
-  writeFileSync(join4(CONFIG_DIR, "api-key"), key.trim() + "\n", { mode: 384 });
-  console.log(`[ClawRouter] API key saved to ${join4(CONFIG_DIR, "api-key")}`);
+  writeFileSync(join5(CONFIG_DIR, "api-key"), key.trim() + "\n", { mode: 384 });
+  console.log(`[ClawRouter] API key saved to ${join5(CONFIG_DIR, "api-key")}`);
 }
 
 // src/cli.ts

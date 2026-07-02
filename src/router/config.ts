@@ -1048,12 +1048,12 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
       primary: "meta-llama/llama-3.3-70b-instruct",
       fallback: [
         "openai/gpt-oss-20b:free",
-        "nvidia/nemotron-nano-9b-v2:free",
+        "nvidia/nemotron-3-super-120b-a12b:free",
         "google/gemma-4-26b-a4b-it:free",
       ],
     },
     MEDIUM: {
-      primary: "qwen/qwen-2.5-72b-instruct",
+      primary: "qwen/qwen3-235b-a22b",
       fallback: [
         "deepseek/deepseek-chat-v3-0324",
         "meta-llama/llama-3.3-70b-instruct",
@@ -1064,7 +1064,7 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
       primary: "deepseek/deepseek-chat-v3-0324",
       fallback: [
         "meta-llama/llama-4-maverick",
-        "qwen/qwen-2.5-72b-instruct",
+        "qwen/qwen3-235b-a22b",
         "nvidia/nemotron-3-super-120b-a12b:free",
       ],
     },
@@ -1072,7 +1072,7 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
       primary: "liquid/lfm-2.5-1.2b-thinking:free",
       fallback: [
         "deepseek/deepseek-chat-v3-0324",
-        "qwen/qwen-2.5-72b-instruct",
+        "qwen/qwen3-235b-a22b",
       ],
     },
   },
@@ -1082,7 +1082,7 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
     SIMPLE: {
       primary: "openai/gpt-oss-20b:free",
       fallback: [
-        "nvidia/nemotron-nano-9b-v2:free",
+        "nvidia/nemotron-3-super-120b-a12b:free",
         "google/gemma-4-26b-a4b-it:free",
         "google/gemma-4-31b-it:free",
       ],
@@ -1097,7 +1097,7 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
     COMPLEX: {
       primary: "meta-llama/llama-3.3-70b-instruct",
       fallback: [
-        "qwen/qwen-2.5-72b-instruct",
+        "qwen/qwen3-235b-a22b",
         "nvidia/nemotron-3-super-120b-a12b:free",
       ],
     },
@@ -1113,15 +1113,15 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
   premiumTiers: {
     SIMPLE: {
       primary: "meta-llama/llama-4-maverick",
-      fallback: ["deepseek/deepseek-chat-v3-0324", "qwen/qwen-2.5-72b-instruct"],
+      fallback: ["deepseek/deepseek-chat-v3-0324", "qwen/qwen3-235b-a22b"],
     },
     MEDIUM: {
       primary: "deepseek/deepseek-chat-v3-0324",
-      fallback: ["meta-llama/llama-4-maverick", "qwen/qwen-2.5-72b-instruct"],
+      fallback: ["meta-llama/llama-4-maverick", "qwen/qwen3-235b-a22b"],
     },
     COMPLEX: {
       primary: "deepseek/deepseek-chat-v3-0324",
-      fallback: ["meta-llama/llama-4-maverick", "qwen/qwen-2.5-72b-instruct"],
+      fallback: ["meta-llama/llama-4-maverick", "qwen/qwen3-235b-a22b"],
     },
     REASONING: {
       primary: "liquid/lfm-2.5-1.2b-thinking:free",
@@ -1133,15 +1133,15 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
   agenticTiers: {
     SIMPLE: {
       primary: "meta-llama/llama-3.3-70b-instruct",
-      fallback: ["qwen/qwen-2.5-72b-instruct"],
+      fallback: ["qwen/qwen3-235b-a22b"],
     },
     MEDIUM: {
       primary: "deepseek/deepseek-chat-v3-0324",
-      fallback: ["meta-llama/llama-4-maverick", "qwen/qwen-2.5-72b-instruct"],
+      fallback: ["meta-llama/llama-4-maverick", "qwen/qwen3-235b-a22b"],
     },
     COMPLEX: {
       primary: "meta-llama/llama-4-maverick",
-      fallback: ["deepseek/deepseek-chat-v3-0324", "qwen/qwen-2.5-72b-instruct"],
+      fallback: ["deepseek/deepseek-chat-v3-0324", "qwen/qwen3-235b-a22b"],
     },
     REASONING: {
       primary: "deepseek/deepseek-chat-v3-0324",

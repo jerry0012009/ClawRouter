@@ -1039,37 +1039,36 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
   },
 
   // Auto (balanced) tier configs - current default smart routing
-  // Benchmark-tuned 2026-03-16: balancing quality (retention) + latency
+  // Demo latency tuning 2026-07-02: avoid slow default paths observed on qwen-235b and llama-3.3-70b.
 
   // ── Tier Configs (verified working models only) ──
 
   tiers: {
     SIMPLE: {
-      primary: "meta-llama/llama-3.3-70b-instruct",
+      primary: "gemini-2.5-flash",
       fallback: [
-        "openai/gpt-oss-20b:free",
-        "nvidia/nemotron-3-super-120b-a12b:free",
-        "google/gemma-4-26b-a4b-it:free",
+        "meta-llama/llama-4-maverick",
+        "deepseek/deepseek-chat-v3-0324",
+        "meta-llama/llama-3.3-70b-instruct",
       ],
     },
     MEDIUM: {
-      primary: "qwen/qwen3-235b-a22b",
+      primary: "gemini-2.5-flash",
       fallback: [
+        "meta-llama/llama-4-maverick",
         "deepseek/deepseek-chat-v3-0324",
-        "meta-llama/llama-3.3-70b-instruct",
-        "nvidia/nemotron-3-super-120b-a12b:free",
+        "qwen/qwen3-235b-a22b",
       ],
     },
     COMPLEX: {
       primary: "deepseek/deepseek-chat-v3-0324",
       fallback: [
+        "gemini-2.5-flash",
         "meta-llama/llama-4-maverick",
-        "qwen/qwen3-235b-a22b",
-        "nvidia/nemotron-3-super-120b-a12b:free",
       ],
     },
     REASONING: {
-      primary: "liquid/lfm-2.5-1.2b-thinking:free",
+      primary: "gemini-2.5-flash",
       fallback: [
         "deepseek/deepseek-chat-v3-0324",
         "qwen/qwen3-235b-a22b",
@@ -1113,32 +1112,32 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
   // Premium tier — best quality
   premiumTiers: {
     SIMPLE: {
-      primary: "meta-llama/llama-4-maverick",
-      fallback: ["deepseek/deepseek-chat-v3-0324", "qwen/qwen3-235b-a22b"],
+      primary: "gemini-2.5-flash",
+      fallback: ["meta-llama/llama-4-maverick", "deepseek/deepseek-chat-v3-0324"],
     },
     MEDIUM: {
-      primary: "deepseek/deepseek-chat-v3-0324",
-      fallback: ["meta-llama/llama-4-maverick", "qwen/qwen3-235b-a22b"],
+      primary: "gemini-2.5-flash",
+      fallback: ["deepseek/deepseek-chat-v3-0324", "meta-llama/llama-4-maverick"],
     },
     COMPLEX: {
       primary: "deepseek/deepseek-chat-v3-0324",
-      fallback: ["meta-llama/llama-4-maverick", "qwen/qwen3-235b-a22b"],
+      fallback: ["gemini-2.5-flash", "meta-llama/llama-4-maverick"],
     },
     REASONING: {
-      primary: "liquid/lfm-2.5-1.2b-thinking:free",
-      fallback: ["deepseek/deepseek-chat-v3-0324"],
+      primary: "gemini-2.5-flash",
+      fallback: ["deepseek/deepseek-chat-v3-0324", "qwen/qwen3-235b-a22b"],
     },
   },
 
   // Agentic tier — models with tool use support
   agenticTiers: {
     SIMPLE: {
-      primary: "meta-llama/llama-3.3-70b-instruct",
-      fallback: ["qwen/qwen3-235b-a22b"],
+      primary: "gemini-2.5-flash",
+      fallback: ["meta-llama/llama-4-maverick", "deepseek/deepseek-chat-v3-0324"],
     },
     MEDIUM: {
-      primary: "deepseek/deepseek-chat-v3-0324",
-      fallback: ["meta-llama/llama-4-maverick", "qwen/qwen3-235b-a22b"],
+      primary: "gemini-2.5-flash",
+      fallback: ["deepseek/deepseek-chat-v3-0324", "meta-llama/llama-4-maverick"],
     },
     COMPLEX: {
       primary: "meta-llama/llama-4-maverick",

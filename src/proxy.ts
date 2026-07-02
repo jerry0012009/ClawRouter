@@ -604,6 +604,17 @@ function normalizeMessagesForThinking(messages: ChatMessage[]): ChatMessage[] {
   });
 }
 
+function stripDemoOnlyRequestFields(parsed: Record<string, unknown>): boolean {
+  let changed = false;
+  for (const key of ["baseline_model", "cache", "expected_schema"]) {
+    if (key in parsed) {
+      delete parsed[key];
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 function isDebugCommand(messages: ChatMessage[]): boolean {
   const lastUser = [...messages].reverse().find((message) => message.role === "user");
   return typeof lastUser?.content === "string" && lastUser.content.trim().startsWith("/debug");
@@ -1085,6 +1096,7 @@ async function handleRequest(
     maxTokens = (parsed.max_tokens as number) || 4096;
     responseFormat = parsed.response_format;
     expectedSchema = parsed.expected_schema;
+    if (stripDemoOnlyRequestFields(parsed)) bodyModified = true;
 
     const messages = Array.isArray(parsed.messages) ? (parsed.messages as ChatMessage[]) : [];
     parsedMessages.push(...messages);
@@ -1643,7 +1655,7 @@ async function handleRequest(
 	        route_reasoning: routingDecision?.reasoning ?? "Explicit model request",
 	        validator_result: validator.result,
 	        validator: validator.validator,
-	        validator_pass: validator.result === "pass",
+        ...(validator.result !== "not_applicable" && { validator_pass: validator.result === "pass" }),
         validator_reason: validator.reason ?? "not_applicable",
       };
 

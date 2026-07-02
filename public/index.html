@@ -236,6 +236,23 @@ function getTrace(response) {
   return response?.acu_trace || response?._acu_trace || null;
 }
 
+function validatorLabelFromTrace(trace) {
+  const result = trace?.validator_result;
+  if (result === 'pass') return '✅';
+  if (result === 'fail') return '❌';
+  if (result === 'not_applicable') return '-';
+  if (trace?.validator_pass === true) return '✅';
+  if (trace?.validator_pass === false) return '❌';
+  return '-';
+}
+
+function validatorMetaFromTrace(trace) {
+  const result = trace?.validator_result;
+  if (result === 'pass') return '✅ Validator 通过';
+  if (result === 'fail') return '⚠️ Validator 未通过';
+  return '';
+}
+
 /* ===== Estimate cost fallback when trace is unavailable ===== */
 function estimateCost(model, usage) {
   if (!usage) return 0;
@@ -307,7 +324,8 @@ async function runComparison() {
     const confidence = trace?.confidence ?? routerRes.confidence ?? '-';
     const signals = trace?.signals || routerRes.signals || [];
     const fallbackChain = trace?.fallback_chain || [];
-    const validatorPass = trace?.validator_pass ?? null;
+    const validatorLabel = validatorLabelFromTrace(trace);
+    const validatorMeta = validatorMetaFromTrace(trace);
     const isFallback = trace?.fallback_used ?? ((trace?.attempts?.length || 0) > 1);
     if (isFallback) fallbackCount++;
 
@@ -318,8 +336,8 @@ async function runComparison() {
       `<span>Tier: <strong>${tier}</strong></span>` +
       `<span class="cost">成本: $${rCost.toFixed(5)}</span>` +
       `<span class="cost">节省: ${savings.toFixed(1)}%</span>`;
-    if (validatorPass !== null) {
-      metaHtml += `<span>${validatorPass ? '✅ Validator 通过' : '⚠️ Validator 未通过'}</span>`;
+    if (validatorMeta) {
+      metaHtml += `<span>${validatorMeta}</span>`;
     }
     document.getElementById('router-meta').innerHTML = metaHtml;
 
@@ -365,7 +383,7 @@ async function runComparison() {
       cost: rCost,
       baseline: bCost,
       savings: savings,
-      validator: validatorPass === null ? '-' : (validatorPass ? '✅' : '❌'),
+      validator: validatorLabel,
       fallback: isFallback ? '✅' : '-',
       latency: elapsed + 'ms',
     });

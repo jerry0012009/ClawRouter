@@ -249,6 +249,8 @@ describe("ACU Router demo reliability", () => {
     expect(html).toContain("typeof trace?.estimated_cost === 'number'");
     expect(html.indexOf("typeof trace?.estimated_cost === 'number'")).toBeLessThan(html.indexOf("estimateCost(fallbackModel"));
     expect(html).toContain("trace?.fallback_used ?? ((trace?.attempts?.length || 0) > 1)");
+    expect(html).toContain("function validatorLabelFromTrace(trace)");
+    expect(html).toContain("if (result === 'not_applicable') return '-'");
     expect(html).toContain("cache: false");
     expect(html).not.toContain("acu_demo_key");
     expect(html).not.toContain("demo_key");

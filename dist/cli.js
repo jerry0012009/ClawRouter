@@ -1492,35 +1492,34 @@ var DEFAULT_ROUTING_CONFIG = {
     confidenceThreshold: 0.7
   },
   // Auto (balanced) tier configs - current default smart routing
-  // Benchmark-tuned 2026-03-16: balancing quality (retention) + latency
+  // Demo latency tuning 2026-07-02: avoid slow default paths observed on qwen-235b and llama-3.3-70b.
   // ── Tier Configs (verified working models only) ──
   tiers: {
     SIMPLE: {
-      primary: "meta-llama/llama-3.3-70b-instruct",
+      primary: "gemini-2.5-flash",
       fallback: [
-        "openai/gpt-oss-20b:free",
-        "nvidia/nemotron-3-super-120b-a12b:free",
-        "google/gemma-4-26b-a4b-it:free"
+        "meta-llama/llama-4-maverick",
+        "deepseek/deepseek-chat-v3-0324",
+        "meta-llama/llama-3.3-70b-instruct"
       ]
     },
     MEDIUM: {
-      primary: "qwen/qwen3-235b-a22b",
+      primary: "gemini-2.5-flash",
       fallback: [
+        "meta-llama/llama-4-maverick",
         "deepseek/deepseek-chat-v3-0324",
-        "meta-llama/llama-3.3-70b-instruct",
-        "nvidia/nemotron-3-super-120b-a12b:free"
+        "qwen/qwen3-235b-a22b"
       ]
     },
     COMPLEX: {
       primary: "deepseek/deepseek-chat-v3-0324",
       fallback: [
-        "meta-llama/llama-4-maverick",
-        "qwen/qwen3-235b-a22b",
-        "nvidia/nemotron-3-super-120b-a12b:free"
+        "gemini-2.5-flash",
+        "meta-llama/llama-4-maverick"
       ]
     },
     REASONING: {
-      primary: "liquid/lfm-2.5-1.2b-thinking:free",
+      primary: "gemini-2.5-flash",
       fallback: [
         "deepseek/deepseek-chat-v3-0324",
         "qwen/qwen3-235b-a22b"
@@ -1562,31 +1561,31 @@ var DEFAULT_ROUTING_CONFIG = {
   // Premium tier — best quality
   premiumTiers: {
     SIMPLE: {
-      primary: "meta-llama/llama-4-maverick",
-      fallback: ["deepseek/deepseek-chat-v3-0324", "qwen/qwen3-235b-a22b"]
+      primary: "gemini-2.5-flash",
+      fallback: ["meta-llama/llama-4-maverick", "deepseek/deepseek-chat-v3-0324"]
     },
     MEDIUM: {
-      primary: "deepseek/deepseek-chat-v3-0324",
-      fallback: ["meta-llama/llama-4-maverick", "qwen/qwen3-235b-a22b"]
+      primary: "gemini-2.5-flash",
+      fallback: ["deepseek/deepseek-chat-v3-0324", "meta-llama/llama-4-maverick"]
     },
     COMPLEX: {
       primary: "deepseek/deepseek-chat-v3-0324",
-      fallback: ["meta-llama/llama-4-maverick", "qwen/qwen3-235b-a22b"]
+      fallback: ["gemini-2.5-flash", "meta-llama/llama-4-maverick"]
     },
     REASONING: {
-      primary: "liquid/lfm-2.5-1.2b-thinking:free",
-      fallback: ["deepseek/deepseek-chat-v3-0324"]
+      primary: "gemini-2.5-flash",
+      fallback: ["deepseek/deepseek-chat-v3-0324", "qwen/qwen3-235b-a22b"]
     }
   },
   // Agentic tier — models with tool use support
   agenticTiers: {
     SIMPLE: {
-      primary: "meta-llama/llama-3.3-70b-instruct",
-      fallback: ["qwen/qwen3-235b-a22b"]
+      primary: "gemini-2.5-flash",
+      fallback: ["meta-llama/llama-4-maverick", "deepseek/deepseek-chat-v3-0324"]
     },
     MEDIUM: {
-      primary: "deepseek/deepseek-chat-v3-0324",
-      fallback: ["meta-llama/llama-4-maverick", "qwen/qwen3-235b-a22b"]
+      primary: "gemini-2.5-flash",
+      fallback: ["deepseek/deepseek-chat-v3-0324", "meta-llama/llama-4-maverick"]
     },
     COMPLEX: {
       primary: "meta-llama/llama-4-maverick",
@@ -4433,6 +4432,16 @@ function normalizeMessagesForThinking(messages) {
     return message;
   });
 }
+function stripDemoOnlyRequestFields(parsed) {
+  let changed = false;
+  for (const key of ["baseline_model", "cache", "expected_schema"]) {
+    if (key in parsed) {
+      delete parsed[key];
+      changed = true;
+    }
+  }
+  return changed;
+}
 function isDebugCommand(messages) {
   const lastUser = [...messages].reverse().find((message) => message.role === "user");
   return typeof lastUser?.content === "string" && lastUser.content.trim().startsWith("/debug");
@@ -4844,6 +4853,7 @@ async function handleRequest(req, res, ctx) {
     maxTokens = parsed.max_tokens || 4096;
     responseFormat = parsed.response_format;
     expectedSchema = parsed.expected_schema;
+    if (stripDemoOnlyRequestFields(parsed)) bodyModified = true;
     const messages = Array.isArray(parsed.messages) ? parsed.messages : [];
     parsedMessages.push(...messages);
     parsed.messages = normalizeMessageRoles(messages);
@@ -5343,7 +5353,7 @@ data: ${JSON.stringify(trace)}
         route_reasoning: routingDecision?.reasoning ?? "Explicit model request",
         validator_result: validator.result,
         validator: validator.validator,
-        validator_pass: validator.result === "pass",
+        ...validator.result !== "not_applicable" && { validator_pass: validator.result === "pass" },
         validator_reason: validator.reason ?? "not_applicable"
       };
       if (debugMode) responseBody = injectTraceIntoJsonResponse(responseBody, trace);

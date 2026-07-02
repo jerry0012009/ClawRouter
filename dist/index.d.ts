@@ -377,17 +377,6 @@ declare function calculateModelCost(model: string, modelPricing: Map<string, Mod
     baselineCost: number;
     savings: number;
 };
-/**
- * Get the fallback chain filtered by context length.
- * Only returns models that can handle the estimated total context.
- *
- * @param tier - The tier to get fallback chain for
- * @param tierConfigs - Tier configurations
- * @param estimatedTotalTokens - Estimated total context (input + output)
- * @param getContextWindow - Function to get context window for a model ID
- * @returns Filtered list of models that can handle the context
- */
-declare function getFallbackChainFiltered(tier: Tier, tierConfigs: Record<Tier, TierConfig>, estimatedTotalTokens: number, getContextWindow: (modelId: string) => number | undefined): string[];
 
 /**
  * Smart Router Types
@@ -616,151 +605,6 @@ declare class ResponseCache {
 }
 
 /**
- * Balance Monitor for ClawRouter
- *
- * Monitors USDC balance on Base network with intelligent caching.
- * Provides pre-request balance checks to prevent failed payments.
- *
- * Caching Strategy:
- *   - TTL: 30 seconds (balance is cached to avoid excessive RPC calls)
- *   - Optimistic deduction: after successful payment, subtract estimated cost from cache
- *   - Invalidation: on payment failure, immediately refresh from RPC
- */
-/** Balance thresholds in USDC smallest unit (6 decimals) */
-declare const BALANCE_THRESHOLDS: {
-    /** Low balance warning threshold: $1.00 */
-    readonly LOW_BALANCE_MICROS: 1000000n;
-    /** Effectively zero threshold: $0.0001 (covers dust/rounding) */
-    readonly ZERO_THRESHOLD: 100n;
-};
-/** Balance information returned by checkBalance() */
-type BalanceInfo = {
-    /** Raw balance in USDC smallest unit (6 decimals) */
-    balance: bigint;
-    /** Formatted balance as "$X.XX" */
-    balanceUSD: string;
-    /** True if balance < $1.00 */
-    isLow: boolean;
-    /** True if balance < $0.0001 (effectively zero) */
-    isEmpty: boolean;
-    /** Wallet address for funding instructions */
-    walletAddress: string;
-};
-/** Result from checkSufficient() */
-type SufficiencyResult = {
-    /** True if balance >= estimated cost */
-    sufficient: boolean;
-    /** Current balance info */
-    info: BalanceInfo;
-    /** If insufficient, the shortfall as "$X.XX" */
-    shortfall?: string;
-};
-/**
- * Monitors USDC balance on Base network.
- *
- * Usage:
- *   const monitor = new BalanceMonitor("0x...");
- *   const info = await monitor.checkBalance();
- *   if (info.isLow) console.warn("Low balance!");
- */
-declare class BalanceMonitor {
-    private readonly client;
-    private readonly walletAddress;
-    /** Cached balance (null = not yet fetched) */
-    private cachedBalance;
-    /** Timestamp when cache was last updated */
-    private cachedAt;
-    constructor(walletAddress: string);
-    /**
-     * Check current USDC balance.
-     * Uses cache if valid, otherwise fetches from RPC.
-     */
-    checkBalance(): Promise<BalanceInfo>;
-    /**
-     * Check if balance is sufficient for an estimated cost.
-     *
-     * @param estimatedCostMicros - Estimated cost in USDC smallest unit (6 decimals)
-     */
-    checkSufficient(estimatedCostMicros: bigint): Promise<SufficiencyResult>;
-    /**
-     * Optimistically deduct estimated cost from cached balance.
-     * Call this after a successful payment to keep cache accurate.
-     *
-     * @param amountMicros - Amount to deduct in USDC smallest unit
-     */
-    deductEstimated(amountMicros: bigint): void;
-    /**
-     * Invalidate cache, forcing next checkBalance() to fetch from RPC.
-     * Call this after a payment failure to get accurate balance.
-     */
-    invalidate(): void;
-    /**
-     * Force refresh balance from RPC (ignores cache).
-     */
-    refresh(): Promise<BalanceInfo>;
-    /**
-     * Format USDC amount (in micros) as "$X.XX".
-     */
-    formatUSDC(amountMicros: bigint): string;
-    /**
-     * Get the wallet address being monitored.
-     */
-    getWalletAddress(): string;
-    /** Fetch balance from RPC */
-    private fetchBalance;
-    /** Build BalanceInfo from raw balance */
-    private buildInfo;
-}
-
-/**
- * Solana USDC Balance Monitor
- *
- * Checks USDC balance on Solana mainnet with caching.
- * Absorbed from @blockrun/clawwallet's solana-adapter.ts (balance portion only).
- */
-type SolanaBalanceInfo = {
-    balance: bigint;
-    balanceUSD: string;
-    isLow: boolean;
-    isEmpty: boolean;
-    walletAddress: string;
-};
-/** Result from checkSufficient() */
-type SolanaSufficiencyResult = {
-    sufficient: boolean;
-    info: SolanaBalanceInfo;
-    shortfall?: string;
-};
-declare class SolanaBalanceMonitor {
-    private readonly rpc;
-    private readonly walletAddress;
-    private cachedBalance;
-    private cachedAt;
-    constructor(walletAddress: string, rpcUrl?: string);
-    checkBalance(): Promise<SolanaBalanceInfo>;
-    deductEstimated(amountMicros: bigint): void;
-    invalidate(): void;
-    refresh(): Promise<SolanaBalanceInfo>;
-    /**
-     * Check if balance is sufficient for an estimated cost.
-     */
-    checkSufficient(estimatedCostMicros: bigint): Promise<SolanaSufficiencyResult>;
-    /**
-     * Format USDC amount (in micros) as "$X.XX".
-     */
-    formatUSDC(amountMicros: bigint): string;
-    getWalletAddress(): string;
-    /**
-     * Check native SOL balance (in lamports). Useful for detecting users who
-     * funded with SOL instead of USDC.
-     */
-    checkSolBalance(): Promise<bigint>;
-    private fetchBalance;
-    private fetchBalanceOnce;
-    private buildInfo;
-}
-
-/**
  * Session Persistence Store
  *
  * Tracks model selections per session to prevent model switching mid-task.
@@ -793,7 +637,6 @@ type SessionConfig = {
     /** Header name for session ID (default: X-Session-ID) */
     headerName: string;
 };
-declare const DEFAULT_SESSION_CONFIG: SessionConfig;
 /**
  * Session persistence store for maintaining model selections.
  */
@@ -886,297 +729,99 @@ declare function getSessionId(headers: Record<string, string | string[] | undefi
 declare function hashRequestContent(lastUserContent: string, toolCallNames?: string[]): string;
 
 /**
- * Local x402 Proxy Server
+ * OpenRouter Smart Proxy
  *
- * Sits between OpenClaw's pi-ai (which makes standard OpenAI-format requests)
- * and BlockRun's API (which requires x402 micropayments).
+ * Local proxy that intercepts OpenAI-compatible requests, applies smart routing,
+ * and forwards to OpenRouter with API key authentication.
  *
  * Flow:
- *   pi-ai → http://localhost:{port}/v1/chat/completions
- *        → proxy forwards to https://blockrun.ai/api/v1/chat/completions
- *        → gets 402 → @x402/fetch signs payment → retries
- *        → streams response back to pi-ai
- *
- * Optimizations (v0.3.0):
- *   - SSE heartbeat: for streaming requests, sends headers + heartbeat immediately
- *     before the x402 flow, preventing OpenClaw's 10-15s timeout from firing.
- *   - Response dedup: hashes request bodies and caches responses for 30s,
- *     preventing double-charging when OpenClaw retries after timeout.
- *   - Smart routing: when model is "blockrun/auto", classify query and pick cheapest model.
- *   - Usage logging: log every request as JSON line to ~/.openclaw/blockrun/logs/
+ *   Client → http://localhost:8402/v1/chat/completions
+ *        → smart routing picks cheapest capable model
+ *        → proxy forwards to https://openrouter.ai/api/v1/chat/completions
+ *        → streams response back to client
  */
 
-/** Union type for chain-agnostic balance monitoring */
-type AnyBalanceMonitor = BalanceMonitor | SolanaBalanceMonitor;
-
-/**
- * Get the proxy port from pre-loaded configuration.
- * Port is validated at module load time, this just returns the cached value.
- */
-declare function getProxyPort(): number;
-/** Callback info for low balance warning */
-type LowBalanceInfo = {
-    balanceUSD: string;
-    walletAddress: string;
-};
-/** Callback info for insufficient funds error */
-type InsufficientFundsInfo = {
-    balanceUSD: string;
-    requiredUSD: string;
-    walletAddress: string;
-};
-/**
- * Wallet config: either a plain EVM private key string, or the full
- * resolution object from resolveOrGenerateWalletKey() which may include
- * Solana keys. Using the full object prevents callers from accidentally
- * forgetting to forward Solana key bytes.
- */
-type WalletConfig = string | {
-    key: string;
-    solanaPrivateKeyBytes?: Uint8Array;
-};
-type PaymentChain = "base" | "solana";
 type ProxyOptions = {
-    wallet: WalletConfig;
-    apiBase?: string;
-    /** Payment chain: "base" (default) or "solana". Can also be set via CLAWROUTER_PAYMENT_CHAIN env var. */
-    paymentChain?: PaymentChain;
-    /** Port to listen on (default: 8402) */
+    apiKey: string;
     port?: number;
     routingConfig?: Partial<RoutingConfig>;
-    /** Request timeout in ms (default: 180000 = 3 minutes). Covers on-chain tx + LLM response. */
-    requestTimeoutMs?: number;
-    /** Skip balance checks (for testing only). Default: false */
-    skipBalanceCheck?: boolean;
-    /** Override the balance monitor with a mock (for testing only). */
-    _balanceMonitorOverride?: AnyBalanceMonitor;
-    /**
-     * Session persistence config. When enabled, maintains model selection
-     * across requests within a session to prevent mid-task model switching.
-     */
+    cacheConfig?: Partial<ResponseCacheConfig>;
     sessionConfig?: Partial<SessionConfig>;
-    /**
-     * Auto-compress large requests to reduce network usage.
-     * When enabled, requests are automatically compressed using
-     * LLM-safe context compression (15-40% reduction).
-     * Default: true
-     */
-    autoCompressRequests?: boolean;
-    /**
-     * Threshold in KB to trigger auto-compression (default: 180).
-     * Requests larger than this are compressed before sending.
-     * Set to 0 to compress all requests.
-     */
-    compressionThresholdKB?: number;
-    /**
-     * Response caching config. When enabled, identical requests return
-     * cached responses instead of making new API calls.
-     * Default: enabled with 10 minute TTL, 200 max entries.
-     */
-    cacheConfig?: ResponseCacheConfig;
-    /**
-     * Maximum total spend (in USD) per session run.
-     * Default: undefined (no limit). Example: 0.5 = $0.50 per session.
-     */
-    maxCostPerRunUsd?: number;
-    /**
-     * How to enforce the per-run cost cap.
-     * - 'graceful' (default): when budget runs low, downgrade to cheaper models; use free model
-     *   as last resort. Only hard-stops when no model can serve the request.
-     * - 'strict': immediately return 429 once the session spend reaches the cap.
-     */
-    maxCostPerRunMode?: "graceful" | "strict";
-    /**
-     * Set of model IDs to exclude from routing.
-     * Excluded models are filtered out of fallback chains.
-     * Loaded from ~/.openclaw/blockrun/exclude-models.json
-     */
-    excludeModels?: Set<string>;
-    onReady?: (port: number) => void;
-    onError?: (error: Error) => void;
-    onPayment?: (info: {
-        model: string;
-        amount: string;
-        network: string;
-    }) => void;
+    skipBalanceCheck?: boolean;
     onRouted?: (decision: RoutingDecision) => void;
-    /** Called when balance drops below $1.00 (warning, request still proceeds) */
-    onLowBalance?: (info: LowBalanceInfo) => void;
-    /** Called when balance is insufficient for a request (request fails) */
-    onInsufficientFunds?: (info: InsufficientFundsInfo) => void;
-    /**
-     * Upstream proxy URL for all outgoing requests.
-     * Supports http://, https://, and socks5:// schemes.
-     * Also readable via BLOCKRUN_UPSTREAM_PROXY environment variable.
-     * Example: "socks5://127.0.0.1:1080"
-     */
-    upstreamProxy?: string;
 };
 type ProxyHandle = {
     port: number;
     baseUrl: string;
-    walletAddress: string;
-    solanaAddress?: string;
-    balanceMonitor: AnyBalanceMonitor;
     close: () => Promise<void>;
 };
-/**
- * Start the local x402 proxy server.
- *
- * If a proxy is already running on the target port, reuses it instead of failing.
- * Port can be configured via BLOCKRUN_PROXY_PORT environment variable.
- *
- * Returns a handle with the assigned port, base URL, and a close function.
- */
 declare function startProxy(options: ProxyOptions): Promise<ProxyHandle>;
+/**
+ * Get the configured proxy port.
+ */
+declare function getProxyPort(): number;
 
 /**
- * Resolve wallet key: load saved → env var → auto-generate.
- * Also loads mnemonic if available for Solana key derivation.
- * Called by index.ts before the auth wizard runs.
+ * OpenRouter Authentication
+ *
+ * Resolves the OpenRouter API key from environment variable or config file.
+ * No wallet management — OpenRouter handles billing via API key.
  */
-type WalletResolution = {
-    key: string;
-    address: string;
-    source: "saved" | "env" | "config" | "generated";
-    mnemonic?: string;
-    solanaPrivateKeyBytes?: Uint8Array;
-};
 /**
- * Set up Solana wallet for existing EVM-only users.
- * Generates a new mnemonic for Solana key derivation.
- * NEVER touches the existing wallet.key file.
+ * Resolve OpenRouter API key.
+ * Priority: env var → config file → error.
  */
-declare function setupSolana(): Promise<{
-    mnemonic: string;
-    solanaPrivateKeyBytes: Uint8Array;
-}>;
+declare function resolveApiKey(): string;
 /**
- * Persist the user's payment chain selection to disk.
+ * Save API key to config file.
  */
-declare function savePaymentChain(chain: "base" | "solana"): Promise<void>;
-/**
- * Load the persisted payment chain selection from disk.
- * Returns "base" if no file exists or the file is invalid.
- */
-declare function loadPaymentChain(): Promise<"base" | "solana">;
-/**
- * Resolve payment chain: env var first → persisted file second → default "base".
- */
-declare function resolvePaymentChain(): Promise<"base" | "solana">;
+declare function saveApiKey(key: string): void;
 
 /**
  * BlockRun ProviderPlugin for OpenClaw
  *
- * Registers BlockRun as an LLM provider in OpenClaw.
- * Uses a local x402 proxy to handle micropayments transparently —
- * pi-ai sees a standard OpenAI-compatible API at localhost.
+ * Registers ClawRouter as an LLM provider in OpenClaw.
+ * Uses a local proxy to handle routing transparently —
+ * the client sees a standard OpenAI-compatible API at localhost.
  */
 
-/**
- * BlockRun provider plugin definition.
- */
 declare const blockrunProvider: ProviderPlugin;
 
 /**
- * BlockRun Model Definitions for OpenClaw
+ * OpenRouter Model Definitions
  *
- * Maps BlockRun's 55+ AI models to OpenClaw's ModelDefinitionConfig format.
- * All models use the "openai-completions" API since BlockRun is OpenAI-compatible.
+ * Maps OpenRouter model catalog to OpenClaw-compatible ModelDefinitionConfig format.
+ * Pricing is in USD per 1M tokens.
  *
- * Pricing is in USD per 1M tokens. Operators pay these rates via x402;
- * they set their own markup when reselling to end users (Phase 2).
+ * @see https://openrouter.ai/models
  */
 
 /**
+ * Model definitions for OpenRouter.
+ * Kept to the most commonly used models — extend as needed.
+ */
+declare const BLOCKRUN_MODELS: ModelDefinitionConfig[];
+/** Alias for backward compatibility */
+declare const OPENCLAW_MODELS: ModelDefinitionConfig[];
+/**
  * Model aliases for convenient shorthand access.
- * Users can type `/model claude` instead of `/model blockrun/anthropic/claude-sonnet-4-6`.
  */
 declare const MODEL_ALIASES: Record<string, string>;
 /**
- * Resolve a model alias to its full model ID.
- * Also strips "blockrun/" prefix for direct model paths.
- * Examples:
- *   - "claude" -> "anthropic/claude-sonnet-4-6" (alias)
- *   - "blockrun/claude" -> "anthropic/claude-sonnet-4-6" (alias with prefix)
- *   - "blockrun/anthropic/claude-sonnet-4-6" -> "anthropic/claude-sonnet-4-6" (prefix stripped)
- *   - "openai/gpt-4o" -> "openai/gpt-4o" (unchanged)
+ * Resolve a model alias to its full OpenRouter ID.
  */
 declare function resolveModelAlias(model: string): string;
-type BlockRunModel = {
-    id: string;
-    name: string;
-    /** Model version (e.g., "4.6", "3.1", "5.2") for tracking updates */
-    version?: string;
-    inputPrice: number;
-    outputPrice: number;
-    contextWindow: number;
-    maxOutput: number;
-    reasoning?: boolean;
-    vision?: boolean;
-    /** Models optimized for agentic workflows (multi-step autonomous tasks) */
-    agentic?: boolean;
-    /**
-     * Model supports OpenAI-compatible structured function/tool calling.
-     * Models without this flag output tool invocations as plain text JSON,
-     * which leaks raw {"command":"..."} into visible chat messages.
-     * Default: false (must opt-in to prevent silent regressions on new models).
-     */
-    toolCalling?: boolean;
-    /** Model is deprecated — will be routed to fallbackModel if set */
-    deprecated?: boolean;
-    /** Model ID to route to when this model is deprecated */
-    fallbackModel?: string;
-    /** Time-limited promotional pricing — auto-expires after endDate */
-    promo?: {
-        /** Flat price per request in USD (replaces token-based pricing) */
-        flatPrice: number;
-        /** ISO date, promo starts (inclusive). e.g. "2026-04-01" */
-        startDate: string;
-        /** ISO date, promo ends (exclusive). e.g. "2026-04-15" */
-        endDate: string;
-    };
-    /**
-     * Permanent flat per-request price in USD (backend billingMode: "flat").
-     * Unlike promo, this never expires. Takes precedence over promo.
-     */
-    flatPrice?: number;
-};
-declare const BLOCKRUN_MODELS: BlockRunModel[];
 /**
- * All BlockRun models in OpenClaw format (including aliases).
- * Used for proxy-side resolution (alias → target ID), tool routing, etc.
- *
- * Catalog entries shadowed by an identically-keyed alias are excluded:
- * resolveModelAlias checks MODEL_ALIASES first, so those catalog entries are
- * unreachable and their metadata (name/pricing) would misadvertise what
- * callers actually get. The alias-derived entry carries the redirect
- * target's real metadata instead.
- */
-declare const OPENCLAW_MODELS: ModelDefinitionConfig[];
-/**
- * Build a ModelProviderConfig for BlockRun.
- *
- * Returns only the TOP_MODELS-listed subset so the OpenClaw picker stays
- * focused. Hidden models are still resolvable through the proxy.
- *
- * @param baseUrl - The proxy's local base URL (e.g., "http://127.0.0.1:12345")
+ * Build the provider models config pointing at the local proxy.
  */
 declare function buildProviderModels(baseUrl: string): ModelProviderConfig;
-/**
- * Check if a model is optimized for agentic workflows.
- * Agentic models continue autonomously with multi-step tasks
- * instead of stopping and waiting for user input.
- */
-declare function isAgenticModel(modelId: string): boolean;
-/**
- * Get all agentic-capable models.
- */
-declare function getAgenticModels(): string[];
-/**
- * Get context window size for a model.
- * Returns undefined if model not found.
- */
+/** Check if a model supports tool calling. */
+declare function supportsToolCalling(modelId: string): boolean;
+/** Check if a model supports vision (image inputs). */
+declare function supportsVision(modelId: string): boolean;
+/** Check if a model is a reasoning model. */
+declare function isReasoningModel(modelId: string): boolean;
+/** Get context window for a model. */
 declare function getModelContextWindow(modelId: string): number | undefined;
 
 /**
@@ -1246,483 +891,20 @@ declare class RequestDeduplicator {
     private prune;
 }
 
-/**
- * Spend Control - Time-windowed spending limits
- *
- * Absorbed from @blockrun/clawwallet. Chain-agnostic (works for both EVM and Solana).
- *
- * Features:
- * - Per-request limits (e.g., max $0.10 per call)
- * - Hourly limits (e.g., max $3.00 per hour)
- * - Daily limits (e.g., max $20.00 per day)
- * - Session limits (e.g., max $5.00 per session)
- * - Rolling windows (last 1h, last 24h)
- * - Persistent storage (~/.openclaw/blockrun/spending.json)
- */
-type SpendWindow = "perRequest" | "hourly" | "daily" | "session";
-interface SpendLimits {
-    perRequest?: number;
-    hourly?: number;
-    daily?: number;
-    session?: number;
-}
-interface SpendRecord {
-    timestamp: number;
-    amount: number;
-    model?: string;
-    action?: string;
-}
-interface SpendingStatus {
-    limits: SpendLimits;
-    spending: {
-        hourly: number;
-        daily: number;
-        session: number;
-    };
-    remaining: {
-        hourly: number | null;
-        daily: number | null;
-        session: number | null;
-    };
-    calls: number;
-}
-interface CheckResult {
-    allowed: boolean;
-    blockedBy?: SpendWindow;
-    remaining?: number;
-    reason?: string;
-    resetIn?: number;
-}
-interface SpendControlStorage {
-    load(): {
-        limits: SpendLimits;
-        history: SpendRecord[];
-    } | null;
-    save(data: {
-        limits: SpendLimits;
-        history: SpendRecord[];
-    }): void;
-}
-declare class FileSpendControlStorage implements SpendControlStorage {
-    private readonly spendingFile;
-    constructor();
-    load(): {
-        limits: SpendLimits;
-        history: SpendRecord[];
-    } | null;
-    save(data: {
-        limits: SpendLimits;
-        history: SpendRecord[];
-    }): void;
-}
-declare class InMemorySpendControlStorage implements SpendControlStorage {
-    private data;
-    load(): {
-        limits: SpendLimits;
-        history: SpendRecord[];
-    } | null;
-    save(data: {
-        limits: SpendLimits;
-        history: SpendRecord[];
-    }): void;
-}
-interface SpendControlOptions {
-    storage?: SpendControlStorage;
-    now?: () => number;
-}
-declare class SpendControl {
-    private limits;
-    private history;
-    private sessionSpent;
-    private sessionCalls;
-    private readonly storage;
-    private readonly now;
-    constructor(options?: SpendControlOptions);
-    setLimit(window: SpendWindow, amount: number): void;
-    clearLimit(window: SpendWindow): void;
-    getLimits(): SpendLimits;
-    check(estimatedCost: number): CheckResult;
-    record(amount: number, metadata?: {
-        model?: string;
-        action?: string;
-    }): void;
-    private getSpendingInWindow;
-    getSpending(window: "hourly" | "daily" | "session"): number;
-    getRemaining(window: "hourly" | "daily" | "session"): number | null;
-    getStatus(): SpendingStatus;
-    getHistory(limit?: number): SpendRecord[];
-    resetSession(): void;
-    private cleanup;
-    private save;
-    private load;
-}
-declare function formatDuration(seconds: number): string;
+declare const VERSION: string;
 
 /**
- * Wallet Key Derivation
+ * ClawRouter — Smart LLM Router (OpenRouter Edition)
  *
- * BIP-39 mnemonic generation + BIP-44 HD key derivation for EVM and Solana.
- * Absorbed from @blockrun/clawwallet. No file I/O here - auth.ts handles persistence.
- *
- * Solana uses SLIP-10 Ed25519 derivation (Phantom/Solflare/Backpack compatible).
- * EVM uses standard BIP-32 secp256k1 derivation.
- */
-interface DerivedKeys {
-    mnemonic: string;
-    evmPrivateKey: `0x${string}`;
-    evmAddress: string;
-    solanaPrivateKeyBytes: Uint8Array;
-}
-/**
- * Generate a 24-word BIP-39 mnemonic.
- */
-declare function generateWalletMnemonic(): string;
-/**
- * Validate a BIP-39 mnemonic.
- */
-declare function isValidMnemonic(mnemonic: string): boolean;
-/**
- * Derive EVM private key and address from a BIP-39 mnemonic.
- * Path: m/44'/60'/0'/0/0 (standard Ethereum derivation)
- */
-declare function deriveEvmKey(mnemonic: string): {
-    privateKey: `0x${string}`;
-    address: string;
-};
-/**
- * Derive 32-byte Solana private key using SLIP-10 Ed25519 derivation.
- * Path: m/44'/501'/0'/0' (Phantom / Solflare / Backpack compatible)
- *
- * Algorithm (SLIP-0010 for Ed25519):
- *   1. Master: HMAC-SHA512(key="ed25519 seed", data=bip39_seed) → IL=key, IR=chainCode
- *   2. For each hardened child index:
- *      HMAC-SHA512(key=chainCode, data=0x00 || key || ser32(index)) → split again
- *   3. Final IL (32 bytes) = Ed25519 private key seed
- */
-declare function deriveSolanaKeyBytes(mnemonic: string): Uint8Array;
-/**
- * Derive both EVM and Solana keys from a single mnemonic.
- */
-declare function deriveAllKeys(mnemonic: string): DerivedKeys;
-
-/**
- * Typed Error Classes for ClawRouter
- *
- * Provides structured errors for balance-related failures with
- * all necessary information for user-friendly error messages.
- */
-/**
- * Thrown when wallet has insufficient USDC balance for a request.
- */
-declare class InsufficientFundsError extends Error {
-    readonly code: "INSUFFICIENT_FUNDS";
-    readonly currentBalanceUSD: string;
-    readonly requiredUSD: string;
-    readonly walletAddress: string;
-    constructor(opts: {
-        currentBalanceUSD: string;
-        requiredUSD: string;
-        walletAddress: string;
-    });
-}
-/**
- * Thrown when wallet has no USDC balance (or effectively zero).
- */
-declare class EmptyWalletError extends Error {
-    readonly code: "EMPTY_WALLET";
-    readonly walletAddress: string;
-    constructor(walletAddress: string);
-}
-/**
- * Type guard to check if an error is InsufficientFundsError.
- */
-declare function isInsufficientFundsError(error: unknown): error is InsufficientFundsError;
-/**
- * Type guard to check if an error is EmptyWalletError.
- */
-declare function isEmptyWalletError(error: unknown): error is EmptyWalletError;
-/**
- * Type guard to check if an error is a balance-related error.
- */
-declare function isBalanceError(error: unknown): error is InsufficientFundsError | EmptyWalletError;
-/**
- * Thrown when RPC call fails (network error, node down, etc).
- * Distinguishes infrastructure failures from actual empty wallets.
- */
-declare class RpcError extends Error {
-    readonly code: "RPC_ERROR";
-    readonly originalError: unknown;
-    constructor(message: string, originalError?: unknown);
-}
-/**
- * Type guard to check if an error is RpcError.
- */
-declare function isRpcError(error: unknown): error is RpcError;
-
-/**
- * Retry Logic for ClawRouter
- *
- * Provides fetch wrapper with exponential backoff for transient errors.
- * Retries on 429 (rate limit), 502, 503, 504 (server errors).
- */
-/** Configuration for retry behavior */
-type RetryConfig = {
-    /** Maximum number of retries (default: 2) */
-    maxRetries: number;
-    /** Base delay in ms for exponential backoff (default: 500) */
-    baseDelayMs: number;
-    /** HTTP status codes that trigger a retry (default: [429, 502, 503, 504]) */
-    retryableCodes: number[];
-};
-/** Default retry configuration */
-declare const DEFAULT_RETRY_CONFIG: RetryConfig;
-/**
- * Wrap a fetch-like function with retry logic and exponential backoff.
- *
- * @param fetchFn - The fetch function to wrap (can be standard fetch or x402 payFetch)
- * @param url - URL to fetch
- * @param init - Fetch init options
- * @param config - Retry configuration (optional, uses defaults)
- * @returns Response from successful fetch or last failed attempt
- *
- * @example
- * ```typescript
- * const response = await fetchWithRetry(
- *   fetch,
- *   "https://api.example.com/endpoint",
- *   { method: "POST", body: JSON.stringify(data) },
- *   { maxRetries: 3 }
- * );
- * ```
- */
-declare function fetchWithRetry(fetchFn: (url: string, init?: RequestInit) => Promise<Response>, url: string, init?: RequestInit, config?: Partial<RetryConfig>): Promise<Response>;
-/**
- * Check if an error or response indicates a retryable condition.
- */
-declare function isRetryable(errorOrResponse: Error | Response, config?: Partial<RetryConfig>): boolean;
-
-/**
- * Usage Statistics Aggregator
- *
- * Reads usage log files and aggregates statistics for terminal display.
- * Supports filtering by date range and provides multiple aggregation views.
- */
-type DailyStats = {
-    date: string;
-    totalRequests: number;
-    totalCost: number;
-    totalBaselineCost: number;
-    totalSavings: number;
-    avgLatencyMs: number;
-    byTier: Record<string, {
-        count: number;
-        cost: number;
-    }>;
-    byModel: Record<string, {
-        count: number;
-        cost: number;
-    }>;
-};
-type AggregatedStats = {
-    period: string;
-    totalRequests: number;
-    totalCost: number;
-    totalBaselineCost: number;
-    totalSavings: number;
-    savingsPercentage: number;
-    avgLatencyMs: number;
-    avgCostPerRequest: number;
-    byTier: Record<string, {
-        count: number;
-        cost: number;
-        percentage: number;
-    }>;
-    byModel: Record<string, {
-        count: number;
-        cost: number;
-        percentage: number;
-    }>;
-    dailyBreakdown: DailyStats[];
-    entriesWithBaseline: number;
-};
-/**
- * Get aggregated statistics for the last N days.
- */
-declare function getStats(days?: number): Promise<AggregatedStats>;
-/**
- * Format stats as ASCII table for terminal display.
- */
-declare function formatStatsAscii(stats: AggregatedStats): string;
-/**
- * Delete all usage log files, resetting stats to zero.
- */
-declare function clearStats(): Promise<{
-    deletedFiles: number;
-}>;
-
-/**
- * Partner Service Registry
- *
- * Defines available partner APIs that can be called through ClawRouter's proxy.
- * Partners cover prediction-market data, realtime market quotes, and image/video
- * generation — all paid via x402 micropayments on the same wallet as LLM calls.
- */
-type PartnerServiceParam = {
-    name: string;
-    type: "string" | "string[]" | "number";
-    description: string;
-    required: boolean;
-};
-type PartnerCategory = "Prediction markets" | "Market data" | "Image & Video" | "Communications";
-type PartnerServiceDefinition = {
-    /** Unique service ID used in tool names: blockrun_{id} */
-    id: string;
-    /** Human-readable name */
-    name: string;
-    /** Partner providing this service */
-    partner: string;
-    /** Category used for grouping in the `/partners` list view */
-    category: PartnerCategory;
-    /** Compact one-liner used in the `/partners` list (≤ 40 chars ideal) */
-    shortDescription: string;
-    /** Full description used for the tool's JSON Schema (LLM sees this) */
-    description: string;
-    /** Proxy path (relative to /v1) */
-    proxyPath: string;
-    /** HTTP method */
-    method: "GET" | "POST";
-    /** Parameters for the tool's JSON Schema */
-    params: PartnerServiceParam[];
-    /** Pricing info for display */
-    pricing: {
-        perUnit: string;
-        unit: string;
-        minimum: string;
-        maximum: string;
-    };
-    /** Example usage for help text */
-    example: {
-        input: Record<string, unknown>;
-        description: string;
-    };
-};
-/**
- * All registered partner services.
- * New partners are added here — the rest of the system picks them up automatically.
- */
-declare const PARTNER_SERVICES: PartnerServiceDefinition[];
-/**
- * Get a partner service by ID.
- */
-declare function getPartnerService(id: string): PartnerServiceDefinition | undefined;
-
-/**
- * Partner Tool Builder
- *
- * Converts partner service definitions into OpenClaw tool definitions.
- * Each tool's execute() calls through the local proxy which handles
- * x402 payment transparently using the same wallet.
- */
-/** OpenClaw tool definition shape (duck-typed) */
-type PartnerToolDefinition = {
-    name: string;
-    description: string;
-    parameters: {
-        type: "object";
-        properties: Record<string, unknown>;
-        required: string[];
-    };
-    execute: (toolCallId: string, params: Record<string, unknown>) => Promise<unknown>;
-};
-/**
- * Build OpenClaw tool definitions for all registered partner services.
- * @param proxyBaseUrl - Local proxy base URL (e.g., "http://127.0.0.1:8402")
- */
-declare function buildPartnerTools(proxyBaseUrl: string): PartnerToolDefinition[];
-
-/**
- * @blockrun/clawrouter
- *
- * Smart LLM router for OpenClaw — 55+ models, x402 micropayments, 78% cost savings.
- * Routes each request to the cheapest model that can handle it.
+ * Routes each request to the cheapest capable model via OpenRouter.
+ * 22+ models, smart 15-dimension routing, <1ms local decisions.
  *
  * Usage:
- *   # Install the plugin
- *   openclaw plugins install @blockrun/clawrouter
- *
- *   # Fund your wallet with USDC on Base (address printed on install)
- *
- *   # Use smart routing (auto-picks cheapest model)
- *   openclaw models set blockrun/auto
- *
- *   # Or use any specific BlockRun model
- *   openclaw models set openai/gpt-5.3
+ *   clawrouter                           # Start proxy
+ *   clawrouter --port 8402               # Custom port
+ *   OPENROUTER_API_KEY=sk-... clawrouter # Set API key
  */
 
-/**
- * Detect whether BlockRun's web search provider should be disabled.
- *
- * Two opt-out paths:
- * - `BLOCKRUN_WEB_SEARCH=off` env var (case-insensitive) — for CI / one-off runs.
- * - `tools.web.search.enabled === false` in `~/.openclaw/openclaw.json` — persistent,
- *   per-user opt-out. Without a check here, `injectModelsConfig` would re-flip
- *   `enabled` to `true` on every plugin load and `register()` would always wire
- *   blockrun-exa back up.
- *
- * When disabled: `injectModelsConfig` leaves `enabled` untouched and `register()`
- * skips `registerWebSearchProvider`. The on-disk migration that strips the legacy
- * `provider: blockrun-exa` field still runs regardless — that's correctness, not
- * opt-in.
- */
-declare function isBlockrunWebSearchDisabled(config?: unknown): boolean;
-/**
- * Inject BlockRun models config into OpenClaw config file.
- * This is required because registerProvider() alone doesn't make models available.
- *
- * CRITICAL: This function must be idempotent and handle ALL edge cases:
- * - Config file doesn't exist (create it)
- * - Config file exists but is empty/invalid (reinitialize)
- * - blockrun provider exists but has undefined fields (fix them)
- * - Config exists but uses old port/models (update them)
- *
- * This function is called on EVERY plugin load to ensure config is always correct.
- *
- * Also strips any previously managed `mcp.servers.blockrun` entry we wrote in
- * older releases — ClawRouter no longer bundles the MCP bridge (the npx-spawned
- * grandchildren were leaking). The scrub only removes entries matching the
- * managed shape; user-defined `blockrun` MCP servers are left alone.
- */
-declare function injectModelsConfig(logger: {
-    info: (msg: string) => void;
-}, options?: {
-    forceWrite?: boolean;
-}): void;
-/**
- * Inject dummy auth profile for BlockRun into agent auth stores.
- * OpenClaw's agent system looks for auth credentials even if provider has auth: [].
- * We inject a placeholder so the lookup succeeds (proxy handles real auth internally).
- */
-declare function injectAuthProfile(logger: {
-    info: (msg: string) => void;
-}): void;
-/**
- * Parse a `/cr-call` args string.
- *
- * Shape: `/cr-call +14155552671 "Tell them X" [--voice nat] [--max-duration 5] [--from +1...] [--language en-US]`
- *
- * - First token starting with `+` is `to` (E.164 destination).
- * - All remaining non-flag tokens are joined into `task` (the prompt for the AI agent).
- *   Quoted spans stay intact.
- * - Flags accept both `--key value` (space-separated) and `--key=value` forms.
- */
-declare function parseCallArgs(raw: string): {
-    to?: string;
-    task: string;
-    voice?: string;
-    max_duration?: number;
-    from?: string;
-    language?: string;
-};
 declare const plugin: OpenClawPluginDefinition;
 
-export { type AggregatedStats, BALANCE_THRESHOLDS, BLOCKRUN_MODELS, type BalanceInfo, BalanceMonitor, type CachedLLMResponse, type CachedResponse, type CheckResult, DEFAULT_RETRY_CONFIG, DEFAULT_ROUTING_CONFIG, DEFAULT_SESSION_CONFIG, type DailyStats, type DerivedKeys, EmptyWalletError, FileSpendControlStorage, InMemorySpendControlStorage, InsufficientFundsError, type InsufficientFundsInfo, type LowBalanceInfo, MODEL_ALIASES, OPENCLAW_MODELS, PARTNER_SERVICES, type PartnerServiceDefinition, type PartnerToolDefinition, type PaymentChain, type ProxyHandle, type ProxyOptions, RequestDeduplicator, ResponseCache, type ResponseCacheConfig, type RetryConfig, type RoutingConfig, type RoutingDecision, RpcError, type SessionConfig, type SessionEntry, SessionStore, type SolanaBalanceInfo, SolanaBalanceMonitor, SpendControl, type SpendControlOptions, type SpendControlStorage, type SpendLimits, type SpendRecord, type SpendWindow, type SpendingStatus, type SufficiencyResult, type Tier, type UsageEntry, type WalletConfig, type WalletResolution, blockrunProvider, buildPartnerTools, buildProviderModels, calculateModelCost, clearStats, plugin as default, deriveAllKeys, deriveEvmKey, deriveSolanaKeyBytes, fetchWithRetry, formatDuration, formatStatsAscii, generateWalletMnemonic, getAgenticModels, getFallbackChain, getFallbackChainFiltered, getModelContextWindow, getPartnerService, getProxyPort, getSessionId, getStats, hashRequestContent, injectAuthProfile, injectModelsConfig, isAgenticModel, isBalanceError, isBlockrunWebSearchDisabled, isEmptyWalletError, isInsufficientFundsError, isRetryable, isRpcError, isValidMnemonic, loadPaymentChain, logUsage, parseCallArgs, resolveModelAlias, resolvePaymentChain, route, savePaymentChain, setupSolana, startProxy };
+export { BLOCKRUN_MODELS, type CachedResponse, DEFAULT_ROUTING_CONFIG, MODEL_ALIASES, OPENCLAW_MODELS, RequestDeduplicator, ResponseCache, type RoutingConfig, type RoutingDecision, type SessionConfig, type SessionEntry, SessionStore, type Tier, type UsageEntry, VERSION, blockrunProvider, buildProviderModels, calculateModelCost, plugin as default, getFallbackChain, getModelContextWindow, getProxyPort, getSessionId, hashRequestContent, isReasoningModel, logUsage, resolveApiKey, resolveModelAlias, route, saveApiKey, startProxy, supportsToolCalling, supportsVision };

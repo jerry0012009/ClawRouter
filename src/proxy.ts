@@ -134,7 +134,8 @@ function safeWrite(res: ServerResponse, data: string | Buffer): boolean {
 /** Categorize upstream errors for retry logic. */
 type ErrorCategory = "rate_limited" | "overloaded" | "server_error" | "auth_failure" | "config_error";
 function categorizeError(status: number, body: string): ErrorCategory | null {
-  if (status === 401 || status === 403) return "auth_failure";
+  if (status === 401) return "auth_failure";
+  if (status === 403) return "server_error"; // OpenRouter uses 403 for content policy too
   if (status === 429) return "rate_limited";
   if (status === 529) return "overloaded";
   if (status === 503 && /overload|capacity/i.test(body)) return "overloaded";
@@ -374,6 +375,23 @@ async function handleRequest(
   }
 
   // ── Only handle chat completions from here ──
+
+  // ── Static file serving (frontend) ──
+  if (req.method === "GET" && (req.url === "/" || req.url === "/index.html" || req.url?.startsWith("/public/"))) {
+    const { readFileSync, existsSync } = await import("node:fs");
+    const { join, dirname } = await import("node:path");
+    const { fileURLToPath } = await import("node:url");
+    const __dirname = dirname(fileURLToPath(import.meta.url));
+    const publicDir = join(__dirname, "..", "public");
+    const filePath = req.url === "/" ? join(publicDir, "index.html") : join(publicDir, req.url!.replace("/public/", ""));
+    if (existsSync(filePath)) {
+      const ext = filePath.split(".").pop() || "html";
+      const mime: Record<string, string> = { html: "text/html", css: "text/css", js: "application/javascript", json: "application/json", png: "image/png", svg: "image/svg+xml" };
+      res.writeHead(200, { "Content-Type": mime[ext] || "text/plain" });
+      res.end(readFileSync(filePath));
+      return;
+    }
+  }
   if (!req.url?.includes("/chat/completions")) {
     res.writeHead(404, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ error: { message: `Not found: ${req.url}`, type: "not_found" } }));
@@ -652,7 +670,7 @@ async function handleRequest(
         markRateLimited(tryModel);
       } else if (category === "overloaded") {
         markOverloaded(tryModel);
-      } else if (category === "auth_failure") {
+      } else if (category === "auth_failure" && response.status === 401) {
         console.error(`[ClawRouter] Auth failure for ${tryModel} — check API key`);
         break; // Don't retry auth failures
       }

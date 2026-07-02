@@ -1,7 +1,7 @@
 {
   "name": "@blockrun/clawrouter",
   "version": "1.0.0",
-  "description": "Smart LLM router via OpenRouter \u2014 22+ models, 15-dimension routing, sub-1ms decisions.",
+  "description": "Smart LLM router via OpenRouter — 22+ models, 15-dimension routing, sub-1ms decisions.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -64,17 +64,18 @@
     "url": "git+https://github.com/BlockRunAI/ClawRouter.git"
   },
   "dependencies": {
-    "undici": "^8.5.0"
+    "undici": "^6.22.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/node": "^18.19.130",
     "eslint": "^10.2.0",
     "prettier": "^3.8.1",
     "tsup": "^8.0.0",
     "tsx": "^4.21.0",
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.58.1",
-    "vitest": "^4.1.3"
+    "vitest": "^2.1.9"
   },
   "overrides": {
     "basic-ftp": "^5.3.1",

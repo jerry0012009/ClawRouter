@@ -174,6 +174,10 @@ export function filterByVision(
 export function filterByExcludeList(models: string[], excludeList: Set<string>): string[] {
   if (excludeList.size === 0) return models;
   const filtered = models.filter((m) => !excludeList.has(m));
+  const excluded = models.filter((m) => excludeList.has(m));
+  if (excluded.length > 0) {
+    console.log(`[ClawRouter] Exclude filter: removed ${excluded.join(", ")}`);
+  }
   return filtered.length > 0 ? filtered : models;
 }
 

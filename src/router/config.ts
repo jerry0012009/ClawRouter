@@ -1082,6 +1082,7 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
     SIMPLE: {
       primary: "openai/gpt-oss-20b:free",
       fallback: [
+        "free/gpt-oss-120b",
         "nvidia/nemotron-3-super-120b-a12b:free",
         "google/gemma-4-26b-a4b-it:free",
         "google/gemma-4-31b-it:free",

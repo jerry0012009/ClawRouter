@@ -755,19 +755,23 @@ declare function getSessionId(headers: Record<string, string | string[] | undefi
 declare function hashRequestContent(lastUserContent: string, toolCallNames?: string[]): string;
 
 type ProxyOptions = {
-    apiKey: string;
+    apiKey?: string;
     port?: number;
+    wallet?: string;
+    apiBase?: string;
     proxyApiKey?: string;
     proxyBaseUrl?: string;
     routingConfig?: Partial<RoutingConfig>;
     cacheConfig?: Partial<ResponseCacheConfig>;
     sessionConfig?: Partial<SessionConfig>;
+    excludeModels?: Set<string> | string[];
     skipBalanceCheck?: boolean;
     onRouted?: (decision: RoutingDecision) => void;
 };
 type ProxyHandle = {
     port: number;
     baseUrl: string;
+    walletAddress?: string;
     close: () => Promise<void>;
 };
 declare function startProxy(options: ProxyOptions): Promise<ProxyHandle>;

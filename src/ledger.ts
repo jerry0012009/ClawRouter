@@ -10,7 +10,9 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { readTextFile } from "./fs-read.js";
 
-const LEDGER_DIR = join(homedir(), ".claw-router", "ledger");
+function ledgerDir(): string {
+  return process.env.ACU_LEDGER_DIR?.trim() || join(homedir(), ".claw-router", "ledger");
+}
 
 export type AcuLedgerEntry = {
   request_id: string;
@@ -32,6 +34,8 @@ export type AcuLedgerEntry = {
   savings: number;
   latency_ms: number;
   fallback_attempts: number;
+  fallback_used: boolean;
+  quality_fallback_used: boolean;
   validator_result: string;
   quality_score?: number;
   cache_hit: boolean;
@@ -53,16 +57,16 @@ export type AcuLedgerSummary = {
 };
 
 async function ensureLedgerDir(): Promise<void> {
-  await mkdir(LEDGER_DIR, { recursive: true });
+  await mkdir(ledgerDir(), { recursive: true });
 }
 
 function ledgerFileFor(date: string): string {
-  return join(LEDGER_DIR, `${date}.jsonl`);
+  return join(ledgerDir(), `${date}.jsonl`);
 }
 
 async function getLedgerFiles(): Promise<string[]> {
   try {
-    const files = await readdir(LEDGER_DIR);
+    const files = await readdir(ledgerDir());
     return files.filter((file) => file.endsWith(".jsonl")).sort().reverse();
   } catch {
     return [];
@@ -71,7 +75,7 @@ async function getLedgerFiles(): Promise<string[]> {
 
 async function readLedgerFile(file: string): Promise<AcuLedgerEntry[]> {
   try {
-    const text = await readTextFile(join(LEDGER_DIR, file));
+    const text = await readTextFile(join(ledgerDir(), file));
     return text
       .trim()
       .split("\n")
@@ -133,7 +137,7 @@ export async function getLedgerSummary(days = 7): Promise<AcuLedgerSummary> {
     total_cost += entry.actual_cost;
     total_baseline_cost += entry.baseline_cost;
     total_latency += entry.latency_ms;
-    if (entry.fallback_attempts > 0) fallback_count++;
+    if (entry.fallback_used ?? entry.fallback_attempts > 0) fallback_count++;
     if (entry.validator_result !== "not_applicable") {
       validator_total++;
       if (entry.validator_result === "pass") validator_pass++;
@@ -164,7 +168,7 @@ export async function clearLedger(): Promise<{ deletedFiles: number }> {
   let deletedFiles = 0;
   for (const file of files) {
     try {
-      await unlink(join(LEDGER_DIR, file));
+      await unlink(join(ledgerDir(), file));
       deletedFiles++;
     } catch {
       // Ignore file-level delete failures.

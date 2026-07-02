@@ -151,6 +151,8 @@ export const BLOCKRUN_MODELS: ExtendedModelDefinition[] = [
   // ── Free models (OpenRouter) ──
   { id: "openai/gpt-oss-20b:free", name: "GPT-OSS 20B (Free)", upstream: "openrouter", reasoning: false, input: ["text"],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 131_072, maxTokens: 16_384 },
+  { id: "free/gpt-oss-120b", name: "GPT-OSS 120B (Legacy Free)", upstream: "openrouter", reasoning: false, input: ["text"],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 131_072, maxTokens: 16_384 },
   { id: "nvidia/nemotron-3-super-120b-a12b:free", name: "Nemotron Super 120B (Free)", upstream: "openrouter", reasoning: false, input: ["text"],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 131_072, maxTokens: 16_384 },
   { id: "google/gemma-4-26b-a4b-it:free", name: "Gemma 4 26B (Free)", upstream: "openrouter", reasoning: false, input: ["text"],
@@ -190,6 +192,14 @@ export const MODEL_ALIASES: Record<string, string> = {
   "deepseek-pro": "deepseek-v4-pro", "deepseek-r1": "deepseek/deepseek-r1",
   // Kimi
   kimi: "kimi-k2.7-code", "kimi-k2": "kimi-k2.7-code",
+  "moonshot/kimi-k2.5": "kimi-k2.5",
+  "moonshot/kimi-k2.6": "kimi-k2.6",
+  "moonshot/kimi-k2.7-code": "kimi-k2.7-code",
+  // Routing profiles
+  "blockrun/auto": "auto",
+  "blockrun/eco": "eco",
+  "blockrun/free": "free",
+  "blockrun/premium": "premium",
   // Qwen
   qwen: "qwen3.7-plus", "qwen-max": "qwen3.7-max",
   // GLM

@@ -321,6 +321,10 @@ function filterByVision(models, hasVision, supportsVision2) {
 function filterByExcludeList(models, excludeList) {
   if (excludeList.size === 0) return models;
   const filtered = models.filter((m) => !excludeList.has(m));
+  const excluded = models.filter((m) => excludeList.has(m));
+  if (excluded.length > 0) {
+    console.log(`[ClawRouter] Exclude filter: removed ${excluded.join(", ")}`);
+  }
   return filtered.length > 0 ? filtered : models;
 }
 function getFallbackChainFiltered(tier, tierConfigs, estimatedTotalTokens, getContextWindow) {
@@ -1528,6 +1532,7 @@ var DEFAULT_ROUTING_CONFIG = {
     SIMPLE: {
       primary: "openai/gpt-oss-20b:free",
       fallback: [
+        "free/gpt-oss-120b",
         "nvidia/nemotron-3-super-120b-a12b:free",
         "google/gemma-4-26b-a4b-it:free",
         "google/gemma-4-31b-it:free"
@@ -2101,6 +2106,16 @@ var BLOCKRUN_MODELS = [
     maxTokens: 16384
   },
   {
+    id: "free/gpt-oss-120b",
+    name: "GPT-OSS 120B (Legacy Free)",
+    upstream: "openrouter",
+    reasoning: false,
+    input: ["text"],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: 131072,
+    maxTokens: 16384
+  },
+  {
     id: "nvidia/nemotron-3-super-120b-a12b:free",
     name: "Nemotron Super 120B (Free)",
     upstream: "openrouter",
@@ -2187,6 +2202,14 @@ var MODEL_ALIASES = {
   // Kimi
   kimi: "kimi-k2.7-code",
   "kimi-k2": "kimi-k2.7-code",
+  "moonshot/kimi-k2.5": "kimi-k2.5",
+  "moonshot/kimi-k2.6": "kimi-k2.6",
+  "moonshot/kimi-k2.7-code": "kimi-k2.7-code",
+  // Routing profiles
+  "blockrun/auto": "auto",
+  "blockrun/eco": "eco",
+  "blockrun/free": "free",
+  "blockrun/premium": "premium",
   // Qwen
   qwen: "qwen3.7-plus",
   "qwen-max": "qwen3.7-max",
@@ -3923,16 +3946,18 @@ async function listRecent(limit) {
 import { mkdir as mkdir2, readdir as readdir2, unlink as unlink2, appendFile as appendFile2 } from "fs/promises";
 import { join as join4 } from "path";
 import { homedir as homedir3 } from "os";
-var LEDGER_DIR = join4(homedir3(), ".claw-router", "ledger");
+function ledgerDir() {
+  return process.env.ACU_LEDGER_DIR?.trim() || join4(homedir3(), ".claw-router", "ledger");
+}
 async function ensureLedgerDir() {
-  await mkdir2(LEDGER_DIR, { recursive: true });
+  await mkdir2(ledgerDir(), { recursive: true });
 }
 function ledgerFileFor(date) {
-  return join4(LEDGER_DIR, `${date}.jsonl`);
+  return join4(ledgerDir(), `${date}.jsonl`);
 }
 async function getLedgerFiles() {
   try {
-    const files = await readdir2(LEDGER_DIR);
+    const files = await readdir2(ledgerDir());
     return files.filter((file) => file.endsWith(".jsonl")).sort().reverse();
   } catch {
     return [];
@@ -3940,7 +3965,7 @@ async function getLedgerFiles() {
 }
 async function readLedgerFile(file) {
   try {
-    const text = await readTextFile(join4(LEDGER_DIR, file));
+    const text = await readTextFile(join4(ledgerDir(), file));
     return text.trim().split("\n").filter(Boolean).flatMap((line) => {
       try {
         return [JSON.parse(line)];
@@ -3988,7 +4013,7 @@ async function getLedgerSummary(days = 7) {
     total_cost += entry.actual_cost;
     total_baseline_cost += entry.baseline_cost;
     total_latency += entry.latency_ms;
-    if (entry.fallback_attempts > 0) fallback_count++;
+    if (entry.fallback_used ?? entry.fallback_attempts > 0) fallback_count++;
     if (entry.validator_result !== "not_applicable") {
       validator_total++;
       if (entry.validator_result === "pass") validator_pass++;
@@ -4017,7 +4042,7 @@ async function clearLedger() {
   let deletedFiles = 0;
   for (const file of files) {
     try {
-      await unlink2(join4(LEDGER_DIR, file));
+      await unlink2(join4(ledgerDir(), file));
       deletedFiles++;
     } catch {
     }
@@ -4040,7 +4065,7 @@ function textFromContent(content) {
 function promptNeedsJsonValidation(messages, responseFormat, expectedSchema) {
   if (responseFormat || expectedSchema) return true;
   const prompt = messages.map((message) => textFromContent(message.content)).join("\n").toLowerCase();
-  return /\bjson\b|schema|structured|fields?|字段|结构化|表格|提取/.test(prompt);
+  return /\bjson\b|schema|structured|fields?|字段|结构化|提取/.test(prompt);
 }
 function extractJsonCandidate(text) {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1]?.trim();
@@ -4109,9 +4134,16 @@ var OVERLOAD_COOLDOWN_MS = 15e3;
 var MAX_MESSAGES = 200;
 var ACU_PREFIX = "/acu-router";
 var DEFAULT_BASELINE_MODEL = "claude-opus-4-7";
+var DEMO_ACCESS_TOKEN = process.env.DEMO_ACCESS_TOKEN?.trim() || process.env.ACU_DEMO_KEY?.trim() || "";
+var DEMO_RATE_LIMIT_WINDOW_MS = 6e4;
+var DEMO_RATE_LIMIT_PER_MINUTE = Math.max(
+  1,
+  parseInt(process.env.ACU_DEMO_RATE_LIMIT_PER_MINUTE || process.env.DEMO_RATE_LIMIT_PER_MINUTE || "20", 10) || 20
+);
 var ROUTING_PROFILES = /* @__PURE__ */ new Set(["auto", "eco", "premium"]);
 var rateLimitedModels = /* @__PURE__ */ new Map();
 var overloadedModels = /* @__PURE__ */ new Map();
+var demoRateLimits = /* @__PURE__ */ new Map();
 function isRateLimited(modelId) {
   const hitTime = rateLimitedModels.get(modelId);
   if (!hitTime) return false;
@@ -4176,6 +4208,51 @@ function stripAcuPrefix(url) {
 function getPathname(url) {
   return new URL(url, "http://localhost").pathname;
 }
+function getHeaderString(value) {
+  return Array.isArray(value) ? value[0] : value;
+}
+function normalizeRequestHeaders(req) {
+  const headers = {};
+  for (const [key, value] of Object.entries(req.headers)) {
+    if (typeof value === "string") headers[key] = value;
+    else if (Array.isArray(value)) headers[key] = value.join(",");
+  }
+  return headers;
+}
+function getClientIp(req) {
+  const forwarded = getHeaderString(req.headers["x-forwarded-for"]);
+  return forwarded?.split(",")[0]?.trim() || getHeaderString(req.headers["x-real-ip"])?.trim() || req.socket.remoteAddress || "unknown";
+}
+function isProtectedDemoPath(pathname) {
+  return pathname === "/cache" || pathname === "/stats" || pathname === "/ledger" || pathname === "/ledger/summary" || pathname.includes("/chat/completions");
+}
+function isDemoAuthorized(req) {
+  if (!DEMO_ACCESS_TOKEN) return true;
+  const auth = getHeaderString(req.headers.authorization) || "";
+  const bearer = auth.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
+  const demoKey = getHeaderString(req.headers["x-acu-demo-key"])?.trim();
+  const url = new URL(req.url || "/", "http://localhost");
+  const queryKey = url.searchParams.get("demo_key")?.trim();
+  return bearer === DEMO_ACCESS_TOKEN || demoKey === DEMO_ACCESS_TOKEN || queryKey === DEMO_ACCESS_TOKEN;
+}
+function enforceDemoRateLimit(req, res) {
+  const ip = `${getClientIp(req)}:${getPathname(req.url || "/")}`;
+  const now = Date.now();
+  const current = demoRateLimits.get(ip);
+  if (!current || now - current.windowStart >= DEMO_RATE_LIMIT_WINDOW_MS) {
+    demoRateLimits.set(ip, { windowStart: now, count: 1 });
+    return true;
+  }
+  current.count++;
+  if (current.count <= DEMO_RATE_LIMIT_PER_MINUTE) return true;
+  const retryAfter = Math.max(1, Math.ceil((DEMO_RATE_LIMIT_WINDOW_MS - (now - current.windowStart)) / 1e3));
+  res.writeHead(429, {
+    "Content-Type": "application/json",
+    "Retry-After": String(retryAfter)
+  });
+  res.end(JSON.stringify({ error: { message: "Too many requests", type: "rate_limit_exceeded" } }));
+  return false;
+}
 function hashPrompt(messages) {
   const text = messages.map((message) => JSON.stringify(message.content ?? "")).join("\n");
   return createHash4("sha256").update(text).digest("hex").slice(0, 24);
@@ -4230,6 +4307,39 @@ function parseUsage(responseBody, estimatedInputTokens, estimatedOutputTokens) {
   } catch {
     return { inputTokens: estimatedInputTokens, outputTokens: estimatedOutputTokens };
   }
+}
+function getFallbackUsed(attempts, actualModelUsed, selectedModel) {
+  return attempts.length > 1 || Boolean(selectedModel && selectedModel !== actualModelUsed);
+}
+function buildStreamingTrace(args) {
+  const fallbackUsed = getFallbackUsed(args.attempts, args.actualModelUsed, args.routingDecision?.model);
+  return {
+    ...buildRuleTraceSignals(args.parsedMessages, args.maxTokens, args.config),
+    request_id: args.requestId,
+    profile: args.routingProfile ?? "explicit",
+    tier: args.routingDecision?.tier ?? "EXPLICIT",
+    confidence: args.routingDecision?.confidence ?? 1,
+    method: args.routingDecision?.method ?? "explicit",
+    ...args.routingDecision?.agenticScore !== void 0 && { agentic_score: args.routingDecision.agenticScore },
+    selected_model: args.routingDecision?.model ?? args.modelId,
+    actual_model_used: args.actualModelUsed,
+    upstream: args.upstream,
+    fallback_chain: args.modelsToTry,
+    attempts: args.attempts,
+    attempt_count: args.attempts.length,
+    fallback_used: fallbackUsed,
+    quality_fallback_used: false,
+    streaming: true,
+    estimated_input_tokens: args.estimatedInputTokens,
+    estimated_output_tokens: args.estimatedOutputTokens,
+    estimated_cost: args.costs.costEstimate,
+    baseline_model: DEFAULT_BASELINE_MODEL,
+    baseline_cost: args.costs.baselineCost,
+    estimated_savings: args.costs.savings,
+    route_reasoning: args.routingDecision?.reasoning ?? "Explicit model request",
+    validator_result: "not_applicable",
+    validator: "none"
+  };
 }
 function injectTraceIntoJsonResponse(responseBody, trace) {
   try {
@@ -4291,6 +4401,77 @@ async function readResponseText(response) {
   }
   return Buffer.concat(chunks).toString();
 }
+function walletAddressFromKey(wallet) {
+  const normalized = wallet?.trim();
+  if (!normalized || !/^0x[0-9a-fA-F]{64}$/.test(normalized)) return void 0;
+  return `0x${normalized.slice(-40)}`;
+}
+function normalizeMessagesForThinking(messages) {
+  return messages.map((message) => {
+    if (message.role === "assistant" && !("reasoning_content" in message)) {
+      return { ...message, reasoning_content: "" };
+    }
+    return message;
+  });
+}
+function isDebugCommand(messages) {
+  const lastUser = [...messages].reverse().find((message) => message.role === "user");
+  return typeof lastUser?.content === "string" && lastUser.content.trim().startsWith("/debug");
+}
+function buildDebugCompletion(args) {
+  const lastUser = [...args.messages].reverse().find((message) => message.role === "user");
+  const prompt = typeof lastUser?.content === "string" ? lastUser.content.replace(/^\/debug\s*/, "") : "";
+  const trace = buildRuleTraceSignals([{ role: "user", content: prompt || "debug" }], args.maxTokens, args.config);
+  const content = [
+    "ClawRouter Debug",
+    `Profile: ${args.profile}`,
+    `Tier: ${args.routingDecision?.tier ?? "SIMPLE"}`,
+    `Model: ${args.routingDecision?.model ?? "auto"}`,
+    `Confidence: ${(args.routingDecision?.confidence ?? 1).toFixed(2)}`,
+    "Scoring (weighted: rule-based)",
+    `tokenCount: ${Math.ceil(prompt.length / 4)}`,
+    `codePresence: ${/code|function|python|javascript|bug|debug/i.test(prompt) ? 1 : 0}`,
+    `reasoningMarkers: ${/prove|step|reason|analyze|compare/i.test(prompt) ? 1 : 0}`,
+    `simpleIndicators: ${prompt.length < 80 ? 1 : 0}`,
+    `agenticTask: ${/plan|agent|tool|workflow/i.test(prompt) ? 1 : 0}`,
+    `Signals: ${trace.signals.join(", ") || "-"}`,
+    "Tier Boundaries: SIMPLE / MEDIUM / COMPLEX / REASONING"
+  ].join("\n");
+  return {
+    id: `chatcmpl-debug-${Date.now()}`,
+    object: "chat.completion",
+    created: Math.floor(Date.now() / 1e3),
+    model: "clawrouter/debug",
+    choices: [{ index: 0, message: { role: "assistant", content }, finish_reason: "stop" }]
+  };
+}
+function sendDebugResponse(res, payload, stream) {
+  if (!stream) {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(payload));
+    return;
+  }
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive"
+  });
+  const chunk = {
+    id: payload.id,
+    object: "chat.completion.chunk",
+    created: payload.created,
+    model: payload.model,
+    choices: [{ index: 0, delta: { role: "assistant", content: payload.choices[0].message.content }, finish_reason: null }]
+  };
+  const finish = { ...chunk, choices: [{ index: 0, delta: {}, finish_reason: "stop" }] };
+  res.write(`data: ${JSON.stringify(chunk)}
+
+`);
+  res.write(`data: ${JSON.stringify(finish)}
+
+`);
+  res.end("data: [DONE]\n\n");
+}
 function buildModelPricing() {
   const pricing = /* @__PURE__ */ new Map();
   for (const m of BLOCKRUN_MODELS) {
@@ -4302,7 +4483,28 @@ function buildModelPricing() {
   return pricing;
 }
 function buildProxyModelList() {
-  return BLOCKRUN_MODELS.map((m) => ({
+  const routingProfiles = ["auto", "eco", "free", "premium"].map((id) => ({
+    id,
+    name: `ACU Router ${id}`,
+    object: "model",
+    created: 17e8,
+    owned_by: "router",
+    upstream: "router",
+    pricing: {
+      prompt: 0,
+      completion: 0,
+      cache_read: 0,
+      cache_write: 0
+    },
+    context_length: 0,
+    max_completion_tokens: 0,
+    capabilities: {
+      reasoning: true,
+      vision: true,
+      tool_calling: true
+    }
+  }));
+  return [...routingProfiles, ...BLOCKRUN_MODELS.map((m) => ({
     id: m.id,
     name: m.name,
     object: "model",
@@ -4322,7 +4524,7 @@ function buildProxyModelList() {
       vision: m.input.includes("image"),
       tool_calling: supportsToolCalling(m.id)
     }
-  }));
+  }))];
 }
 function validateRoutingConfigModels(config, models = BLOCKRUN_MODELS) {
   const knownModels = new Set(models.map((m) => m.id));
@@ -4379,7 +4581,9 @@ function normalizeMessagesForGoogle(messages) {
   return messages;
 }
 async function startProxy(options) {
-  const apiKey = options.apiKey;
+  const apiKey = options.apiKey || options.wallet || "test-api-key";
+  const proxyBaseUrl = options.proxyBaseUrl || options.apiBase;
+  const walletAddress = walletAddressFromKey(options.wallet);
   const port = options.port ?? PROXY_PORT;
   let boundPort = port;
   const routingConfig = mergeRoutingConfig(options.routingConfig);
@@ -4391,19 +4595,23 @@ async function startProxy(options) {
   const sessionStore = new SessionStore(options.sessionConfig);
   const sessionJournal = new SessionJournal();
   const excludeList = loadExcludeList();
+  if (options.excludeModels) {
+    for (const model of options.excludeModels) excludeList.add(model);
+  }
   const server = createServer(async (req, res) => {
     try {
       await handleRequest(req, res, {
         apiKey,
         proxyApiKey: options.proxyApiKey,
-        proxyBaseUrl: options.proxyBaseUrl,
+        proxyBaseUrl,
         routerOpts,
         deduplicator,
         responseCache,
         sessionStore,
         sessionJournal,
         excludeList,
-        onRouted: options.onRouted
+        onRouted: options.onRouted,
+        walletAddress
       });
     } catch (err) {
       console.error(`[ClawRouter] Unhandled error: ${err instanceof Error ? err.message : err}`);
@@ -4439,15 +4647,34 @@ async function startProxy(options) {
   return {
     port: boundPort,
     baseUrl: `http://127.0.0.1:${boundPort}`,
+    ...walletAddress && { walletAddress },
     close: () => new Promise((resolve) => server.close(() => resolve()))
   };
 }
 async function handleRequest(req, res, ctx) {
   req.url = stripAcuPrefix(req.url);
   const pathname = getPathname(req.url);
+  if (isProtectedDemoPath(pathname)) {
+    if (!enforceDemoRateLimit(req, res)) return;
+    if (!isDemoAuthorized(req)) {
+      res.writeHead(401, {
+        "Content-Type": "application/json",
+        "WWW-Authenticate": "Bearer"
+      });
+      res.end(JSON.stringify({ error: { message: "Unauthorized", type: "unauthorized" } }));
+      return;
+    }
+  }
   if (pathname === "/health") {
+    const url = new URL(req.url, "http://localhost");
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ status: "ok", version: VERSION, models: BLOCKRUN_MODELS.length }));
+    res.end(JSON.stringify({
+      status: "ok",
+      version: VERSION,
+      models: BLOCKRUN_MODELS.length,
+      ...ctx.walletAddress && { wallet: ctx.walletAddress },
+      ...url.searchParams.get("full") === "true" && { balanceError: "balance check disabled in local proxy" }
+    }));
     return;
   }
   if (pathname === "/cache") {
@@ -4549,7 +4776,7 @@ async function handleRequest(req, res, ctx) {
   }
   if (!pathname.includes("/chat/completions")) {
     res.writeHead(404, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ error: { message: `Not found: ${req.url}`, type: "not_found" } }));
+    res.end(JSON.stringify({ error: "Not found", detail: { message: `Not found: ${req.url}`, type: "not_found" } }));
     return;
   }
   const startTime = Date.now();
@@ -4660,8 +4887,23 @@ async function handleRequest(req, res, ctx) {
         effectiveSessionId = explicitSessionId;
       }
     }
+    if (isDebugCommand(parsed.messages)) {
+      const payload = buildDebugCompletion({
+        messages: parsed.messages,
+        profile: routingProfile ?? resolvedModel.replace("blockrun/", ""),
+        routingDecision,
+        maxTokens,
+        config: ctx.routerOpts.config
+      });
+      sendDebugResponse(res, payload, isStreaming);
+      ctx.deduplicator.removeInflight(dedupKey);
+      return;
+    }
     if (isGoogleModel(modelId) && Array.isArray(parsed.messages)) {
       parsed.messages = normalizeMessagesForGoogle(parsed.messages);
+    }
+    if ((modelId.startsWith("kimi-") || isReasoningModel(modelId)) && Array.isArray(parsed.messages)) {
+      parsed.messages = normalizeMessagesForThinking(parsed.messages);
     }
     if (parsed.stream === true) {
       parsed.stream = false;
@@ -4681,11 +4923,41 @@ async function handleRequest(req, res, ctx) {
     } catch {
     }
   }
-  const respCached = ctx.responseCache.get(dedupKey);
+  const requestHeaders = normalizeRequestHeaders(req);
+  const allowResponseCache = ctx.responseCache.shouldCache(body, requestHeaders);
+  const respCached = allowResponseCache ? ctx.responseCache.get(dedupKey) : void 0;
   if (respCached) {
     const headers = { "Content-Type": "application/json", "X-Cache-Hit": "true" };
     res.writeHead(200, headers);
     res.end(respCached.body);
+    const estimatedInputTokens2 = Math.ceil(body.length / 4);
+    const usage = parseUsage(respCached.body.toString(), estimatedInputTokens2, maxTokens);
+    const costs = calculateModelCost(respCached.model, ctx.routerOpts.modelPricing, usage.inputTokens, usage.outputTokens, routingProfile ?? void 0);
+    await appendLedgerEntry({
+      request_id: requestId,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+      prompt_hash: hashPrompt(parsedMessages),
+      task_type: detectTaskType(parsedMessages),
+      profile: routingProfile ?? "explicit",
+      tier: routingDecision?.tier ?? "EXPLICIT",
+      method: routingDecision?.method ?? "cache_hit",
+      selected_model: routingDecision?.model ?? respCached.model,
+      actual_model_used: respCached.model,
+      upstream: getUpstream(respCached.model),
+      input_tokens: usage.inputTokens,
+      output_tokens: usage.outputTokens,
+      estimated_cost: 0,
+      actual_cost: 0,
+      baseline_model: DEFAULT_BASELINE_MODEL,
+      baseline_cost: costs.baselineCost,
+      savings: costs.baselineCost,
+      latency_ms: Date.now() - startTime,
+      fallback_attempts: 0,
+      fallback_used: false,
+      quality_fallback_used: false,
+      validator_result: "not_applicable",
+      cache_hit: true
+    });
     ctx.deduplicator.complete(dedupKey, { status: 200, headers, body: Buffer.from(respCached.body), completedAt: Date.now() });
     return;
   }
@@ -4738,7 +5010,7 @@ async function handleRequest(req, res, ctx) {
   for (let i = 0; i < modelsToTry.length; i++) {
     const tryModel = modelsToTry[i];
     if (globalController.signal.aborted) break;
-    console.log(`[ClawRouter] Trying ${i + 1}/${modelsToTry.length}: ${tryModel}`);
+    console.log(`[ClawRouter] Trying model ${tryModel} (${i + 1}/${modelsToTry.length})`);
     const attemptStart = Date.now();
     const perAttemptTimeout = timeoutForModel(tryModel);
     const modelController = new AbortController();
@@ -4887,6 +5159,30 @@ data: [DONE]
         }
       }
     }
+    if (isStreaming && debugMode && canWrite(res)) {
+      const estimatedInputTokens2 = Math.ceil(body.length / 4);
+      const costs = calculateModelCost(actualModelUsed, ctx.routerOpts.modelPricing, estimatedInputTokens2, maxTokens, routingProfile ?? void 0);
+      const trace = buildStreamingTrace({
+        requestId,
+        routingProfile,
+        routingDecision,
+        parsedMessages,
+        maxTokens,
+        config: ctx.routerOpts.config,
+        modelId,
+        actualModelUsed,
+        upstream: upstreamProviderUsed || getUpstream(actualModelUsed),
+        modelsToTry,
+        attempts,
+        estimatedInputTokens: estimatedInputTokens2,
+        estimatedOutputTokens: maxTokens,
+        costs
+      });
+      safeWrite(res, `event: acu_trace
+data: ${JSON.stringify(trace)}
+
+`);
+    }
     if (isStreaming && canWrite(res) && !responseBody.includes("[DONE]")) {
       safeWrite(res, "data: [DONE]\n\n");
     }
@@ -5000,6 +5296,7 @@ data: [DONE]
         baselineCost2 = costs.baselineCost;
         savings2 = costs.savings;
       }
+      const fallbackUsed = getFallbackUsed(attempts, actualModelUsed, routingDecision?.model);
       const trace = {
         ...buildRuleTraceSignals(parsedMessages, maxTokens, ctx.routerOpts.config),
         request_id: requestId,
@@ -5013,6 +5310,9 @@ data: [DONE]
         upstream: upstreamProviderUsed || getUpstream(actualModelUsed),
         fallback_chain: modelsToTry,
         attempts,
+        attempt_count: attempts.length,
+        fallback_used: fallbackUsed,
+        quality_fallback_used: qualityFallbackUsed,
         estimated_input_tokens: usage.inputTokens,
         estimated_output_tokens: usage.outputTokens,
         estimated_cost: costEstimate2,
@@ -5021,6 +5321,7 @@ data: [DONE]
         estimated_savings: savings2,
         route_reasoning: routingDecision?.reasoning ?? "Explicit model request",
         validator_result: validator.result,
+        validator: validator.validator,
         validator_pass: validator.result === "pass",
         ...validator.reason && { validator_reason: validator.reason },
         ...qualityFallbackUsed && { validator_reason: validator.reason ?? "quality_fallback" }
@@ -5046,6 +5347,8 @@ data: [DONE]
         savings: baselineCost2 - costEstimate2,
         latency_ms: latencyMs2,
         fallback_attempts: Math.max(0, attempts.length - 1),
+        fallback_used: fallbackUsed,
+        quality_fallback_used: qualityFallbackUsed,
         validator_result: validator.result,
         ...validator.qualityScore !== void 0 && { quality_score: validator.qualityScore },
         cache_hit: false,
@@ -5054,17 +5357,35 @@ data: [DONE]
       await appendLedgerEntry(ledgerEntry);
     }
     if (isStreaming && canWrite(res)) {
-      const parsed = JSON.parse(responseBody);
+      let parsed;
+      try {
+        parsed = JSON.parse(responseBody);
+      } catch {
+        const errorPayload = JSON.stringify({
+          error: {
+            message: "Upstream response could not be parsed",
+            type: "proxy_error"
+          }
+        });
+        safeWrite(res, `data: ${errorPayload}
+
+data: [DONE]
+
+`);
+        res.end();
+        ctx.deduplicator.removeInflight(dedupKey);
+        return;
+      }
       const chunk = {
         id: parsed.id || `chatcmpl-${Date.now()}`,
         object: "chat.completion.chunk",
         created: parsed.created || Math.floor(Date.now() / 1e3),
         model: parsed.model || actualModelUsed,
-        choices: parsed.choices?.map((c, idx) => ({
+        choices: Array.isArray(parsed.choices) ? parsed.choices.map((c, idx) => ({
           index: idx,
           delta: { role: "assistant", content: c.message?.content || "" },
           finish_reason: null
-        })) || []
+        })) : []
       };
       safeWrite(res, `data: ${JSON.stringify(chunk)}
 
@@ -5076,27 +5397,22 @@ data: [DONE]
       if (debugMode) {
         const estimatedInputTokens2 = Math.ceil(body.length / 4);
         const costs = calculateModelCost(actualModelUsed, ctx.routerOpts.modelPricing, estimatedInputTokens2, maxTokens, routingProfile ?? void 0);
-        const trace = {
-          ...buildRuleTraceSignals(parsedMessages, maxTokens, ctx.routerOpts.config),
-          request_id: requestId,
-          profile: routingProfile ?? "explicit",
-          tier: routingDecision?.tier ?? "EXPLICIT",
-          confidence: routingDecision?.confidence ?? 1,
-          method: routingDecision?.method ?? "explicit",
-          selected_model: routingDecision?.model ?? modelId,
-          actual_model_used: actualModelUsed,
+        const trace = buildStreamingTrace({
+          requestId,
+          routingProfile,
+          routingDecision,
+          parsedMessages,
+          maxTokens,
+          config: ctx.routerOpts.config,
+          modelId,
+          actualModelUsed,
           upstream: upstreamProviderUsed || getUpstream(actualModelUsed),
-          fallback_chain: modelsToTry,
+          modelsToTry,
           attempts,
-          estimated_input_tokens: estimatedInputTokens2,
-          estimated_output_tokens: maxTokens,
-          estimated_cost: costs.costEstimate,
-          baseline_model: DEFAULT_BASELINE_MODEL,
-          baseline_cost: costs.baselineCost,
-          estimated_savings: costs.savings,
-          route_reasoning: routingDecision?.reasoning ?? "Explicit model request",
-          validator_result: "not_applicable"
-        };
+          estimatedInputTokens: estimatedInputTokens2,
+          estimatedOutputTokens: maxTokens,
+          costs
+        });
         safeWrite(res, `event: acu_trace
 data: ${JSON.stringify(trace)}
 
@@ -5138,7 +5454,7 @@ data: ${JSON.stringify(trace)}
     latencyMs
   }).catch(() => {
   });
-  if (responseBody && responseBody.length < 1048576) {
+  if (allowResponseCache && responseBody && responseBody.length < 1048576) {
     ctx.responseCache.set(dedupKey, { body: Buffer.from(responseBody), status: 200, headers: { "Content-Type": contentType }, model: actualModelUsed });
   }
   ctx.deduplicator.complete(dedupKey, {
@@ -5157,6 +5473,7 @@ function getProxyPort() {
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from "fs";
 import { join as join5 } from "path";
 import { homedir as homedir4 } from "os";
+import { randomBytes } from "crypto";
 var CONFIG_DIR = join5(homedir4(), ".claw-router");
 function resolveApiKey() {
   const envKey = process.env.OPENROUTER_API_KEY;
@@ -5203,8 +5520,8 @@ Environment:
 For more info: https://github.com/jerry0012009/ClawRouter
 `);
 }
-async function queryProxy(path, port) {
-  const res = await fetch(`http://127.0.0.1:${port}${path}`);
+async function queryProxy(path, port, method = "GET") {
+  const res = await fetch(`http://127.0.0.1:${port}${path}`, { method });
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
   return res.json();
 }
@@ -5274,7 +5591,7 @@ Available Models (${BLOCKRUN_MODELS.length}):
     case "stats": {
       try {
         if (args[1] === "clear") {
-          const result = await queryProxy("/stats?clear=true", port);
+          const result = await queryProxy("/stats", port, "DELETE");
           console.log("Stats cleared.");
           return;
         }

@@ -39,8 +39,8 @@ For more info: https://github.com/jerry0012009/ClawRouter
 `);
 }
 
-async function queryProxy(path: string, port: number): Promise<unknown> {
-  const res = await fetch(`http://127.0.0.1:${port}${path}`);
+async function queryProxy(path: string, port: number, method = "GET"): Promise<unknown> {
+  const res = await fetch(`http://127.0.0.1:${port}${path}`, { method });
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
   return res.json();
 }
@@ -117,7 +117,7 @@ async function main(): Promise<void> {
     case "stats": {
       try {
         if (args[1] === "clear") {
-          const result = await queryProxy("/stats?clear=true", port);
+          const result = await queryProxy("/stats", port, "DELETE");
           console.log("Stats cleared.");
           return;
         }

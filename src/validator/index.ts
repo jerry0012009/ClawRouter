@@ -34,7 +34,7 @@ export function promptNeedsJsonValidation(
 ): boolean {
   if (responseFormat || expectedSchema) return true;
   const prompt = messages.map((message) => textFromContent(message.content)).join("\n").toLowerCase();
-  return /\bjson\b|schema|structured|fields?|字段|结构化|表格|提取/.test(prompt);
+  return /\bjson\b|schema|structured|fields?|字段|结构化|提取/.test(prompt);
 }
 
 function extractJsonCandidate(text: string): string | undefined {

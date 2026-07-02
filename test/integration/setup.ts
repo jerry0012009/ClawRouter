@@ -16,13 +16,8 @@ const HEALTH_TIMEOUT_MS = 5_000;
 let proxyHandle: ProxyHandle | undefined;
 
 function getTestPort(): number {
-  // Keep worker 1 on the historical default (8402), then offset others.
-  const workerRaw = process.env.VITEST_POOL_ID ?? process.env.VITEST_WORKER_ID ?? "1";
-  const workerId = Number.parseInt(workerRaw, 10);
-  if (Number.isInteger(workerId) && workerId >= 1) {
-    return 8401 + workerId;
-  }
-  return 8402;
+  // Let the OS allocate a free port. Fixed ports collide under parallel Vitest workers.
+  return 0;
 }
 
 /**

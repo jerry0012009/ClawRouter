@@ -188,7 +188,7 @@ function getApiBase() {
 const API = getApiBase();
 
 /* ===== Baseline model config ===== */
-const BASELINE_MODEL = 'gpt-4o';
+const BASELINE_MODEL = 'claude-opus-4-7';
 const ROUTER_MODEL = 'auto';
 
 /* ===== State ===== */
@@ -223,22 +223,54 @@ function initPresets() {
 
 /* ===== Chat completion helper ===== */
 async function chatComplete(model, messages, maxTokens) {
+  const headers = { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' };
+  const demoKey = getDemoKey();
+  if (demoKey) headers['X-ACU-Demo-Key'] = demoKey;
   const res = await fetch(`${API}/v1/chat/completions`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, messages, max_tokens: maxTokens || 600 }),
+    headers,
+    body: JSON.stringify({ model, messages, max_tokens: maxTokens || 600, cache: false, baseline_model: BASELINE_MODEL }),
   });
   return res.json();
 }
 
-/* ===== Estimate cost (simple token-based) ===== */
+function getDemoKey() {
+  const params = new URLSearchParams(location.search);
+  const queryKey = params.get('demo_key') || params.get('acu_demo_key');
+  if (queryKey) {
+    try { localStorage.setItem('acu_demo_key', queryKey); } catch {}
+    return queryKey;
+  }
+  try { return localStorage.getItem('acu_demo_key') || ''; } catch { return ''; }
+}
+
+function authFetch(url, options = {}) {
+  const headers = { ...(options.headers || {}) };
+  const demoKey = getDemoKey();
+  if (demoKey) headers['X-ACU-Demo-Key'] = demoKey;
+  return fetch(url, { ...options, headers });
+}
+
+function getTrace(response) {
+  return response?.acu_trace || response?._acu_trace || null;
+}
+
+/* ===== Estimate cost fallback when trace is unavailable ===== */
 function estimateCost(model, usage) {
   if (!usage) return 0;
   const m = modelCatalogMap[model];
   if (!m) return 0;
-  const inp = (usage.prompt_tokens || 0) * (m.input || 0) / 1e6;
-  const out = (usage.completion_tokens || 0) * (m.output || 0) / 1e6;
+  const inpTokens = usage.prompt_tokens ?? usage.input_tokens ?? 0;
+  const outTokens = usage.completion_tokens ?? usage.output_tokens ?? 0;
+  const inp = inpTokens * (m.input || 0) / 1e6;
+  const out = outTokens * (m.output || 0) / 1e6;
   return inp + out;
+}
+
+function costFromTraceOrUsage(response, fallbackModel) {
+  const trace = getTrace(response);
+  if (typeof trace?.estimated_cost === 'number') return trace.estimated_cost;
+  return estimateCost(fallbackModel, response?.usage);
 }
 
 /* ===== Main comparison ===== */
@@ -272,30 +304,30 @@ async function runComparison() {
 
     // --- Baseline ---
     const bContent = baselineRes.choices?.[0]?.message?.content || baselineRes.error?.message || '(empty)';
-    const bUsage = baselineRes.usage;
-    const bCost = estimateCost(BASELINE_MODEL, bUsage);
+    const baselineTrace = getTrace(baselineRes);
     const bModel = baselineRes.model || BASELINE_MODEL;
+    const bCost = costFromTraceOrUsage(baselineRes, bModel);
     bAns.textContent = bContent;
     document.getElementById('baseline-meta').innerHTML =
-      `<span>模型: <strong>${bModel}</strong></span>` +
+      `<span>Baseline Model: <strong>${baselineTrace?.baseline_model || BASELINE_MODEL}</strong></span>` +
+      `<span>实际调用: <strong>${bModel}</strong></span>` +
       `<span>延迟: <strong>${elapsed}ms</strong></span>` +
       `<span class="high-cost">成本: $${bCost.toFixed(5)}</span>`;
 
     // --- Router ---
     const rContent = routerRes.choices?.[0]?.message?.content || routerRes.error?.message || '(empty)';
-    const rUsage = routerRes.usage;
     const rActualModel = routerRes.model || 'unknown';
-    const rCost = estimateCost(rActualModel, rUsage);
+    const rCost = costFromTraceOrUsage(routerRes, rActualModel);
     rAns.textContent = rContent;
 
     // Trace from response
-    const trace = routerRes.acu_trace || routerRes._acu_trace || null;
+    const trace = getTrace(routerRes);
     const tier = trace?.tier || routerRes.tier || '-';
     const confidence = trace?.confidence ?? routerRes.confidence ?? '-';
     const signals = trace?.signals || routerRes.signals || [];
     const fallbackChain = trace?.fallback_chain || [];
     const validatorPass = trace?.validator_pass ?? null;
-    const isFallback = fallbackChain.length > 1;
+    const isFallback = trace?.fallback_used ?? ((trace?.attempts?.length || 0) > 1);
     if (isFallback) fallbackCount++;
 
     const savings = bCost > 0 ? ((bCost - rCost) / bCost * 100) : 0;
@@ -338,7 +370,7 @@ async function runComparison() {
       selected_model: trace?.selected_model || rActualModel,
       actual_model: rActualModel,
       fallback_chain: fallbackChain.length ? fallbackChain : [rActualModel],
-      attempts: trace?.attempts || 1,
+      attempts: trace?.attempt_count ?? trace?.attempts?.length ?? 1,
       upstream: trace?.upstream || '-',
       estimated_savings: savings.toFixed(1) + '%',
     });
@@ -430,7 +462,7 @@ function renderLedger() {
 
 async function loadLedgerSummary() {
   try {
-    const res = await fetch(`${API}/ledger/summary?days=1`);
+    const res = await authFetch(`${API}/ledger/summary?days=1`);
     if (!res.ok) return;
     const summary = await res.json();
     totalRequests = summary.total_requests || 0;
@@ -452,7 +484,7 @@ async function loadLedgerSummary() {
       baseline: e.baseline_cost || 0,
       savings: e.baseline_cost > 0 ? ((e.baseline_cost - e.actual_cost) / e.baseline_cost * 100) : 0,
       validator: e.validator_result === 'not_applicable' ? '-' : (e.validator_result === 'pass' ? '✅' : '❌'),
-      fallback: e.fallback_attempts > 0 ? '✅' : '-',
+      fallback: (e.fallback_used ?? e.fallback_attempts > 0) ? '✅' : '-',
       latency: `${Math.round(e.latency_ms || 0)}ms`,
     }));
     renderLedger();

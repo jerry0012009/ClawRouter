@@ -782,17 +782,15 @@ declare function saveApiKey(key: string): void;
 declare const blockrunProvider: ProviderPlugin;
 
 /**
- * Model Definitions — Dual Upstream
+ * Model Definitions — Dual Upstream (2026-07-02 updated)
  *
- * Models are routed to one of two upstream providers:
- *   - "proxy": api.openai-proxy.org (OpenAI, Anthropic, Google)
- *   - "openrouter": openrouter.ai (DeepSeek, Llama, Qwen, free models)
+ * "proxy": api.openai-proxy.org (OpenAI, Anthropic, Google, DeepSeek, Kimi, Qwen, GLM)
+ * "openrouter": openrouter.ai (DeepSeek, Meta, Qwen, Grok, free models)
  */
 
 type UpstreamProvider = "proxy" | "openrouter";
 type ExtendedModelDefinition = ModelDefinitionConfig & {
     upstream: UpstreamProvider;
-    /** Use max_completion_tokens instead of max_tokens (required for o-series) */
     useMaxCompletionTokens?: boolean;
 };
 declare const BLOCKRUN_MODELS: ExtendedModelDefinition[];

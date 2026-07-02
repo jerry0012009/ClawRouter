@@ -30,7 +30,7 @@ function sleep(ms: number): Promise<void> {
 /**
  * Wrap a fetch-like function with retry logic and exponential backoff.
  *
- * @param fetchFn - The fetch function to wrap (can be standard fetch or x402 payFetch)
+ * @param fetchFn - The fetch function to wrap (standard fetch)
  * @param url - URL to fetch
  * @param init - Fetch init options
  * @param config - Retry configuration (optional, uses defaults)

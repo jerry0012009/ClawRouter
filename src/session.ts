@@ -235,7 +235,7 @@ export class SessionStore {
 
   /**
    * Add cost to a session's running total for maxCostPerRun tracking.
-   * Cost is in USDC 6-decimal units (micros).
+   * Cost in micro-currency units (6 decimal places).
    * Creates a cost-tracking-only entry if none exists (e.g., explicit model requests
    * that never go through the routing path).
    */

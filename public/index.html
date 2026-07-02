@@ -428,6 +428,37 @@ function renderLedger() {
     `<span>Validator 通过率: <strong>${vpTotal > 0 ? (vpCount/vpTotal*100).toFixed(0) : '-'}%</strong></span>`;
 }
 
+async function loadLedgerSummary() {
+  try {
+    const res = await fetch(`${API}/ledger/summary?days=1`);
+    if (!res.ok) return;
+    const summary = await res.json();
+    totalRequests = summary.total_requests || 0;
+    totalRouterCost = summary.total_cost || 0;
+    totalBaselineCost = summary.total_baseline_cost || 0;
+    fallbackCount = Math.round((summary.fallback_rate || 0) * totalRequests);
+    const saved = summary.total_savings || 0;
+    const pct = totalBaselineCost > 0 ? (saved / totalBaselineCost * 100) : 0;
+    document.getElementById('kpi-requests').textContent = totalRequests;
+    document.getElementById('kpi-savings').textContent = '$' + saved.toFixed(4);
+    document.getElementById('kpi-pct').textContent = pct.toFixed(1) + '%';
+    document.getElementById('kpi-fallback').textContent = ((summary.fallback_rate || 0) * 100).toFixed(0) + '%';
+
+    ledger = (summary.recent || []).slice(0, 10).map(e => ({
+      time: new Date(e.timestamp).toLocaleTimeString(),
+      task: e.task_type || '-',
+      model: e.actual_model_used || e.selected_model || '-',
+      cost: e.actual_cost || 0,
+      baseline: e.baseline_cost || 0,
+      savings: e.baseline_cost > 0 ? ((e.baseline_cost - e.actual_cost) / e.baseline_cost * 100) : 0,
+      validator: e.validator_result === 'not_applicable' ? '-' : (e.validator_result === 'pass' ? '✅' : '❌'),
+      fallback: e.fallback_attempts > 0 ? '✅' : '-',
+      latency: `${Math.round(e.latency_ms || 0)}ms`,
+    }));
+    renderLedger();
+  } catch { /* silent */ }
+}
+
 /* ===== Model Catalog ===== */
 let modelCatalogMap = {};
 async function loadModels() {
@@ -486,6 +517,7 @@ document.getElementById('prompt-input').addEventListener('keydown', e => {
 initPresets();
 checkHealth();
 loadModels();
+loadLedgerSummary();
 setInterval(checkHealth, 30000);
 </script>
 </body>

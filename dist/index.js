@@ -4206,6 +4206,25 @@ function detectTaskType(messages) {
   if (/email|邮件|投资人|investor/.test(text)) return "writing";
   return "general";
 }
+function extractPromptText(messages) {
+  const lastUserMsg = [...messages].reverse().find((message) => message.role === "user");
+  const rawPrompt = lastUserMsg?.content;
+  const prompt = typeof rawPrompt === "string" ? rawPrompt : Array.isArray(rawPrompt) ? rawPrompt.filter((block) => block.type === "text").map((block) => block.text ?? "").join(" ") : "";
+  const systemMsg = messages.find((message) => message.role === "system");
+  const systemPrompt = typeof systemMsg?.content === "string" ? systemMsg.content : void 0;
+  return { prompt, systemPrompt };
+}
+function buildRuleTraceSignals(messages, maxTokens, config) {
+  const { prompt, systemPrompt } = extractPromptText(messages);
+  if (!prompt) return { score: void 0, signals: [] };
+  const ruleResult = classifyByRules(
+    prompt,
+    systemPrompt,
+    Math.ceil((prompt.length + (systemPrompt?.length ?? 0)) / 4) + maxTokens,
+    config.scoring
+  );
+  return { score: ruleResult.score, signals: ruleResult.signals };
+}
 function extractAssistantText(responseBody) {
   try {
     const parsed = JSON.parse(responseBody);
@@ -4996,12 +5015,12 @@ data: [DONE]
         savings2 = costs.savings;
       }
       const trace = {
+        ...buildRuleTraceSignals(parsedMessages, maxTokens, ctx.routerOpts.config),
         request_id: requestId,
         profile: routingProfile ?? "explicit",
         tier: routingDecision?.tier ?? "EXPLICIT",
         confidence: routingDecision?.confidence ?? 1,
         method: routingDecision?.method ?? "explicit",
-        signals: [],
         ...routingDecision?.agenticScore !== void 0 && { agentic_score: routingDecision.agenticScore },
         selected_model: routingDecision?.model ?? modelId,
         actual_model_used: actualModelUsed,
@@ -5072,12 +5091,12 @@ data: [DONE]
         const estimatedInputTokens2 = Math.ceil(body.length / 4);
         const costs = calculateModelCost(actualModelUsed, ctx.routerOpts.modelPricing, estimatedInputTokens2, maxTokens, routingProfile ?? void 0);
         const trace = {
+          ...buildRuleTraceSignals(parsedMessages, maxTokens, ctx.routerOpts.config),
           request_id: requestId,
           profile: routingProfile ?? "explicit",
           tier: routingDecision?.tier ?? "EXPLICIT",
           confidence: routingDecision?.confidence ?? 1,
           method: routingDecision?.method ?? "explicit",
-          signals: [],
           selected_model: routingDecision?.model ?? modelId,
           actual_model_used: actualModelUsed,
           upstream: upstreamProviderUsed || getUpstream(actualModelUsed),

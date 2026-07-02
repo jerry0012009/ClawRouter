@@ -223,6 +223,29 @@ function detectTaskType(messages: ChatMessage[]): string {
   return "general";
 }
 
+function extractPromptText(messages: ChatMessage[]): { prompt: string; systemPrompt?: string } {
+  const lastUserMsg = [...messages].reverse().find((message) => message.role === "user");
+  const rawPrompt = lastUserMsg?.content;
+  const prompt = typeof rawPrompt === "string" ? rawPrompt : Array.isArray(rawPrompt)
+    ? (rawPrompt as Array<{ type: string; text?: string }>).filter((block) => block.type === "text").map((block) => block.text ?? "").join(" ")
+    : "";
+  const systemMsg = messages.find((message) => message.role === "system");
+  const systemPrompt = typeof systemMsg?.content === "string" ? systemMsg.content : undefined;
+  return { prompt, systemPrompt };
+}
+
+function buildRuleTraceSignals(messages: ChatMessage[], maxTokens: number, config: RoutingConfig) {
+  const { prompt, systemPrompt } = extractPromptText(messages);
+  if (!prompt) return { score: undefined, signals: [] as string[] };
+  const ruleResult = classifyByRules(
+    prompt,
+    systemPrompt,
+    Math.ceil((prompt.length + (systemPrompt?.length ?? 0)) / 4) + maxTokens,
+    config.scoring,
+  );
+  return { score: ruleResult.score, signals: ruleResult.signals };
+}
+
 function extractAssistantText(responseBody: string): string {
   try {
     const parsed = JSON.parse(responseBody) as {
@@ -1188,12 +1211,12 @@ async function handleRequest(
       }
 
       const trace: AcuTrace = {
+        ...buildRuleTraceSignals(parsedMessages, maxTokens, ctx.routerOpts.config),
         request_id: requestId,
         profile: routingProfile ?? "explicit",
         tier: routingDecision?.tier ?? "EXPLICIT",
         confidence: routingDecision?.confidence ?? 1,
         method: routingDecision?.method ?? "explicit",
-        signals: [],
         ...(routingDecision?.agenticScore !== undefined && { agentic_score: routingDecision.agenticScore }),
         selected_model: routingDecision?.model ?? modelId,
         actual_model_used: actualModelUsed,
@@ -1266,12 +1289,12 @@ async function handleRequest(
         const estimatedInputTokens = Math.ceil(body.length / 4);
         const costs = calculateModelCost(actualModelUsed, ctx.routerOpts.modelPricing, estimatedInputTokens, maxTokens, routingProfile ?? undefined);
         const trace: AcuTrace = {
+          ...buildRuleTraceSignals(parsedMessages, maxTokens, ctx.routerOpts.config),
           request_id: requestId,
           profile: routingProfile ?? "explicit",
           tier: routingDecision?.tier ?? "EXPLICIT",
           confidence: routingDecision?.confidence ?? 1,
           method: routingDecision?.method ?? "explicit",
-          signals: [],
           selected_model: routingDecision?.model ?? modelId,
           actual_model_used: actualModelUsed,
           upstream: upstreamProviderUsed || getUpstream(actualModelUsed),

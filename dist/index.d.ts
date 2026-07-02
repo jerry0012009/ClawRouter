@@ -765,6 +765,7 @@ type ProxyOptions = {
     cacheConfig?: Partial<ResponseCacheConfig>;
     sessionConfig?: Partial<SessionConfig>;
     excludeModels?: Set<string> | string[];
+    demoAccessToken?: string;
     skipBalanceCheck?: boolean;
     onRouted?: (decision: RoutingDecision) => void;
 };

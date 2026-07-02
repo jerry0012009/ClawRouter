@@ -45,6 +45,8 @@ export type AcuLedgerEntry = {
 export type AcuLedgerSummary = {
   total_requests: number;
   total_cost: number;
+  baseline_cost: number;
+  savings: number;
   total_baseline_cost: number;
   total_savings: number;
   avg_latency_ms: number;
@@ -148,11 +150,14 @@ export async function getLedgerSummary(days = 7): Promise<AcuLedgerSummary> {
   }
 
   const total_requests = entries.length;
+  const total_savings = total_baseline_cost - total_cost;
   return {
     total_requests,
     total_cost,
+    baseline_cost: total_baseline_cost,
+    savings: total_savings,
     total_baseline_cost,
-    total_savings: total_baseline_cost - total_cost,
+    total_savings,
     avg_latency_ms: total_requests > 0 ? total_latency / total_requests : 0,
     fallback_rate: total_requests > 0 ? fallback_count / total_requests : 0,
     validator_pass_rate: validator_total > 0 ? validator_pass / validator_total : 0,

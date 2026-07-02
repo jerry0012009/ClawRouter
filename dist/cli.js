@@ -4023,11 +4023,14 @@ async function getLedgerSummary(days = 7) {
     addGroup(by_task_type, entry.task_type || "unknown", entry);
   }
   const total_requests = entries.length;
+  const total_savings = total_baseline_cost - total_cost;
   return {
     total_requests,
     total_cost,
+    baseline_cost: total_baseline_cost,
+    savings: total_savings,
     total_baseline_cost,
-    total_savings: total_baseline_cost - total_cost,
+    total_savings,
     avg_latency_ms: total_requests > 0 ? total_latency / total_requests : 0,
     fallback_rate: total_requests > 0 ? fallback_count / total_requests : 0,
     validator_pass_rate: validator_total > 0 ? validator_pass / validator_total : 0,
@@ -4065,6 +4068,7 @@ function textFromContent(content) {
 function promptNeedsJsonValidation(messages, responseFormat, expectedSchema) {
   if (responseFormat || expectedSchema) return true;
   const prompt = messages.map((message) => textFromContent(message.content)).join("\n").toLowerCase();
+  if (/不要\s*(输出|返回)?\s*json|do\s+not\s+(output|return)\s+json|no\s+json/.test(prompt)) return false;
   return /\bjson\b|schema|structured|fields?|字段|结构化|提取/.test(prompt);
 }
 function extractJsonCandidate(text) {
@@ -4116,9 +4120,9 @@ function validateAssistantOutput(args) {
         reason: `Missing required fields: ${missing.join(", ")}`
       };
     }
-    return { result: "pass", validator: "schema_validator" };
+    return { result: "pass", validator: "schema_validator", reason: "Valid JSON matching required schema" };
   }
-  return { result: "pass", validator: "json_validator" };
+  return { result: "pass", validator: "json_validator", reason: "Valid JSON" };
 }
 
 // src/proxy.ts
@@ -4134,7 +4138,6 @@ var OVERLOAD_COOLDOWN_MS = 15e3;
 var MAX_MESSAGES = 200;
 var ACU_PREFIX = "/acu-router";
 var DEFAULT_BASELINE_MODEL = "claude-opus-4-7";
-var DEMO_ACCESS_TOKEN = process.env.DEMO_ACCESS_TOKEN?.trim() || process.env.ACU_DEMO_KEY?.trim() || "";
 var DEMO_RATE_LIMIT_WINDOW_MS = 6e4;
 var DEMO_RATE_LIMIT_PER_MINUTE = Math.max(
   1,
@@ -4224,16 +4227,32 @@ function getClientIp(req) {
   return forwarded?.split(",")[0]?.trim() || getHeaderString(req.headers["x-real-ip"])?.trim() || req.socket.remoteAddress || "unknown";
 }
 function isProtectedDemoPath(pathname) {
-  return pathname === "/cache" || pathname === "/stats" || pathname === "/ledger" || pathname === "/ledger/summary" || pathname.includes("/chat/completions");
+  return pathname === "/" || pathname === "/index.html" || pathname.startsWith("/public/") || pathname === "/cache" || pathname === "/stats" || pathname === "/ledger" || pathname === "/ledger/summary" || pathname.includes("/chat/completions");
 }
-function isDemoAuthorized(req) {
-  if (!DEMO_ACCESS_TOKEN) return true;
+function getEnvDemoAccessToken() {
+  return process.env.DEMO_ACCESS_TOKEN?.trim() || process.env.ACU_DEMO_KEY?.trim() || process.env.PROXY_API_KEY?.trim() || "";
+}
+function decodeBasicAuthPassword(auth) {
+  const encoded = auth.match(/^Basic\s+(.+)$/i)?.[1]?.trim();
+  if (!encoded) return void 0;
+  try {
+    const decoded = Buffer.from(encoded, "base64").toString("utf8");
+    const separator = decoded.indexOf(":");
+    if (separator < 0) return decoded.trim();
+    return decoded.slice(separator + 1).trim();
+  } catch {
+    return void 0;
+  }
+}
+function isDemoAuthorized(req, demoAccessToken) {
+  if (!demoAccessToken) return true;
   const auth = getHeaderString(req.headers.authorization) || "";
   const bearer = auth.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
+  const basicPassword = decodeBasicAuthPassword(auth);
   const demoKey = getHeaderString(req.headers["x-acu-demo-key"])?.trim();
   const url = new URL(req.url || "/", "http://localhost");
   const queryKey = url.searchParams.get("demo_key")?.trim();
-  return bearer === DEMO_ACCESS_TOKEN || demoKey === DEMO_ACCESS_TOKEN || queryKey === DEMO_ACCESS_TOKEN;
+  return basicPassword === demoAccessToken || bearer === demoAccessToken || demoKey === demoAccessToken || queryKey === demoAccessToken;
 }
 function enforceDemoRateLimit(req, res) {
   const ip = `${getClientIp(req)}:${getPathname(req.url || "/")}`;
@@ -4590,6 +4609,7 @@ async function startProxy(options) {
   validateRoutingConfigModels(routingConfig);
   const modelPricing = buildModelPricing();
   const routerOpts = { config: routingConfig, modelPricing };
+  const demoAccessToken = options.demoAccessToken?.trim() ?? getEnvDemoAccessToken();
   const deduplicator = new RequestDeduplicator();
   const responseCache = new ResponseCache(options.cacheConfig);
   const sessionStore = new SessionStore(options.sessionConfig);
@@ -4611,7 +4631,8 @@ async function startProxy(options) {
         sessionJournal,
         excludeList,
         onRouted: options.onRouted,
-        walletAddress
+        walletAddress,
+        demoAccessToken
       });
     } catch (err) {
       console.error(`[ClawRouter] Unhandled error: ${err instanceof Error ? err.message : err}`);
@@ -4656,10 +4677,10 @@ async function handleRequest(req, res, ctx) {
   const pathname = getPathname(req.url);
   if (isProtectedDemoPath(pathname)) {
     if (!enforceDemoRateLimit(req, res)) return;
-    if (!isDemoAuthorized(req)) {
+    if (!isDemoAuthorized(req, ctx.demoAccessToken)) {
       res.writeHead(401, {
         "Content-Type": "application/json",
-        "WWW-Authenticate": "Bearer"
+        "WWW-Authenticate": 'Basic realm="ACU Router Demo"'
       });
       res.end(JSON.stringify({ error: { message: "Unauthorized", type: "unauthorized" } }));
       return;
@@ -5323,8 +5344,7 @@ data: ${JSON.stringify(trace)}
         validator_result: validator.result,
         validator: validator.validator,
         validator_pass: validator.result === "pass",
-        ...validator.reason && { validator_reason: validator.reason },
-        ...qualityFallbackUsed && { validator_reason: validator.reason ?? "quality_fallback" }
+        validator_reason: validator.reason ?? "not_applicable"
       };
       if (debugMode) responseBody = injectTraceIntoJsonResponse(responseBody, trace);
       const ledgerEntry = {

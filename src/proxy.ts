@@ -79,7 +79,6 @@ const OVERLOAD_COOLDOWN_MS = 15_000;
 const MAX_MESSAGES = 200;
 const ACU_PREFIX = "/acu-router";
 const DEFAULT_BASELINE_MODEL = "claude-opus-4-7";
-const DEMO_ACCESS_TOKEN = process.env.DEMO_ACCESS_TOKEN?.trim() || process.env.ACU_DEMO_KEY?.trim() || "";
 const DEMO_RATE_LIMIT_WINDOW_MS = 60_000;
 const DEMO_RATE_LIMIT_PER_MINUTE = Math.max(
   1,
@@ -239,21 +238,48 @@ function getClientIp(req: IncomingMessage): string {
 }
 
 function isProtectedDemoPath(pathname: string): boolean {
-  return pathname === "/cache"
+  return pathname === "/"
+    || pathname === "/index.html"
+    || pathname.startsWith("/public/")
+    || pathname === "/cache"
     || pathname === "/stats"
     || pathname === "/ledger"
     || pathname === "/ledger/summary"
     || pathname.includes("/chat/completions");
 }
 
-function isDemoAuthorized(req: IncomingMessage): boolean {
-  if (!DEMO_ACCESS_TOKEN) return true;
+function getEnvDemoAccessToken(): string {
+  return process.env.DEMO_ACCESS_TOKEN?.trim()
+    || process.env.ACU_DEMO_KEY?.trim()
+    || process.env.PROXY_API_KEY?.trim()
+    || "";
+}
+
+function decodeBasicAuthPassword(auth: string): string | undefined {
+  const encoded = auth.match(/^Basic\s+(.+)$/i)?.[1]?.trim();
+  if (!encoded) return undefined;
+  try {
+    const decoded = Buffer.from(encoded, "base64").toString("utf8");
+    const separator = decoded.indexOf(":");
+    if (separator < 0) return decoded.trim();
+    return decoded.slice(separator + 1).trim();
+  } catch {
+    return undefined;
+  }
+}
+
+function isDemoAuthorized(req: IncomingMessage, demoAccessToken: string): boolean {
+  if (!demoAccessToken) return true;
   const auth = getHeaderString(req.headers.authorization) || "";
   const bearer = auth.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
+  const basicPassword = decodeBasicAuthPassword(auth);
   const demoKey = getHeaderString(req.headers["x-acu-demo-key"])?.trim();
   const url = new URL(req.url || "/", "http://localhost");
   const queryKey = url.searchParams.get("demo_key")?.trim();
-  return bearer === DEMO_ACCESS_TOKEN || demoKey === DEMO_ACCESS_TOKEN || queryKey === DEMO_ACCESS_TOKEN;
+  return basicPassword === demoAccessToken
+    || bearer === demoAccessToken
+    || demoKey === demoAccessToken
+    || queryKey === demoAccessToken;
 }
 
 function enforceDemoRateLimit(req: IncomingMessage, res: ServerResponse): boolean {
@@ -551,6 +577,7 @@ export type ProxyOptions = {
   cacheConfig?: Partial<ResponseCacheConfig>;
   sessionConfig?: Partial<SessionConfig>;
   excludeModels?: Set<string> | string[];
+  demoAccessToken?: string;
   skipBalanceCheck?: boolean; // unused, kept for API compat
   onRouted?: (decision: RoutingDecision) => void;
 };
@@ -786,6 +813,7 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
   validateRoutingConfigModels(routingConfig);
   const modelPricing = buildModelPricing();
   const routerOpts: RouterOptions = { config: routingConfig, modelPricing };
+  const demoAccessToken = options.demoAccessToken?.trim() ?? getEnvDemoAccessToken();
 
   const deduplicator = new RequestDeduplicator();
   const responseCache = new ResponseCache(options.cacheConfig);
@@ -800,7 +828,7 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
     try {
       await handleRequest(req, res, {
         apiKey, proxyApiKey: options.proxyApiKey, proxyBaseUrl, routerOpts, deduplicator, responseCache, sessionStore,
-        sessionJournal, excludeList, onRouted: options.onRouted, walletAddress,
+        sessionJournal, excludeList, onRouted: options.onRouted, walletAddress, demoAccessToken,
       });
     } catch (err) {
       console.error(`[ClawRouter] Unhandled error: ${err instanceof Error ? err.message : err}`);
@@ -862,6 +890,7 @@ async function handleRequest(
     excludeList: Set<string>;
     onRouted?: (decision: RoutingDecision) => void;
     walletAddress?: string;
+    demoAccessToken: string;
   },
 ): Promise<void> {
   req.url = stripAcuPrefix(req.url);
@@ -869,10 +898,10 @@ async function handleRequest(
 
   if (isProtectedDemoPath(pathname)) {
     if (!enforceDemoRateLimit(req, res)) return;
-    if (!isDemoAuthorized(req)) {
+    if (!isDemoAuthorized(req, ctx.demoAccessToken)) {
       res.writeHead(401, {
         "Content-Type": "application/json",
-        "WWW-Authenticate": "Bearer",
+        "WWW-Authenticate": 'Basic realm="ACU Router Demo"',
       });
       res.end(JSON.stringify({ error: { message: "Unauthorized", type: "unauthorized" } }));
       return;
@@ -1615,8 +1644,7 @@ async function handleRequest(
 	        validator_result: validator.result,
 	        validator: validator.validator,
 	        validator_pass: validator.result === "pass",
-        ...(validator.reason && { validator_reason: validator.reason }),
-        ...(qualityFallbackUsed && { validator_reason: validator.reason ?? "quality_fallback" }),
+        validator_reason: validator.reason ?? "not_applicable",
       };
 
       if (debugMode) responseBody = injectTraceIntoJsonResponse(responseBody, trace);

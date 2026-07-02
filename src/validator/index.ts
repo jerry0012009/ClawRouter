@@ -34,6 +34,7 @@ export function promptNeedsJsonValidation(
 ): boolean {
   if (responseFormat || expectedSchema) return true;
   const prompt = messages.map((message) => textFromContent(message.content)).join("\n").toLowerCase();
+  if (/不要\s*(输出|返回)?\s*json|do\s+not\s+(output|return)\s+json|no\s+json/.test(prompt)) return false;
   return /\bjson\b|schema|structured|fields?|字段|结构化|提取/.test(prompt);
 }
 
@@ -97,8 +98,8 @@ export function validateAssistantOutput(args: {
         reason: `Missing required fields: ${missing.join(", ")}`,
       };
     }
-    return { result: "pass", validator: "schema_validator" };
+    return { result: "pass", validator: "schema_validator", reason: "Valid JSON matching required schema" };
   }
 
-  return { result: "pass", validator: "json_validator" };
+  return { result: "pass", validator: "json_validator", reason: "Valid JSON" };
 }

@@ -224,31 +224,12 @@ function initPresets() {
 /* ===== Chat completion helper ===== */
 async function chatComplete(model, messages, maxTokens) {
   const headers = { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' };
-  const demoKey = getDemoKey();
-  if (demoKey) headers['X-ACU-Demo-Key'] = demoKey;
   const res = await fetch(`${API}/v1/chat/completions`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ model, messages, max_tokens: maxTokens || 600, cache: false, baseline_model: BASELINE_MODEL }),
   });
   return res.json();
-}
-
-function getDemoKey() {
-  const params = new URLSearchParams(location.search);
-  const queryKey = params.get('demo_key') || params.get('acu_demo_key');
-  if (queryKey) {
-    try { localStorage.setItem('acu_demo_key', queryKey); } catch {}
-    return queryKey;
-  }
-  try { return localStorage.getItem('acu_demo_key') || ''; } catch { return ''; }
-}
-
-function authFetch(url, options = {}) {
-  const headers = { ...(options.headers || {}) };
-  const demoKey = getDemoKey();
-  if (demoKey) headers['X-ACU-Demo-Key'] = demoKey;
-  return fetch(url, { ...options, headers });
 }
 
 function getTrace(response) {
@@ -462,7 +443,7 @@ function renderLedger() {
 
 async function loadLedgerSummary() {
   try {
-    const res = await authFetch(`${API}/ledger/summary?days=1`);
+    const res = await fetch(`${API}/ledger/summary?days=1`);
     if (!res.ok) return;
     const summary = await res.json();
     totalRequests = summary.total_requests || 0;

@@ -790,38 +790,21 @@ declare const blockrunProvider: ProviderPlugin;
 /**
  * OpenRouter Model Definitions
  *
- * Maps OpenRouter model catalog to OpenClaw-compatible ModelDefinitionConfig format.
- * Pricing is in USD per 1M tokens.
+ * Only includes models verified working with the current API key.
+ * Tested 2026-07-02 against openrouter.ai/api/v1.
  *
  * @see https://openrouter.ai/models
  */
 
-/**
- * Model definitions for OpenRouter.
- * Kept to the most commonly used models — extend as needed.
- */
 declare const BLOCKRUN_MODELS: ModelDefinitionConfig[];
 /** Alias for backward compatibility */
 declare const OPENCLAW_MODELS: ModelDefinitionConfig[];
-/**
- * Model aliases for convenient shorthand access.
- */
 declare const MODEL_ALIASES: Record<string, string>;
-/**
- * Resolve a model alias to its full OpenRouter ID.
- */
 declare function resolveModelAlias(model: string): string;
-/**
- * Build the provider models config pointing at the local proxy.
- */
 declare function buildProviderModels(baseUrl: string): ModelProviderConfig;
-/** Check if a model supports tool calling. */
 declare function supportsToolCalling(modelId: string): boolean;
-/** Check if a model supports vision (image inputs). */
 declare function supportsVision(modelId: string): boolean;
-/** Check if a model is a reasoning model. */
 declare function isReasoningModel(modelId: string): boolean;
-/** Get context window for a model. */
 declare function getModelContextWindow(modelId: string): number | undefined;
 
 /**

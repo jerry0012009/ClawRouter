@@ -1491,148 +1491,107 @@ var DEFAULT_ROUTING_CONFIG = {
   },
   // Auto (balanced) tier configs - current default smart routing
   // Benchmark-tuned 2026-03-16: balancing quality (retention) + latency
-  // ── Tier Configs (OpenRouter models) ──
+  // ── Tier Configs (verified working models only) ──
   tiers: {
     SIMPLE: {
-      primary: "google/gemini-2.5-flash",
+      primary: "meta-llama/llama-3.3-70b-instruct",
       fallback: [
-        "google/gemini-2.5-flash-lite",
-        "openai/gpt-4.1-nano",
-        "deepseek/deepseek-chat-v3-0324",
-        "meta-llama/llama-3.3-70b-instruct"
+        "openai/gpt-oss-20b:free",
+        "nvidia/nemotron-nano-9b-v2:free",
+        "google/gemma-4-26b-a4b-it:free"
       ]
     },
     MEDIUM: {
-      primary: "openai/gpt-4o-mini",
+      primary: "qwen/qwen-2.5-72b-instruct",
       fallback: [
-        "anthropic/claude-haiku-3.5",
-        "google/gemini-2.5-flash",
         "deepseek/deepseek-chat-v3-0324",
-        "x-ai/grok-3-mini"
+        "meta-llama/llama-3.3-70b-instruct",
+        "nvidia/nemotron-3-super-120b-a12b:free"
       ]
     },
     COMPLEX: {
-      primary: "openai/gpt-4o",
+      primary: "deepseek/deepseek-chat-v3-0324",
       fallback: [
-        "anthropic/claude-sonnet-4",
-        "google/gemini-2.5-pro",
-        "openai/gpt-4.1",
-        "x-ai/grok-3"
+        "meta-llama/llama-4-maverick",
+        "qwen/qwen-2.5-72b-instruct",
+        "nvidia/nemotron-3-super-120b-a12b:free"
       ]
     },
     REASONING: {
-      primary: "openai/o4-mini",
+      primary: "liquid/lfm-2.5-1.2b-thinking:free",
       fallback: [
-        "openai/o3",
-        "deepseek/deepseek-r1",
-        "anthropic/claude-opus-4",
-        "google/gemini-2.5-pro"
+        "deepseek/deepseek-chat-v3-0324",
+        "qwen/qwen-2.5-72b-instruct"
       ]
     }
   },
-  // Eco tier — cheapest models
+  // Eco tier — cheapest/free models
   ecoTiers: {
     SIMPLE: {
-      primary: "google/gemini-2.5-flash-lite",
+      primary: "openai/gpt-oss-20b:free",
       fallback: [
-        "openai/gpt-4.1-nano",
-        "meta-llama/llama-3.3-70b-instruct",
-        "google/gemini-2.5-flash"
+        "nvidia/nemotron-nano-9b-v2:free",
+        "google/gemma-4-26b-a4b-it:free",
+        "google/gemma-4-31b-it:free"
       ]
     },
     MEDIUM: {
-      primary: "openai/gpt-4.1-nano",
+      primary: "nvidia/nemotron-3-super-120b-a12b:free",
       fallback: [
-        "google/gemini-2.5-flash-lite",
-        "deepseek/deepseek-chat-v3-0324",
-        "google/gemini-2.5-flash"
+        "openai/gpt-oss-20b:free",
+        "google/gemma-4-31b-it:free"
       ]
     },
     COMPLEX: {
-      primary: "google/gemini-2.5-flash",
+      primary: "meta-llama/llama-3.3-70b-instruct",
       fallback: [
-        "openai/gpt-4o-mini",
-        "deepseek/deepseek-chat-v3-0324",
-        "anthropic/claude-haiku-3.5"
+        "qwen/qwen-2.5-72b-instruct",
+        "nvidia/nemotron-3-super-120b-a12b:free"
       ]
     },
     REASONING: {
-      primary: "x-ai/grok-3-mini",
+      primary: "liquid/lfm-2.5-1.2b-thinking:free",
       fallback: [
-        "deepseek/deepseek-r1",
-        "openai/o4-mini"
+        "deepseek/deepseek-chat-v3-0324"
       ]
     }
   },
   // Premium tier — best quality
   premiumTiers: {
     SIMPLE: {
-      primary: "anthropic/claude-sonnet-4",
-      fallback: [
-        "openai/gpt-4o",
-        "google/gemini-2.5-pro",
-        "x-ai/grok-3"
-      ]
+      primary: "meta-llama/llama-4-maverick",
+      fallback: ["deepseek/deepseek-chat-v3-0324", "qwen/qwen-2.5-72b-instruct"]
     },
     MEDIUM: {
-      primary: "anthropic/claude-sonnet-4",
-      fallback: [
-        "openai/gpt-4o",
-        "google/gemini-2.5-pro",
-        "openai/gpt-4.1"
-      ]
+      primary: "deepseek/deepseek-chat-v3-0324",
+      fallback: ["meta-llama/llama-4-maverick", "qwen/qwen-2.5-72b-instruct"]
     },
     COMPLEX: {
-      primary: "anthropic/claude-opus-4",
-      fallback: [
-        "openai/o3",
-        "anthropic/claude-sonnet-4",
-        "google/gemini-2.5-pro",
-        "openai/gpt-4o"
-      ]
+      primary: "deepseek/deepseek-chat-v3-0324",
+      fallback: ["meta-llama/llama-4-maverick", "qwen/qwen-2.5-72b-instruct"]
     },
     REASONING: {
-      primary: "anthropic/claude-opus-4",
-      fallback: [
-        "openai/o3",
-        "openai/o4-mini",
-        "deepseek/deepseek-r1"
-      ]
+      primary: "liquid/lfm-2.5-1.2b-thinking:free",
+      fallback: ["deepseek/deepseek-chat-v3-0324"]
     }
   },
-  // Agentic tier — models with strong tool use
+  // Agentic tier — models with tool use support
   agenticTiers: {
     SIMPLE: {
-      primary: "openai/gpt-4o-mini",
-      fallback: [
-        "anthropic/claude-haiku-3.5",
-        "google/gemini-2.5-flash"
-      ]
+      primary: "meta-llama/llama-3.3-70b-instruct",
+      fallback: ["qwen/qwen-2.5-72b-instruct"]
     },
     MEDIUM: {
-      primary: "openai/gpt-4o",
-      fallback: [
-        "anthropic/claude-sonnet-4",
-        "google/gemini-2.5-flash",
-        "openai/gpt-4o-mini"
-      ]
+      primary: "deepseek/deepseek-chat-v3-0324",
+      fallback: ["meta-llama/llama-4-maverick", "qwen/qwen-2.5-72b-instruct"]
     },
     COMPLEX: {
-      primary: "anthropic/claude-sonnet-4",
-      fallback: [
-        "openai/gpt-4o",
-        "anthropic/claude-opus-4",
-        "openai/gpt-4.1",
-        "google/gemini-2.5-pro"
-      ]
+      primary: "meta-llama/llama-4-maverick",
+      fallback: ["deepseek/deepseek-chat-v3-0324", "qwen/qwen-2.5-72b-instruct"]
     },
     REASONING: {
-      primary: "anthropic/claude-opus-4",
-      fallback: [
-        "openai/o3",
-        "openai/o4-mini",
-        "deepseek/deepseek-r1"
-      ]
+      primary: "deepseek/deepseek-chat-v3-0324",
+      fallback: ["meta-llama/llama-4-maverick"]
     }
   },
   promotions: [],
@@ -1651,127 +1610,7 @@ function route(prompt, systemPrompt, maxOutputTokens, options) {
 
 // src/models.ts
 var BLOCKRUN_MODELS = [
-  // ── OpenAI ──
-  {
-    id: "openai/gpt-4o",
-    name: "GPT-4o",
-    reasoning: false,
-    input: ["text", "image"],
-    cost: { input: 2.5, output: 10, cacheRead: 1.25, cacheWrite: 2.5 },
-    contextWindow: 128e3,
-    maxTokens: 16384
-  },
-  {
-    id: "openai/gpt-4o-mini",
-    name: "GPT-4o Mini",
-    reasoning: false,
-    input: ["text", "image"],
-    cost: { input: 0.15, output: 0.6, cacheRead: 0.075, cacheWrite: 0.15 },
-    contextWindow: 128e3,
-    maxTokens: 16384
-  },
-  {
-    id: "openai/o3",
-    name: "o3",
-    reasoning: true,
-    input: ["text", "image"],
-    cost: { input: 10, output: 40, cacheRead: 2.5, cacheWrite: 10 },
-    contextWindow: 2e5,
-    maxTokens: 1e5
-  },
-  {
-    id: "openai/o4-mini",
-    name: "o4-mini",
-    reasoning: true,
-    input: ["text", "image"],
-    cost: { input: 1.1, output: 4.4, cacheRead: 0.275, cacheWrite: 1.1 },
-    contextWindow: 2e5,
-    maxTokens: 1e5
-  },
-  {
-    id: "openai/gpt-4.1",
-    name: "GPT-4.1",
-    reasoning: false,
-    input: ["text", "image"],
-    cost: { input: 2, output: 8, cacheRead: 0.5, cacheWrite: 2 },
-    contextWindow: 1048576,
-    maxTokens: 32768
-  },
-  {
-    id: "openai/gpt-4.1-mini",
-    name: "GPT-4.1 Mini",
-    reasoning: false,
-    input: ["text", "image"],
-    cost: { input: 0.4, output: 1.6, cacheRead: 0.1, cacheWrite: 0.4 },
-    contextWindow: 1048576,
-    maxTokens: 32768
-  },
-  {
-    id: "openai/gpt-4.1-nano",
-    name: "GPT-4.1 Nano",
-    reasoning: false,
-    input: ["text", "image"],
-    cost: { input: 0.1, output: 0.4, cacheRead: 0.025, cacheWrite: 0.1 },
-    contextWindow: 1048576,
-    maxTokens: 32768
-  },
-  // ── Anthropic ──
-  {
-    id: "anthropic/claude-sonnet-4",
-    name: "Claude Sonnet 4",
-    reasoning: false,
-    input: ["text", "image"],
-    cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
-    contextWindow: 2e5,
-    maxTokens: 16384
-  },
-  {
-    id: "anthropic/claude-opus-4",
-    name: "Claude Opus 4",
-    reasoning: true,
-    input: ["text", "image"],
-    cost: { input: 15, output: 75, cacheRead: 1.5, cacheWrite: 18.75 },
-    contextWindow: 2e5,
-    maxTokens: 32e3
-  },
-  {
-    id: "anthropic/claude-haiku-3.5",
-    name: "Claude 3.5 Haiku",
-    reasoning: false,
-    input: ["text", "image"],
-    cost: { input: 0.8, output: 4, cacheRead: 0.08, cacheWrite: 1 },
-    contextWindow: 2e5,
-    maxTokens: 8192
-  },
-  // ── Google ──
-  {
-    id: "google/gemini-2.5-flash",
-    name: "Gemini 2.5 Flash",
-    reasoning: true,
-    input: ["text", "image"],
-    cost: { input: 0.15, output: 0.6, cacheRead: 0.0375, cacheWrite: 0.15 },
-    contextWindow: 1048576,
-    maxTokens: 65536
-  },
-  {
-    id: "google/gemini-2.5-pro",
-    name: "Gemini 2.5 Pro",
-    reasoning: true,
-    input: ["text", "image"],
-    cost: { input: 1.25, output: 10, cacheRead: 0.3125, cacheWrite: 1.25 },
-    contextWindow: 1048576,
-    maxTokens: 65536
-  },
-  {
-    id: "google/gemini-2.5-flash-lite",
-    name: "Gemini 2.5 Flash Lite",
-    reasoning: false,
-    input: ["text", "image"],
-    cost: { input: 0.1, output: 0.4, cacheRead: 0.025, cacheWrite: 0.1 },
-    contextWindow: 1048576,
-    maxTokens: 8192
-  },
-  // ── DeepSeek ──
+  // ── Paid (cheap, verified working) ──
   {
     id: "deepseek/deepseek-chat-v3-0324",
     name: "DeepSeek V3",
@@ -1781,35 +1620,6 @@ var BLOCKRUN_MODELS = [
     contextWindow: 163840,
     maxTokens: 163840
   },
-  {
-    id: "deepseek/deepseek-r1",
-    name: "DeepSeek R1",
-    reasoning: true,
-    input: ["text"],
-    cost: { input: 0.55, output: 2.19, cacheRead: 0.14, cacheWrite: 0.55 },
-    contextWindow: 163840,
-    maxTokens: 163840
-  },
-  // ── xAI ──
-  {
-    id: "x-ai/grok-3",
-    name: "Grok 3",
-    reasoning: false,
-    input: ["text", "image"],
-    cost: { input: 3, output: 15, cacheRead: 0.75, cacheWrite: 3 },
-    contextWindow: 131072,
-    maxTokens: 16384
-  },
-  {
-    id: "x-ai/grok-3-mini",
-    name: "Grok 3 Mini",
-    reasoning: true,
-    input: ["text", "image"],
-    cost: { input: 0.3, output: 0.5, cacheRead: 0.075, cacheWrite: 0.3 },
-    contextWindow: 131072,
-    maxTokens: 16384
-  },
-  // ── Meta ──
   {
     id: "meta-llama/llama-4-maverick",
     name: "Llama 4 Maverick",
@@ -1828,7 +1638,6 @@ var BLOCKRUN_MODELS = [
     contextWindow: 131072,
     maxTokens: 16384
   },
-  // ── Qwen ──
   {
     id: "qwen/qwen-2.5-72b-instruct",
     name: "Qwen 2.5 72B",
@@ -1838,60 +1647,88 @@ var BLOCKRUN_MODELS = [
     contextWindow: 131072,
     maxTokens: 16384
   },
-  // ── Mistral ──
+  // ── Free (verified working) ──
   {
-    id: "mistralai/mistral-large-2411",
-    name: "Mistral Large",
+    id: "openai/gpt-oss-20b:free",
+    name: "GPT-OSS 20B (Free)",
     reasoning: false,
     input: ["text"],
-    cost: { input: 2, output: 6, cacheRead: 0.5, cacheWrite: 2 },
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: 131072,
+    maxTokens: 16384
+  },
+  {
+    id: "nvidia/nemotron-3-super-120b-a12b:free",
+    name: "Nemotron Super 120B (Free)",
+    reasoning: false,
+    input: ["text"],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: 131072,
+    maxTokens: 16384
+  },
+  {
+    id: "nvidia/nemotron-nano-9b-v2:free",
+    name: "Nemotron Nano 9B (Free)",
+    reasoning: false,
+    input: ["text"],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: 131072,
+    maxTokens: 16384
+  },
+  {
+    id: "google/gemma-4-26b-a4b-it:free",
+    name: "Gemma 4 26B (Free)",
+    reasoning: false,
+    input: ["text"],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: 131072,
+    maxTokens: 16384
+  },
+  {
+    id: "google/gemma-4-31b-it:free",
+    name: "Gemma 4 31B (Free)",
+    reasoning: false,
+    input: ["text"],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: 131072,
+    maxTokens: 16384
+  },
+  {
+    id: "liquid/lfm-2.5-1.2b-thinking:free",
+    name: "Liquid LFM 2.5 Thinking (Free)",
+    reasoning: true,
+    input: ["text"],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: 131072,
     maxTokens: 16384
   }
 ];
 var MODEL_ALIASES = {
-  // Claude
-  claude: "anthropic/claude-sonnet-4",
-  sonnet: "anthropic/claude-sonnet-4",
-  opus: "anthropic/claude-opus-4",
-  haiku: "anthropic/claude-haiku-3.5",
-  // OpenAI
-  gpt: "openai/gpt-4o",
-  gpt4: "openai/gpt-4o",
-  mini: "openai/gpt-4o-mini",
-  o1: "openai/o3",
-  o3: "openai/o3",
-  o4: "openai/o4-mini",
   // DeepSeek
   deepseek: "deepseek/deepseek-chat-v3-0324",
   "deepseek-chat": "deepseek/deepseek-chat-v3-0324",
-  reasoner: "deepseek/deepseek-r1",
-  // Google
-  gemini: "google/gemini-2.5-flash",
-  flash: "google/gemini-2.5-flash",
-  pro: "google/gemini-2.5-pro",
-  // xAI
-  grok: "x-ai/grok-3",
-  "grok-mini": "x-ai/grok-3-mini",
   // Meta
   llama: "meta-llama/llama-4-maverick",
   maverick: "meta-llama/llama-4-maverick",
+  "llama-3.3": "meta-llama/llama-3.3-70b-instruct",
   // Qwen
   qwen: "qwen/qwen-2.5-72b-instruct",
-  // Mistral
-  mistral: "mistralai/mistral-large-2411"
+  // Free models
+  free: "nvidia/nemotron-3-super-120b-a12b:free",
+  nemotron: "nvidia/nemotron-3-super-120b-a12b:free",
+  gemma: "google/gemma-4-31b-it:free",
+  gpt: "openai/gpt-oss-20b:free"
 };
 function resolveModelAlias(model) {
   const lower = model.toLowerCase().trim();
   return MODEL_ALIASES[lower] ?? lower;
 }
 function supportsToolCalling(modelId) {
-  const noToolSupport = /* @__PURE__ */ new Set(["deepseek/deepseek-r1", "meta-llama/llama-3.3-70b-instruct"]);
+  const noToolSupport = /* @__PURE__ */ new Set(["liquid/lfm-2.5-1.2b-thinking:free"]);
   return !noToolSupport.has(modelId);
 }
 function supportsVision(modelId) {
-  const model = BLOCKRUN_MODELS.find((m) => m.id === modelId);
-  return model?.input.includes("image") ?? false;
+  return BLOCKRUN_MODELS.find((m) => m.id === modelId)?.input.includes("image") ?? false;
 }
 function isReasoningModel(modelId) {
   return BLOCKRUN_MODELS.find((m) => m.id === modelId)?.reasoning ?? false;

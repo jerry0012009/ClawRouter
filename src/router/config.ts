@@ -1041,78 +1041,70 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
   // Auto (balanced) tier configs - current default smart routing
   // Benchmark-tuned 2026-03-16: balancing quality (retention) + latency
 
-  // ── Tier Configs (OpenRouter models) ──
+  // ── Tier Configs (verified working models only) ──
 
   tiers: {
     SIMPLE: {
-      primary: "google/gemini-2.5-flash",
+      primary: "meta-llama/llama-3.3-70b-instruct",
       fallback: [
-        "google/gemini-2.5-flash-lite",
-        "openai/gpt-4.1-nano",
-        "deepseek/deepseek-chat-v3-0324",
-        "meta-llama/llama-3.3-70b-instruct",
+        "openai/gpt-oss-20b:free",
+        "nvidia/nemotron-nano-9b-v2:free",
+        "google/gemma-4-26b-a4b-it:free",
       ],
     },
     MEDIUM: {
-      primary: "openai/gpt-4o-mini",
+      primary: "qwen/qwen-2.5-72b-instruct",
       fallback: [
-        "anthropic/claude-haiku-3.5",
-        "google/gemini-2.5-flash",
         "deepseek/deepseek-chat-v3-0324",
-        "x-ai/grok-3-mini",
+        "meta-llama/llama-3.3-70b-instruct",
+        "nvidia/nemotron-3-super-120b-a12b:free",
       ],
     },
     COMPLEX: {
-      primary: "openai/gpt-4o",
+      primary: "deepseek/deepseek-chat-v3-0324",
       fallback: [
-        "anthropic/claude-sonnet-4",
-        "google/gemini-2.5-pro",
-        "openai/gpt-4.1",
-        "x-ai/grok-3",
+        "meta-llama/llama-4-maverick",
+        "qwen/qwen-2.5-72b-instruct",
+        "nvidia/nemotron-3-super-120b-a12b:free",
       ],
     },
     REASONING: {
-      primary: "openai/o4-mini",
+      primary: "liquid/lfm-2.5-1.2b-thinking:free",
       fallback: [
-        "openai/o3",
-        "deepseek/deepseek-r1",
-        "anthropic/claude-opus-4",
-        "google/gemini-2.5-pro",
+        "deepseek/deepseek-chat-v3-0324",
+        "qwen/qwen-2.5-72b-instruct",
       ],
     },
   },
 
-  // Eco tier — cheapest models
+  // Eco tier — cheapest/free models
   ecoTiers: {
     SIMPLE: {
-      primary: "google/gemini-2.5-flash-lite",
+      primary: "openai/gpt-oss-20b:free",
       fallback: [
-        "openai/gpt-4.1-nano",
-        "meta-llama/llama-3.3-70b-instruct",
-        "google/gemini-2.5-flash",
+        "nvidia/nemotron-nano-9b-v2:free",
+        "google/gemma-4-26b-a4b-it:free",
+        "google/gemma-4-31b-it:free",
       ],
     },
     MEDIUM: {
-      primary: "openai/gpt-4.1-nano",
+      primary: "nvidia/nemotron-3-super-120b-a12b:free",
       fallback: [
-        "google/gemini-2.5-flash-lite",
-        "deepseek/deepseek-chat-v3-0324",
-        "google/gemini-2.5-flash",
+        "openai/gpt-oss-20b:free",
+        "google/gemma-4-31b-it:free",
       ],
     },
     COMPLEX: {
-      primary: "google/gemini-2.5-flash",
+      primary: "meta-llama/llama-3.3-70b-instruct",
       fallback: [
-        "openai/gpt-4o-mini",
-        "deepseek/deepseek-chat-v3-0324",
-        "anthropic/claude-haiku-3.5",
+        "qwen/qwen-2.5-72b-instruct",
+        "nvidia/nemotron-3-super-120b-a12b:free",
       ],
     },
     REASONING: {
-      primary: "x-ai/grok-3-mini",
+      primary: "liquid/lfm-2.5-1.2b-thinking:free",
       fallback: [
-        "deepseek/deepseek-r1",
-        "openai/o4-mini",
+        "deepseek/deepseek-chat-v3-0324",
       ],
     },
   },
@@ -1120,73 +1112,40 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
   // Premium tier — best quality
   premiumTiers: {
     SIMPLE: {
-      primary: "anthropic/claude-sonnet-4",
-      fallback: [
-        "openai/gpt-4o",
-        "google/gemini-2.5-pro",
-        "x-ai/grok-3",
-      ],
+      primary: "meta-llama/llama-4-maverick",
+      fallback: ["deepseek/deepseek-chat-v3-0324", "qwen/qwen-2.5-72b-instruct"],
     },
     MEDIUM: {
-      primary: "anthropic/claude-sonnet-4",
-      fallback: [
-        "openai/gpt-4o",
-        "google/gemini-2.5-pro",
-        "openai/gpt-4.1",
-      ],
+      primary: "deepseek/deepseek-chat-v3-0324",
+      fallback: ["meta-llama/llama-4-maverick", "qwen/qwen-2.5-72b-instruct"],
     },
     COMPLEX: {
-      primary: "anthropic/claude-opus-4",
-      fallback: [
-        "openai/o3",
-        "anthropic/claude-sonnet-4",
-        "google/gemini-2.5-pro",
-        "openai/gpt-4o",
-      ],
+      primary: "deepseek/deepseek-chat-v3-0324",
+      fallback: ["meta-llama/llama-4-maverick", "qwen/qwen-2.5-72b-instruct"],
     },
     REASONING: {
-      primary: "anthropic/claude-opus-4",
-      fallback: [
-        "openai/o3",
-        "openai/o4-mini",
-        "deepseek/deepseek-r1",
-      ],
+      primary: "liquid/lfm-2.5-1.2b-thinking:free",
+      fallback: ["deepseek/deepseek-chat-v3-0324"],
     },
   },
 
-  // Agentic tier — models with strong tool use
+  // Agentic tier — models with tool use support
   agenticTiers: {
     SIMPLE: {
-      primary: "openai/gpt-4o-mini",
-      fallback: [
-        "anthropic/claude-haiku-3.5",
-        "google/gemini-2.5-flash",
-      ],
+      primary: "meta-llama/llama-3.3-70b-instruct",
+      fallback: ["qwen/qwen-2.5-72b-instruct"],
     },
     MEDIUM: {
-      primary: "openai/gpt-4o",
-      fallback: [
-        "anthropic/claude-sonnet-4",
-        "google/gemini-2.5-flash",
-        "openai/gpt-4o-mini",
-      ],
+      primary: "deepseek/deepseek-chat-v3-0324",
+      fallback: ["meta-llama/llama-4-maverick", "qwen/qwen-2.5-72b-instruct"],
     },
     COMPLEX: {
-      primary: "anthropic/claude-sonnet-4",
-      fallback: [
-        "openai/gpt-4o",
-        "anthropic/claude-opus-4",
-        "openai/gpt-4.1",
-        "google/gemini-2.5-pro",
-      ],
+      primary: "meta-llama/llama-4-maverick",
+      fallback: ["deepseek/deepseek-chat-v3-0324", "qwen/qwen-2.5-72b-instruct"],
     },
     REASONING: {
-      primary: "anthropic/claude-opus-4",
-      fallback: [
-        "openai/o3",
-        "openai/o4-mini",
-        "deepseek/deepseek-r1",
-      ],
+      primary: "deepseek/deepseek-chat-v3-0324",
+      fallback: ["meta-llama/llama-4-maverick"],
     },
   },
 

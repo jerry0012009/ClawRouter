@@ -128,8 +128,8 @@ export const BLOCKRUN_MODELS: ModelDefinitionConfig[] = [
     maxTokens: 65_536,
   },
   {
-    id: "google/gemini-2.0-flash",
-    name: "Gemini 2.0 Flash",
+    id: "google/gemini-2.5-flash-lite",
+    name: "Gemini 2.5 Flash Lite",
     reasoning: false,
     input: ["text", "image"],
     cost: { input: 0.1, output: 0.4, cacheRead: 0.025, cacheWrite: 0.1 },

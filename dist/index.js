@@ -1501,7 +1501,7 @@ var DEFAULT_ROUTING_CONFIG = {
     SIMPLE: {
       primary: "google/gemini-2.5-flash",
       fallback: [
-        "google/gemini-2.0-flash",
+        "google/gemini-2.5-flash-lite",
         "openai/gpt-4.1-nano",
         "deepseek/deepseek-chat-v3-0324",
         "meta-llama/llama-3.3-70b-instruct"
@@ -1538,7 +1538,7 @@ var DEFAULT_ROUTING_CONFIG = {
   // Eco tier — cheapest models
   ecoTiers: {
     SIMPLE: {
-      primary: "google/gemini-2.0-flash",
+      primary: "google/gemini-2.5-flash-lite",
       fallback: [
         "openai/gpt-4.1-nano",
         "meta-llama/llama-3.3-70b-instruct",
@@ -1548,7 +1548,7 @@ var DEFAULT_ROUTING_CONFIG = {
     MEDIUM: {
       primary: "openai/gpt-4.1-nano",
       fallback: [
-        "google/gemini-2.0-flash",
+        "google/gemini-2.5-flash-lite",
         "deepseek/deepseek-chat-v3-0324",
         "google/gemini-2.5-flash"
       ]
@@ -1768,8 +1768,8 @@ var BLOCKRUN_MODELS = [
     maxTokens: 65536
   },
   {
-    id: "google/gemini-2.0-flash",
-    name: "Gemini 2.0 Flash",
+    id: "google/gemini-2.5-flash-lite",
+    name: "Gemini 2.5 Flash Lite",
     reasoning: false,
     input: ["text", "image"],
     cost: { input: 0.1, output: 0.4, cacheRead: 0.025, cacheWrite: 0.1 },

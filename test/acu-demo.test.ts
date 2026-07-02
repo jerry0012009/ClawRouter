@@ -74,6 +74,10 @@ async function readFrontend(): Promise<string> {
   return readFile(join(process.cwd(), "public", "index.html"), "utf8");
 }
 
+async function readProxySource(): Promise<string> {
+  return readFile(join(process.cwd(), "src", "proxy.ts"), "utf8");
+}
+
 describe("ACU Router demo reliability", () => {
   beforeAll(async () => {
     oldHome = process.env.HOME;
@@ -251,9 +255,22 @@ describe("ACU Router demo reliability", () => {
     expect(html).toContain("trace?.fallback_used ?? ((trace?.attempts?.length || 0) > 1)");
     expect(html).toContain("function validatorLabelFromTrace(trace)");
     expect(html).toContain("if (result === 'not_applicable') return '-'");
+    expect(html).toContain("chatComplete(BASELINE_MODEL, messages)");
+    expect(html).toContain("chatComplete(ROUTER_MODEL, messages)");
+    expect(html).toContain("function finishReasonFromResponse(response)");
+    expect(html).toContain("模型返回 finish_reason=length");
     expect(html).toContain("cache: false");
+    expect(html).not.toContain("max_tokens: maxTokens || 600");
+    expect(html).not.toContain("payload.max_tokens");
     expect(html).not.toContain("acu_demo_key");
     expect(html).not.toContain("demo_key");
     expect(html).not.toContain("X-ACU-Demo-Key");
+  });
+
+  it("does not add demo-only rate limiting on top of auth", async () => {
+    const source = await readProxySource();
+    expect(source).not.toContain("DEMO_RATE_LIMIT_PER_MINUTE");
+    expect(source).not.toContain("enforceDemoRateLimit");
+    expect(source).not.toContain("demoRateLimits");
   });
 });

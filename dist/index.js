@@ -4151,15 +4151,9 @@ var OVERLOAD_COOLDOWN_MS = 15e3;
 var MAX_MESSAGES = 200;
 var ACU_PREFIX = "/acu-router";
 var DEFAULT_BASELINE_MODEL = "claude-opus-4-7";
-var DEMO_RATE_LIMIT_WINDOW_MS = 6e4;
-var DEMO_RATE_LIMIT_PER_MINUTE = Math.max(
-  1,
-  parseInt(process.env.ACU_DEMO_RATE_LIMIT_PER_MINUTE || process.env.DEMO_RATE_LIMIT_PER_MINUTE || "20", 10) || 20
-);
 var ROUTING_PROFILES = /* @__PURE__ */ new Set(["auto", "eco", "premium"]);
 var rateLimitedModels = /* @__PURE__ */ new Map();
 var overloadedModels = /* @__PURE__ */ new Map();
-var demoRateLimits = /* @__PURE__ */ new Map();
 function isRateLimited(modelId) {
   const hitTime = rateLimitedModels.get(modelId);
   if (!hitTime) return false;
@@ -4235,10 +4229,6 @@ function normalizeRequestHeaders(req) {
   }
   return headers;
 }
-function getClientIp(req) {
-  const forwarded = getHeaderString(req.headers["x-forwarded-for"]);
-  return forwarded?.split(",")[0]?.trim() || getHeaderString(req.headers["x-real-ip"])?.trim() || req.socket.remoteAddress || "unknown";
-}
 function isProtectedDemoPath(pathname) {
   return pathname === "/" || pathname === "/index.html" || pathname.startsWith("/public/") || pathname === "/cache" || pathname === "/stats" || pathname === "/ledger" || pathname === "/ledger/summary" || pathname.includes("/chat/completions");
 }
@@ -4266,24 +4256,6 @@ function isDemoAuthorized(req, demoAccessToken) {
   const url = new URL(req.url || "/", "http://localhost");
   const queryKey = url.searchParams.get("demo_key")?.trim();
   return basicPassword === demoAccessToken || bearer === demoAccessToken || demoKey === demoAccessToken || queryKey === demoAccessToken;
-}
-function enforceDemoRateLimit(req, res) {
-  const ip = `${getClientIp(req)}:${getPathname(req.url || "/")}`;
-  const now = Date.now();
-  const current = demoRateLimits.get(ip);
-  if (!current || now - current.windowStart >= DEMO_RATE_LIMIT_WINDOW_MS) {
-    demoRateLimits.set(ip, { windowStart: now, count: 1 });
-    return true;
-  }
-  current.count++;
-  if (current.count <= DEMO_RATE_LIMIT_PER_MINUTE) return true;
-  const retryAfter = Math.max(1, Math.ceil((DEMO_RATE_LIMIT_WINDOW_MS - (now - current.windowStart)) / 1e3));
-  res.writeHead(429, {
-    "Content-Type": "application/json",
-    "Retry-After": String(retryAfter)
-  });
-  res.end(JSON.stringify({ error: { message: "Too many requests", type: "rate_limit_exceeded" } }));
-  return false;
 }
 function hashPrompt(messages) {
   const text = messages.map((message) => JSON.stringify(message.content ?? "")).join("\n");
@@ -4699,7 +4671,6 @@ async function handleRequest(req, res, ctx) {
   req.url = stripAcuPrefix(req.url);
   const pathname = getPathname(req.url);
   if (isProtectedDemoPath(pathname)) {
-    if (!enforceDemoRateLimit(req, res)) return;
     if (!isDemoAuthorized(req, ctx.demoAccessToken)) {
       res.writeHead(401, {
         "Content-Type": "application/json",

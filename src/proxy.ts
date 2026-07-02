@@ -79,11 +79,6 @@ const OVERLOAD_COOLDOWN_MS = 15_000;
 const MAX_MESSAGES = 200;
 const ACU_PREFIX = "/acu-router";
 const DEFAULT_BASELINE_MODEL = "claude-opus-4-7";
-const DEMO_RATE_LIMIT_WINDOW_MS = 60_000;
-const DEMO_RATE_LIMIT_PER_MINUTE = Math.max(
-  1,
-  parseInt(process.env.ACU_DEMO_RATE_LIMIT_PER_MINUTE || process.env.DEMO_RATE_LIMIT_PER_MINUTE || "20", 10) || 20,
-);
 
 // ── Routing profile virtual models ──
 const ROUTING_PROFILES = new Set(["auto", "eco", "premium"]);
@@ -91,7 +86,6 @@ const ROUTING_PROFILES = new Set(["auto", "eco", "premium"]);
 // ── Per-model error tracking ──
 const rateLimitedModels = new Map<string, number>();
 const overloadedModels = new Map<string, number>();
-const demoRateLimits = new Map<string, { windowStart: number; count: number }>();
 
 function isRateLimited(modelId: string): boolean {
   const hitTime = rateLimitedModels.get(modelId);
@@ -229,14 +223,6 @@ function normalizeRequestHeaders(req: IncomingMessage): Record<string, string> {
   return headers;
 }
 
-function getClientIp(req: IncomingMessage): string {
-  const forwarded = getHeaderString(req.headers["x-forwarded-for"]);
-  return forwarded?.split(",")[0]?.trim()
-    || getHeaderString(req.headers["x-real-ip"])?.trim()
-    || req.socket.remoteAddress
-    || "unknown";
-}
-
 function isProtectedDemoPath(pathname: string): boolean {
   return pathname === "/"
     || pathname === "/index.html"
@@ -280,26 +266,6 @@ function isDemoAuthorized(req: IncomingMessage, demoAccessToken: string): boolea
     || bearer === demoAccessToken
     || demoKey === demoAccessToken
     || queryKey === demoAccessToken;
-}
-
-function enforceDemoRateLimit(req: IncomingMessage, res: ServerResponse): boolean {
-  const ip = `${getClientIp(req)}:${getPathname(req.url || "/")}`;
-  const now = Date.now();
-  const current = demoRateLimits.get(ip);
-  if (!current || now - current.windowStart >= DEMO_RATE_LIMIT_WINDOW_MS) {
-    demoRateLimits.set(ip, { windowStart: now, count: 1 });
-    return true;
-  }
-  current.count++;
-  if (current.count <= DEMO_RATE_LIMIT_PER_MINUTE) return true;
-
-  const retryAfter = Math.max(1, Math.ceil((DEMO_RATE_LIMIT_WINDOW_MS - (now - current.windowStart)) / 1000));
-  res.writeHead(429, {
-    "Content-Type": "application/json",
-    "Retry-After": String(retryAfter),
-  });
-  res.end(JSON.stringify({ error: { message: "Too many requests", type: "rate_limit_exceeded" } }));
-  return false;
 }
 
 function hashPrompt(messages: ChatMessage[]): string {
@@ -908,7 +874,6 @@ async function handleRequest(
   const pathname = getPathname(req.url);
 
   if (isProtectedDemoPath(pathname)) {
-    if (!enforceDemoRateLimit(req, res)) return;
     if (!isDemoAuthorized(req, ctx.demoAccessToken)) {
       res.writeHead(401, {
         "Content-Type": "application/json",

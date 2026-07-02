@@ -222,18 +222,36 @@ function initPresets() {
 }
 
 /* ===== Chat completion helper ===== */
-async function chatComplete(model, messages, maxTokens) {
+async function chatComplete(model, messages) {
   const headers = { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' };
+  const payload = { model, messages, cache: false, baseline_model: BASELINE_MODEL };
   const res = await fetch(`${API}/v1/chat/completions`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ model, messages, max_tokens: maxTokens || 600, cache: false, baseline_model: BASELINE_MODEL }),
+    body: JSON.stringify(payload),
   });
   return res.json();
 }
 
 function getTrace(response) {
   return response?.acu_trace || response?._acu_trace || null;
+}
+
+function finishReasonFromResponse(response) {
+  return response?.choices?.[0]?.finish_reason || response?.choices?.[0]?.finishReason || null;
+}
+
+function truncationMeta(response) {
+  return finishReasonFromResponse(response) === 'length'
+    ? '<span class="high-cost">⚠️ 模型达到输出上限，可能未完整结束</span>'
+    : '';
+}
+
+function renderAnswer(el, response, content) {
+  el.textContent = content;
+  if (finishReasonFromResponse(response) === 'length') {
+    el.textContent += '\n\n[提示：模型返回 finish_reason=length，输出可能未完整结束。]';
+  }
 }
 
 function validatorLabelFromTrace(trace) {
@@ -305,18 +323,19 @@ async function runComparison() {
     const baselineTrace = getTrace(baselineRes);
     const bModel = baselineRes.model || BASELINE_MODEL;
     const bCost = costFromTraceOrUsage(baselineRes, bModel);
-    bAns.textContent = bContent;
+    renderAnswer(bAns, baselineRes, bContent);
     document.getElementById('baseline-meta').innerHTML =
       `<span>Baseline Model: <strong>${baselineTrace?.baseline_model || BASELINE_MODEL}</strong></span>` +
       `<span>实际调用: <strong>${bModel}</strong></span>` +
       `<span>延迟: <strong>${elapsed}ms</strong></span>` +
-      `<span class="high-cost">成本: $${bCost.toFixed(5)}</span>`;
+      `<span class="high-cost">成本: $${bCost.toFixed(5)}</span>` +
+      truncationMeta(baselineRes);
 
     // --- Router ---
     const rContent = routerRes.choices?.[0]?.message?.content || routerRes.error?.message || '(empty)';
     const rActualModel = routerRes.model || 'unknown';
     const rCost = costFromTraceOrUsage(routerRes, rActualModel);
-    rAns.textContent = rContent;
+    renderAnswer(rAns, routerRes, rContent);
 
     // Trace from response
     const trace = getTrace(routerRes);
@@ -336,6 +355,7 @@ async function runComparison() {
       `<span>Tier: <strong>${tier}</strong></span>` +
       `<span class="cost">成本: $${rCost.toFixed(5)}</span>` +
       `<span class="cost">节省: ${savings.toFixed(1)}%</span>`;
+    metaHtml += truncationMeta(routerRes);
     if (validatorMeta) {
       metaHtml += `<span>${validatorMeta}</span>`;
     }

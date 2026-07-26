@@ -1,0 +1,8 @@
+benchmark,scenario,record_count,instance_count,steps_per_instance_min,steps_per_instance_median,steps_per_instance_max,first_step_count,later_step_count,tier_low_count,tier_mid_count,tier_mid_high_count,tier_high_count,ground_truth_ready_count,degradation_search_done_count,mixed_model_validated_count,main_analysis_count,sensitivity_only_count
+bfcl,bfcl_tool_use_multi_turn,148,30,1,5.5,7,30,118,142,5,1,0,148,0,0,148,0
+bfcl,bfcl_tool_use_single_turn,100,100,1,1.0,1,100,0,97,3,0,0,100,0,0,100,0
+mtrag,rag_multiturn,193,193,1,1.0,1,193,0,183,8,1,1,193,0,0,193,0
+pinchbench,general_agent,48,12,2,4.0,6,12,36,41,3,3,1,0,0,48,48,0
+qmsum,meeting_query_summarization,145,145,1,1.0,1,145,0,132,10,3,0,145,0,0,145,0
+swebench,code_swe,336,40,4,9.0,13,40,296,94,33,41,168,0,336,0,0,336
+__all__,__all__,970,520,1,1.0,13,520,450,689,62,49,170,586,336,48,634,336

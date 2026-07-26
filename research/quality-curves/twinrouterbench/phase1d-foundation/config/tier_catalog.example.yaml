@@ -1,0 +1,65 @@
+schema_version: 1
+data_status: synthetic
+currency: USD
+price_unit: per_million_tokens
+description: >-
+  Synthetic-only configuration for exercising the Phase 1D cost and fallback
+  interfaces. Values are not vendor prices and must not be used for production.
+
+validator:
+  validator_detection_rate: 0.80
+  assumption_type: synthetic_assumption
+
+tiers:
+  low:
+    models: [demo-economy]
+    provider: synthetic-provider
+    input_price: 0.10
+    output_price: 0.30
+    cache_read_price: 0.02
+    cache_write_price: 0.12
+    expected_output_tokens: 320
+    router_cost: 0.00001
+    fallback_tier: mid
+    switch_cost: 0.00005
+    uncertainty_penalty: 0.08
+    failure_penalty: 0.020
+  mid:
+    models: [demo-value]
+    provider: synthetic-provider
+    input_price: 0.35
+    output_price: 1.10
+    cache_read_price: 0.07
+    cache_write_price: 0.42
+    expected_output_tokens: 420
+    router_cost: 0.00001
+    fallback_tier: mid_high
+    switch_cost: 0.00008
+    uncertainty_penalty: 0.06
+    failure_penalty: 0.020
+  mid_high:
+    models: [demo-premium]
+    provider: synthetic-provider
+    input_price: 1.10
+    output_price: 3.60
+    cache_read_price: 0.22
+    cache_write_price: 1.32
+    expected_output_tokens: 520
+    router_cost: 0.00001
+    fallback_tier: high
+    switch_cost: 0.00012
+    uncertainty_penalty: 0.04
+    failure_penalty: 0.020
+  high:
+    models: [demo-frontier]
+    provider: synthetic-provider
+    input_price: 3.20
+    output_price: 10.00
+    cache_read_price: 0.64
+    cache_write_price: 3.84
+    expected_output_tokens: 650
+    router_cost: 0.00001
+    fallback_tier: null
+    switch_cost: 0.0
+    uncertainty_penalty: 0.0
+    failure_penalty: 0.020

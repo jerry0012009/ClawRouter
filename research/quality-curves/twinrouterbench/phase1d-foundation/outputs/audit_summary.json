@@ -1,0 +1,258 @@
+{
+  "acceptance_checks": {
+    "all_public_records_audited": true,
+    "context_views_reproducible": true,
+    "cost_results_configuration_reproducible": true,
+    "curve_probability_cumulative_relation_correct": true,
+    "docker_tasks": 0,
+    "jsonl_parquet_core_fields_consistent": true,
+    "model_api_calls": 0,
+    "online_offline_26_report_files_byte_identical": true,
+    "production_code_modified": false,
+    "same_instance_cross_split_count": 0,
+    "same_or_near_duplicate_task_cross_split_count": 0,
+    "same_trajectory_cross_split_count": 0
+  },
+  "api_schema_mapping": {
+    "anthropic_messages": {
+      "direct": 0,
+      "field_conversion": 936,
+      "information_loss": 34,
+      "unreliable": 0
+    },
+    "clawrouter_internal": {
+      "direct": 722,
+      "field_conversion": 248,
+      "information_loss": 0,
+      "unreliable": 0
+    },
+    "openai_chat_completions": {
+      "direct": 688,
+      "field_conversion": 248,
+      "information_loss": 34,
+      "unreliable": 0
+    },
+    "openai_responses": {
+      "direct": 0,
+      "field_conversion": 936,
+      "information_loss": 34,
+      "unreliable": 0
+    }
+  },
+  "context_views": {
+    "acu_head_tail_context": {
+      "count": 970,
+      "max_approx_tokens": 8192,
+      "mean_approx_tokens": 2496.761855670103,
+      "mean_truncation_ratio_among_truncated": 0.5671012871650902,
+      "median_approx_tokens": 1701.0,
+      "min_approx_tokens": 19,
+      "p95_approx_tokens": 7597.399999999999,
+      "truncated_count": 120
+    },
+    "full_context_text": {
+      "count": 970,
+      "max_approx_tokens": 17778,
+      "mean_approx_tokens": 3268.686597938144,
+      "mean_truncation_ratio_among_truncated": 0.0,
+      "median_approx_tokens": 1830.5,
+      "min_approx_tokens": 19,
+      "p95_approx_tokens": 10956.299999999997,
+      "truncated_count": 0
+    },
+    "last_message_text": {
+      "count": 970,
+      "max_approx_tokens": 14095,
+      "mean_approx_tokens": 617.0226804123712,
+      "mean_truncation_ratio_among_truncated": 0.0,
+      "median_approx_tokens": 65.0,
+      "min_approx_tokens": 2,
+      "p95_approx_tokens": 2658.0,
+      "truncated_count": 0
+    }
+  },
+  "data": {
+    "benchmark_count": 5,
+    "benchmarks": {
+      "bfcl": 248,
+      "mtrag": 193,
+      "pinchbench": 48,
+      "qmsum": 145,
+      "swebench": 336
+    },
+    "conflicting_instance_step_labels": 0,
+    "degradation_search_done_records": 336,
+    "duplicate_id_records": 0,
+    "duplicate_instance_step_records": 0,
+    "first_step_records": 520,
+    "first_step_tier_distribution": {
+      "high": 4,
+      "low": 476,
+      "mid": 28,
+      "mid_high": 12
+    },
+    "ground_truth_ready_records": 586,
+    "instance_total_steps_mismatches": 0,
+    "invalid_functions_records": 0,
+    "label_confidence_distribution": {
+      "strong_ground_truth_ready": 586,
+      "strong_mixed_model_validated": 48,
+      "weak_degradation_search": 336
+    },
+    "later_step_records": 450,
+    "later_step_tier_distribution": {
+      "high": 166,
+      "low": 213,
+      "mid": 34,
+      "mid_high": 37
+    },
+    "main_analysis_records": 634,
+    "missing_functions_or_tools_records": 722,
+    "missing_messages_records": 0,
+    "mixed_model_validated_records": 48,
+    "noncontiguous_step_instances": 0,
+    "notes_distribution": {
+      "<null>": 634,
+      "SWE-bench Verified 40-task full-route step-level export aligned to 数据结果格式(1). This export is not marked as ground_truth_ready. Formal GT validation has currently confirmed 25 hard counterexample fixes across the 2026-04-04, 2026-04-05, and 2026-04-06 validation rounds. Treat the dataset as degradation_search_done / weak-label routing supervision data rather than strict ground truth.": 311,
+      "SWE-bench Verified 40-task full-route step-level export aligned to 数据结果格式(1). This export is not marked as ground_truth_ready. Formal GT validation has currently confirmed 25 hard counterexample fixes across the 2026-04-04, 2026-04-05, and 2026-04-06 validation rounds. Treat the dataset as degradation_search_done / weak-label routing supervision data rather than strict ground truth. Post-fix primary rerun on 2026-04-06 found a hard counterexample: step 7 can be downgraded from 高 to 中高 with same submission and same assistant-step count.": 1,
+      "SWE-bench Verified 40-task full-route step-level export aligned to 数据结果格式(1). This export is not marked as ground_truth_ready. Formal GT validation has currently confirmed 25 hard counterexample fixes across the 2026-04-04, 2026-04-05, and 2026-04-06 validation rounds. Treat the dataset as degradation_search_done / weak-label routing supervision data rather than strict ground truth. Post-fix primary rerun on 2026-04-06 found a second hard counterexample in the same case: step 10 can be downgraded from 高 to 中高 with same submission and same assistant-step count.": 2,
+      "SWE-bench Verified 40-task full-route step-level export aligned to 数据结果格式(1). This export is not marked as ground_truth_ready. Formal GT validation has currently confirmed 25 hard counterexample fixes across the 2026-04-04, 2026-04-05, and 2026-04-06 validation rounds. Treat the dataset as degradation_search_done / weak-label routing supervision data rather than strict ground truth. Post-fix primary rerun on 2026-04-06 found a second hard counterexample in the same case: step 6 can be downgraded from 高 to 中高 with same submission and same assistant-step count.": 1,
+      "SWE-bench Verified 40-task full-route step-level export aligned to 数据结果格式(1). This export is not marked as ground_truth_ready. Formal GT validation has currently confirmed 25 hard counterexample fixes across the 2026-04-04, 2026-04-05, and 2026-04-06 validation rounds. Treat the dataset as degradation_search_done / weak-label routing supervision data rather than strict ground truth. Post-fix primary rerun on 2026-04-06 found a second hard counterexample in the same case: step 8 can be downgraded from 高 to 中高 with same submission and same assistant-step count.": 4,
+      "SWE-bench Verified 40-task full-route step-level export aligned to 数据结果格式(1). This export is not marked as ground_truth_ready. Formal GT validation has currently confirmed 25 hard counterexample fixes across the 2026-04-04, 2026-04-05, and 2026-04-06 validation rounds. Treat the dataset as degradation_search_done / weak-label routing supervision data rather than strict ground truth. Post-fix primary rerun on 2026-04-06 found an additional hard counterexample in the same case: step 9 can be downgraded from 高 to 中高 with same submission and same assistant-step count.": 1,
+      "SWE-bench Verified 40-task full-route step-level export aligned to 数据结果格式(1). This export is not marked as ground_truth_ready. Formal GT validation has currently confirmed 25 hard counterexample fixes across the 2026-04-04, 2026-04-05, and 2026-04-06 validation rounds. Treat the dataset as degradation_search_done / weak-label routing supervision data rather than strict ground truth. Primary case-first GT sampling on 2026-04-05 found a hard counterexample: step 10 can be downgraded from 高 to 中高 with same submission and same assistant-step count.": 2,
+      "SWE-bench Verified 40-task full-route step-level export aligned to 数据结果格式(1). This export is not marked as ground_truth_ready. Formal GT validation has currently confirmed 25 hard counterexample fixes across the 2026-04-04, 2026-04-05, and 2026-04-06 validation rounds. Treat the dataset as degradation_search_done / weak-label routing supervision data rather than strict ground truth. Primary case-first GT sampling on 2026-04-05 found a hard counterexample: step 11 can be downgraded from 高 to 中高 with same submission and same assistant-step count.": 2,
+      "SWE-bench Verified 40-task full-route step-level export aligned to 数据结果格式(1). This export is not marked as ground_truth_ready. Formal GT validation has currently confirmed 25 hard counterexample fixes across the 2026-04-04, 2026-04-05, and 2026-04-06 validation rounds. Treat the dataset as degradation_search_done / weak-label routing supervision data rather than strict ground truth. Primary case-first GT sampling on 2026-04-05 found a hard counterexample: step 13 can be downgraded from 高 to 中高 with same submission and same assistant-step count.": 1,
+      "SWE-bench Verified 40-task full-route step-level export aligned to 数据结果格式(1). This export is not marked as ground_truth_ready. Formal GT validation has currently confirmed 25 hard counterexample fixes across the 2026-04-04, 2026-04-05, and 2026-04-06 validation rounds. Treat the dataset as degradation_search_done / weak-label routing supervision data rather than strict ground truth. Primary case-first GT sampling on 2026-04-05 found a hard counterexample: step 6 can be downgraded from 高 to 中高 with same submission and same assistant-step count.": 1,
+      "SWE-bench Verified 40-task full-route step-level export aligned to 数据结果格式(1). This export is not marked as ground_truth_ready. Formal GT validation has currently confirmed 25 hard counterexample fixes across the 2026-04-04, 2026-04-05, and 2026-04-06 validation rounds. Treat the dataset as degradation_search_done / weak-label routing supervision data rather than strict ground truth. Primary case-first GT sampling on 2026-04-05 found a hard counterexample: step 7 can be downgraded from 高 to 中高 with same submission and same assistant-step count.": 2,
+      "SWE-bench Verified 40-task full-route step-level export aligned to 数据结果格式(1). This export is not marked as ground_truth_ready. Formal GT validation has currently confirmed 25 hard counterexample fixes across the 2026-04-04, 2026-04-05, and 2026-04-06 validation rounds. Treat the dataset as degradation_search_done / weak-label routing supervision data rather than strict ground truth. Primary case-first GT sampling on 2026-04-05 found a hard counterexample: step 8 can be downgraded from 高 to 中高 with same submission and same assistant-step count.": 1,
+      "SWE-bench Verified 40-task full-route step-level export aligned to 数据结果格式(1). This export is not marked as ground_truth_ready. Formal GT validation has currently confirmed 25 hard counterexample fixes across the 2026-04-04, 2026-04-05, and 2026-04-06 validation rounds. Treat the dataset as degradation_search_done / weak-label routing supervision data rather than strict ground truth. Primary case-first GT sampling on 2026-04-05 found a hard counterexample: step 9 can be downgraded from 高 to 中高 with same submission and same assistant-step count.": 5,
+      "SWE-bench Verified 40-task full-route step-level export aligned to 数据结果格式(1). This export is not marked as ground_truth_ready. Formal GT validation has currently confirmed 25 hard counterexample fixes across the 2026-04-04, 2026-04-05, and 2026-04-06 validation rounds. Treat the dataset as degradation_search_done / weak-label routing supervision data rather than strict ground truth. Teacher-style hard counterexample validated on 2026-04-04: step 5 can be downgraded from 中高 to 中 with same submission and same assistant-step count.": 1,
+      "SWE-bench Verified 40-task full-route step-level export aligned to 数据结果格式(1). This export is not marked as ground_truth_ready. Formal GT validation has currently confirmed 25 hard counterexample fixes across the 2026-04-04, 2026-04-05, and 2026-04-06 validation rounds. Treat the dataset as degradation_search_done / weak-label routing supervision data rather than strict ground truth. Teacher-style hard counterexample validated on 2026-04-04: step 5 can be downgraded from 高 to 中高 with same submission and same assistant-step count.": 1
+    },
+    "pipeline_stage_distribution": {
+      "degradation_search_done": 336,
+      "ground_truth_ready": 586,
+      "mixed_model_validated": 48
+    },
+    "scenario_count": 6,
+    "scenarios": {
+      "bfcl_tool_use_multi_turn": 148,
+      "bfcl_tool_use_single_turn": 100,
+      "code_swe": 336,
+      "general_agent": 48,
+      "meeting_query_summarization": 145,
+      "rag_multiturn": 193
+    },
+    "sensitivity_analysis_records": 970,
+    "swebench_not_fully_ready_records": 336,
+    "target_tier_id_mismatches": 0,
+    "tier_distribution": {
+      "high": 170,
+      "low": 689,
+      "mid": 62,
+      "mid_high": 49
+    },
+    "total_records": 970,
+    "unique_ids": 970,
+    "unique_instances": 520,
+    "weak_supervision_records": 336
+  },
+  "go_no_go": "conditional_go",
+  "oracle_chain_validation": {
+    "costs_are_synthetic": true,
+    "curve_monotonicity_passed": true,
+    "oracle_90_costsave": 0.6984417485063688,
+    "oracle_90_rowpass": 1.0,
+    "oracle_90_trajpass": 1.0,
+    "oracle_is_router_result": false,
+    "sticky_90_costsave": 0.5337807830651271,
+    "sticky_90_rowpass": 1.0,
+    "thresholds": [
+      0.8,
+      0.9,
+      0.95
+    ]
+  },
+  "phase1e_protocol_complete": true,
+  "phase2_interface": {
+    "aggregate_only_mean_interval_width": 0.39894611676976277,
+    "aggregate_only_slope_identified": false,
+    "aggregate_to_stratified_width_ratio": 5.697934882550163,
+    "beta_strictly_positive": true,
+    "curve_family": "constrained_logistic",
+    "model_ids": [
+      "demo-economy",
+      "demo-value",
+      "demo-premium",
+      "demo-frontier"
+    ],
+    "real_model_records": 0,
+    "stratified_mean_interval_width": 0.07001591365874135,
+    "validator_assumption_type": "synthetic_assumption"
+  },
+  "recommendation": "Proceed conditionally with the frozen offline RouteLLM/P2L comparison; use 634 strong rows for primary analysis, all 970 only for sensitivity, and require later execution evidence before production claims.",
+  "scope": "static_data_audit_and_interface_validation_only",
+  "source_equivalence": {
+    "github_hf_jsonl_byte_equal": false,
+    "github_hf_jsonl_semantically_equal": true,
+    "hf_parquet_columns": [
+      "id",
+      "benchmark",
+      "scenario",
+      "instance_id",
+      "step_index",
+      "total_steps",
+      "messages",
+      "target_tier",
+      "target_tier_id",
+      "benchmark_display",
+      "benchmark_subset",
+      "benchmark_version",
+      "pipeline_stage",
+      "collector",
+      "collected_at",
+      "notes",
+      "functions"
+    ],
+    "hf_parquet_rows": 970,
+    "jsonl_parquet_core_fields_equal": true,
+    "jsonl_parquet_core_mismatch_count": 0,
+    "semantic_jsonl_mismatch_count": 0
+  },
+  "splits": {
+    "checks": {
+      "identical_task_cross_split_count": 0,
+      "instance_cross_split_count": 0,
+      "near_duplicate_group_cross_split_count": 0,
+      "trajectory_cross_split_count": 0
+    },
+    "cv_fold_records": {
+      "0": 218,
+      "1": 216,
+      "2": 158,
+      "3": 212,
+      "4": 166
+    },
+    "cv_fold_roles": {
+      "0": "validation",
+      "1": "train",
+      "2": "train",
+      "3": "train",
+      "4": "test"
+    },
+    "identical_task_signature_count": 513,
+    "instances": {
+      "test": 104,
+      "train": 312,
+      "validation": 104
+    },
+    "leakage_group_count": 511,
+    "random_seed": 20260726,
+    "records": {
+      "test": 166,
+      "train": 586,
+      "validation": 218
+    }
+  },
+  "status": "complete"
+}

@@ -1,0 +1,162 @@
+{
+  "acceptance_validation": {
+    "configuration_driven_cost_recalculation": true,
+    "curve_probability_and_monotonicity_checks": true,
+    "instance_and_near_duplicate_split_leakage_count": 0,
+    "jsonl_parquet_core_fields_consistent": true,
+    "online_then_offline_replay_all_26_report_files_byte_identical": true,
+    "three_context_views_deterministically_regenerated": true
+  },
+  "chart_map": [
+    {
+      "family": "composition",
+      "file": "figures/tier_distribution.png",
+      "question": "How are released tiers distributed across benchmarks?",
+      "source_csv": "data_coverage.csv"
+    },
+    {
+      "family": "distribution",
+      "file": "figures/context_length_by_step.png",
+      "question": "How does full-context length vary by step?",
+      "source_csv": "context_length_audit.csv"
+    },
+    {
+      "family": "ordered relationship",
+      "file": "figures/oracle_difficulty_quality_curves.png",
+      "question": "Does the one-hot cumulative sufficiency chain behave correctly?",
+      "source_csv": "oracle_curve_data.csv"
+    },
+    {
+      "family": "relationship",
+      "file": "figures/oracle_cost_quality_frontier.png",
+      "question": "What synthetic cost-quality operating points does the Oracle chain produce?",
+      "source_csv": "cost_quality_frontier.csv"
+    },
+    {
+      "family": "matrix",
+      "file": "figures/session_tier_transitions.png",
+      "question": "How does sticky escalation alter Oracle recommendations?",
+      "source_csv": "oracle_session_simulation.csv"
+    },
+    {
+      "family": "uncertainty",
+      "file": "figures/synthetic_difficulty_quality_curves.png",
+      "question": "Does the constrained benchmark fitter emit monotone curves and intervals?",
+      "source_csv": "synthetic_model_curves.csv"
+    },
+    {
+      "family": "relationship",
+      "file": "figures/synthetic_model_cost_frontier.png",
+      "question": "Can synthetic model-level fits feed the fallback cost interface?",
+      "source_csv": "synthetic_cost_quality_frontier.csv"
+    }
+  ],
+  "execution_boundary": {
+    "docker_tasks_executed": 0,
+    "llm_judges_executed": 0,
+    "model_api_calls": 0,
+    "production_code_modified": false,
+    "routers_executed": [],
+    "static_data_only": true
+  },
+  "input_files": {
+    "acu_benchmark_curve_fitter_sha256": "5579bcaafc9336af85f1322c2cd71916e04ed2d03c2af630cac9ea8cad13088d",
+    "acu_curve_engine_sha256": "16d6fad0b9ac451baac20411f0fab6e7c8392aafa3d9370d5a250484d4b08cca",
+    "acu_decision_engine_sha256": "ca044ca781a10de038d78989e29464703bb3af9f218e897f01c0540711836149",
+    "acu_session_policy_sha256": "96151c76e7ecd115c47b93e2904a075c844d4194daa269776ea13717c2729e29",
+    "build_script_sha256": "f2e851e4e0dccbf7dc8157851def8257d07c1b20790ec8a4d3980eea3ca5bde3",
+    "public_model_benchmark_catalog_sha256": "93c583988870324f1fc463470c244ca51d7aa2ccf8bb5dbed0d7a19345c8fc2a",
+    "tier_catalog_sha256": "4bd72f021d5c87b79746fc4b5d7d9b207c838638adfb980301468c3afbf1ca1f"
+  },
+  "production_schema_inspection": {
+    "files": [
+      {
+        "path": "src/proxy.ts",
+        "sha256": "1a7c55ec995b734342a8b715b5b3af2aabdff7840b52efb1cc5e3ae8aa2428b1"
+      },
+      {
+        "path": "src/types.ts",
+        "sha256": "776231dda692c754be15c173e6aee020b651d4c83d554f0ce1d62798ecc550d4"
+      }
+    ],
+    "finding": "Current proxy parses OpenAI-style messages and tools; no production file was changed.",
+    "mode": "read_only"
+  },
+  "run_parameters": {
+    "approx_token_chars": 4,
+    "head_tail_max_approx_tokens": 8192,
+    "output_determinism": "No wall-clock timestamps or mode-dependent analytical fields are emitted.",
+    "split_seed": 20260726,
+    "supported_modes": [
+      "online_verified_download",
+      "offline_verified_cache_replay"
+    ]
+  },
+  "runtime": {
+    "dependencies": {
+      "PyYAML": "6.0.2",
+      "matplotlib": "3.10.3",
+      "numpy": "2.2.6",
+      "pandas": "2.2.3",
+      "pyarrow": "21.0.0",
+      "scikit-learn": "1.7.1",
+      "scipy": "1.15.3"
+    },
+    "platform": "Linux-6.8.0-134-generic-x86_64-with-glibc2.39",
+    "python_implementation": "CPython",
+    "python_version": "3.12.3"
+  },
+  "schema_version": 1,
+  "source_equivalence": {
+    "github_hf_jsonl_byte_equal": false,
+    "github_hf_jsonl_semantically_equal": true,
+    "hf_parquet_columns": [
+      "id",
+      "benchmark",
+      "scenario",
+      "instance_id",
+      "step_index",
+      "total_steps",
+      "messages",
+      "target_tier",
+      "target_tier_id",
+      "benchmark_display",
+      "benchmark_subset",
+      "benchmark_version",
+      "pipeline_stage",
+      "collector",
+      "collected_at",
+      "notes",
+      "functions"
+    ],
+    "hf_parquet_rows": 970,
+    "jsonl_parquet_core_fields_equal": true,
+    "jsonl_parquet_core_mismatch_count": 0,
+    "semantic_jsonl_mismatch_count": 0
+  },
+  "source_record_count": 970,
+  "sources": {
+    "github": {
+      "commit": "430acecac71141de77afd8e5e13690d236d58e93",
+      "commit_date": "2026-07-10T20:11:25+08:00",
+      "manifest_sha256": "e575b8cc8e33bba993f2d1bcf09b4ee6940fbb098c9255a9c8e5ef7c6771e726",
+      "question_bank_sha256": "5b4f90c24643b214a9b0f26bf4e05afc742554262f4ef405e0b3b4a4cce503f4",
+      "repository": "https://github.com/CommonstackAI/TwinRouterBench"
+    },
+    "hugging_face": {
+      "dataset": "Amorph/TwinRouterBench",
+      "manifest_sha256": "d83bb75071fd8c1f68f17402881242c56467807ff4090b5e26cb1afa22421b16",
+      "question_bank_sha256": "7e2870b5e2e5c801f6444c05a4311c9c9010e965016f6938f0bb5abc226252d0",
+      "revision": "c2907f006455d9d3b4bf69472a527536c7baa195",
+      "revision_date": "2026-05-23T15:15:22+00:00",
+      "train_parquet_sha256": "28070bd3e807565cc0144d8b558167d2a7035c6400b5fd55f97ea10383780427"
+    },
+    "paper": {
+      "arxiv_id": "2605.18859",
+      "pdf_sha256": "3c4b038c04d1ed6b3c144ff2c2272c2713eebd25044eacd32f8522e4c3120ff9",
+      "url": "https://arxiv.org/abs/2605.18859v2",
+      "version": "v2"
+    }
+  },
+  "study": "TwinRouterBench Phase 1D foundation plus Phase 2 synthetic interfaces"
+}

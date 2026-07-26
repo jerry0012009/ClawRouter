@@ -1,0 +1,87 @@
+schema_version: 1
+data_status: synthetic
+description: >-
+  Interface-only Phase 2 catalog. Every score, date, capability, and price below
+  is synthetic and exists solely to test parsing and curve fitting.
+
+models:
+  - model_id: demo-economy
+    display_name: Demo Economy
+    provider: synthetic-provider
+    model_version: synthetic-v1
+    release_date: synthetic
+    domain: agentic-routing-demo
+    benchmark_name: TwinRouterBench-synthetic-demo
+    benchmark_score: 0.46
+    benchmark_score_scale: 0_to_1
+    benchmark_source: synthetic://phase2-interface-demo
+    benchmark_date: synthetic
+    evaluation_mode: aggregate_only
+    agent_harness: synthetic-harness
+    input_price: 0.10
+    output_price: 0.30
+    cache_read_price: 0.02
+    cache_write_price: 0.12
+    context_window: 32768
+    tool_call_support: true
+    source_confidence: synthetic_low
+  - model_id: demo-value
+    display_name: Demo Value
+    provider: synthetic-provider
+    model_version: synthetic-v1
+    release_date: synthetic
+    domain: agentic-routing-demo
+    benchmark_name: TwinRouterBench-synthetic-demo
+    benchmark_score: 0.63
+    benchmark_score_scale: 0_to_1
+    benchmark_source: synthetic://phase2-interface-demo
+    benchmark_date: synthetic
+    evaluation_mode: aggregate_only
+    agent_harness: synthetic-harness
+    input_price: 0.35
+    output_price: 1.10
+    cache_read_price: 0.07
+    cache_write_price: 0.42
+    context_window: 65536
+    tool_call_support: true
+    source_confidence: synthetic_low
+  - model_id: demo-premium
+    display_name: Demo Premium
+    provider: synthetic-provider
+    model_version: synthetic-v1
+    release_date: synthetic
+    domain: agentic-routing-demo
+    benchmark_name: TwinRouterBench-synthetic-demo
+    benchmark_score: 0.76
+    benchmark_score_scale: 0_to_1
+    benchmark_source: synthetic://phase2-interface-demo
+    benchmark_date: synthetic
+    evaluation_mode: stratified_synthetic
+    agent_harness: synthetic-harness
+    input_price: 1.10
+    output_price: 3.60
+    cache_read_price: 0.22
+    cache_write_price: 1.32
+    context_window: 131072
+    tool_call_support: true
+    source_confidence: synthetic_medium
+  - model_id: demo-frontier
+    display_name: Demo Frontier
+    provider: synthetic-provider
+    model_version: synthetic-v1
+    release_date: synthetic
+    domain: agentic-routing-demo
+    benchmark_name: TwinRouterBench-synthetic-demo
+    benchmark_score: 0.88
+    benchmark_score_scale: 0_to_1
+    benchmark_source: synthetic://phase2-interface-demo
+    benchmark_date: synthetic
+    evaluation_mode: stratified_synthetic
+    agent_harness: synthetic-harness
+    input_price: 3.20
+    output_price: 10.00
+    cache_read_price: 0.64
+    cache_write_price: 3.84
+    context_window: 262144
+    tool_call_support: true
+    source_confidence: synthetic_medium

@@ -1,0 +1,6 @@
+benchmark,pipeline_stage,label_confidence,analysis_scope,record_count,instance_count,record_share,tier_low_count,tier_mid_count,tier_mid_high_count,tier_high_count,notes_nonempty_count
+bfcl,ground_truth_ready,strong_ground_truth_ready,main,248,130,0.2556701030927835,239,8,1,0,0
+mtrag,ground_truth_ready,strong_ground_truth_ready,main,193,193,0.19896907216494844,183,8,1,1,0
+pinchbench,mixed_model_validated,strong_mixed_model_validated,main,48,12,0.049484536082474224,41,3,3,1,0
+qmsum,ground_truth_ready,strong_ground_truth_ready,main,145,145,0.14948453608247422,132,10,3,0,0
+swebench,degradation_search_done,weak_degradation_search,sensitivity_only,336,40,0.3463917525773196,94,33,41,168,336

@@ -1,0 +1,357 @@
+{
+  "audit_generated_at": "2026-07-26T11:20:40.828658+00:00",
+  "scope": "Phase 1A public LiveBench data audit; no model inference",
+  "sources": {
+    "livebench_code": {
+      "name": "LiveBench/LiveBench",
+      "url": "https://github.com/LiveBench/LiveBench.git",
+      "web_url": "https://github.com/LiveBench/LiveBench",
+      "commit": "a41783c06f646697a96cc2ae2275a6b5c2646cb4"
+    },
+    "datasets": {
+      "model_judgment": {
+        "url": "https://huggingface.co/datasets/livebench/model_judgment",
+        "commit": "9704e5da7bfbefe75ac1482a13de827127295993",
+        "files": [
+          {
+            "path": "data/leaderboard-00000-of-00001.parquet",
+            "schema_columns": [
+              "category",
+              "model",
+              "question_id",
+              "score",
+              "task",
+              "tstamp",
+              "turn"
+            ],
+            "projected_row_count": 60372,
+            "read_via": "projection_cache",
+            "lfs_sha256": "35ad896970151776145c96b31c5ddb3a2749ea9a1d91e6b7f1a4c4c04735182a",
+            "lfs_size_bytes": 737444
+          }
+        ]
+      },
+      "reasoning": {
+        "url": "https://huggingface.co/datasets/livebench/reasoning",
+        "commit": "6fc6498a5dfba553f69f4413feabade1f1a2d384",
+        "files": [
+          {
+            "path": "data/test-00000-of-00001.parquet",
+            "schema_columns": [
+              "category",
+              "question_id",
+              "task",
+              "turns"
+            ],
+            "projected_row_count": 200,
+            "read_via": "projection_cache",
+            "lfs_sha256": "4204bb94c812690ef8ba5f4c1f10b5b1082ca0b7bc532166834f798aa56e2a3c",
+            "lfs_size_bytes": 88219
+          }
+        ]
+      },
+      "math": {
+        "url": "https://huggingface.co/datasets/livebench/math",
+        "commit": "bb66571c8ccf32d3df9e6f48b920d3770ff4aacb",
+        "files": [
+          {
+            "path": "data/test-00000-of-00001.parquet",
+            "schema_columns": [
+              "category",
+              "question_id",
+              "task",
+              "turns"
+            ],
+            "projected_row_count": 368,
+            "read_via": "projection_cache",
+            "lfs_sha256": "3d365cad1f9b8d7c5416d63866653d6854b270d9c93b51323d405ed5fd51df54",
+            "lfs_size_bytes": 185605
+          }
+        ]
+      },
+      "coding": {
+        "url": "https://huggingface.co/datasets/livebench/coding",
+        "commit": "a958549fdd8aa57be0a3fafe7b205ffc160ed5f4",
+        "files": [
+          {
+            "path": "data/test-00000-of-00001.parquet",
+            "schema_columns": [
+              "category",
+              "question_id",
+              "task",
+              "turns"
+            ],
+            "projected_row_count": 128,
+            "read_via": "projection_cache",
+            "lfs_sha256": "5f02d01fb21672f5d84169f940adab46ff3ca09b9159fd42fdd289bc9be23502",
+            "lfs_size_bytes": 244785858
+          }
+        ]
+      },
+      "language": {
+        "url": "https://huggingface.co/datasets/livebench/language",
+        "commit": "3ada32a2e53d5e04e57fa503384cb85ce9116c40",
+        "files": [
+          {
+            "path": "data/test-00000-of-00001.parquet",
+            "schema_columns": [
+              "category",
+              "question_id",
+              "task",
+              "turns"
+            ],
+            "projected_row_count": 190,
+            "read_via": "projection_cache",
+            "lfs_sha256": "76ba142afd242ca02d6baa8bb737608d2b416674f311d8f9d798b4e3908a499c",
+            "lfs_size_bytes": 287876
+          }
+        ]
+      },
+      "data_analysis": {
+        "url": "https://huggingface.co/datasets/livebench/data_analysis",
+        "commit": "31b9661ff678df9958e2f7fa228427f4c858c1a1",
+        "files": [
+          {
+            "path": "data/test-00000-of-00001.parquet",
+            "schema_columns": [
+              "category",
+              "question_id",
+              "task",
+              "turns"
+            ],
+            "projected_row_count": 150,
+            "read_via": "projection_cache",
+            "lfs_sha256": "fb86a7a02fa9eabf785d9e8af85955990cf6d228cc9d3f805a54f863bc8c4c52",
+            "lfs_size_bytes": 144796
+          }
+        ]
+      },
+      "instruction_following": {
+        "url": "https://huggingface.co/datasets/livebench/instruction_following",
+        "commit": "0868379c4b5cf62aeacaf8be4f08fced815c81bb",
+        "files": [
+          {
+            "path": "data/test-00000-of-00001.parquet",
+            "schema_columns": [
+              "category",
+              "question_id",
+              "task",
+              "turns"
+            ],
+            "projected_row_count": 400,
+            "read_via": "projection_cache",
+            "lfs_sha256": "a9bb97bbaf8788142c310bcb33d50e2f6f5df8cbd8b8c3db677816b06f0f4f25",
+            "lfs_size_bytes": 537024
+          }
+        ]
+      }
+    }
+  },
+  "counts": {
+    "official_current_question_rows": 1436,
+    "official_current_distinct_questions": 1436,
+    "historical_questions_recovered": 0,
+    "judged_distinct_questions": 494,
+    "joined_distinct_questions": 394,
+    "unjoined_judged_questions": 100,
+    "raw_judgments": 60372,
+    "deduplicated_latest_judgments": 59388,
+    "joined_raw_judgments": 53470,
+    "joined_deduplicated_judgments": 52486,
+    "models": 195,
+    "public_question_categories": 6,
+    "public_question_tasks": 18,
+    "judgment_categories": 3,
+    "judgment_tasks": 7
+  },
+  "join_quality": {
+    "question_id_join_possible": true,
+    "distinct_question_join_rate": 0.7975708502024291,
+    "raw_judgment_join_rate": 0.8856754786987345,
+    "task_or_category_mismatch_rows_among_joinable": 0,
+    "history_scan": {
+      "language": {
+        "target_question_count": 100,
+        "commits_scanned": [
+          "1561feebcfa3a5adaf8ecb3a0bc3b01536af5710",
+          "6a4906b0387269ceb355774a0e2089c2df51715a",
+          "f6ed53d61e8b22089108200bd1b3bd090aaa1441",
+          "f7c91c7b30b4dee868845e185e19d0e1bd5eadc0",
+          "a3a3ed16faa29817311197c949bbe0499ab14c41",
+          "e40000291c1b8fba41efaf1509f2e8887005f76d",
+          "c233da731f98b4e53fc61a245a05cf86931a8a2b",
+          "8f8f92397a994a1285020cb5bc207ad7b647b873",
+          "ca5f76c058b2ba6b330e3035dce2d33ed2a0d554"
+        ],
+        "recovered_question_count": 0
+      }
+    }
+  },
+  "data_quality": {
+    "duplicate_official_question_ids": 0,
+    "exact_duplicate_judgment_rows": 0,
+    "duplicate_model_question_turn_groups": 984,
+    "extra_duplicate_model_question_turn_rows": 984,
+    "duplicate_groups_with_score_conflict": 64,
+    "missing_prompt_in_official_current_questions": 0,
+    "judged_question_ids_missing_official_prompt": 100,
+    "raw_judgment_rows_missing_official_prompt": 6902,
+    "missing_judgment_fields": {
+      "question_id": 0,
+      "task": 0,
+      "model": 0,
+      "score": 0,
+      "turn": 0,
+      "tstamp": 0,
+      "category": 0
+    },
+    "turn_distribution": {
+      "1": 60372
+    },
+    "latest_tstamp_used_for_duplicate_resolution": true
+  },
+  "score_semantics": {
+    "global_range": [
+      0.0,
+      1.0
+    ],
+    "definitions_are_consistent_across_tasks": false,
+    "full_success_conversion": "pass = (score == 1.0)",
+    "conversion_assessment": "Safe as an exact/full-success indicator for the seven published tasks, but it discards partial credit and is not equivalent to score > 0.",
+    "turn_filter_recommendation": "Filter turn == 1 for this snapshot; all rows are turn 1. Keep the filter explicit to prevent future multi-turn grain changes."
+  },
+  "category_summary": [
+    {
+      "category": "coding",
+      "official_current_question_count": 128,
+      "judged_question_count": 128,
+      "raw_judgment_count": 21541,
+      "model_count": 183,
+      "score_min": 0.0,
+      "score_max": 1.0,
+      "task_count": 2,
+      "pass_fail_summary": "native_binary"
+    },
+    {
+      "category": "data_analysis",
+      "official_current_question_count": 150,
+      "judged_question_count": 0,
+      "raw_judgment_count": 0,
+      "model_count": 0,
+      "score_min": null,
+      "score_max": null,
+      "task_count": 3,
+      "pass_fail_summary": "no_public_judgments"
+    },
+    {
+      "category": "instruction_following",
+      "official_current_question_count": 400,
+      "judged_question_count": 76,
+      "raw_judgment_count": 7652,
+      "model_count": 163,
+      "score_min": 0.0,
+      "score_max": 1.0,
+      "task_count": 4,
+      "pass_fail_summary": "score_eq_1_is_full_success_but_partial_credit_exists"
+    },
+    {
+      "category": "language",
+      "official_current_question_count": 190,
+      "judged_question_count": 290,
+      "raw_judgment_count": 31179,
+      "model_count": 173,
+      "score_min": 0.0,
+      "score_max": 1.0,
+      "task_count": 3,
+      "pass_fail_summary": "score_eq_1_is_full_success_but_partial_credit_exists"
+    },
+    {
+      "category": "math",
+      "official_current_question_count": 368,
+      "judged_question_count": 0,
+      "raw_judgment_count": 0,
+      "model_count": 0,
+      "score_min": null,
+      "score_max": null,
+      "task_count": 3,
+      "pass_fail_summary": "no_public_judgments"
+    },
+    {
+      "category": "reasoning",
+      "official_current_question_count": 200,
+      "judged_question_count": 0,
+      "raw_judgment_count": 0,
+      "model_count": 0,
+      "score_min": null,
+      "score_max": null,
+      "task_count": 3,
+      "pass_fail_summary": "no_public_judgments"
+    }
+  ],
+  "recommended_anchor_models": [
+    {
+      "model": "command-r-08-2024",
+      "joined_prompt_question_count": 394,
+      "category_count": 3,
+      "task_count": 7,
+      "joined_average_score": 0.25749963995491704,
+      "joined_full_success_rate": 0.19796954314720813
+    },
+    {
+      "model": "gemini-1.5-flash-001",
+      "joined_prompt_question_count": 394,
+      "category_count": 3,
+      "task_count": 7,
+      "joined_average_score": 0.3631215519693949,
+      "joined_full_success_rate": 0.2868020304568528
+    },
+    {
+      "model": "claude-3-opus-20240229",
+      "joined_prompt_question_count": 394,
+      "category_count": 3,
+      "task_count": 7,
+      "joined_average_score": 0.4759893000268767,
+      "joined_full_success_rate": 0.3730964467005076
+    },
+    {
+      "model": "chatgpt-4o-latest-2025-03-27",
+      "joined_prompt_question_count": 394,
+      "category_count": 3,
+      "task_count": 7,
+      "joined_average_score": 0.5964783148773433,
+      "joined_full_success_rate": 0.49238578680203043
+    },
+    {
+      "model": "o1-preview-2024-09-12",
+      "joined_prompt_question_count": 393,
+      "category_count": 3,
+      "task_count": 7,
+      "joined_average_score": 0.703186272375447,
+      "joined_full_success_rate": 0.628498727735369
+    }
+  ],
+  "anchor_selection": {
+    "coverage_floor": 391,
+    "eligible_model_count": 37,
+    "score_targets": [
+      0.25749963995491704,
+      0.36892129806004953,
+      0.48034295616518197,
+      0.5917646142703145,
+      0.703186272375447
+    ],
+    "common_joined_question_count": 393
+  },
+  "route_llm_readiness": {
+    "ready_for_final_quality_curve": false,
+    "usable_for_initial_anchor_experiments": true,
+    "blocking_or_required_followups": [
+      "Choose whether to exclude the 100 judged questions whose official prompt is unavailable.",
+      "Resolve or exclude the 64 duplicate model/question/turn groups with conflicting scores.",
+      "Decide whether RouteLLM target is exact success (score == 1) or task-specific partial credit.",
+      "Stratify by task/category; raw scores are not semantically identical across tasks.",
+      "Obtain official judgments for reasoning, math, and data_analysis if those categories are required.",
+      "Freeze the pinned snapshot and model-name normalization policy before training/evaluation."
+    ]
+  }
+}

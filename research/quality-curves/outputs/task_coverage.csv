@@ -1,0 +1,19 @@
+category,task,official_current_question_count,judged_question_count,joined_prompt_question_count,missing_prompt_question_count,raw_judgment_count,deduplicated_judgment_count,model_count,score_min,score_max,unique_score_count,partial_credit_present,score_definition,pass_fail_suitability
+coding,LCB_generation,78,78,78,0,13240,12657,182,0.0,1.0,2,False,binary: all public/private code tests pass,native_binary
+coding,coding_completion,50,50,50,0,8301,7900,162,0.0,1.0,2,False,binary: all public/private code tests pass,native_binary
+data_analysis,cta,50,0,0,0,0,0,0,,,0,False,not present in public judgment snapshot,not_evaluable_no_judgments
+data_analysis,tablejoin,50,0,0,0,0,0,0,,,0,False,not present in public judgment snapshot,not_evaluable_no_judgments
+data_analysis,tablereformat,50,0,0,0,0,0,0,,,0,False,not present in public judgment snapshot,not_evaluable_no_judgments
+instruction_following,paraphrase,100,50,50,0,5150,5150,103,0.0,1.0,11,True,0.5 * (all constraints pass + fraction of constraints passed),safe_only_as_full_success_score_eq_1
+instruction_following,simplify,100,0,0,0,0,0,0,,,0,False,not present in public judgment snapshot,not_evaluable_no_judgments
+instruction_following,story_generation,100,26,26,0,2502,2502,97,0.0,1.0,7,True,0.5 * (all constraints pass + fraction of constraints passed),safe_only_as_full_success_score_eq_1
+instruction_following,summarize,100,0,0,0,0,0,0,,,0,False,not present in public judgment snapshot,not_evaluable_no_judgments
+language,connections,100,100,100,0,10200,10200,166,0.0,1.0,7,True,fraction of exact four-item groups recovered,safe_only_as_full_success_score_eq_1
+language,plot_unscrambling,40,90,40,50,9729,9729,169,0.0,1.0,453,True,1 - normalized sentence-order edit distance,safe_only_as_full_success_score_eq_1
+language,typos,50,100,50,50,11250,11250,168,0.0,1.0,2,False,binary: corrected reference text is present,native_binary
+math,AMPS_Hard,150,0,0,0,0,0,0,,,0,False,not present in public judgment snapshot,not_evaluable_no_judgments
+math,math_comp,146,0,0,0,0,0,0,,,0,False,not present in public judgment snapshot,not_evaluable_no_judgments
+math,olympiad,72,0,0,0,0,0,0,,,0,False,not present in public judgment snapshot,not_evaluable_no_judgments
+reasoning,spatial,50,0,0,0,0,0,0,,,0,False,not present in public judgment snapshot,not_evaluable_no_judgments
+reasoning,web_of_lies_v2,50,0,0,0,0,0,0,,,0,False,not present in public judgment snapshot,not_evaluable_no_judgments
+reasoning,zebra_puzzle,100,0,0,0,0,0,0,,,0,False,not present in public judgment snapshot,not_evaluable_no_judgments

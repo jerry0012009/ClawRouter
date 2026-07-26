@@ -1,0 +1,979 @@
+{
+  "analysis_name": "Phase 1C P2L difficulty validity",
+  "primary_metric_definition": "count(beta_i <= 0) / count(beta_i)",
+  "primary_analysis": {
+    "primary_metric": {
+      "metric": "p2l_difficulty_primary",
+      "spearman": -0.007415325756194564,
+      "bootstrap_95_ci": [
+        -0.09669256194386326,
+        0.08341526275495084
+      ],
+      "bootstrap_samples_requested": 10000,
+      "bootstrap_samples_valid": 10000,
+      "distribution": {
+        "minimum": 0.09230769230769231,
+        "p25": 0.2076923076923077,
+        "median": 0.3076923076923077,
+        "mean": 0.3095076923076923,
+        "p75": 0.4,
+        "maximum": 0.7076923076923077,
+        "unique_value_count": 67
+      },
+      "failure_trend_by_equal_count_decile": [
+        {
+          "decile": 1,
+          "question_count": 50,
+          "mean_metric": 0.13676923076923078,
+          "mean_failure_rate": 0.24705882352941175
+        },
+        {
+          "decile": 2,
+          "question_count": 50,
+          "mean_metric": 0.174,
+          "mean_failure_rate": 0.34352941176470586
+        },
+        {
+          "decile": 3,
+          "question_count": 50,
+          "mean_metric": 0.20476923076923076,
+          "mean_failure_rate": 0.28764705882352937
+        },
+        {
+          "decile": 4,
+          "question_count": 50,
+          "mean_metric": 0.2507692307692308,
+          "mean_failure_rate": 0.3311764705882353
+        },
+        {
+          "decile": 5,
+          "question_count": 50,
+          "mean_metric": 0.28892307692307695,
+          "mean_failure_rate": 0.17941176470588235
+        },
+        {
+          "decile": 6,
+          "question_count": 50,
+          "mean_metric": 0.32353846153846155,
+          "mean_failure_rate": 0.19294117647058823
+        },
+        {
+          "decile": 7,
+          "question_count": 50,
+          "mean_metric": 0.35184615384615386,
+          "mean_failure_rate": 0.29882352941176465
+        },
+        {
+          "decile": 8,
+          "question_count": 50,
+          "mean_metric": 0.3963076923076922,
+          "mean_failure_rate": 0.24588235294117644
+        },
+        {
+          "decile": 9,
+          "question_count": 50,
+          "mean_metric": 0.4393846153846154,
+          "mean_failure_rate": 0.3035294117647059
+        },
+        {
+          "decile": 10,
+          "question_count": 50,
+          "mean_metric": 0.5287692307692307,
+          "mean_failure_rate": 0.3435294117647059
+        }
+      ],
+      "nondecreasing_decile_steps_out_of_9": 6
+    },
+    "auxiliary_metrics": [
+      {
+        "metric": "p2l_difficulty_neg_median",
+        "spearman": -0.015670869375330163,
+        "bootstrap_95_ci": [
+          -0.1062128214042436,
+          0.07475500440653657
+        ],
+        "bootstrap_samples_requested": 10000,
+        "bootstrap_samples_valid": 10000,
+        "distribution": {
+          "minimum": -0.7392158508300781,
+          "p25": -0.4388349950313568,
+          "median": -0.2747865915298462,
+          "mean": -0.280624746453017,
+          "p75": -0.12797218933701515,
+          "maximum": 0.2579651176929474,
+          "unique_value_count": 500
+        },
+        "failure_trend_by_equal_count_decile": [
+          {
+            "decile": 1,
+            "question_count": 50,
+            "mean_metric": -0.6137757551670074,
+            "mean_failure_rate": 0.26999999999999996
+          },
+          {
+            "decile": 2,
+            "question_count": 50,
+            "mean_metric": -0.5119249147176742,
+            "mean_failure_rate": 0.3664705882352941
+          },
+          {
+            "decile": 3,
+            "question_count": 50,
+            "mean_metric": -0.4333938026428223,
+            "mean_failure_rate": 0.25058823529411767
+          },
+          {
+            "decile": 4,
+            "question_count": 50,
+            "mean_metric": -0.35167592763900757,
+            "mean_failure_rate": 0.2823529411764706
+          },
+          {
+            "decile": 5,
+            "question_count": 50,
+            "mean_metric": -0.2970646768808365,
+            "mean_failure_rate": 0.1776470588235294
+          },
+          {
+            "decile": 6,
+            "question_count": 50,
+            "mean_metric": -0.2424081790447235,
+            "mean_failure_rate": 0.2817647058823529
+          },
+          {
+            "decile": 7,
+            "question_count": 50,
+            "mean_metric": -0.19240126192569731,
+            "mean_failure_rate": 0.27352941176470585
+          },
+          {
+            "decile": 8,
+            "question_count": 50,
+            "mean_metric": -0.1274798347055912,
+            "mean_failure_rate": 0.26647058823529407
+          },
+          {
+            "decile": 9,
+            "question_count": 50,
+            "mean_metric": -0.06937211357057095,
+            "mean_failure_rate": 0.26176470588235295
+          },
+          {
+            "decile": 10,
+            "question_count": 50,
+            "mean_metric": 0.03324900176376104,
+            "mean_failure_rate": 0.34294117647058825
+          }
+        ],
+        "nondecreasing_decile_steps_out_of_9": 4
+      },
+      {
+        "metric": "p2l_difficulty_neg_mean",
+        "spearman": -0.010166149070002994,
+        "bootstrap_95_ci": [
+          -0.10048877599515124,
+          0.07994843158776645
+        ],
+        "bootstrap_samples_requested": 10000,
+        "bootstrap_samples_valid": 10000,
+        "distribution": {
+          "minimum": -0.7314484119415283,
+          "p25": -0.3875342682003975,
+          "median": -0.21464355289936066,
+          "mean": -0.2277270296686329,
+          "p75": -0.06471922807395458,
+          "maximum": 0.2853970527648926,
+          "unique_value_count": 500
+        },
+        "failure_trend_by_equal_count_decile": [
+          {
+            "decile": 1,
+            "question_count": 50,
+            "mean_metric": -0.5838420879840851,
+            "mean_failure_rate": 0.26
+          },
+          {
+            "decile": 2,
+            "question_count": 50,
+            "mean_metric": -0.4686315101385117,
+            "mean_failure_rate": 0.3576470588235294
+          },
+          {
+            "decile": 3,
+            "question_count": 50,
+            "mean_metric": -0.3864877611398697,
+            "mean_failure_rate": 0.2852941176470588
+          },
+          {
+            "decile": 4,
+            "question_count": 50,
+            "mean_metric": -0.29961789727210997,
+            "mean_failure_rate": 0.2647058823529412
+          },
+          {
+            "decile": 5,
+            "question_count": 50,
+            "mean_metric": -0.23844525694847107,
+            "mean_failure_rate": 0.1823529411764706
+          },
+          {
+            "decile": 6,
+            "question_count": 50,
+            "mean_metric": -0.18586063385009766,
+            "mean_failure_rate": 0.24941176470588236
+          },
+          {
+            "decile": 7,
+            "question_count": 50,
+            "mean_metric": -0.13320026963949202,
+            "mean_failure_rate": 0.30882352941176466
+          },
+          {
+            "decile": 8,
+            "question_count": 50,
+            "mean_metric": -0.07126528181135655,
+            "mean_failure_rate": 0.22588235294117645
+          },
+          {
+            "decile": 9,
+            "question_count": 50,
+            "mean_metric": -0.008146571316756309,
+            "mean_failure_rate": 0.2888235294117647
+          },
+          {
+            "decile": 10,
+            "question_count": 50,
+            "mean_metric": 0.09822697341442108,
+            "mean_failure_rate": 0.3505882352941177
+          }
+        ],
+        "nondecreasing_decile_steps_out_of_9": 5
+      },
+      {
+        "metric": "p2l_beta_spread",
+        "spearman": 0.03981380386774345,
+        "bootstrap_95_ci": [
+          -0.051130306958896594,
+          0.12842829382116389
+        ],
+        "bootstrap_samples_requested": 10000,
+        "bootstrap_samples_valid": 10000,
+        "distribution": {
+          "minimum": 1.0921106815338133,
+          "p25": 1.1958365052938467,
+          "median": 1.2448573961853981,
+          "mean": 1.2612369305670263,
+          "p75": 1.3113550864160064,
+          "maximum": 1.545456935465336,
+          "unique_value_count": 500
+        },
+        "failure_trend_by_equal_count_decile": [
+          {
+            "decile": 1,
+            "question_count": 50,
+            "mean_metric": 1.1423474551439288,
+            "mean_failure_rate": 0.2652941176470588
+          },
+          {
+            "decile": 2,
+            "question_count": 50,
+            "mean_metric": 1.1778354043960573,
+            "mean_failure_rate": 0.3052941176470588
+          },
+          {
+            "decile": 3,
+            "question_count": 50,
+            "mean_metric": 1.1968438977897171,
+            "mean_failure_rate": 0.2135294117647059
+          },
+          {
+            "decile": 4,
+            "question_count": 50,
+            "mean_metric": 1.2170213204026223,
+            "mean_failure_rate": 0.27705882352941175
+          },
+          {
+            "decile": 5,
+            "question_count": 50,
+            "mean_metric": 1.2365389717817308,
+            "mean_failure_rate": 0.19352941176470587
+          },
+          {
+            "decile": 6,
+            "question_count": 50,
+            "mean_metric": 1.2559461311101916,
+            "mean_failure_rate": 0.2929411764705882
+          },
+          {
+            "decile": 7,
+            "question_count": 50,
+            "mean_metric": 1.2824011582136157,
+            "mean_failure_rate": 0.27529411764705874
+          },
+          {
+            "decile": 8,
+            "question_count": 50,
+            "mean_metric": 1.3107685596346856,
+            "mean_failure_rate": 0.29764705882352943
+          },
+          {
+            "decile": 9,
+            "question_count": 50,
+            "mean_metric": 1.3481764496862891,
+            "mean_failure_rate": 0.35764705882352943
+          },
+          {
+            "decile": 10,
+            "question_count": 50,
+            "mean_metric": 1.4444899575114252,
+            "mean_failure_rate": 0.2952941176470588
+          }
+        ],
+        "nondecreasing_decile_steps_out_of_9": 5
+      }
+    ],
+    "official_difficulty_primary_spearman": 0.016274446620679277,
+    "official_difficulty_groups": [
+      {
+        "official_difficulty": "<15 min fix",
+        "question_count": 194,
+        "mean_primary_difficulty": 0.3062648691514671,
+        "median_primary_difficulty": 0.3038461538461539
+      },
+      {
+        "official_difficulty": "15 min - 1 hour",
+        "question_count": 261,
+        "mean_primary_difficulty": 0.31066902446212785,
+        "median_primary_difficulty": 0.3153846153846154
+      },
+      {
+        "official_difficulty": "1-4 hours",
+        "question_count": 42,
+        "mean_primary_difficulty": 0.3232600732600733,
+        "median_primary_difficulty": 0.29615384615384616
+      },
+      {
+        "official_difficulty": ">4 hours",
+        "question_count": 3,
+        "mean_primary_difficulty": 0.22564102564102564,
+        "median_primary_difficulty": 0.18461538461538463
+      }
+    ],
+    "official_difficulty_kruskal_h": 1.9436104715302636,
+    "official_difficulty_kruskal_p": 0.5841926536385078,
+    "monotonic_model_count": 0,
+    "nonmonotonic_model_count": 34,
+    "easy_to_hard_drop_pp_median": -0.5988023952095856,
+    "easy_to_hard_drop_pp_min": -8.383233532934131,
+    "easy_to_hard_drop_pp_max": 3.592814371257491,
+    "conclusion": "not_support",
+    "decision_rule": {
+      "support": "primary bootstrap CI lower > 0; >= 2/3 models monotonic; median Easy-to-Hard drop > 0",
+      "partial_support": "primary rho > 0 and CI upper > 0; >= 1/2 models monotonic; median drop > 0",
+      "not_support": "otherwise"
+    }
+  },
+  "null_excluded_sensitivity": {
+    "primary_metric": {
+      "metric": "p2l_difficulty_primary",
+      "spearman": -0.004907715453339995,
+      "bootstrap_95_ci": [
+        -0.09415873315856482,
+        0.08605167830791562
+      ],
+      "bootstrap_samples_requested": 10000,
+      "bootstrap_samples_valid": 10000,
+      "distribution": {
+        "minimum": 0.09230769230769231,
+        "p25": 0.2076923076923077,
+        "median": 0.3076923076923077,
+        "mean": 0.3095076923076923,
+        "p75": 0.4,
+        "maximum": 0.7076923076923077,
+        "unique_value_count": 67
+      },
+      "failure_trend_by_equal_count_decile": [
+        {
+          "decile": 1,
+          "question_count": 50,
+          "mean_metric": 0.13676923076923078,
+          "mean_failure_rate": 0.24655971479500888
+        },
+        {
+          "decile": 2,
+          "question_count": 50,
+          "mean_metric": 0.174,
+          "mean_failure_rate": 0.3428342245989305
+        },
+        {
+          "decile": 3,
+          "question_count": 50,
+          "mean_metric": 0.20476923076923076,
+          "mean_failure_rate": 0.28764705882352937
+        },
+        {
+          "decile": 4,
+          "question_count": 50,
+          "mean_metric": 0.2507692307692308,
+          "mean_failure_rate": 0.3305882352941176
+        },
+        {
+          "decile": 5,
+          "question_count": 50,
+          "mean_metric": 0.28892307692307695,
+          "mean_failure_rate": 0.1790017825311943
+        },
+        {
+          "decile": 6,
+          "question_count": 50,
+          "mean_metric": 0.32353846153846155,
+          "mean_failure_rate": 0.1927573529411765
+        },
+        {
+          "decile": 7,
+          "question_count": 50,
+          "mean_metric": 0.35184615384615386,
+          "mean_failure_rate": 0.29827094474153293
+        },
+        {
+          "decile": 8,
+          "question_count": 50,
+          "mean_metric": 0.3963076923076922,
+          "mean_failure_rate": 0.2456862745098039
+        },
+        {
+          "decile": 9,
+          "question_count": 50,
+          "mean_metric": 0.4393846153846154,
+          "mean_failure_rate": 0.3035294117647059
+        },
+        {
+          "decile": 10,
+          "question_count": 50,
+          "mean_metric": 0.5287692307692307,
+          "mean_failure_rate": 0.3435294117647059
+        }
+      ],
+      "nondecreasing_decile_steps_out_of_9": 6
+    },
+    "auxiliary_metrics": [
+      {
+        "metric": "p2l_difficulty_neg_median",
+        "spearman": -0.01315100162762978,
+        "bootstrap_95_ci": [
+          -0.10393356462203669,
+          0.07791787444622303
+        ],
+        "bootstrap_samples_requested": 10000,
+        "bootstrap_samples_valid": 10000,
+        "distribution": {
+          "minimum": -0.7392158508300781,
+          "p25": -0.4388349950313568,
+          "median": -0.2747865915298462,
+          "mean": -0.280624746453017,
+          "p75": -0.12797218933701515,
+          "maximum": 0.2579651176929474,
+          "unique_value_count": 500
+        },
+        "failure_trend_by_equal_count_decile": [
+          {
+            "decile": 1,
+            "question_count": 50,
+            "mean_metric": -0.6137757551670074,
+            "mean_failure_rate": 0.26939393939393935
+          },
+          {
+            "decile": 2,
+            "question_count": 50,
+            "mean_metric": -0.5119249147176742,
+            "mean_failure_rate": 0.36588235294117644
+          },
+          {
+            "decile": 3,
+            "question_count": 50,
+            "mean_metric": -0.4333938026428223,
+            "mean_failure_rate": 0.25058823529411767
+          },
+          {
+            "decile": 4,
+            "question_count": 50,
+            "mean_metric": -0.35167592763900757,
+            "mean_failure_rate": 0.28135472370766496
+          },
+          {
+            "decile": 5,
+            "question_count": 50,
+            "mean_metric": -0.2970646768808365,
+            "mean_failure_rate": 0.1776470588235294
+          },
+          {
+            "decile": 6,
+            "question_count": 50,
+            "mean_metric": -0.2424081790447235,
+            "mean_failure_rate": 0.28158088235294115
+          },
+          {
+            "decile": 7,
+            "question_count": 50,
+            "mean_metric": -0.19240126192569731,
+            "mean_failure_rate": 0.27297682709447413
+          },
+          {
+            "decile": 8,
+            "question_count": 50,
+            "mean_metric": -0.1274798347055912,
+            "mean_failure_rate": 0.2662745098039216
+          },
+          {
+            "decile": 9,
+            "question_count": 50,
+            "mean_metric": -0.06937211357057095,
+            "mean_failure_rate": 0.26176470588235295
+          },
+          {
+            "decile": 10,
+            "question_count": 50,
+            "mean_metric": 0.03324900176376104,
+            "mean_failure_rate": 0.34294117647058825
+          }
+        ],
+        "nondecreasing_decile_steps_out_of_9": 4
+      },
+      {
+        "metric": "p2l_difficulty_neg_mean",
+        "spearman": -0.007976274529105506,
+        "bootstrap_95_ci": [
+          -0.0983606331830746,
+          0.08207357659278156
+        ],
+        "bootstrap_samples_requested": 10000,
+        "bootstrap_samples_valid": 10000,
+        "distribution": {
+          "minimum": -0.7314484119415283,
+          "p25": -0.3875342682003975,
+          "median": -0.21464355289936066,
+          "mean": -0.2277270296686329,
+          "p75": -0.06471922807395458,
+          "maximum": 0.2853970527648926,
+          "unique_value_count": 500
+        },
+        "failure_trend_by_equal_count_decile": [
+          {
+            "decile": 1,
+            "question_count": 50,
+            "mean_metric": -0.5838420879840851,
+            "mean_failure_rate": 0.25950089126559717
+          },
+          {
+            "decile": 2,
+            "question_count": 50,
+            "mean_metric": -0.4686315101385117,
+            "mean_failure_rate": 0.356951871657754
+          },
+          {
+            "decile": 3,
+            "question_count": 50,
+            "mean_metric": -0.3864877611398697,
+            "mean_failure_rate": 0.2852941176470588
+          },
+          {
+            "decile": 4,
+            "question_count": 50,
+            "mean_metric": -0.29961789727210997,
+            "mean_failure_rate": 0.2647058823529412
+          },
+          {
+            "decile": 5,
+            "question_count": 50,
+            "mean_metric": -0.23844525694847107,
+            "mean_failure_rate": 0.1813547237076649
+          },
+          {
+            "decile": 6,
+            "question_count": 50,
+            "mean_metric": -0.18586063385009766,
+            "mean_failure_rate": 0.24922794117647062
+          },
+          {
+            "decile": 7,
+            "question_count": 50,
+            "mean_metric": -0.13320026963949202,
+            "mean_failure_rate": 0.30827094474153294
+          },
+          {
+            "decile": 8,
+            "question_count": 50,
+            "mean_metric": -0.07126528181135655,
+            "mean_failure_rate": 0.2256862745098039
+          },
+          {
+            "decile": 9,
+            "question_count": 50,
+            "mean_metric": -0.008146571316756309,
+            "mean_failure_rate": 0.2888235294117647
+          },
+          {
+            "decile": 10,
+            "question_count": 50,
+            "mean_metric": 0.09822697341442108,
+            "mean_failure_rate": 0.3505882352941177
+          }
+        ],
+        "nondecreasing_decile_steps_out_of_9": 5
+      },
+      {
+        "metric": "p2l_beta_spread",
+        "spearman": 0.038645054207317994,
+        "bootstrap_95_ci": [
+          -0.05202285183864306,
+          0.1270247998064663
+        ],
+        "bootstrap_samples_requested": 10000,
+        "bootstrap_samples_valid": 10000,
+        "distribution": {
+          "minimum": 1.0921106815338133,
+          "p25": 1.1958365052938467,
+          "median": 1.2448573961853981,
+          "mean": 1.2612369305670263,
+          "p75": 1.3113550864160064,
+          "maximum": 1.545456935465336,
+          "unique_value_count": 500
+        },
+        "failure_trend_by_equal_count_decile": [
+          {
+            "decile": 1,
+            "question_count": 50,
+            "mean_metric": 1.1423474551439288,
+            "mean_failure_rate": 0.2652941176470588
+          },
+          {
+            "decile": 2,
+            "question_count": 50,
+            "mean_metric": 1.1778354043960573,
+            "mean_failure_rate": 0.30488413547237075
+          },
+          {
+            "decile": 3,
+            "question_count": 50,
+            "mean_metric": 1.1968438977897171,
+            "mean_failure_rate": 0.2135294117647059
+          },
+          {
+            "decile": 4,
+            "question_count": 50,
+            "mean_metric": 1.2170213204026223,
+            "mean_failure_rate": 0.27627450980392154
+          },
+          {
+            "decile": 5,
+            "question_count": 50,
+            "mean_metric": 1.2365389717817308,
+            "mean_failure_rate": 0.19352941176470587
+          },
+          {
+            "decile": 6,
+            "question_count": 50,
+            "mean_metric": 1.2559461311101916,
+            "mean_failure_rate": 0.2929411764705882
+          },
+          {
+            "decile": 7,
+            "question_count": 50,
+            "mean_metric": 1.2824011582136157,
+            "mean_failure_rate": 0.2747950089126559
+          },
+          {
+            "decile": 8,
+            "question_count": 50,
+            "mean_metric": 1.3107685596346856,
+            "mean_failure_rate": 0.29705882352941176
+          },
+          {
+            "decile": 9,
+            "question_count": 50,
+            "mean_metric": 1.3481764496862891,
+            "mean_failure_rate": 0.35680369875222817
+          },
+          {
+            "decile": 10,
+            "question_count": 50,
+            "mean_metric": 1.4444899575114252,
+            "mean_failure_rate": 0.2952941176470588
+          }
+        ],
+        "nondecreasing_decile_steps_out_of_9": 5
+      }
+    ],
+    "official_difficulty_primary_spearman": 0.016274446620679277,
+    "official_difficulty_groups": [
+      {
+        "official_difficulty": "<15 min fix",
+        "question_count": 194,
+        "mean_primary_difficulty": 0.3062648691514671,
+        "median_primary_difficulty": 0.3038461538461539
+      },
+      {
+        "official_difficulty": "15 min - 1 hour",
+        "question_count": 261,
+        "mean_primary_difficulty": 0.31066902446212785,
+        "median_primary_difficulty": 0.3153846153846154
+      },
+      {
+        "official_difficulty": "1-4 hours",
+        "question_count": 42,
+        "mean_primary_difficulty": 0.3232600732600733,
+        "median_primary_difficulty": 0.29615384615384616
+      },
+      {
+        "official_difficulty": ">4 hours",
+        "question_count": 3,
+        "mean_primary_difficulty": 0.22564102564102564,
+        "median_primary_difficulty": 0.18461538461538463
+      }
+    ],
+    "official_difficulty_kruskal_h": 1.9436104715302636,
+    "official_difficulty_kruskal_p": 0.5841926536385078,
+    "monotonic_model_count": 0,
+    "nonmonotonic_model_count": 34,
+    "easy_to_hard_drop_pp_median": -0.5988023952095856,
+    "easy_to_hard_drop_pp_min": -8.383233532934131,
+    "easy_to_hard_drop_pp_max": 3.6144578313253017,
+    "conclusion": "not_support",
+    "decision_rule": {
+      "support": "primary bootstrap CI lower > 0; >= 2/3 models monotonic; median Easy-to-Hard drop > 0",
+      "partial_support": "primary rho > 0 and CI upper > 0; >= 1/2 models monotonic; median drop > 0",
+      "not_support": "otherwise"
+    }
+  },
+  "null_sensitivity_changes_conclusion": false,
+  "comparison_with_routellm": {
+    "same_question_count": 500,
+    "same_model_count": 34,
+    "p2l_spearman": -0.007415325756194564,
+    "routellm_spearman": 0.005112642486989214,
+    "p2l_spearman_bootstrap_95_ci": [
+      -0.09669256194386326,
+      0.08341526275495084
+    ],
+    "routellm_spearman_bootstrap_95_ci": [
+      -0.08410599351377263,
+      0.09370822530092465
+    ],
+    "paired_spearman_difference": -0.012527968243183779,
+    "paired_spearman_difference_bootstrap_95_ci": [
+      -0.11262793163373308,
+      0.08960607829542074
+    ],
+    "paired_bootstrap_samples_valid": 10000,
+    "p2l_monotonic_model_count": 0,
+    "routellm_monotonic_model_count": 1,
+    "p2l_median_easy_to_hard_drop_pp": -0.5988023952095856,
+    "routellm_median_easy_to_hard_drop_pp": 0.5988023952095745,
+    "p2l_model_auc_median": 0.508750373683099,
+    "routellm_model_auc_median": 0.48553778224370747,
+    "p2l_auc_higher_model_count": 26,
+    "clear_spearman_improvement": false,
+    "comparison_interpretation": "P2L does not have a statistically clear paired Spearman improvement",
+    "phase1b_commit": "0b64fdafe049e596a3f5657c219329f24af24198",
+    "phase1b_checkpoint": "routellm/mf_gpt4_augmented"
+  },
+  "data_counts": {
+    "question_count": 500,
+    "p2l_output_count": 500,
+    "p2l_beta_dimension": 130,
+    "openhands_model_count": 34,
+    "model_question_result_count": 17000,
+    "resolved_null_count": 9,
+    "truncated_question_count": 1,
+    "truncated_question_rate": 0.002,
+    "tertile_question_counts": {
+      "Easy": 167,
+      "Medium": 166,
+      "Hard": 167
+    }
+  },
+  "input_token_distribution": {
+    "minimum": 33,
+    "p25": 202.75,
+    "median": 374.5,
+    "mean": 564.976,
+    "p75": 667.25,
+    "p95": 1584.7999999999993,
+    "maximum": 9212
+  },
+  "full_inference_benchmark": {
+    "question_count": 500,
+    "sum_single_question_latency_seconds": 865.0578394837212,
+    "mean_single_question_latency_seconds": 1.7301156789674423,
+    "p50_single_question_latency_seconds": 1.005515583558008,
+    "p95_single_question_latency_seconds": 5.061643540044306,
+    "minimum_single_question_latency_seconds": 0.12580757192336023,
+    "maximum_single_question_latency_seconds": 43.885151645867154
+  },
+  "representative_models": [
+    {
+      "language_model": "claude-opus-4-8",
+      "question_count": 500,
+      "valid_result_count": 500,
+      "resolved_null_count": 0,
+      "easy_success_rate": 0.8263473053892215,
+      "medium_success_rate": 0.8554216867469879,
+      "hard_success_rate": 0.8323353293413174,
+      "easy_to_hard_drop_pp": -0.5988023952095856,
+      "monotonic_easy_ge_medium_ge_hard": false,
+      "difficulty_success_spearman": -0.023774359677449557,
+      "difficulty_failure_spearman": 0.023774359677449557,
+      "difficulty_failure_roc_auc": 0.518621644715519,
+      "analysis_definition": "null_as_not_success",
+      "representative_model": true
+    },
+    {
+      "language_model": "DeepSeek-V4-Pro",
+      "question_count": 500,
+      "valid_result_count": 500,
+      "resolved_null_count": 0,
+      "easy_success_rate": 0.7425149700598802,
+      "medium_success_rate": 0.7469879518072289,
+      "hard_success_rate": 0.7065868263473054,
+      "easy_to_hard_drop_pp": 3.59281437125748,
+      "monotonic_easy_ge_medium_ge_hard": false,
+      "difficulty_success_spearman": -0.05740715779078588,
+      "difficulty_failure_spearman": 0.05740715779078588,
+      "difficulty_failure_roc_auc": 0.5374051871788599,
+      "analysis_definition": "null_as_not_success",
+      "representative_model": true
+    },
+    {
+      "language_model": "Gemini-3.5-Flash",
+      "question_count": 500,
+      "valid_result_count": 500,
+      "resolved_null_count": 0,
+      "easy_success_rate": 0.7604790419161677,
+      "medium_success_rate": 0.8313253012048193,
+      "hard_success_rate": 0.7664670658682635,
+      "easy_to_hard_drop_pp": -0.5988023952095856,
+      "monotonic_easy_ge_medium_ge_hard": false,
+      "difficulty_success_spearman": -0.014092536306264674,
+      "difficulty_failure_spearman": 0.014092536306264674,
+      "difficulty_failure_roc_auc": 0.5099165299279446,
+      "analysis_definition": "null_as_not_success",
+      "representative_model": true
+    },
+    {
+      "language_model": "GLM-5.1",
+      "question_count": 500,
+      "valid_result_count": 500,
+      "resolved_null_count": 0,
+      "easy_success_rate": 0.7485029940119761,
+      "medium_success_rate": 0.7590361445783133,
+      "hard_success_rate": 0.7425149700598802,
+      "easy_to_hard_drop_pp": 0.5988023952095856,
+      "monotonic_easy_ge_medium_ge_hard": false,
+      "difficulty_success_spearman": -0.012915587621918845,
+      "difficulty_failure_spearman": 0.012915587621918845,
+      "difficulty_failure_roc_auc": 0.508608,
+      "analysis_definition": "null_as_not_success",
+      "representative_model": true
+    },
+    {
+      "language_model": "GPT-5.5",
+      "question_count": 500,
+      "valid_result_count": 500,
+      "resolved_null_count": 0,
+      "easy_success_rate": 0.7604790419161677,
+      "medium_success_rate": 0.8132530120481928,
+      "hard_success_rate": 0.7724550898203593,
+      "easy_to_hard_drop_pp": -1.19760479041916,
+      "monotonic_easy_ge_medium_ge_hard": false,
+      "difficulty_success_spearman": -0.012722687316198442,
+      "difficulty_failure_spearman": 0.012722687316198442,
+      "difficulty_failure_roc_auc": 0.5088927473661982,
+      "analysis_definition": "null_as_not_success",
+      "representative_model": true
+    },
+    {
+      "language_model": "Kimi-K2.6",
+      "question_count": 500,
+      "valid_result_count": 500,
+      "resolved_null_count": 0,
+      "easy_success_rate": 0.7245508982035929,
+      "medium_success_rate": 0.7831325301204819,
+      "hard_success_rate": 0.7305389221556886,
+      "easy_to_hard_drop_pp": -0.5988023952095745,
+      "monotonic_easy_ge_medium_ge_hard": false,
+      "difficulty_success_spearman": -0.002754235695201891,
+      "difficulty_failure_spearman": 0.002754235695201891,
+      "difficulty_failure_roc_auc": 0.5018260116949189,
+      "analysis_definition": "null_as_not_success",
+      "representative_model": true
+    },
+    {
+      "language_model": "MiniMax-M3",
+      "question_count": 500,
+      "valid_result_count": 500,
+      "resolved_null_count": 0,
+      "easy_success_rate": 0.7544910179640718,
+      "medium_success_rate": 0.7831325301204819,
+      "hard_success_rate": 0.7544910179640718,
+      "easy_to_hard_drop_pp": 0.0,
+      "monotonic_easy_ge_medium_ge_hard": false,
+      "difficulty_success_spearman": -0.03249449939373778,
+      "difficulty_failure_spearman": 0.03249449939373778,
+      "difficulty_failure_roc_auc": 0.522084923240749,
+      "analysis_definition": "null_as_not_success",
+      "representative_model": true
+    },
+    {
+      "language_model": "Qwen3-Coder-Next",
+      "question_count": 500,
+      "valid_result_count": 500,
+      "resolved_null_count": 0,
+      "easy_success_rate": 0.6467065868263473,
+      "medium_success_rate": 0.6927710843373494,
+      "hard_success_rate": 0.6586826347305389,
+      "easy_to_hard_drop_pp": -1.19760479041916,
+      "monotonic_easy_ge_medium_ge_hard": false,
+      "difficulty_success_spearman": 0.008625197029783394,
+      "difficulty_failure_spearman": -0.008625197029783394,
+      "difficulty_failure_roc_auc": 0.494722267177357,
+      "analysis_definition": "null_as_not_success",
+      "representative_model": true
+    }
+  ],
+  "models_with_nonmonotonic_curves": [
+    "claude-fable-5",
+    "claude-opus-4-5",
+    "claude-opus-4-6",
+    "claude-opus-4-7",
+    "claude-opus-4-8",
+    "claude-sonnet-4-5",
+    "claude-sonnet-4-6",
+    "DeepSeek-V3.2-Reasoner",
+    "DeepSeek-V4-Pro",
+    "Gemini-3-Flash",
+    "Gemini-3-Pro",
+    "Gemini-3.1-Pro",
+    "Gemini-3.5-Flash",
+    "GLM-4.7",
+    "GLM-5",
+    "GLM-5.1",
+    "GPT-5.2",
+    "GPT-5.2-Codex",
+    "GPT-5.4",
+    "GPT-5.5",
+    "Kimi-K2-Thinking",
+    "Kimi-K2.5",
+    "Kimi-K2.6",
+    "Minimax-2.7",
+    "MiniMax-M2.1",
+    "MiniMax-M2.5",
+    "MiniMax-M3",
+    "Nemotron-3-Nano",
+    "Nemotron-3-Super",
+    "Qwen3-Coder-480B",
+    "Qwen3-Coder-Next",
+    "Qwen3.5-Flash",
+    "Qwen3.6-Plus",
+    "Trinity-Large-Thinking"
+  ]
+}

@@ -8,4 +8,6 @@ dist-e2e/
 .worktrees/
 .gstack/
 .pytest_cache/
+__pycache__/
+research/quality-curves/.cache/
 .env

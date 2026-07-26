@@ -1,0 +1,57 @@
+severity,issue_type,scope,count,details
+warning,model_instance_sets_differ,gaia,3,Distinct per-model instance sets; benchmark is outside the first curve scope
+warning,model_instance_sets_differ,swe-bench-multimodal,7,Distinct per-model instance sets; benchmark is outside the first curve scope
+warning,model_instance_sets_differ,swt-bench,12,Distinct per-model instance sets; benchmark is outside the first curve scope
+warning,unmatched_upstream_result_directory,upstream/results,1,Minimax-2.7
+warning,default_sdk_vs_swebench_agent_version_mismatch,claude-fable-5,1,default=v1.18.1; scores.swe-bench=v1.28.0
+warning,metadata_vs_swebench_agent_version_mismatch,claude-fable-5,1,metadata=v1.18.1; scores.swe-bench=v1.28.0
+warning,default_sdk_vs_swebench_agent_version_mismatch,claude-opus-4-8,1,default=v1.18.1; scores.swe-bench=v1.24.0
+warning,metadata_vs_swebench_agent_version_mismatch,claude-opus-4-8,1,metadata=v1.18.1; scores.swe-bench=v1.24.0
+warning,default_sdk_vs_swebench_agent_version_mismatch,claude-opus-4-7,1,default=v1.11.0; scores.swe-bench=v1.24.0
+warning,metadata_vs_swebench_agent_version_mismatch,claude-opus-4-7,1,metadata=v1.11.0; scores.swe-bench=v1.24.0
+warning,default_sdk_vs_swebench_agent_version_mismatch,claude-opus-4-6,1,default=v1.11.0; scores.swe-bench=v1.15.0
+warning,metadata_vs_swebench_agent_version_mismatch,claude-opus-4-6,1,metadata=v1.11.0; scores.swe-bench=v1.15.0
+warning,default_sdk_vs_swebench_agent_version_mismatch,GPT-5.4,1,default=v1.13.0; scores.swe-bench=v1.18.1
+warning,metadata_vs_swebench_agent_version_mismatch,GPT-5.4,1,metadata=v1.13.0; scores.swe-bench=v1.18.1
+warning,default_sdk_vs_swebench_agent_version_mismatch,Gemini-3.5-Flash,1,default=v1.24.0; scores.swe-bench=v1.28.0
+warning,metadata_vs_swebench_agent_version_mismatch,Gemini-3.5-Flash,1,metadata=v1.24.0; scores.swe-bench=v1.28.0
+warning,default_sdk_vs_swebench_agent_version_mismatch,Gemini-3.1-Pro,1,default=v1.11.5; scores.swe-bench=v1.27.0
+warning,metadata_vs_swebench_agent_version_mismatch,Gemini-3.1-Pro,1,metadata=v1.11.5; scores.swe-bench=v1.27.0
+warning,default_sdk_vs_swebench_agent_version_mismatch,GLM-5.1,1,default=v1.11.5; scores.swe-bench=v1.17.0
+warning,metadata_vs_swebench_agent_version_mismatch,GLM-5.1,1,metadata=v1.11.5; scores.swe-bench=v1.17.0
+warning,default_sdk_vs_swebench_agent_version_mismatch,MiniMax-M3,1,default=v1.18.1; scores.swe-bench=v1.24.0
+warning,metadata_vs_swebench_agent_version_mismatch,MiniMax-M3,1,metadata=v1.18.1; scores.swe-bench=v1.24.0
+warning,default_sdk_vs_swebench_agent_version_mismatch,Kimi-K2.6,1,default=v1.11.5; scores.swe-bench=v1.18.1
+warning,metadata_vs_swebench_agent_version_mismatch,Kimi-K2.6,1,metadata=v1.11.5; scores.swe-bench=v1.18.1
+warning,default_sdk_vs_swebench_agent_version_mismatch,Qwen3.6-Plus,1,default=v1.11.5; scores.swe-bench=v1.16.1
+warning,metadata_vs_swebench_agent_version_mismatch,Qwen3.6-Plus,1,metadata=v1.11.5; scores.swe-bench=v1.16.1
+warning,default_sdk_vs_swebench_agent_version_mismatch,MiniMax-M2.5,1,default=v0.38.0; scores.swe-bench=v1.11.3
+warning,metadata_vs_swebench_agent_version_mismatch,MiniMax-M2.5,1,metadata=v0.38.0; scores.swe-bench=v1.11.3
+warning,default_sdk_vs_swebench_agent_version_mismatch,Qwen3-Coder-Next,1,default=v1.11.0; scores.swe-bench=v1.11.1
+warning,metadata_vs_swebench_agent_version_mismatch,Qwen3-Coder-Next,1,metadata=v1.11.0; scores.swe-bench=v1.11.1
+warning,default_sdk_vs_swebench_agent_version_mismatch,GLM-4.7,1,default=v1.8.3; scores.swe-bench=v1.10.0
+warning,metadata_vs_swebench_agent_version_mismatch,GLM-4.7,1,metadata=v1.8.3; scores.swe-bench=v1.10.0
+warning,default_sdk_vs_swebench_agent_version_mismatch,DeepSeek-V4-Pro,1,default=v1.0.0; scores.swe-bench=v1.22.1
+warning,metadata_vs_swebench_agent_version_mismatch,DeepSeek-V4-Pro,1,metadata=v1.0.0; scores.swe-bench=v1.22.1
+warning,default_sdk_vs_swebench_agent_version_mismatch,Qwen3.5-Flash,1,default=v1.11.5; scores.swe-bench=v1.16.1
+warning,metadata_vs_swebench_agent_version_mismatch,Qwen3.5-Flash,1,metadata=v1.11.5; scores.swe-bench=v1.16.1
+warning,default_sdk_vs_swebench_agent_version_mismatch,Nemotron-3-Super,1,default=v1.14.0; scores.swe-bench=v1.16.1
+warning,metadata_vs_swebench_agent_version_mismatch,Nemotron-3-Super,1,metadata=v1.14.0; scores.swe-bench=v1.16.1
+warning,cost_missing,Gemini-3.5-Flash,2,SWE-bench rows with null cost
+warning,cost_missing,Gemini-3.1-Pro,1,SWE-bench rows with null cost
+warning,aggregate_score_mismatch,Gemini-3.1-Pro,1,default=76.8; true/rows*100=77.0; delta_pp=-0.2
+warning,cost_missing,GLM-5.1,2,SWE-bench rows with null cost
+info,cost_zero,GLM-5,95,SWE-bench rows with zero cost; retained in statistics
+warning,resolved_null,Kimi-K2.5,1,SWE-bench rows with null resolved
+warning,cost_missing,Gemini-3-Pro,2,SWE-bench rows with null cost
+warning,resolved_null,DeepSeek-V3.2-Reasoner,3,SWE-bench rows with null resolved
+warning,cost_missing,claude-sonnet-4-6,1,SWE-bench rows with null cost
+info,cost_zero,claude-sonnet-4-6,21,SWE-bench rows with zero cost; retained in statistics
+warning,cost_missing,Qwen3-Coder-Next,9,SWE-bench rows with null cost
+info,cost_zero,Qwen3-Coder-Next,18,SWE-bench rows with zero cost; retained in statistics
+warning,cost_missing,GLM-4.7,2,SWE-bench rows with null cost
+warning,resolved_null,Kimi-K2-Thinking,2,SWE-bench rows with null resolved
+warning,cost_missing,Kimi-K2-Thinking,2,SWE-bench rows with null cost
+warning,cost_missing,Qwen3.5-Flash,1,SWE-bench rows with null cost
+warning,cost_missing,Trinity-Large-Thinking,3,SWE-bench rows with null cost
+warning,resolved_null,Nemotron-3-Nano,3,SWE-bench rows with null resolved

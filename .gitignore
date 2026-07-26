@@ -10,4 +10,5 @@ dist-e2e/
 .pytest_cache/
 __pycache__/
 research/quality-curves/.cache/
+research/quality-curves/openhands/.cache/
 .env

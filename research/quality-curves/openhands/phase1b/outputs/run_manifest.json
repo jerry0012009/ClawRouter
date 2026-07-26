@@ -1,0 +1,115 @@
+{
+  "run_name": "ClawRouter OpenHands Phase 1B",
+  "score_frozen_at_utc": "2026-07-26T15:37:27.187855+00:00",
+  "execution_mode": "offline_replay",
+  "data": {
+    "openhands_dataset": "OpenHands/openhands-index",
+    "openhands_tag": "v2026.06.30-3015ac6",
+    "openhands_hf_commit": "94ac78ad8ec547875a0a4ec56e15a644aa5653f6",
+    "swebench_dataset": "SWE-bench/SWE-bench_Verified",
+    "swebench_commit": "91aa3ed51b709be6457e12d00300a6a596d4c6a3",
+    "input_files": {
+      "openhands_instances": {
+        "sha256": "f456e937771bdd45815cacd6458433e0e750be0a2a6bcd5daf91670b151968a5",
+        "rows": 40643
+      },
+      "swebench_verified": {
+        "sha256": "43ed5a3d1d98da36472c1ade65ddd2085d7b4ff694fcaf6a023a07c5c1f32f21",
+        "rows": 500
+      }
+    }
+  },
+  "routellm": {
+    "repository": "https://github.com/lm-sys/RouteLLM.git",
+    "git_commit": "0b64fdafe049e596a3f5657c219329f24af24198",
+    "router": "mf",
+    "checkpoint": "routellm/mf_gpt4_augmented",
+    "checkpoint_revision": "5eb3dc745cbe7cb16ca342ceb83b7f6ecf8c77c5",
+    "checkpoint_sha256": "bfc93d473b48f8b85ce719f0d7e8bb86a139fa052e8b0c3ac387eabf45e47293",
+    "strong_model": "gpt-4-1106-preview",
+    "weak_model": "mixtral-8x7b-instruct-v0.1",
+    "strong_model_id": 24,
+    "weak_model_id": 36,
+    "source_contract": {
+      "model_source_sha256": "81072b840e6dd389888e9f7a7198342693beab37b06aeab690083d67663da7ba",
+      "router_source_sha256": "2393da77f9049970f57dd6d8eada3cc68e99506b2a547e7662e7d2d56b5065b8",
+      "equivalent_lower_level_formula": "L2-normalize P[model_ids]; project 1536-D prompt embedding with text_proj.0.weight; elementwise multiply; apply classifier.0.weight; sigmoid(strong_logit - weak_logit)"
+    },
+    "implementation": "equivalent NumPy float32 lower-level interface; no PyTorch runtime"
+  },
+  "embeddings": {
+    "provider_gateway": "closeai",
+    "api_base": "https://api.openai-proxy.org/v1",
+    "semantic_model": "text-embedding-3-small",
+    "request_model": "text-embedding-3-small",
+    "dimensions": 1536,
+    "cached_embedding_count": 500,
+    "completion_calls": 0,
+    "preflight_audit": {
+      "status": "passed",
+      "question_count": 5,
+      "finite_score_count": 5,
+      "embedding_dimensions": 1536,
+      "request_audit": {
+        "request_count": 5,
+        "embedding_request_count": 5,
+        "completion_request_count": 0,
+        "request_paths": {
+          "/v1/embeddings": 5
+        }
+      },
+      "completion_calls": 0,
+      "credential_source": "repository .env (ignored)",
+      "created_at_utc": "2026-07-26T15:34:30.932522+00:00",
+      "gateway": "closeai",
+      "request_model": "text-embedding-3-small",
+      "upstream_assertion": "Gateway advertises OpenAI text-embedding-3-small; actual upstream snapshot cannot be independently attested by the compatible API response"
+    },
+    "current_run_request_audit": {
+      "request_count": 0,
+      "embedding_request_count": 0,
+      "completion_request_count": 0,
+      "request_paths": {}
+    },
+    "credential_source": "not required (offline)",
+    "credential_saved": false,
+    "controlled_deviation": "Gateway advertises OpenAI text-embedding-3-small; actual upstream snapshot cannot be independently attested by the compatible API response"
+  },
+  "runtime": {
+    "python": "3.12.3",
+    "platform": "Linux-6.8.0-134-generic-x86_64-with-glibc2.39",
+    "dependencies": {
+      "numpy": "1.26.4",
+      "pandas": "2.2.3",
+      "pyarrow": "21.0.0",
+      "scipy": "1.15.3",
+      "scikit-learn": "1.7.1",
+      "matplotlib": "3.10.3",
+      "safetensors": "0.5.3",
+      "openai": "1.97.1"
+    }
+  },
+  "parameters": {
+    "question_count": 500,
+    "model_count": 34,
+    "primary_success": "resolved is true",
+    "primary_null_handling": "resolved null is not success",
+    "sensitivity_null_handling": "exclude resolved null",
+    "bootstrap_samples": 10000,
+    "random_seed": 20260726,
+    "tertile_rule": "stable raw-score order; 167 Easy, 166 Medium, 167 Hard",
+    "cost_fields_used": false,
+    "gold_patch_or_answer_fields_used": false
+  },
+  "validation": {
+    "unique_finite_scores": true,
+    "model_question_rows": 17000,
+    "models_in_metrics": 34,
+    "tertile_counts": {
+      "Medium": 166,
+      "Easy": 167,
+      "Hard": 167
+    },
+    "figures_from_csv": true
+  }
+}

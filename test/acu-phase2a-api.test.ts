@@ -107,9 +107,16 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
       headers: { Authorization: AUTHORIZATION },
     });
     expect(response.status).toBe(200);
-    const catalog = await response.json() as { models: unknown[]; curves: Record<string, unknown[]> };
+    const catalog = await response.json() as { models: Array<{ modelId: string }>; curves: Record<string, unknown[]> };
     expect(catalog.models.length).toBeGreaterThanOrEqual(8);
     expect(Object.values(catalog.curves).every((curve) => curve.length === 101)).toBe(true);
+    for (const fallbackId of [
+      "gemini-2.5-flash", "meta-llama/llama-4-maverick", "deepseek/deepseek-chat-v3-0324",
+      "meta-llama/llama-3.3-70b-instruct", "qwen/qwen3-235b-a22b",
+    ]) {
+      expect(catalog.models.some((model) => model.modelId === fallbackId), fallbackId).toBe(true);
+      expect(catalog.curves[fallbackId], fallbackId).toHaveLength(101);
+    }
 
     const gallery = await fetch(`${proxy.baseUrl}/acu/curves`, {
       headers: { Authorization: AUTHORIZATION },
@@ -197,6 +204,10 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
         };
         selected_model?: string;
         actual_model_used?: string;
+        attempts?: Array<{ model: string; status: string; latency_ms: number }>;
+        latency_breakdown?: { judge_latency_ms: number; upstream_latency_ms: number; total_router_latency_ms: number };
+        usage_audit?: { usageSource: string; completionTokens: number; visibleOutputTokens: number; usageRawKeys: string[] };
+        cost_audit?: { model_call_cost: number; judge_cost: number; total_acu_cost: number };
       };
     };
     expect(payload.acu_trace?.acu_demo?.judgeStatus).toBe("live");
@@ -208,6 +219,18 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
     expect(payload.acu_trace?.acu_demo?.actualModel).toBe(payload.acu_trace?.actual_model_used);
     expect(payload.acu_trace?.acu_demo?.recommendationApplied).toBe(true);
     expect(payload.model).toBe(payload.acu_trace?.actual_model_used);
+    expect(payload.acu_trace?.attempts).toEqual([
+      expect.objectContaining({ model: payload.acu_trace?.actual_model_used, status: "success" }),
+    ]);
+    expect(payload.acu_trace?.latency_breakdown?.total_router_latency_ms).toBeGreaterThanOrEqual(
+      payload.acu_trace?.latency_breakdown?.upstream_latency_ms ?? 0,
+    );
+    expect(payload.acu_trace?.usage_audit?.usageSource).toBe("upstream_usage");
+    expect(payload.acu_trace?.usage_audit?.completionTokens).toBe(5);
+    expect(payload.acu_trace?.usage_audit?.visibleOutputTokens).toBeGreaterThan(0);
+    expect(payload.acu_trace?.cost_audit?.total_acu_cost).toBeGreaterThanOrEqual(
+      payload.acu_trace?.cost_audit?.model_call_cost ?? 0,
+    );
   });
 
   it("does not write explicit baseline requests into ACU routing records", async () => {

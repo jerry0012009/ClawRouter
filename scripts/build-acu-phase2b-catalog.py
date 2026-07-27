@@ -47,6 +47,11 @@ MODEL_PROFILE = {
     "glm-5.1": "balanced_frontier", "qwen3.6-plus": "balanced_frontier",
     "gpt-5.6-luna": "efficient_fast", "gpt-5.4-mini": "efficient_fast",
     "deepseek-v4-flash": "efficient_fast", "qwen3.5-flash": "efficient_fast",
+    "gemini-2.5-flash": "efficient_fast",
+    "meta-llama/llama-4-maverick": "efficient_fast",
+    "deepseek/deepseek-chat-v3-0324": "efficient_fast",
+    "meta-llama/llama-3.3-70b-instruct": "efficient_fast",
+    "qwen/qwen3-235b-a22b": "coding_specialist",
     "kimi-k2.7-code": "coding_specialist", "kimi-k2.6": "coding_specialist",
     "qwen3.7-max": "coding_specialist", "minimax-m3": "balanced_frontier",
 }
@@ -156,7 +161,11 @@ def phase2a_models() -> dict[str, dict[str, Any]]:
     if data["schemaVersion"] not in {"acu-model-catalog-v1", "acu-model-catalog-v2"}:
         raise RuntimeError("Unsupported ACU catalog schema")
     models = {model["modelId"]: model for model in data["models"] if model["modelId"] not in {
-        "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "glm-5.2", "kimi-k2.7-code"}}
+        "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "glm-5.2", "kimi-k2.7-code",
+        "gemini-2.5-flash"}}
+    models = {model_id: model for model_id, model in models.items() if model_id not in {
+        "meta-llama/llama-4-maverick", "deepseek/deepseek-chat-v3-0324",
+        "meta-llama/llama-3.3-70b-instruct", "qwen/qwen3-235b-a22b"}}
     frozen = pd.read_csv(PHASE2A / "model_tier_sufficiency.csv").set_index("model_id")
     for model_id, model in models.items():
         row = frozen.loc[model_id]
@@ -195,10 +204,14 @@ def evidence_rows() -> list[dict[str, str]]:
     add("gpt-5.6-sol", "terminal/tool use|long-horizon agent|repository engineering", OFFICIAL["openai_sol"], "Official preview positions Sol for coding, terminal and long-horizon agent work.")
     add("claude-opus-4-8", "repository engineering|long-horizon agent|context capability", OFFICIAL["anthropic"], "Official Opus page emphasizes long-running coding and agent tasks with sustained consistency.")
     add("gemini-3.5-flash", "terminal/tool use|long-horizon agent|latency/cost positioning", OFFICIAL["google"], "Official release reports agentic/terminal benchmarks and fast deployment positioning.")
+    add("gemini-2.5-flash", "latency/cost positioning|context capability", "https://ai.google.dev/gemini-api/docs/models#gemini-2.5-flash", "Catalog curve is a low-confidence same-family relative estimate; it is included because this callable fallback can become the actual execution model.", "low")
     add("deepseek-v4-flash|deepseek-v4-pro", "terminal/tool use|long-horizon agent|latency/cost positioning", OFFICIAL["deepseek"], "Official comparison says Flash is near Pro on simple agent tasks while Pro leads on complex reasoning.", "high")
     add("glm-5.2", "repository engineering|terminal/tool use|long-horizon agent", OFFICIAL["glm"], "Official coding-agent documentation targets multi-turn, tool-driven engineering workflows.")
     add("kimi-k2.7-code", "broad coding|repository engineering|terminal/tool use|long-horizon agent", OFFICIAL["kimi"], "Official model card reports gains over K2.6 across coding-agent suites, with harness differences explicitly noted.")
     add("qwen3.7-max|qwen3.6-plus|qwen3.5-flash", "broad coding|context capability|latency/cost positioning", OFFICIAL["qwen"], "Official Qwen Code provider documentation identifies current model roles; direct cross-vendor score comparability is unavailable.", "low")
+    add("meta-llama/llama-4-maverick|meta-llama/llama-3.3-70b-instruct", "broad capability|context capability", "https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E-Instruct", "Fallback curves use low-confidence family-relative placement so actual execution is visible; no cross-vendor score equivalence is claimed.", "low")
+    add("deepseek/deepseek-chat-v3-0324", "broad coding|latency/cost positioning", "https://api-docs.deepseek.com/news/news250325", "Legacy callable fallback is relatively anchored below the pinned V4 Flash position.", "low")
+    add("qwen/qwen3-235b-a22b", "broad coding|tool use", "https://huggingface.co/Qwen/Qwen3-235B-A22B", "Callable fallback is relatively anchored to the audited Qwen family; harness comparability is unavailable.", "low")
     rows.append({"model_ids": "all_phase2a_models", "dimensions": "broad coding|repository engineering", "source_type": "benchmark_official",
                  "source_url": OFFICIAL["openhands"], "retrieved_at": RETRIEVED_AT,
                  "profile_claim": "Pinned OpenHands SWE-bench aggregates retain overall ability positions.", "profile_confidence": "medium",
@@ -215,6 +228,11 @@ def build_models() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     new["gpt-5.6-luna"] = relative_model("gpt-5.6-luna", "GPT-5.6 Luna", "OpenAI", old["gpt-5.5"], 0.010, "GPT-5.6 official capability suite", OFFICIAL["openai"], "Family-relative product mapping from GPT-5.5; efficient profile follows official positioning.")
     new["glm-5.2"] = relative_model("glm-5.2", "GLM 5.2", "Zhipu AI", old["glm-5.1"], 0.025, "GLM-5.2 official coding-agent positioning", OFFICIAL["glm"], "Series-relative estimate from GLM 5.1; no directly comparable pinned OpenHands row.")
     new["kimi-k2.7-code"] = relative_model("kimi-k2.7-code", "Kimi K2.7 Code", "Moonshot AI", old["kimi-k2.6"], 0.030, "Kimi K2.7 Code official model-card suites", OFFICIAL["kimi"], "Series-relative estimate from K2.6; vendor comparisons use different agent harnesses.")
+    new["gemini-2.5-flash"] = relative_model("gemini-2.5-flash", "Gemini 2.5 Flash", "Google", old["gemini-3.5-flash"], -0.100, "Gemini family relative product mapping", "https://ai.google.dev/gemini-api/docs/models#gemini-2.5-flash", "Low-confidence same-family relative estimate from Gemini 3.5 Flash; retained so an actual fallback is never hidden from the chart.")
+    new["meta-llama/llama-4-maverick"] = relative_model("meta-llama/llama-4-maverick", "Llama 4 Maverick", "Meta", new["gemini-2.5-flash"], -0.015, "Fallback relative capability mapping", "https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E-Instruct", "Low-confidence relative estimate; included because this model is in the live fallback chain.")
+    new["deepseek/deepseek-chat-v3-0324"] = relative_model("deepseek/deepseek-chat-v3-0324", "DeepSeek V3 (OR)", "DeepSeek", old["deepseek-v4-flash"], -0.070, "DeepSeek family relative product mapping", "https://api-docs.deepseek.com/news/news250325", "Low-confidence family-relative estimate; included because this model is in the live fallback chain.")
+    new["meta-llama/llama-3.3-70b-instruct"] = relative_model("meta-llama/llama-3.3-70b-instruct", "Llama 3.3 70B", "Meta", new["meta-llama/llama-4-maverick"], -0.050, "Llama family relative product mapping", "https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct", "Low-confidence family-relative estimate; included because this model is in the live fallback chain.")
+    new["qwen/qwen3-235b-a22b"] = relative_model("qwen/qwen3-235b-a22b", "Qwen3 235B (OR)", "Qwen", old["qwen3.5-flash"], 0.030, "Qwen family relative product mapping", "https://huggingface.co/Qwen/Qwen3-235B-A22B", "Low-confidence family-relative estimate; included because this model is in the live fallback chain.")
     output, parameters = [], []
     for model_id, model in new.items():
         profile_name = MODEL_PROFILE[model_id]

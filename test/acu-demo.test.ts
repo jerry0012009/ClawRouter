@@ -265,19 +265,29 @@ describe("ACU Router demo reliability", () => {
 
   it("integrated frontend consumes the ACU trace without embedding credentials", async () => {
     const html = await readFrontend();
+    const integrated = await readFile(join(process.cwd(), "public", "acu-integrated.js"), "utf8");
     expect(html).toContain("const BASELINE_MODEL='claude-opus-4-7'");
     expect(html).toContain("acu-decision-module");
     expect(html).toContain("window.dispatchEvent(new CustomEvent('acu:evaluation'");
-    expect(html).toContain("t?.estimated_cost");
+    expect(html).toContain("t?.cost_audit?.total_acu_cost");
     expect(html).toContain("trace?.fallback_used");
-    expect(html).toContain("chatComplete(BASELINE_MODEL,messages)");
-    expect(html).toContain("chatComplete(ROUTER_MODEL,messages,spec.threshold/100)");
+    expect(html).toContain("chatComplete(BASELINE_MODEL,messages,undefined,maxTokens)");
+    expect(html).toContain("chatComplete(ROUTER_MODEL,messages,spec.threshold/100,maxTokens)");
     expect(html).toContain("cache:false");
-    expect(html).not.toContain("max_tokens: maxTokens || 600");
-    expect(html).not.toContain("payload.max_tokens");
+    expect(html).toContain("structured_extraction:256");
+    expect(html).toContain("reasoning:1200");
+    expect(html).toContain("max_tokens:maxTokens");
+    expect(html).toContain("Promise.allSettled");
+    expect(html).not.toContain("await Promise.all([chatComplete");
     expect(html).not.toContain("acu_demo_key");
     expect(html).not.toContain("demo_key");
     expect(html).not.toContain("X-ACU-Demo-Key");
+    expect(integrated).toContain("function displayModelIds(evaluation, trace)");
+    expect(integrated).toContain("ACU推荐");
+    expect(integrated).toContain("实际执行");
+    expect(integrated).toContain("推荐模型调用失败");
+    expect(integrated).toContain("质量复核后升级");
+    expect(integrated).toContain("slice(0, 8)");
   });
 
   it("resolves production and Dev API prefixes without allowing Dev to call production", async () => {

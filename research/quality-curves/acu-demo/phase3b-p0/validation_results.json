@@ -1,0 +1,95 @@
+{
+  "run_date": "2026-07-27",
+  "public_dev_url": "https://eu.jerrypsy.top/acu-router-dev/",
+  "usage_definition": "upstream usage/cost preferred; visible-response estimate only when usage is absent",
+  "cases": [
+    {
+      "case": "structured_extraction",
+      "max_tokens": 256,
+      "difficulty_score": 5.0,
+      "recommended_model": "qwen3.6-plus",
+      "actual_model": "qwen3.6-plus",
+      "attempts": [{"model": "qwen3.6-plus", "status": "success", "latency_ms": 2801}],
+      "judge_latency_ms": 4329,
+      "router_total_latency_ms": 7203,
+      "baseline_latency_ms": 2150,
+      "page_wait_ms": 7543,
+      "model_cost_usd": 0.0000706,
+      "judge_cost_usd": 0.00036435,
+      "acu_total_cost_usd": 0.00043495,
+      "baseline_total_cost_usd": 0.00137,
+      "savings_percent": 68.2518,
+      "usage_source": "upstream_usage"
+    },
+    {
+      "case": "code_fix",
+      "max_tokens": 900,
+      "difficulty_score": 55.0,
+      "recommended_model": "claude-opus-4-8",
+      "actual_model": "claude-opus-4-8",
+      "attempts": [{"model": "claude-opus-4-8", "status": "success", "latency_ms": 11998}],
+      "judge_latency_ms": 3695,
+      "router_total_latency_ms": 15712,
+      "baseline_latency_ms": 10669,
+      "page_wait_ms": 15793,
+      "model_cost_usd": 0.0228,
+      "judge_cost_usd": 0.0003672,
+      "acu_total_cost_usd": 0.0231672,
+      "baseline_total_cost_usd": 0.02283,
+      "savings_percent": -1.477,
+      "usage_source": "upstream_usage"
+    },
+    {
+      "case": "writing",
+      "max_tokens": 600,
+      "difficulty_score": 25.0,
+      "recommended_model": "qwen3.6-plus",
+      "actual_model": "qwen3.6-plus",
+      "attempts": [{"model": "qwen3.6-plus", "status": "success", "latency_ms": 4790}],
+      "judge_latency_ms": 2092,
+      "router_total_latency_ms": 6901,
+      "baseline_latency_ms": 10190,
+      "page_wait_ms": 10191,
+      "model_cost_usd": 0.0003984,
+      "judge_cost_usd": 0.0003636,
+      "acu_total_cost_usd": 0.000762,
+      "baseline_total_cost_usd": 0.01336,
+      "savings_percent": 94.2964,
+      "usage_source": "upstream_usage"
+    },
+    {
+      "case": "reasoning",
+      "max_tokens": 1200,
+      "difficulty_score": 78.5,
+      "recommended_model": "claude-opus-4-8",
+      "actual_model": "claude-opus-4-8",
+      "attempts": [{"model": "claude-opus-4-8", "status": "success", "latency_ms": 20408}],
+      "judge_latency_ms": 2422,
+      "router_total_latency_ms": 22860,
+      "baseline_latency_ms": 18911,
+      "page_wait_ms": 22923,
+      "model_cost_usd": 0.030385,
+      "judge_cost_usd": 0.00037365,
+      "acu_total_cost_usd": 0.03075865,
+      "baseline_total_cost_usd": 0.030415,
+      "savings_percent": -1.1299,
+      "usage_source": "upstream_usage"
+    }
+  ],
+  "qwen_gemini_switch": {
+    "request_id": "db198bf6-fb63-4d00-83a4-0495611feaf7",
+    "difficulty_score": 15.0,
+    "recommended_model": "qwen3.6-plus",
+    "actual_model": "gemini-2.5-flash",
+    "attempts": [
+      {"index": 1, "model": "qwen3.6-plus", "status": "timeout", "error_category": "timeout", "latency_ms": 15004},
+      {"index": 2, "model": "gpt-5.6-sol", "status": "error", "error_category": "config_error", "latency_ms": 915},
+      {"index": 3, "model": "gemini-2.5-flash", "status": "success", "latency_ms": 9626}
+    ]
+  },
+  "qwen_thinking_ab": {
+    "prompt_class": "simple_politeness_rewrite",
+    "default": {"latency_ms": 22360, "completion_tokens": 1120, "reasoning_tokens": 1105, "model_cost_usd": 0.0019681, "answer_quality": "correct_concise"},
+    "thinking_off": {"latency_ms": 2373, "completion_tokens": 10, "reasoning_tokens": 0, "model_cost_usd": 0.0000262, "answer_quality": "correct_concise"}
+  }
+}

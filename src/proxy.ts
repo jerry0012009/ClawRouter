@@ -141,6 +141,15 @@ function timeoutForModel(modelId: string): number {
   return isReasoningModel(modelId) ? REASONING_MODEL_TIMEOUT_MS : PER_MODEL_TIMEOUT_MS;
 }
 
+function timeoutForAttempt(modelId: string, attemptIndex: number, acuSelected: boolean, maxTokens: number): number {
+  const configured = Number(process.env.ACU_FIRST_ATTEMPT_TIMEOUT_MS);
+  const isDevConfigured = Number.isFinite(configured) && configured > 0;
+  if (isDevConfigured && acuSelected && attemptIndex === 0 && !isReasoningModel(modelId) && maxTokens <= 1200) {
+    return Math.min(timeoutForModel(modelId), configured);
+  }
+  return timeoutForModel(modelId);
+}
+
 /** Make header values safe for non-ASCII content. */
 function sanitizeHeaderValue(value: string): string {
   return value.replace(/[^\t\x20-\x7E]/gu, (c) => {
@@ -176,6 +185,32 @@ type AcuAttemptTrace = {
   status: "success" | "error" | "timeout" | "skipped";
   error_category?: string;
   latency_ms: number;
+  billed_cost?: number;
+  usage_source?: "upstream_usage" | "upstream_cost" | "response_text_estimate" | "max_token_estimate";
+};
+
+type UsageSource = "upstream_usage" | "upstream_cost" | "response_text_estimate" | "max_token_estimate";
+
+type UsageAudit = {
+  inputTokens: number;
+  visibleOutputTokens: number;
+  completionTokens: number;
+  reasoningTokens: number;
+  cachedInputTokens: number;
+  usageSource: UsageSource;
+  usageRawKeys: string[];
+  inputPricePerMillion: number;
+  outputPricePerMillion: number;
+  modelCallCost: number;
+};
+
+type LatencyBreakdown = {
+  judge_latency_ms: number;
+  route_compute_latency_ms: number;
+  upstream_latency_ms: number;
+  validator_latency_ms: number;
+  fallback_latency_ms: number;
+  total_router_latency_ms: number;
 };
 
 type AcuTrace = {
@@ -202,6 +237,14 @@ type AcuTrace = {
   baseline_model: string;
   baseline_cost: number;
   estimated_savings: number;
+  usage_audit?: UsageAudit;
+  cost_audit?: {
+    judge_cost: number;
+    model_call_cost: number;
+    failed_attempt_cost: number;
+    total_acu_cost: number;
+  };
+  latency_breakdown?: LatencyBreakdown;
   route_reasoning: string;
   validator_result: ValidatorResult["result"];
   validator: ValidatorResult["validator"];
@@ -368,22 +411,93 @@ function extractAssistantText(responseBody: string): string {
   }
 }
 
-function parseUsage(responseBody: string, estimatedInputTokens: number, estimatedOutputTokens: number) {
+function finiteNonNegative(value: unknown): number | undefined {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : undefined;
+}
+
+function extractExplicitUpstreamCost(responseBody: string): number | undefined {
   try {
-    const parsed = JSON.parse(responseBody) as {
-      usage?: {
-        prompt_tokens?: number;
-        completion_tokens?: number;
-        input_tokens?: number;
-        output_tokens?: number;
-      };
-    };
+    const parsed = JSON.parse(responseBody) as Record<string, unknown>;
+    const usage = parsed.usage && typeof parsed.usage === "object" ? parsed.usage as Record<string, unknown> : undefined;
+    return finiteNonNegative(usage?.cost) ?? finiteNonNegative(usage?.total_cost)
+      ?? finiteNonNegative(parsed.cost) ?? finiteNonNegative(parsed.provider_cost);
+  } catch {
+    return undefined;
+  }
+}
+
+function parseUsage(
+  responseBody: string,
+  estimatedInputTokens: number,
+  maxOutputTokens: number,
+  pricing?: ModelPricing,
+): UsageAudit {
+  const inputPrice = pricing?.inputPrice ?? 0;
+  const outputPrice = pricing?.outputPrice ?? 0;
+  try {
+    const parsed = JSON.parse(responseBody) as Record<string, unknown>;
+    const usage = parsed.usage && typeof parsed.usage === "object"
+      ? parsed.usage as Record<string, unknown> : undefined;
+    const details = usage?.completion_tokens_details && typeof usage.completion_tokens_details === "object"
+      ? usage.completion_tokens_details as Record<string, unknown> : undefined;
+    const promptDetails = usage?.prompt_tokens_details && typeof usage.prompt_tokens_details === "object"
+      ? usage.prompt_tokens_details as Record<string, unknown> : undefined;
+    const inputTokens = finiteNonNegative(usage?.prompt_tokens)
+      ?? finiteNonNegative(usage?.input_tokens) ?? estimatedInputTokens;
+    const upstreamCompletion = finiteNonNegative(usage?.completion_tokens)
+      ?? finiteNonNegative(usage?.output_tokens);
+    const reasoningTokens = finiteNonNegative(details?.reasoning_tokens)
+      ?? finiteNonNegative(usage?.reasoning_tokens) ?? 0;
+    const cachedInputTokens = finiteNonNegative(promptDetails?.cached_tokens)
+      ?? finiteNonNegative(usage?.cached_input_tokens) ?? 0;
+    const assistantText = extractAssistantText(responseBody);
+    const visibleOutputTokens = assistantText.length > 0 ? Math.max(1, Math.ceil(assistantText.length / 4)) : 0;
+    const explicitCost = finiteNonNegative(usage?.cost)
+      ?? finiteNonNegative(usage?.total_cost)
+      ?? finiteNonNegative(parsed.cost)
+      ?? finiteNonNegative(parsed.provider_cost);
+    const hasUsage = Boolean(usage && (
+      upstreamCompletion !== undefined
+      || finiteNonNegative(usage.prompt_tokens) !== undefined
+      || finiteNonNegative(usage.input_tokens) !== undefined
+    ));
+    const completionTokens = upstreamCompletion
+      ?? (visibleOutputTokens > 0 ? visibleOutputTokens : maxOutputTokens);
+    const usageSource: UsageSource = explicitCost !== undefined
+      ? "upstream_cost"
+      : hasUsage ? "upstream_usage"
+        : visibleOutputTokens > 0 ? "response_text_estimate" : "max_token_estimate";
+    const calculatedCost = (inputTokens * inputPrice + completionTokens * outputPrice) / 1_000_000;
     return {
-      inputTokens: parsed.usage?.prompt_tokens ?? parsed.usage?.input_tokens ?? estimatedInputTokens,
-      outputTokens: parsed.usage?.completion_tokens ?? parsed.usage?.output_tokens ?? estimatedOutputTokens,
+      inputTokens,
+      visibleOutputTokens,
+      completionTokens,
+      reasoningTokens,
+      cachedInputTokens,
+      usageSource,
+      usageRawKeys: usage ? [
+        ...Object.keys(usage),
+        ...Object.keys(details ?? {}).map((key) => `completion_tokens_details.${key}`),
+        ...Object.keys(promptDetails ?? {}).map((key) => `prompt_tokens_details.${key}`),
+      ].sort() : [],
+      inputPricePerMillion: inputPrice,
+      outputPricePerMillion: outputPrice,
+      modelCallCost: explicitCost ?? calculatedCost,
     };
   } catch {
-    return { inputTokens: estimatedInputTokens, outputTokens: estimatedOutputTokens };
+    return {
+      inputTokens: estimatedInputTokens,
+      visibleOutputTokens: 0,
+      completionTokens: maxOutputTokens,
+      reasoningTokens: 0,
+      cachedInputTokens: 0,
+      usageSource: "max_token_estimate",
+      usageRawKeys: [],
+      inputPricePerMillion: inputPrice,
+      outputPricePerMillion: outputPrice,
+      modelCallCost: (estimatedInputTokens * inputPrice + maxOutputTokens * outputPrice) / 1_000_000,
+    };
   }
 }
 
@@ -1250,6 +1364,7 @@ async function handleRequest(
   let expectedSchema: unknown;
   let acuQualityTarget = 0.8;
   let executeAcuRecommended: boolean;
+  let routeComputeLatencyMs = 0;
 
   try {
     const parsed = JSON.parse(body.toString()) as Record<string, unknown>;
@@ -1301,6 +1416,7 @@ async function handleRequest(
       });
       routingDecision = rulesDecision;
       if (ctx.acuStrategy.enabled) {
+        const acuRouteStart = Date.now();
         const eligibleModelIds = BLOCKRUN_MODELS.filter((model) => (
           !ctx.excludeList.has(model.id)
           && (!hasTools || modelSupportsToolCalling(model.id))
@@ -1318,6 +1434,7 @@ async function handleRequest(
           requestedModel: modelId,
           sessionHash: hashSession(effectiveSessionId),
         }, rulesDecision);
+        routeComputeLatencyMs = Math.max(0, Date.now() - acuRouteStart - acuEvaluation.judgeLatencyMs);
         try {
           ctx.acuStore?.recordEvaluation(acuEvaluation, {
             sessionHash: hashSession(effectiveSessionId),
@@ -1333,6 +1450,7 @@ async function handleRequest(
           const fallback = acuEvaluation.recommendation.fallbackModel.modelId;
           const tier = routingTierFromAcu(acuEvaluation);
           const baseTiers = routingDecision.tierConfigs ?? ctx.routerOpts.config.tiers;
+          const originalPrimary = baseTiers[tier].primary;
           const existingFallbacks = baseTiers[tier].fallback;
           routingDecision = {
             ...rulesDecision,
@@ -1348,7 +1466,7 @@ async function handleRequest(
               ...baseTiers,
               [tier]: {
                 primary: selected.modelId,
-                fallback: [...new Set([fallback, ...existingFallbacks])]
+                fallback: [...new Set([fallback, originalPrimary, ...existingFallbacks])]
                   .filter((modelId) => modelId !== selected.modelId),
               },
             },
@@ -1360,6 +1478,9 @@ async function handleRequest(
       if (acuRecommendationSelected) {
         modelId = routingDecision.model;
         parsed.model = modelId;
+        if (modelId === "qwen3.6-plus" && acuEvaluation && acuEvaluation.difficultyScore < 55 && parsed.enable_thinking === undefined) {
+          parsed.enable_thinking = false;
+        }
         bodyModified = true;
         if (effectiveSessionId) {
           ctx.sessionStore.setSession(effectiveSessionId, routingDecision.model, routingDecision.tier);
@@ -1464,8 +1585,8 @@ async function handleRequest(
     res.writeHead(200, headers);
     res.end(respCached.body);
     const estimatedInputTokens = Math.ceil(body.length / 4);
-    const usage = parseUsage(respCached.body.toString(), estimatedInputTokens, maxTokens);
-    const costs = calculateModelCost(respCached.model, ctx.routerOpts.modelPricing, usage.inputTokens, usage.outputTokens, routingProfile ?? undefined);
+    const usage = parseUsage(respCached.body.toString(), estimatedInputTokens, maxTokens, ctx.routerOpts.modelPricing.get(respCached.model));
+    const costs = calculateModelCost(respCached.model, ctx.routerOpts.modelPricing, usage.inputTokens, usage.completionTokens, routingProfile ?? undefined);
     await appendLedgerEntry({
       request_id: requestId,
       timestamp: new Date().toISOString(),
@@ -1478,7 +1599,7 @@ async function handleRequest(
       actual_model_used: respCached.model,
       upstream: getUpstream(respCached.model),
       input_tokens: usage.inputTokens,
-      output_tokens: usage.outputTokens,
+      output_tokens: usage.completionTokens,
       estimated_cost: 0,
       actual_cost: 0,
       baseline_model: DEFAULT_BASELINE_MODEL,
@@ -1494,7 +1615,7 @@ async function handleRequest(
     if (acuEvaluation) {
       try {
         ctx.acuStore?.finalizeRequest(requestId, {
-          actualModel: respCached.model, inputTokens: usage.inputTokens, outputTokens: usage.outputTokens,
+          actualModel: respCached.model, inputTokens: usage.inputTokens, outputTokens: usage.completionTokens,
           actualCost: 0, latencyMs: Date.now() - startTime, finalStatus: "response_cache_hit",
         });
       } catch { /* telemetry must not affect the response */ }
@@ -1567,7 +1688,7 @@ async function handleRequest(
     console.log(`[ClawRouter] Trying model ${tryModel} (${i + 1}/${modelsToTry.length})`);
     const attemptStart = Date.now();
 
-    const perAttemptTimeout = timeoutForModel(tryModel);
+    const perAttemptTimeout = timeoutForAttempt(tryModel, i, acuRecommendationSelected, maxTokens);
     const modelController = new AbortController();
     const modelTimeoutId = setTimeout(() => modelController.abort(), perAttemptTimeout);
     const combinedSignal = AbortSignal.any([globalController.signal, modelController.signal]);
@@ -1605,6 +1726,9 @@ async function handleRequest(
         status: "error",
         error_category: lastErrorCategory,
         latency_ms: Date.now() - attemptStart,
+        ...(extractExplicitUpstreamCost(errorBody) !== undefined && {
+          billed_cost: extractExplicitUpstreamCost(errorBody), usage_source: "upstream_cost" as const,
+        }),
       });
 
       if (category === "rate_limited") {
@@ -1679,7 +1803,10 @@ async function handleRequest(
     }
     ctx.deduplicator.removeInflight(dedupKey);
     if (acuEvaluation) {
-      try { ctx.acuStore?.finalizeRequest(requestId, { finalStatus: "upstream_error", errorCategory: lastErrorCategory }); }
+      try {
+        ctx.acuStore?.recordAttempts(requestId, attempts);
+        ctx.acuStore?.finalizeRequest(requestId, { finalStatus: "upstream_error", errorCategory: lastErrorCategory });
+      }
       catch { /* telemetry must not affect the response */ }
     }
     return;
@@ -1775,12 +1902,14 @@ async function handleRequest(
     responseBody = Buffer.concat(chunks).toString();
 
     if (!isStreaming) {
+      const initialValidatorStart = Date.now();
       let validator = validateAssistantOutput({
         messages: parsedMessages,
         assistantText: extractAssistantText(responseBody),
         responseFormat,
         expectedSchema,
       });
+      let validatorLatencyMs = Date.now() - initialValidatorStart;
       let qualityFallbackUsed = false;
 
       if (validator.result === "fail" && routingDecision) {
@@ -1804,6 +1933,18 @@ async function handleRequest(
               signal: AbortSignal.any([globalController.signal, qualityController.signal]),
             });
             if (response.status === 200) {
+              const replacedModel = actualModelUsed;
+              const replacedUsage = parseUsage(
+                responseBody, Math.ceil(body.length / 4), maxTokens,
+                ctx.routerOpts.modelPricing.get(replacedModel),
+              );
+              const replacedAttempt = [...attempts].reverse().find((attempt) => (
+                attempt.model === replacedModel && attempt.status === "success"
+              ));
+              if (replacedAttempt) {
+                replacedAttempt.billed_cost = replacedUsage.modelCallCost;
+                replacedAttempt.usage_source = replacedUsage.usageSource;
+              }
               responseBody = await readResponseText(response);
               actualModelUsed = qualityFallbackModel;
               upstreamProviderUsed = upstreamProvider;
@@ -1814,12 +1955,14 @@ async function handleRequest(
                 status: "success",
                 latency_ms: Date.now() - qualityStart,
               });
+              const fallbackValidatorStart = Date.now();
               validator = validateAssistantOutput({
                 messages: parsedMessages,
                 assistantText: extractAssistantText(responseBody),
                 responseFormat,
                 expectedSchema,
               });
+              validatorLatencyMs += Date.now() - fallbackValidatorStart;
             } else {
               const errorBody = await response.text().catch(() => "");
               const category = categorizeError(response.status, errorBody) ?? "validation_fallback_error";
@@ -1830,6 +1973,9 @@ async function handleRequest(
                 status: "error",
                 error_category: category,
                 latency_ms: Date.now() - qualityStart,
+                ...(extractExplicitUpstreamCost(errorBody) !== undefined && {
+                  billed_cost: extractExplicitUpstreamCost(errorBody), usage_source: "upstream_cost" as const,
+                }),
               });
             }
           } catch (err) {
@@ -1850,25 +1996,25 @@ async function handleRequest(
 
       const latencyMs = Date.now() - startTime;
       const estimatedInputTokens = Math.ceil(body.length / 4);
-      const usage = parseUsage(responseBody, estimatedInputTokens, maxTokens);
+      const usage = parseUsage(responseBody, estimatedInputTokens, maxTokens, ctx.routerOpts.modelPricing.get(actualModelUsed));
       let costEstimate = 0;
       let baselineCost = 0;
       let savings = 0;
 
       if (routingDecision) {
         if (actualModelUsed !== routingDecision.model) {
-          const costs = calculateModelCost(actualModelUsed, ctx.routerOpts.modelPricing, usage.inputTokens, usage.outputTokens, routingProfile ?? undefined);
+          const costs = calculateModelCost(actualModelUsed, ctx.routerOpts.modelPricing, usage.inputTokens, usage.completionTokens, routingProfile ?? undefined);
           costEstimate = costs.costEstimate;
           baselineCost = costs.baselineCost;
           savings = costs.savings;
         } else {
-          const costs = calculateModelCost(actualModelUsed, ctx.routerOpts.modelPricing, usage.inputTokens, usage.outputTokens, routingProfile ?? undefined);
+          const costs = calculateModelCost(actualModelUsed, ctx.routerOpts.modelPricing, usage.inputTokens, usage.completionTokens, routingProfile ?? undefined);
           costEstimate = costs.costEstimate;
           baselineCost = costs.baselineCost;
           savings = costs.savings;
         }
       } else {
-        const costs = calculateModelCost(actualModelUsed, ctx.routerOpts.modelPricing, usage.inputTokens, usage.outputTokens);
+        const costs = calculateModelCost(actualModelUsed, ctx.routerOpts.modelPricing, usage.inputTokens, usage.completionTokens);
         costEstimate = costs.costEstimate;
         baselineCost = costs.baselineCost;
         savings = costs.savings;
@@ -1876,6 +2022,13 @@ async function handleRequest(
 
 	      const fallbackUsed = getFallbackUsed(attempts, actualModelUsed, routingDecision?.model);
 	      if (acuEvaluation) setAcuExecutionResult(acuEvaluation, acuRecommendationSelected, actualModelUsed);
+	      const upstreamLatencyMs = attempts.reduce((sum, attempt) => sum + attempt.latency_ms, 0);
+        const fallbackLatencyMs = attempts.slice(1).reduce((sum, attempt) => sum + attempt.latency_ms, 0);
+        const failedAttemptCost = attempts.reduce((sum, attempt, index) => (
+          index === attempts.length - 1 && attempt.status === "success"
+            ? sum : sum + (attempt.billed_cost ?? 0)
+        ), 0);
+        const totalAcuCost = usage.modelCallCost + failedAttemptCost + (acuEvaluation?.judgeCost ?? 0);
 	      const trace: AcuTrace = {
         ...buildRuleTraceSignals(parsedMessages, maxTokens, ctx.routerOpts.config),
         request_id: requestId,
@@ -1893,11 +2046,26 @@ async function handleRequest(
 	        fallback_used: fallbackUsed,
 	        quality_fallback_used: qualityFallbackUsed,
 	        estimated_input_tokens: usage.inputTokens,
-        estimated_output_tokens: usage.outputTokens,
+        estimated_output_tokens: usage.completionTokens,
         estimated_cost: costEstimate,
         baseline_model: DEFAULT_BASELINE_MODEL,
         baseline_cost: baselineCost,
         estimated_savings: savings,
+        usage_audit: usage,
+        cost_audit: {
+          judge_cost: acuEvaluation?.judgeCost ?? 0,
+          model_call_cost: usage.modelCallCost,
+          failed_attempt_cost: failedAttemptCost,
+          total_acu_cost: totalAcuCost,
+        },
+        latency_breakdown: {
+          judge_latency_ms: acuEvaluation?.judgeLatencyMs ?? 0,
+          route_compute_latency_ms: routeComputeLatencyMs,
+          upstream_latency_ms: upstreamLatencyMs,
+          validator_latency_ms: validatorLatencyMs,
+          fallback_latency_ms: fallbackLatencyMs,
+          total_router_latency_ms: latencyMs,
+        },
 	        route_reasoning: routingDecision?.reasoning ?? "Explicit model request",
 	        validator_result: validator.result,
 	        validator: validator.validator,
@@ -1920,7 +2088,7 @@ async function handleRequest(
         actual_model_used: actualModelUsed,
         upstream: trace.upstream,
         input_tokens: usage.inputTokens,
-        output_tokens: usage.outputTokens,
+        output_tokens: usage.completionTokens,
         estimated_cost: costEstimate,
         actual_cost: costEstimate,
         baseline_model: DEFAULT_BASELINE_MODEL,
@@ -1938,9 +2106,15 @@ async function handleRequest(
       await appendLedgerEntry(ledgerEntry);
       if (acuEvaluation) {
         try {
+          ctx.acuStore?.recordAttempts(requestId, attempts);
           ctx.acuStore?.finalizeRequest(requestId, {
-            actualModel: actualModelUsed, inputTokens: usage.inputTokens, outputTokens: usage.outputTokens,
-            actualCost: costEstimate, latencyMs, finalStatus: "completed", errorCategory: lastErrorCategory,
+            actualModel: actualModelUsed, inputTokens: usage.inputTokens, outputTokens: usage.completionTokens,
+            actualCost: totalAcuCost, latencyMs, finalStatus: "completed", errorCategory: lastErrorCategory,
+            visibleOutputTokens: usage.visibleOutputTokens, completionTokens: usage.completionTokens,
+            reasoningTokens: usage.reasoningTokens, cachedInputTokens: usage.cachedInputTokens,
+            usageSource: usage.usageSource, usageRawKeys: usage.usageRawKeys,
+            inputPricePerMillion: usage.inputPricePerMillion, outputPricePerMillion: usage.outputPricePerMillion,
+            modelCallCost: usage.modelCallCost, totalAcuCost,
           });
           if (validator.result !== "not_applicable") {
             ctx.acuStore?.recordOutcome({
@@ -2059,9 +2233,18 @@ async function handleRequest(
 
   if (acuEvaluation && isStreaming) {
     try {
+      const streamingUsage = parseUsage(responseBody, estimatedInputTokens, maxTokens, ctx.routerOpts.modelPricing.get(actualModelUsed));
+      const streamingTotalAcuCost = streamingUsage.modelCallCost + acuEvaluation.judgeCost;
+      ctx.acuStore?.recordAttempts(requestId, attempts);
       ctx.acuStore?.finalizeRequest(requestId, {
-        actualModel: actualModelUsed, inputTokens: estimatedInputTokens, outputTokens: maxTokens,
-        actualCost: costEstimate, latencyMs, finalStatus: "completed_streaming", errorCategory: lastErrorCategory,
+        actualModel: actualModelUsed, inputTokens: streamingUsage.inputTokens, outputTokens: streamingUsage.completionTokens,
+        actualCost: streamingTotalAcuCost, latencyMs, finalStatus: "completed_streaming", errorCategory: lastErrorCategory,
+        visibleOutputTokens: streamingUsage.visibleOutputTokens, completionTokens: streamingUsage.completionTokens,
+        reasoningTokens: streamingUsage.reasoningTokens, cachedInputTokens: streamingUsage.cachedInputTokens,
+        usageSource: streamingUsage.usageSource, usageRawKeys: streamingUsage.usageRawKeys,
+        inputPricePerMillion: streamingUsage.inputPricePerMillion,
+        outputPricePerMillion: streamingUsage.outputPricePerMillion,
+        modelCallCost: streamingUsage.modelCallCost, totalAcuCost: streamingTotalAcuCost,
       });
     } catch { /* telemetry must not affect the response */ }
   }

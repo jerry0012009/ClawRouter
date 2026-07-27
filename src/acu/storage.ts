@@ -30,6 +30,26 @@ export type RoutingRecordMetadata = {
   finalStatus?: string;
   hadTools?: boolean;
   errorCategory?: string;
+  visibleOutputTokens?: number;
+  completionTokens?: number;
+  reasoningTokens?: number;
+  cachedInputTokens?: number;
+  usageSource?: "upstream_usage" | "upstream_cost" | "response_text_estimate" | "max_token_estimate";
+  usageRawKeys?: string[];
+  inputPricePerMillion?: number;
+  outputPricePerMillion?: number;
+  modelCallCost?: number;
+  totalAcuCost?: number;
+};
+
+export type RoutingAttemptInput = {
+  model: string;
+  upstream: string;
+  status: "success" | "error" | "timeout" | "skipped";
+  error_category?: string;
+  latency_ms: number;
+  billed_cost?: number;
+  usage_source?: "upstream_usage" | "upstream_cost" | "response_text_estimate" | "max_token_estimate";
 };
 
 export type FeedbackInput = {
@@ -140,12 +160,45 @@ export class AcuRoutingStore {
         outcome_source TEXT NOT NULL CHECK(outcome_source IN ('explicit_user_feedback','validator','test_result','retry_signal','model_upgrade_signal')),
         created_at TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS routing_attempts (
+        request_id TEXT NOT NULL REFERENCES routing_requests(request_id) ON DELETE CASCADE,
+        attempt_index INTEGER NOT NULL,
+        model_id TEXT NOT NULL,
+        upstream TEXT NOT NULL,
+        status TEXT NOT NULL CHECK(status IN ('success','error','timeout','skipped')),
+        error_category TEXT,
+        latency_ms INTEGER NOT NULL,
+        billed_cost REAL,
+        usage_source TEXT,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY(request_id, attempt_index)
+      );
       CREATE INDEX IF NOT EXISTS idx_routing_created ON routing_requests(created_at);
       CREATE INDEX IF NOT EXISTS idx_routing_hash ON routing_requests(context_sha256);
       CREATE INDEX IF NOT EXISTS idx_feedback_request ON user_feedback(request_id);
       CREATE INDEX IF NOT EXISTS idx_outcomes_request ON execution_outcomes(request_id);
+      CREATE INDEX IF NOT EXISTS idx_attempts_request ON routing_attempts(request_id);
     `);
+    this.ensureColumn("routing_requests", "visible_output_tokens", "INTEGER");
+    this.ensureColumn("routing_requests", "completion_tokens", "INTEGER");
+    this.ensureColumn("routing_requests", "reasoning_tokens", "INTEGER");
+    this.ensureColumn("routing_requests", "cached_input_tokens", "INTEGER");
+    this.ensureColumn("routing_requests", "usage_source", "TEXT");
+    this.ensureColumn("routing_requests", "usage_raw_keys", "TEXT");
+    this.ensureColumn("routing_requests", "input_price_per_million", "REAL");
+    this.ensureColumn("routing_requests", "output_price_per_million", "REAL");
+    this.ensureColumn("routing_requests", "model_call_cost", "REAL");
+    this.ensureColumn("routing_requests", "total_acu_cost", "REAL");
+    this.ensureColumn("routing_attempts", "billed_cost", "REAL");
+    this.ensureColumn("routing_attempts", "usage_source", "TEXT");
     chmodSync(path, 0o600);
+  }
+
+  private ensureColumn(table: string, column: string, definition: string): void {
+    const columns = this.database.prepare(`PRAGMA table_info(${table})`).all();
+    if (!columns.some((entry) => entry.name === column)) {
+      this.database.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    }
   }
 
   recordEvaluation(evaluation: AcuEvaluation, metadata: RoutingRecordMetadata = {}): void {
@@ -205,11 +258,38 @@ export class AcuRoutingStore {
       actual_model=COALESCE(?,actual_model), input_tokens=COALESCE(?,input_tokens),
       output_tokens=COALESCE(?,output_tokens), actual_cost=COALESCE(?,actual_cost),
       latency_ms=COALESCE(?,latency_ms), final_status=COALESCE(?,final_status),
-      error_category=COALESCE(?,error_category) WHERE request_id=?`).run(
+      error_category=COALESCE(?,error_category),
+      visible_output_tokens=COALESCE(?,visible_output_tokens),
+      completion_tokens=COALESCE(?,completion_tokens), reasoning_tokens=COALESCE(?,reasoning_tokens),
+      cached_input_tokens=COALESCE(?,cached_input_tokens), usage_source=COALESCE(?,usage_source),
+      usage_raw_keys=COALESCE(?,usage_raw_keys), input_price_per_million=COALESCE(?,input_price_per_million),
+      output_price_per_million=COALESCE(?,output_price_per_million),
+      model_call_cost=COALESCE(?,model_call_cost), total_acu_cost=COALESCE(?,total_acu_cost)
+      WHERE request_id=?`).run(
       metadata.actualModel ?? null, metadata.inputTokens ?? null, metadata.outputTokens ?? null,
       metadata.actualCost ?? null, metadata.latencyMs ?? null, metadata.finalStatus ?? null,
-      metadata.errorCategory ?? null, requestId,
+      metadata.errorCategory ?? null, metadata.visibleOutputTokens ?? null,
+      metadata.completionTokens ?? null, metadata.reasoningTokens ?? null,
+      metadata.cachedInputTokens ?? null, metadata.usageSource ?? null,
+      metadata.usageRawKeys ? JSON.stringify(metadata.usageRawKeys) : null,
+      metadata.inputPricePerMillion ?? null, metadata.outputPricePerMillion ?? null,
+      metadata.modelCallCost ?? null, metadata.totalAcuCost ?? null, requestId,
     );
+  }
+
+  recordAttempts(requestId: string, attempts: RoutingAttemptInput[]): void {
+    const statement = this.database.prepare(`INSERT INTO routing_attempts
+      (request_id,attempt_index,model_id,upstream,status,error_category,latency_ms,billed_cost,usage_source,created_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?)
+      ON CONFLICT(request_id,attempt_index) DO UPDATE SET
+        model_id=excluded.model_id,upstream=excluded.upstream,status=excluded.status,
+        error_category=excluded.error_category,latency_ms=excluded.latency_ms,
+        billed_cost=excluded.billed_cost,usage_source=excluded.usage_source`);
+    attempts.forEach((attempt, index) => statement.run(
+      requestId, index + 1, attempt.model, attempt.upstream, attempt.status,
+      attempt.error_category ?? null, attempt.latency_ms, attempt.billed_cost ?? null,
+      attempt.usage_source ?? null, new Date().toISOString(),
+    ));
   }
 
   recordFeedback(input: FeedbackInput): void {

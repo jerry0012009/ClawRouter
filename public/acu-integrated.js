@@ -2,7 +2,7 @@
   const prefix = location.pathname.match(/^\/(acu-router(?:-dev)?)(?:\/|$)/)?.[1];
   const api = prefix ? `${location.origin}/${prefix}/acu/api` : `${location.origin}/acu/api`;
   const safeFetch = (target, options) => window.AcuApiPrefix.fetchFrom(location.pathname, target, options);
-  const colors = ['#90e8a0','#ffd76a','#9fc7ff','#ff8fa3','#b7a1ff','#67d8c2'];
+  const colors = ['#90e8a0','#ffd76a','#9fc7ff','#ff8fa3','#b7a1ff','#67d8c2','#f6a96b','#85d7ff'];
   let catalog;
   let latestEvaluation;
   let latestMessages;
@@ -24,6 +24,54 @@
     return ['规则估算','rules'];
   }
 
+  function interpolateCurve(curve, difficulty) {
+    if (!Array.isArray(curve) || !curve.length) return null;
+    const leftIndex = Math.max(0, Math.min(curve.length - 1, Math.floor(difficulty)));
+    const rightIndex = Math.max(0, Math.min(curve.length - 1, Math.ceil(difficulty)));
+    const left = curve[leftIndex], right = curve[rightIndex];
+    if (!left || !right) return null;
+    const fraction = difficulty - Math.floor(difficulty);
+    return (left.estimatedQuality + (right.estimatedQuality - left.estimatedQuality) * fraction) * 100;
+  }
+
+  function displayModelIds(evaluation, trace) {
+    const recommended = evaluation.recommendation.recommended.modelId;
+    const actual = evaluation.actualModel || trace?.actual_model_used;
+    const attempts = (trace?.attempts || []).map((attempt) => attempt.model);
+    const defaults = catalog.models.filter((model) => model.defaultDisplay && model.routingEligible).map((model) => model.modelId);
+    const roleReferences = [
+      defaults.find((id) => /opus|sol/i.test(id)),
+      defaults.find((id) => /terra|glm|kimi/i.test(id)),
+      defaults.find((id) => /flash|luna/i.test(id)),
+      ...defaults,
+    ];
+    return [...new Set([recommended, actual, ...attempts, ...roleReferences].filter(Boolean))]
+      .filter((id) => catalog.curves[id] && catalog.models.some((model) => model.modelId === id))
+      .slice(0, 8);
+  }
+
+  function roleLabels(modelId, evaluation, trace) {
+    const labels = [];
+    if (modelId === evaluation.recommendation.recommended.modelId) labels.push('ACU推荐');
+    if (modelId === (evaluation.actualModel || trace?.actual_model_used)) labels.push('实际执行');
+    (trace?.attempts || []).forEach((attempt, index) => {
+      if (attempt.model === modelId) labels.push(`第${index + 1}次尝试`);
+    });
+    return [...new Set(labels)];
+  }
+
+  function executionStatus(evaluation, trace) {
+    if (evaluation.recommendationApplied === true) return '推荐已执行';
+    if (trace?.quality_fallback_used === true) return '质量复核后升级';
+    const attempts = trace?.attempts || [];
+    if (attempts.length > 1 && ['error','timeout'].includes(attempts[0]?.status) && attempts.some((item) => item.status === 'success')) {
+      const reason = attempts[0].status === 'timeout' ? '超时' : (attempts[0].error_category || '调用错误');
+      return `推荐模型调用失败（${reason}），已切换`;
+    }
+    if ((evaluation.actualModel || trace?.actual_model_used) !== evaluation.recommendation.recommended.modelId) return '执行模型发生切换';
+    return evaluation.shadowMode ? 'Shadow模式未执行推荐' : '推荐未执行';
+  }
+
   function drawChart(evaluation) {
     if (!catalog) return;
     const canvas = $('acu-integrated-chart');
@@ -40,23 +88,24 @@
       ctx.strokeStyle='rgba(255,255,255,.10)';ctx.beginPath();ctx.moveTo(margin.left,y(tick));ctx.lineTo(width-margin.right,y(tick));ctx.stroke();
       ctx.fillStyle='#888';ctx.textAlign='right';ctx.fillText(String(tick),margin.left-7,y(tick)+3);ctx.textAlign='center';ctx.fillText(String(tick),x(tick),height-14);
     }
-    const defaults = catalog.models.filter((model) => model.defaultDisplay && model.routingEligible).slice(0,6);
+    const modelIds = displayModelIds(evaluation, window.__latestAcuTrace);
+    const defaults = modelIds.map((id) => catalog.models.find((model) => model.modelId === id)).filter(Boolean);
     const estimates = new Map(evaluation.recommendation.estimates.map((item) => [item.modelId,item]));
     const points=[];
     defaults.forEach((model,index) => {
       const curve=catalog.curves[model.modelId], color=colors[index%colors.length];ctx.strokeStyle=color;ctx.lineWidth=model.modelId===evaluation.recommendation.recommended.modelId?2.8:1.5;ctx.beginPath();
       curve.forEach((point,i)=>{const px=x(point.difficultyScore),py=y(point.estimatedQuality*100);if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py)});ctx.stroke();
-      const estimate=estimates.get(model.modelId);if(!estimate)return;const px=x(evaluation.difficultyScore),py=y(estimate.predictedScore);ctx.fillStyle=color;ctx.beginPath();ctx.arc(px,py,model.modelId===evaluation.recommendation.recommended.modelId?5:3.5,0,Math.PI*2);ctx.fill();points.push({model,estimate,px,py,color});
+      const originalEstimate=estimates.get(model.modelId);const predictedScore=interpolateCurve(curve,evaluation.difficultyScore);if(predictedScore===null)return;const actual=model.modelId===(evaluation.actualModel||window.__latestAcuTrace?.actual_model_used);const actualCost=window.__latestAcuTrace?.cost_audit?.total_acu_cost;const estimate={...(originalEstimate||{}),predictedScore,expectedTotalCost:actual&&Number.isFinite(actualCost)?actualCost:(originalEstimate?.expectedTotalCost||0)};const px=x(evaluation.difficultyScore),py=y(predictedScore);ctx.fillStyle=color;ctx.beginPath();ctx.arc(px,py,model.modelId===evaluation.recommendation.recommended.modelId||actual?5:3.5,0,Math.PI*2);ctx.fill();points.push({model,estimate,px,py,color});
     });
     const lineX=x(evaluation.difficultyScore);ctx.strokeStyle='rgba(255,255,255,.65)';ctx.setLineDash([3,4]);ctx.beginPath();ctx.moveTo(lineX,margin.top);ctx.lineTo(lineX,height-margin.bottom);ctx.stroke();ctx.setLineDash([]);
     const labels=points.sort((a,b)=>a.py-b.py);const gap=36;labels.forEach((item,i)=>{item.ly=Math.max(27,item.py);if(i&&item.ly<labels[i-1].ly+gap)item.ly=labels[i-1].ly+gap});const overflow=labels.at(-1)?.ly-(height-52)||0;if(overflow>0)labels.forEach(item=>item.ly-=overflow);
     const right=lineX<width*.68, boxW=170, boxH=31, boxX=right?Math.min(width-boxW-9,lineX+12):Math.max(margin.left,lineX-boxW-12);
     labels.forEach((item)=>{const selected=item.model.modelId===evaluation.recommendation.recommended.modelId;ctx.strokeStyle=item.color;ctx.lineWidth=selected?2:1;ctx.beginPath();ctx.moveTo(item.px,item.py);ctx.lineTo(right?boxX:boxX+boxW,item.ly);ctx.stroke();ctx.fillStyle=selected?'rgba(70,65,28,.97)':'rgba(15,15,17,.96)';ctx.strokeStyle=item.color;ctx.fillRect(boxX,item.ly-boxH/2,boxW,boxH);ctx.strokeRect(boxX,item.ly-boxH/2,boxW,boxH);ctx.textAlign='left';ctx.fillStyle=selected?'#ffd76a':'#f3f3f4';ctx.font='600 10px sans-serif';ctx.fillText(item.model.displayName,boxX+7,item.ly-2);ctx.fillStyle='#aaa';ctx.font='9px ui-monospace,monospace';ctx.fillText(`${score(item.estimate.predictedScore)} · ${money(item.estimate.expectedTotalCost)}`,boxX+7,item.ly+10)});
-    $('acu-integrated-legend').innerHTML=defaults.map((model,index)=>{const item=estimates.get(model.modelId);return `<div class="acu-legend-row"><strong><b style="color:${colors[index]}">${model.displayName}</b><em>${item?score(item.predictedScore):'—'}</em></strong><span>${item?money(item.expectedTotalCost):'—'}</span></div>`}).join('');
+    $('acu-integrated-legend').innerHTML=points.map((item)=>{const roles=roleLabels(item.model.modelId,evaluation,window.__latestAcuTrace);const evidence=item.model.evidenceConfidence==='low'?' · 相对估算':'';return `<div class="acu-legend-row"><strong><b style="color:${item.color}">${item.model.displayName}</b><em>${score(item.estimate.predictedScore)}</em></strong><span>${roles.map((role)=>`<small>${role}</small>`).join(' ')}${evidence}<br>${money(item.estimate.expectedTotalCost)}</span></div>`}).join('');
   }
 
   function render(evaluation, messages, trace) {
-    latestEvaluation=evaluation;latestMessages=messages||latestMessages||currentMessages();
+    latestEvaluation=evaluation;latestMessages=messages||latestMessages||currentMessages();window.__latestAcuTrace=trace||window.__latestAcuTrace;
     const [label,cls]=sourceLabel(evaluation), badge=$('acu-source-badge');badge.textContent=label;badge.className=`acu-source-badge ${cls}`;
     $('acu-routing-mode').textContent=evaluation.shadowMode?'路由模式：Shadow观察':'路由模式：ACU实际执行';
     $('acu-live-difficulty').textContent=score(evaluation.difficultyScore);
@@ -64,10 +113,12 @@
     const rec=evaluation.recommendation.recommended, actual=evaluation.actualModel||trace?.actual_model_used||'—', fallback=trace?.fallback_used===true;
     $('acu-live-recommendation').textContent=`ACU推荐：${rec.displayName} · ${score(rec.predictedScore)} · ${money(rec.expectedTotalCost)}`;
     $('acu-live-actual').textContent=`实际执行：${actual}`;
-    $('acu-live-application').textContent=evaluation.recommendationApplied?'推荐已执行':fallback?'执行中发生升级':evaluation.shadowMode?'Shadow模式未执行推荐':'推荐未执行';
+    $('acu-live-application').textContent=executionStatus(evaluation,trace);
     $('acu-live-reason').textContent=`质量偏好 ${(evaluation.qualityTarget*100).toFixed(0)}分 · ${evaluation.recommendation.reason}`;
     $('acu-server-feedback').hidden=false;
-    $('acu-technical-details').innerHTML=[['状态',label],['路由模式',evaluation.shadowMode?'Shadow观察':'ACU实际执行'],['ACU推荐',rec.modelId],['实际执行',actual],['recommendationApplied',String(evaluation.recommendationApplied===true)],['当前质量偏好',`${(evaluation.qualityTarget*100).toFixed(0)}分`],['上游模型',evaluation.judgeModel],['Provider',evaluation.judgeProvider],['Endpoint Host',evaluation.judgeEndpointHost],['延迟',`${evaluation.judgeLatencyMs} ms`],['Token',`${evaluation.judgePromptTokens}+${evaluation.judgeCompletionTokens} · ${evaluation.usageStatus}`],['Context hash',`…${evaluation.contextSha256.slice(-8)}`],['缓存键',`…${evaluation.cacheKeySha256.slice(-8)}`],['评估时间',evaluation.cacheCreatedAt],['Request ID',evaluation.requestId],['曲线版本',evaluation.routingModelVersion]].map(([key,value])=>`<div><dt>${key}</dt><dd>${value??'—'}</dd></div>`).join('');
+    const latency=trace?.latency_breakdown||{},usage=trace?.usage_audit||{},costs=trace?.cost_audit||{};
+    const attempts=(trace?.attempts||[]).map((item,index)=>`#${index+1} ${item.model}: ${item.status}${item.error_category?`/${item.error_category}`:''} · ${item.latency_ms}ms`).join('<br>')||'—';
+    $('acu-technical-details').innerHTML=[['状态',label],['执行状态',executionStatus(evaluation,trace)],['路由模式',evaluation.shadowMode?'Shadow观察':'ACU实际执行'],['ACU推荐',rec.modelId],['实际执行',actual],['Attempts',attempts],['recommendationApplied',String(evaluation.recommendationApplied===true)],['当前质量偏好',`${(evaluation.qualityTarget*100).toFixed(0)}分`],['Judge延迟',`${latency.judge_latency_ms??evaluation.judgeLatencyMs} ms`],['推荐模型调用',`${trace?.attempts?.[0]?.latency_ms??0} ms`],['切换耗时',`${latency.fallback_latency_ms??0} ms`],['Router总耗时',`${latency.total_router_latency_ms??0} ms`],['输入 / 可见输出Token',`${usage.inputTokens??'—'} / ${usage.visibleOutputTokens??'—'}`],['Completion / Reasoning Token',`${usage.completionTokens??'—'} / ${usage.reasoningTokens??'—'}`],['Usage来源',usage.usageSource??'—'],['Usage字段',(usage.usageRawKeys||[]).join(', ')||'—'],['Judge成本',money(costs.judge_cost)],['模型成本',money(costs.model_call_cost)],['切换成本',money(costs.failed_attempt_cost)],['ACU总成本',money(costs.total_acu_cost)],['上游模型',evaluation.judgeModel],['Provider',evaluation.judgeProvider],['Endpoint Host',evaluation.judgeEndpointHost],['Context hash',`…${evaluation.contextSha256.slice(-8)}`],['评估时间',evaluation.cacheCreatedAt],['Request ID',evaluation.requestId],['曲线版本',evaluation.routingModelVersion]].map(([key,value])=>`<div><dt>${key}</dt><dd>${value??'—'}</dd></div>`).join('');
     drawChart(evaluation);
   }
 

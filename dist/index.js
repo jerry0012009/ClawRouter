@@ -4429,7 +4429,7 @@ var model_catalog_default = {
     priceAndAvailabilitySource: "src/models.ts at build-time",
     priceAndAvailabilitySourceSha256: "105e2ceb8c9795faf9cd226bef5d703164dfc3824bfa2fc9caaf2d0c45fbfd32",
     crossBenchmarkCaveat: "Product-demo constrained connection; not strict statistical equivalence across benchmarks.",
-    phase2aCatalogSha256: "498a4561bb9a440e2fe5729087a0f3dd036011acaf145f2bcfeab7ea43c03db0",
+    phase2aCatalogSha256: "bcc0c8b2f3c6e7b267a8f4016ae4bb2349c23a6edd711e6b9c496c7ee016d0f6",
     phase2bBuilder: "scripts/build-acu-phase2b-catalog.py",
     gpt56ProxyPricing: "not exposed; official list price used",
     profileEvidence: "research/quality-curves/acu-demo/phase2b-product/curve_profile_evidence.csv"
@@ -5581,6 +5581,326 @@ var model_catalog_default = {
         "https://huggingface.co/datasets/OpenHands/openhands-index"
       ],
       profileConfidence: "medium"
+    },
+    {
+      modelId: "gemini-2.5-flash",
+      displayName: "Gemini 2.5 Flash",
+      upstream: "proxy",
+      inputPricePerMillion: 0.15,
+      outputPricePerMillion: 0.6,
+      cachedInputPricePerMillion: 0.0375,
+      cacheWritePricePerMillion: 0.15,
+      contextWindow: 1048576,
+      maxOutputTokens: 65536,
+      toolCallSupport: true,
+      visionSupport: true,
+      provider: "Google",
+      availability: "callable_preflight_or_repository",
+      routingEligible: true,
+      defaultDisplay: false,
+      abilityAnchor: 0.6859999999999999,
+      solvedAbilityParameter: 0.3488493546512945,
+      fittingError: 0,
+      sufficientLow: 0.9296262890788107,
+      sufficientMid: 0.3988112458887811,
+      sufficientMidHigh: 0.0036977465223457795,
+      sufficientHigh: 0,
+      benchmarkEvidence: [
+        {
+          benchmarkName: "Gemini family relative product mapping",
+          normalizedScore: 0.6859999999999999,
+          scoreScale: "relative family mapping onto pinned OpenHands anchor scale",
+          sampleSize: 0,
+          sourceModelName: "gemini-2.5-flash",
+          evaluationMode: "vendor-reported; not OpenHands-comparable",
+          sourceUrl: "https://ai.google.dev/gemini-api/docs/models#gemini-2.5-flash",
+          resultsUrl: "https://ai.google.dev/gemini-api/docs/models#gemini-2.5-flash",
+          sourceVersion: "retrieved-2026-07-27",
+          benchmarkDate: "2026-07-27",
+          directForModel: false,
+          configuredRelativeDelta: -0.1
+        }
+      ],
+      evidenceConfidence: "low",
+      uncertaintyWidth: 0.14,
+      curveMethod: "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
+      sourceNames: [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      sourceRetrievedAt: "2026-07-27",
+      notes: "Low-confidence same-family relative estimate from Gemini 3.5 Flash; retained so an actual fallback is never hidden from the chart.",
+      curveProfile: "efficient_fast",
+      curveTemperature: 0.095,
+      curveFloor: 0.025,
+      curveCeiling: 0.985,
+      tierAdjustments: {
+        low: 0.05,
+        mid: 0.02,
+        midHigh: -0.06,
+        high: -0.08
+      },
+      profileEvidence: [
+        "https://ai.google.dev/gemini-api/docs/models#gemini-2.5-flash",
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      profileConfidence: "low"
+    },
+    {
+      modelId: "meta-llama/llama-4-maverick",
+      displayName: "Llama 4 Maverick",
+      upstream: "openrouter",
+      inputPricePerMillion: 0.2,
+      outputPricePerMillion: 0.6,
+      cachedInputPricePerMillion: 0.05,
+      cacheWritePricePerMillion: 0.2,
+      contextWindow: 1048576,
+      maxOutputTokens: 32768,
+      toolCallSupport: true,
+      visionSupport: true,
+      provider: "Meta",
+      availability: "callable_preflight_or_repository",
+      routingEligible: true,
+      defaultDisplay: false,
+      abilityAnchor: 0.6709999999999999,
+      solvedAbilityParameter: 0.33233528857103356,
+      fittingError: 0,
+      sufficientLow: 0.9121799566038431,
+      sufficientMid: 0.36093564354761387,
+      sufficientMidHigh: 0,
+      sufficientHigh: 0,
+      benchmarkEvidence: [
+        {
+          benchmarkName: "Fallback relative capability mapping",
+          normalizedScore: 0.6709999999999999,
+          scoreScale: "relative family mapping onto pinned OpenHands anchor scale",
+          sampleSize: 0,
+          sourceModelName: "meta-llama/llama-4-maverick",
+          evaluationMode: "vendor-reported; not OpenHands-comparable",
+          sourceUrl: "https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E-Instruct",
+          resultsUrl: "https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E-Instruct",
+          sourceVersion: "retrieved-2026-07-27",
+          benchmarkDate: "2026-07-27",
+          directForModel: false,
+          configuredRelativeDelta: -0.015
+        }
+      ],
+      evidenceConfidence: "low",
+      uncertaintyWidth: 0.14,
+      curveMethod: "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
+      sourceNames: [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      sourceRetrievedAt: "2026-07-27",
+      notes: "Low-confidence relative estimate; included because this model is in the live fallback chain.",
+      curveProfile: "efficient_fast",
+      curveTemperature: 0.095,
+      curveFloor: 0.025,
+      curveCeiling: 0.985,
+      tierAdjustments: {
+        low: 0.05,
+        mid: 0.02,
+        midHigh: -0.06,
+        high: -0.08
+      },
+      profileEvidence: [
+        "https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E-Instruct",
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      profileConfidence: "low"
+    },
+    {
+      modelId: "deepseek/deepseek-chat-v3-0324",
+      displayName: "DeepSeek V3 (OR)",
+      upstream: "openrouter",
+      inputPricePerMillion: 0.5,
+      outputPricePerMillion: 1.54,
+      cachedInputPricePerMillion: 0.07,
+      cacheWritePricePerMillion: 0.5,
+      contextWindow: 163840,
+      maxOutputTokens: 163840,
+      toolCallSupport: true,
+      visionSupport: false,
+      provider: "DeepSeek",
+      availability: "callable_preflight_or_repository",
+      routingEligible: true,
+      defaultDisplay: false,
+      abilityAnchor: 0.6019999999999999,
+      solvedAbilityParameter: 0.27136198580110293,
+      fittingError: -11102230246251565e-32,
+      sufficientLow: 0.8257420780589249,
+      sufficientMid: 0.2419952938290411,
+      sufficientMidHigh: 0,
+      sufficientHigh: 0,
+      benchmarkEvidence: [
+        {
+          benchmarkName: "DeepSeek family relative product mapping",
+          normalizedScore: 0.6019999999999999,
+          scoreScale: "relative family mapping onto pinned OpenHands anchor scale",
+          sampleSize: 0,
+          sourceModelName: "deepseek/deepseek-chat-v3-0324",
+          evaluationMode: "vendor-reported; not OpenHands-comparable",
+          sourceUrl: "https://api-docs.deepseek.com/news/news250325",
+          resultsUrl: "https://api-docs.deepseek.com/news/news250325",
+          sourceVersion: "retrieved-2026-07-27",
+          benchmarkDate: "2026-07-27",
+          directForModel: false,
+          configuredRelativeDelta: -0.07
+        }
+      ],
+      evidenceConfidence: "low",
+      uncertaintyWidth: 0.14,
+      curveMethod: "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
+      sourceNames: [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      sourceRetrievedAt: "2026-07-27",
+      notes: "Low-confidence family-relative estimate; included because this model is in the live fallback chain.",
+      curveProfile: "efficient_fast",
+      curveTemperature: 0.095,
+      curveFloor: 0.025,
+      curveCeiling: 0.985,
+      tierAdjustments: {
+        low: 0.05,
+        mid: 0.02,
+        midHigh: -0.06,
+        high: -0.08
+      },
+      profileEvidence: [
+        "https://api-docs.deepseek.com/news/news250325",
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      profileConfidence: "low"
+    },
+    {
+      modelId: "meta-llama/llama-3.3-70b-instruct",
+      displayName: "Llama 3.3 70B",
+      upstream: "openrouter",
+      inputPricePerMillion: 0.1,
+      outputPricePerMillion: 0.1,
+      cachedInputPricePerMillion: 0.025,
+      cacheWritePricePerMillion: 0.1,
+      contextWindow: 131072,
+      maxOutputTokens: 16384,
+      toolCallSupport: true,
+      visionSupport: false,
+      provider: "Meta",
+      availability: "callable_preflight_or_repository",
+      routingEligible: true,
+      defaultDisplay: false,
+      abilityAnchor: 0.6209999999999999,
+      solvedAbilityParameter: 0.2862077219365291,
+      fittingError: -2220446049250313e-31,
+      sufficientLow: 0.8501878516101128,
+      sufficientMid: 0.2675898425908389,
+      sufficientMidHigh: 0,
+      sufficientHigh: 0,
+      benchmarkEvidence: [
+        {
+          benchmarkName: "Llama family relative product mapping",
+          normalizedScore: 0.6209999999999999,
+          scoreScale: "relative family mapping onto pinned OpenHands anchor scale",
+          sampleSize: 0,
+          sourceModelName: "meta-llama/llama-3.3-70b-instruct",
+          evaluationMode: "vendor-reported; not OpenHands-comparable",
+          sourceUrl: "https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct",
+          resultsUrl: "https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct",
+          sourceVersion: "retrieved-2026-07-27",
+          benchmarkDate: "2026-07-27",
+          directForModel: false,
+          configuredRelativeDelta: -0.05
+        }
+      ],
+      evidenceConfidence: "low",
+      uncertaintyWidth: 0.14,
+      curveMethod: "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
+      sourceNames: [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      sourceRetrievedAt: "2026-07-27",
+      notes: "Low-confidence family-relative estimate; included because this model is in the live fallback chain.",
+      curveProfile: "efficient_fast",
+      curveTemperature: 0.095,
+      curveFloor: 0.025,
+      curveCeiling: 0.985,
+      tierAdjustments: {
+        low: 0.05,
+        mid: 0.02,
+        midHigh: -0.06,
+        high: -0.08
+      },
+      profileEvidence: [
+        "https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E-Instruct",
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      profileConfidence: "low"
+    },
+    {
+      modelId: "qwen/qwen3-235b-a22b",
+      displayName: "Qwen3 235B (OR)",
+      upstream: "openrouter",
+      inputPricePerMillion: 0.2,
+      outputPricePerMillion: 0.6,
+      cachedInputPricePerMillion: 0.1,
+      cacheWritePricePerMillion: 0.2,
+      contextWindow: 131072,
+      maxOutputTokens: 32768,
+      toolCallSupport: true,
+      visionSupport: false,
+      provider: "Qwen",
+      availability: "callable_preflight_or_repository",
+      routingEligible: true,
+      defaultDisplay: false,
+      abilityAnchor: 0.65,
+      solvedAbilityParameter: 0.3715726164998827,
+      fittingError: 0,
+      sufficientLow: 0.8505872079437978,
+      sufficientMid: 0.48065345307022056,
+      sufficientMidHigh: 0.1734225220822092,
+      sufficientHigh: 0.03615997679024336,
+      benchmarkEvidence: [
+        {
+          benchmarkName: "Qwen family relative product mapping",
+          normalizedScore: 0.65,
+          scoreScale: "relative family mapping onto pinned OpenHands anchor scale",
+          sampleSize: 0,
+          sourceModelName: "qwen/qwen3-235b-a22b",
+          evaluationMode: "vendor-reported; not OpenHands-comparable",
+          sourceUrl: "https://huggingface.co/Qwen/Qwen3-235B-A22B",
+          resultsUrl: "https://huggingface.co/Qwen/Qwen3-235B-A22B",
+          sourceVersion: "retrieved-2026-07-27",
+          benchmarkDate: "2026-07-27",
+          directForModel: false,
+          configuredRelativeDelta: 0.03
+        }
+      ],
+      evidenceConfidence: "low",
+      uncertaintyWidth: 0.14,
+      curveMethod: "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
+      sourceNames: [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      sourceRetrievedAt: "2026-07-27",
+      notes: "Low-confidence family-relative estimate; included because this model is in the live fallback chain.",
+      curveProfile: "coding_specialist",
+      curveTemperature: 0.125,
+      curveFloor: 0.03,
+      curveCeiling: 0.99,
+      tierAdjustments: {
+        low: 0,
+        mid: 0.025,
+        midHigh: 0.05,
+        high: -0.01
+      },
+      profileEvidence: [
+        "https://huggingface.co/Qwen/Qwen3-235B-A22B",
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      profileConfidence: "low"
     }
   ]
 };
@@ -6690,15 +7010,47 @@ var AcuRoutingStore = class {
         outcome_source TEXT NOT NULL CHECK(outcome_source IN ('explicit_user_feedback','validator','test_result','retry_signal','model_upgrade_signal')),
         created_at TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS routing_attempts (
+        request_id TEXT NOT NULL REFERENCES routing_requests(request_id) ON DELETE CASCADE,
+        attempt_index INTEGER NOT NULL,
+        model_id TEXT NOT NULL,
+        upstream TEXT NOT NULL,
+        status TEXT NOT NULL CHECK(status IN ('success','error','timeout','skipped')),
+        error_category TEXT,
+        latency_ms INTEGER NOT NULL,
+        billed_cost REAL,
+        usage_source TEXT,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY(request_id, attempt_index)
+      );
       CREATE INDEX IF NOT EXISTS idx_routing_created ON routing_requests(created_at);
       CREATE INDEX IF NOT EXISTS idx_routing_hash ON routing_requests(context_sha256);
       CREATE INDEX IF NOT EXISTS idx_feedback_request ON user_feedback(request_id);
       CREATE INDEX IF NOT EXISTS idx_outcomes_request ON execution_outcomes(request_id);
+      CREATE INDEX IF NOT EXISTS idx_attempts_request ON routing_attempts(request_id);
     `);
+    this.ensureColumn("routing_requests", "visible_output_tokens", "INTEGER");
+    this.ensureColumn("routing_requests", "completion_tokens", "INTEGER");
+    this.ensureColumn("routing_requests", "reasoning_tokens", "INTEGER");
+    this.ensureColumn("routing_requests", "cached_input_tokens", "INTEGER");
+    this.ensureColumn("routing_requests", "usage_source", "TEXT");
+    this.ensureColumn("routing_requests", "usage_raw_keys", "TEXT");
+    this.ensureColumn("routing_requests", "input_price_per_million", "REAL");
+    this.ensureColumn("routing_requests", "output_price_per_million", "REAL");
+    this.ensureColumn("routing_requests", "model_call_cost", "REAL");
+    this.ensureColumn("routing_requests", "total_acu_cost", "REAL");
+    this.ensureColumn("routing_attempts", "billed_cost", "REAL");
+    this.ensureColumn("routing_attempts", "usage_source", "TEXT");
     chmodSync(path, 384);
   }
   path;
   database;
+  ensureColumn(table, column, definition) {
+    const columns = this.database.prepare(`PRAGMA table_info(${table})`).all();
+    if (!columns.some((entry) => entry.name === column)) {
+      this.database.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    }
+  }
   recordEvaluation(evaluation, metadata = {}) {
     const judgeTokens = evaluation.usageStatus === "not_applicable" ? null : evaluation.judgePromptTokens + evaluation.judgeCompletionTokens;
     this.database.prepare(`
@@ -6782,7 +7134,14 @@ var AcuRoutingStore = class {
       actual_model=COALESCE(?,actual_model), input_tokens=COALESCE(?,input_tokens),
       output_tokens=COALESCE(?,output_tokens), actual_cost=COALESCE(?,actual_cost),
       latency_ms=COALESCE(?,latency_ms), final_status=COALESCE(?,final_status),
-      error_category=COALESCE(?,error_category) WHERE request_id=?`).run(
+      error_category=COALESCE(?,error_category),
+      visible_output_tokens=COALESCE(?,visible_output_tokens),
+      completion_tokens=COALESCE(?,completion_tokens), reasoning_tokens=COALESCE(?,reasoning_tokens),
+      cached_input_tokens=COALESCE(?,cached_input_tokens), usage_source=COALESCE(?,usage_source),
+      usage_raw_keys=COALESCE(?,usage_raw_keys), input_price_per_million=COALESCE(?,input_price_per_million),
+      output_price_per_million=COALESCE(?,output_price_per_million),
+      model_call_cost=COALESCE(?,model_call_cost), total_acu_cost=COALESCE(?,total_acu_cost)
+      WHERE request_id=?`).run(
       metadata.actualModel ?? null,
       metadata.inputTokens ?? null,
       metadata.outputTokens ?? null,
@@ -6790,8 +7149,39 @@ var AcuRoutingStore = class {
       metadata.latencyMs ?? null,
       metadata.finalStatus ?? null,
       metadata.errorCategory ?? null,
+      metadata.visibleOutputTokens ?? null,
+      metadata.completionTokens ?? null,
+      metadata.reasoningTokens ?? null,
+      metadata.cachedInputTokens ?? null,
+      metadata.usageSource ?? null,
+      metadata.usageRawKeys ? JSON.stringify(metadata.usageRawKeys) : null,
+      metadata.inputPricePerMillion ?? null,
+      metadata.outputPricePerMillion ?? null,
+      metadata.modelCallCost ?? null,
+      metadata.totalAcuCost ?? null,
       requestId
     );
+  }
+  recordAttempts(requestId, attempts) {
+    const statement = this.database.prepare(`INSERT INTO routing_attempts
+      (request_id,attempt_index,model_id,upstream,status,error_category,latency_ms,billed_cost,usage_source,created_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?)
+      ON CONFLICT(request_id,attempt_index) DO UPDATE SET
+        model_id=excluded.model_id,upstream=excluded.upstream,status=excluded.status,
+        error_category=excluded.error_category,latency_ms=excluded.latency_ms,
+        billed_cost=excluded.billed_cost,usage_source=excluded.usage_source`);
+    attempts.forEach((attempt, index) => statement.run(
+      requestId,
+      index + 1,
+      attempt.model,
+      attempt.upstream,
+      attempt.status,
+      attempt.error_category ?? null,
+      attempt.latency_ms,
+      attempt.billed_cost ?? null,
+      attempt.usage_source ?? null,
+      (/* @__PURE__ */ new Date()).toISOString()
+    ));
   }
   recordFeedback(input) {
     if (input.rating !== void 0 && (!Number.isInteger(input.rating) || input.rating < 1 || input.rating > 5)) {
@@ -6941,6 +7331,14 @@ function prioritizeNonRateLimited(models) {
 function timeoutForModel(modelId) {
   return isReasoningModel(modelId) ? REASONING_MODEL_TIMEOUT_MS : PER_MODEL_TIMEOUT_MS;
 }
+function timeoutForAttempt(modelId, attemptIndex, acuSelected, maxTokens) {
+  const configured = Number(process.env.ACU_FIRST_ATTEMPT_TIMEOUT_MS);
+  const isDevConfigured = Number.isFinite(configured) && configured > 0;
+  if (isDevConfigured && acuSelected && attemptIndex === 0 && !isReasoningModel(modelId) && maxTokens <= 1200) {
+    return Math.min(timeoutForModel(modelId), configured);
+  }
+  return timeoutForModel(modelId);
+}
 function canWrite(res) {
   return !res.writableEnded && !res.destroyed && res.socket !== null && !res.socket.destroyed && res.socket.writable;
 }
@@ -7077,15 +7475,67 @@ function extractAssistantText(responseBody) {
     return "";
   }
 }
-function parseUsage(responseBody, estimatedInputTokens, estimatedOutputTokens) {
+function finiteNonNegative(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : void 0;
+}
+function extractExplicitUpstreamCost(responseBody) {
   try {
     const parsed = JSON.parse(responseBody);
+    const usage = parsed.usage && typeof parsed.usage === "object" ? parsed.usage : void 0;
+    return finiteNonNegative(usage?.cost) ?? finiteNonNegative(usage?.total_cost) ?? finiteNonNegative(parsed.cost) ?? finiteNonNegative(parsed.provider_cost);
+  } catch {
+    return void 0;
+  }
+}
+function parseUsage(responseBody, estimatedInputTokens, maxOutputTokens, pricing) {
+  const inputPrice = pricing?.inputPrice ?? 0;
+  const outputPrice = pricing?.outputPrice ?? 0;
+  try {
+    const parsed = JSON.parse(responseBody);
+    const usage = parsed.usage && typeof parsed.usage === "object" ? parsed.usage : void 0;
+    const details = usage?.completion_tokens_details && typeof usage.completion_tokens_details === "object" ? usage.completion_tokens_details : void 0;
+    const promptDetails = usage?.prompt_tokens_details && typeof usage.prompt_tokens_details === "object" ? usage.prompt_tokens_details : void 0;
+    const inputTokens = finiteNonNegative(usage?.prompt_tokens) ?? finiteNonNegative(usage?.input_tokens) ?? estimatedInputTokens;
+    const upstreamCompletion = finiteNonNegative(usage?.completion_tokens) ?? finiteNonNegative(usage?.output_tokens);
+    const reasoningTokens = finiteNonNegative(details?.reasoning_tokens) ?? finiteNonNegative(usage?.reasoning_tokens) ?? 0;
+    const cachedInputTokens = finiteNonNegative(promptDetails?.cached_tokens) ?? finiteNonNegative(usage?.cached_input_tokens) ?? 0;
+    const assistantText = extractAssistantText(responseBody);
+    const visibleOutputTokens = assistantText.length > 0 ? Math.max(1, Math.ceil(assistantText.length / 4)) : 0;
+    const explicitCost = finiteNonNegative(usage?.cost) ?? finiteNonNegative(usage?.total_cost) ?? finiteNonNegative(parsed.cost) ?? finiteNonNegative(parsed.provider_cost);
+    const hasUsage = Boolean(usage && (upstreamCompletion !== void 0 || finiteNonNegative(usage.prompt_tokens) !== void 0 || finiteNonNegative(usage.input_tokens) !== void 0));
+    const completionTokens = upstreamCompletion ?? (visibleOutputTokens > 0 ? visibleOutputTokens : maxOutputTokens);
+    const usageSource = explicitCost !== void 0 ? "upstream_cost" : hasUsage ? "upstream_usage" : visibleOutputTokens > 0 ? "response_text_estimate" : "max_token_estimate";
+    const calculatedCost = (inputTokens * inputPrice + completionTokens * outputPrice) / 1e6;
     return {
-      inputTokens: parsed.usage?.prompt_tokens ?? parsed.usage?.input_tokens ?? estimatedInputTokens,
-      outputTokens: parsed.usage?.completion_tokens ?? parsed.usage?.output_tokens ?? estimatedOutputTokens
+      inputTokens,
+      visibleOutputTokens,
+      completionTokens,
+      reasoningTokens,
+      cachedInputTokens,
+      usageSource,
+      usageRawKeys: usage ? [
+        ...Object.keys(usage),
+        ...Object.keys(details ?? {}).map((key) => `completion_tokens_details.${key}`),
+        ...Object.keys(promptDetails ?? {}).map((key) => `prompt_tokens_details.${key}`)
+      ].sort() : [],
+      inputPricePerMillion: inputPrice,
+      outputPricePerMillion: outputPrice,
+      modelCallCost: explicitCost ?? calculatedCost
     };
   } catch {
-    return { inputTokens: estimatedInputTokens, outputTokens: estimatedOutputTokens };
+    return {
+      inputTokens: estimatedInputTokens,
+      visibleOutputTokens: 0,
+      completionTokens: maxOutputTokens,
+      reasoningTokens: 0,
+      cachedInputTokens: 0,
+      usageSource: "max_token_estimate",
+      usageRawKeys: [],
+      inputPricePerMillion: inputPrice,
+      outputPricePerMillion: outputPrice,
+      modelCallCost: (estimatedInputTokens * inputPrice + maxOutputTokens * outputPrice) / 1e6
+    };
   }
 }
 function getFallbackUsed(attempts, actualModelUsed, selectedModel) {
@@ -7741,6 +8191,7 @@ async function handleRequest(req, res, ctx) {
   let expectedSchema;
   let acuQualityTarget = 0.8;
   let executeAcuRecommended;
+  let routeComputeLatencyMs = 0;
   try {
     const parsed = JSON.parse(body.toString());
     isStreaming = parsed.stream === true;
@@ -7779,6 +8230,7 @@ async function handleRequest(req, res, ctx) {
       });
       routingDecision = rulesDecision;
       if (ctx.acuStrategy.enabled) {
+        const acuRouteStart = Date.now();
         const eligibleModelIds = BLOCKRUN_MODELS.filter((model) => !ctx.excludeList.has(model.id) && (!hasTools || supportsToolCalling(model.id)) && (!hasVision || supportsVision(model.id))).map((model) => model.id);
         acuEvaluation = await ctx.acuStrategy.evaluate({
           messages,
@@ -7792,6 +8244,7 @@ async function handleRequest(req, res, ctx) {
           requestedModel: modelId,
           sessionHash: hashSession(effectiveSessionId)
         }, rulesDecision);
+        routeComputeLatencyMs = Math.max(0, Date.now() - acuRouteStart - acuEvaluation.judgeLatencyMs);
         try {
           ctx.acuStore?.recordEvaluation(acuEvaluation, {
             sessionHash: hashSession(effectiveSessionId),
@@ -7807,6 +8260,7 @@ async function handleRequest(req, res, ctx) {
           const fallback = acuEvaluation.recommendation.fallbackModel.modelId;
           const tier = routingTierFromAcu(acuEvaluation);
           const baseTiers = routingDecision.tierConfigs ?? ctx.routerOpts.config.tiers;
+          const originalPrimary = baseTiers[tier].primary;
           const existingFallbacks = baseTiers[tier].fallback;
           routingDecision = {
             ...rulesDecision,
@@ -7822,7 +8276,7 @@ async function handleRequest(req, res, ctx) {
               ...baseTiers,
               [tier]: {
                 primary: selected.modelId,
-                fallback: [.../* @__PURE__ */ new Set([fallback, ...existingFallbacks])].filter((modelId2) => modelId2 !== selected.modelId)
+                fallback: [.../* @__PURE__ */ new Set([fallback, originalPrimary, ...existingFallbacks])].filter((modelId2) => modelId2 !== selected.modelId)
               }
             }
           };
@@ -7832,6 +8286,9 @@ async function handleRequest(req, res, ctx) {
       if (acuRecommendationSelected) {
         modelId = routingDecision.model;
         parsed.model = modelId;
+        if (modelId === "qwen3.6-plus" && acuEvaluation && acuEvaluation.difficultyScore < 55 && parsed.enable_thinking === void 0) {
+          parsed.enable_thinking = false;
+        }
         bodyModified = true;
         if (effectiveSessionId) {
           ctx.sessionStore.setSession(effectiveSessionId, routingDecision.model, routingDecision.tier);
@@ -7918,8 +8375,8 @@ async function handleRequest(req, res, ctx) {
     res.writeHead(200, headers);
     res.end(respCached.body);
     const estimatedInputTokens2 = Math.ceil(body.length / 4);
-    const usage = parseUsage(respCached.body.toString(), estimatedInputTokens2, maxTokens);
-    const costs = calculateModelCost(respCached.model, ctx.routerOpts.modelPricing, usage.inputTokens, usage.outputTokens, routingProfile ?? void 0);
+    const usage = parseUsage(respCached.body.toString(), estimatedInputTokens2, maxTokens, ctx.routerOpts.modelPricing.get(respCached.model));
+    const costs = calculateModelCost(respCached.model, ctx.routerOpts.modelPricing, usage.inputTokens, usage.completionTokens, routingProfile ?? void 0);
     await appendLedgerEntry({
       request_id: requestId,
       timestamp: (/* @__PURE__ */ new Date()).toISOString(),
@@ -7932,7 +8389,7 @@ async function handleRequest(req, res, ctx) {
       actual_model_used: respCached.model,
       upstream: getUpstream(respCached.model),
       input_tokens: usage.inputTokens,
-      output_tokens: usage.outputTokens,
+      output_tokens: usage.completionTokens,
       estimated_cost: 0,
       actual_cost: 0,
       baseline_model: DEFAULT_BASELINE_MODEL,
@@ -7950,7 +8407,7 @@ async function handleRequest(req, res, ctx) {
         ctx.acuStore?.finalizeRequest(requestId, {
           actualModel: respCached.model,
           inputTokens: usage.inputTokens,
-          outputTokens: usage.outputTokens,
+          outputTokens: usage.completionTokens,
           actualCost: 0,
           latencyMs: Date.now() - startTime,
           finalStatus: "response_cache_hit"
@@ -8012,7 +8469,7 @@ async function handleRequest(req, res, ctx) {
     if (globalController.signal.aborted) break;
     console.log(`[ClawRouter] Trying model ${tryModel} (${i + 1}/${modelsToTry.length})`);
     const attemptStart = Date.now();
-    const perAttemptTimeout = timeoutForModel(tryModel);
+    const perAttemptTimeout = timeoutForAttempt(tryModel, i, acuRecommendationSelected, maxTokens);
     const modelController = new AbortController();
     const modelTimeoutId = setTimeout(() => modelController.abort(), perAttemptTimeout);
     const combinedSignal = AbortSignal.any([globalController.signal, modelController.signal]);
@@ -8046,7 +8503,11 @@ async function handleRequest(req, res, ctx) {
         upstream: upstreamProvider,
         status: "error",
         error_category: lastErrorCategory,
-        latency_ms: Date.now() - attemptStart
+        latency_ms: Date.now() - attemptStart,
+        ...extractExplicitUpstreamCost(errorBody) !== void 0 && {
+          billed_cost: extractExplicitUpstreamCost(errorBody),
+          usage_source: "upstream_cost"
+        }
       });
       if (category === "rate_limited") {
         markRateLimited(tryModel);
@@ -8121,6 +8582,7 @@ data: [DONE]
     ctx.deduplicator.removeInflight(dedupKey);
     if (acuEvaluation) {
       try {
+        ctx.acuStore?.recordAttempts(requestId, attempts);
         ctx.acuStore?.finalizeRequest(requestId, { finalStatus: "upstream_error", errorCategory: lastErrorCategory });
       } catch {
       }
@@ -8211,12 +8673,14 @@ data: ${JSON.stringify(trace)}
     }
     responseBody = Buffer.concat(chunks).toString();
     if (!isStreaming) {
+      const initialValidatorStart = Date.now();
       let validator = validateAssistantOutput({
         messages: parsedMessages,
         assistantText: extractAssistantText(responseBody),
         responseFormat,
         expectedSchema
       });
+      let validatorLatencyMs = Date.now() - initialValidatorStart;
       let qualityFallbackUsed = false;
       if (validator.result === "fail" && routingDecision) {
         const qualityFallbackModel = selectQualityFallbackModel(
@@ -8239,6 +8703,18 @@ data: ${JSON.stringify(trace)}
               signal: AbortSignal.any([globalController.signal, qualityController.signal])
             });
             if (response.status === 200) {
+              const replacedModel = actualModelUsed;
+              const replacedUsage = parseUsage(
+                responseBody,
+                Math.ceil(body.length / 4),
+                maxTokens,
+                ctx.routerOpts.modelPricing.get(replacedModel)
+              );
+              const replacedAttempt = [...attempts].reverse().find((attempt) => attempt.model === replacedModel && attempt.status === "success");
+              if (replacedAttempt) {
+                replacedAttempt.billed_cost = replacedUsage.modelCallCost;
+                replacedAttempt.usage_source = replacedUsage.usageSource;
+              }
               responseBody = await readResponseText(response);
               actualModelUsed = qualityFallbackModel;
               upstreamProviderUsed = upstreamProvider;
@@ -8249,12 +8725,14 @@ data: ${JSON.stringify(trace)}
                 status: "success",
                 latency_ms: Date.now() - qualityStart
               });
+              const fallbackValidatorStart = Date.now();
               validator = validateAssistantOutput({
                 messages: parsedMessages,
                 assistantText: extractAssistantText(responseBody),
                 responseFormat,
                 expectedSchema
               });
+              validatorLatencyMs += Date.now() - fallbackValidatorStart;
             } else {
               const errorBody = await response.text().catch(() => "");
               const category = categorizeError(response.status, errorBody) ?? "validation_fallback_error";
@@ -8264,7 +8742,11 @@ data: ${JSON.stringify(trace)}
                 upstream: upstreamProvider,
                 status: "error",
                 error_category: category,
-                latency_ms: Date.now() - qualityStart
+                latency_ms: Date.now() - qualityStart,
+                ...extractExplicitUpstreamCost(errorBody) !== void 0 && {
+                  billed_cost: extractExplicitUpstreamCost(errorBody),
+                  usage_source: "upstream_cost"
+                }
               });
             }
           } catch (err) {
@@ -8284,30 +8766,34 @@ data: ${JSON.stringify(trace)}
       }
       const latencyMs2 = Date.now() - startTime;
       const estimatedInputTokens2 = Math.ceil(body.length / 4);
-      const usage = parseUsage(responseBody, estimatedInputTokens2, maxTokens);
+      const usage = parseUsage(responseBody, estimatedInputTokens2, maxTokens, ctx.routerOpts.modelPricing.get(actualModelUsed));
       let costEstimate2 = 0;
       let baselineCost2 = 0;
       let savings2 = 0;
       if (routingDecision) {
         if (actualModelUsed !== routingDecision.model) {
-          const costs = calculateModelCost(actualModelUsed, ctx.routerOpts.modelPricing, usage.inputTokens, usage.outputTokens, routingProfile ?? void 0);
+          const costs = calculateModelCost(actualModelUsed, ctx.routerOpts.modelPricing, usage.inputTokens, usage.completionTokens, routingProfile ?? void 0);
           costEstimate2 = costs.costEstimate;
           baselineCost2 = costs.baselineCost;
           savings2 = costs.savings;
         } else {
-          const costs = calculateModelCost(actualModelUsed, ctx.routerOpts.modelPricing, usage.inputTokens, usage.outputTokens, routingProfile ?? void 0);
+          const costs = calculateModelCost(actualModelUsed, ctx.routerOpts.modelPricing, usage.inputTokens, usage.completionTokens, routingProfile ?? void 0);
           costEstimate2 = costs.costEstimate;
           baselineCost2 = costs.baselineCost;
           savings2 = costs.savings;
         }
       } else {
-        const costs = calculateModelCost(actualModelUsed, ctx.routerOpts.modelPricing, usage.inputTokens, usage.outputTokens);
+        const costs = calculateModelCost(actualModelUsed, ctx.routerOpts.modelPricing, usage.inputTokens, usage.completionTokens);
         costEstimate2 = costs.costEstimate;
         baselineCost2 = costs.baselineCost;
         savings2 = costs.savings;
       }
       const fallbackUsed = getFallbackUsed(attempts, actualModelUsed, routingDecision?.model);
       if (acuEvaluation) setAcuExecutionResult(acuEvaluation, acuRecommendationSelected, actualModelUsed);
+      const upstreamLatencyMs = attempts.reduce((sum, attempt) => sum + attempt.latency_ms, 0);
+      const fallbackLatencyMs = attempts.slice(1).reduce((sum, attempt) => sum + attempt.latency_ms, 0);
+      const failedAttemptCost = attempts.reduce((sum, attempt, index) => index === attempts.length - 1 && attempt.status === "success" ? sum : sum + (attempt.billed_cost ?? 0), 0);
+      const totalAcuCost = usage.modelCallCost + failedAttemptCost + (acuEvaluation?.judgeCost ?? 0);
       const trace = {
         ...buildRuleTraceSignals(parsedMessages, maxTokens, ctx.routerOpts.config),
         request_id: requestId,
@@ -8325,11 +8811,26 @@ data: ${JSON.stringify(trace)}
         fallback_used: fallbackUsed,
         quality_fallback_used: qualityFallbackUsed,
         estimated_input_tokens: usage.inputTokens,
-        estimated_output_tokens: usage.outputTokens,
+        estimated_output_tokens: usage.completionTokens,
         estimated_cost: costEstimate2,
         baseline_model: DEFAULT_BASELINE_MODEL,
         baseline_cost: baselineCost2,
         estimated_savings: savings2,
+        usage_audit: usage,
+        cost_audit: {
+          judge_cost: acuEvaluation?.judgeCost ?? 0,
+          model_call_cost: usage.modelCallCost,
+          failed_attempt_cost: failedAttemptCost,
+          total_acu_cost: totalAcuCost
+        },
+        latency_breakdown: {
+          judge_latency_ms: acuEvaluation?.judgeLatencyMs ?? 0,
+          route_compute_latency_ms: routeComputeLatencyMs,
+          upstream_latency_ms: upstreamLatencyMs,
+          validator_latency_ms: validatorLatencyMs,
+          fallback_latency_ms: fallbackLatencyMs,
+          total_router_latency_ms: latencyMs2
+        },
         route_reasoning: routingDecision?.reasoning ?? "Explicit model request",
         validator_result: validator.result,
         validator: validator.validator,
@@ -8350,7 +8851,7 @@ data: ${JSON.stringify(trace)}
         actual_model_used: actualModelUsed,
         upstream: trace.upstream,
         input_tokens: usage.inputTokens,
-        output_tokens: usage.outputTokens,
+        output_tokens: usage.completionTokens,
         estimated_cost: costEstimate2,
         actual_cost: costEstimate2,
         baseline_model: DEFAULT_BASELINE_MODEL,
@@ -8368,14 +8869,25 @@ data: ${JSON.stringify(trace)}
       await appendLedgerEntry(ledgerEntry);
       if (acuEvaluation) {
         try {
+          ctx.acuStore?.recordAttempts(requestId, attempts);
           ctx.acuStore?.finalizeRequest(requestId, {
             actualModel: actualModelUsed,
             inputTokens: usage.inputTokens,
-            outputTokens: usage.outputTokens,
-            actualCost: costEstimate2,
+            outputTokens: usage.completionTokens,
+            actualCost: totalAcuCost,
             latencyMs: latencyMs2,
             finalStatus: "completed",
-            errorCategory: lastErrorCategory
+            errorCategory: lastErrorCategory,
+            visibleOutputTokens: usage.visibleOutputTokens,
+            completionTokens: usage.completionTokens,
+            reasoningTokens: usage.reasoningTokens,
+            cachedInputTokens: usage.cachedInputTokens,
+            usageSource: usage.usageSource,
+            usageRawKeys: usage.usageRawKeys,
+            inputPricePerMillion: usage.inputPricePerMillion,
+            outputPricePerMillion: usage.outputPricePerMillion,
+            modelCallCost: usage.modelCallCost,
+            totalAcuCost
           });
           if (validator.result !== "not_applicable") {
             ctx.acuStore?.recordOutcome({
@@ -8499,14 +9011,27 @@ data: ${JSON.stringify(trace)}
   });
   if (acuEvaluation && isStreaming) {
     try {
+      const streamingUsage = parseUsage(responseBody, estimatedInputTokens, maxTokens, ctx.routerOpts.modelPricing.get(actualModelUsed));
+      const streamingTotalAcuCost = streamingUsage.modelCallCost + acuEvaluation.judgeCost;
+      ctx.acuStore?.recordAttempts(requestId, attempts);
       ctx.acuStore?.finalizeRequest(requestId, {
         actualModel: actualModelUsed,
-        inputTokens: estimatedInputTokens,
-        outputTokens: maxTokens,
-        actualCost: costEstimate,
+        inputTokens: streamingUsage.inputTokens,
+        outputTokens: streamingUsage.completionTokens,
+        actualCost: streamingTotalAcuCost,
         latencyMs,
         finalStatus: "completed_streaming",
-        errorCategory: lastErrorCategory
+        errorCategory: lastErrorCategory,
+        visibleOutputTokens: streamingUsage.visibleOutputTokens,
+        completionTokens: streamingUsage.completionTokens,
+        reasoningTokens: streamingUsage.reasoningTokens,
+        cachedInputTokens: streamingUsage.cachedInputTokens,
+        usageSource: streamingUsage.usageSource,
+        usageRawKeys: streamingUsage.usageRawKeys,
+        inputPricePerMillion: streamingUsage.inputPricePerMillion,
+        outputPricePerMillion: streamingUsage.outputPricePerMillion,
+        modelCallCost: streamingUsage.modelCallCost,
+        totalAcuCost: streamingTotalAcuCost
       });
     } catch {
     }

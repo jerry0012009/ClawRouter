@@ -1103,6 +1103,25 @@ type RoutingRecordMetadata = {
     finalStatus?: string;
     hadTools?: boolean;
     errorCategory?: string;
+    visibleOutputTokens?: number;
+    completionTokens?: number;
+    reasoningTokens?: number;
+    cachedInputTokens?: number;
+    usageSource?: "upstream_usage" | "upstream_cost" | "response_text_estimate" | "max_token_estimate";
+    usageRawKeys?: string[];
+    inputPricePerMillion?: number;
+    outputPricePerMillion?: number;
+    modelCallCost?: number;
+    totalAcuCost?: number;
+};
+type RoutingAttemptInput = {
+    model: string;
+    upstream: string;
+    status: "success" | "error" | "timeout" | "skipped";
+    error_category?: string;
+    latency_ms: number;
+    billed_cost?: number;
+    usage_source?: "upstream_usage" | "upstream_cost" | "response_text_estimate" | "max_token_estimate";
 };
 type FeedbackInput = {
     requestId: string;
@@ -1127,8 +1146,10 @@ declare class AcuRoutingStore {
     readonly path: string;
     private readonly database;
     constructor(path: string);
+    private ensureColumn;
     recordEvaluation(evaluation: AcuEvaluation, metadata?: RoutingRecordMetadata): void;
     finalizeRequest(requestId: string, metadata: RoutingRecordMetadata): void;
+    recordAttempts(requestId: string, attempts: RoutingAttemptInput[]): void;
     recordFeedback(input: FeedbackInput): void;
     recordOutcome(input: OutcomeInput): void;
     summary(): Record<string, unknown>;

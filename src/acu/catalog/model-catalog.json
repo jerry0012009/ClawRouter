@@ -87,7 +87,7 @@
     "priceAndAvailabilitySource": "src/models.ts at build-time",
     "priceAndAvailabilitySourceSha256": "105e2ceb8c9795faf9cd226bef5d703164dfc3824bfa2fc9caaf2d0c45fbfd32",
     "crossBenchmarkCaveat": "Product-demo constrained connection; not strict statistical equivalence across benchmarks.",
-    "phase2aCatalogSha256": "498a4561bb9a440e2fe5729087a0f3dd036011acaf145f2bcfeab7ea43c03db0",
+    "phase2aCatalogSha256": "bcc0c8b2f3c6e7b267a8f4016ae4bb2349c23a6edd711e6b9c496c7ee016d0f6",
     "phase2bBuilder": "scripts/build-acu-phase2b-catalog.py",
     "gpt56ProxyPricing": "not exposed; official list price used",
     "profileEvidence": "research/quality-curves/acu-demo/phase2b-product/curve_profile_evidence.csv"
@@ -1239,6 +1239,326 @@
         "https://huggingface.co/datasets/OpenHands/openhands-index"
       ],
       "profileConfidence": "medium"
+    },
+    {
+      "modelId": "gemini-2.5-flash",
+      "displayName": "Gemini 2.5 Flash",
+      "upstream": "proxy",
+      "inputPricePerMillion": 0.15,
+      "outputPricePerMillion": 0.6,
+      "cachedInputPricePerMillion": 0.0375,
+      "cacheWritePricePerMillion": 0.15,
+      "contextWindow": 1048576,
+      "maxOutputTokens": 65536,
+      "toolCallSupport": true,
+      "visionSupport": true,
+      "provider": "Google",
+      "availability": "callable_preflight_or_repository",
+      "routingEligible": true,
+      "defaultDisplay": false,
+      "abilityAnchor": 0.6859999999999999,
+      "solvedAbilityParameter": 0.3488493546512945,
+      "fittingError": 0.0,
+      "sufficientLow": 0.9296262890788107,
+      "sufficientMid": 0.3988112458887811,
+      "sufficientMidHigh": 0.0036977465223457795,
+      "sufficientHigh": 0.0,
+      "benchmarkEvidence": [
+        {
+          "benchmarkName": "Gemini family relative product mapping",
+          "normalizedScore": 0.6859999999999999,
+          "scoreScale": "relative family mapping onto pinned OpenHands anchor scale",
+          "sampleSize": 0,
+          "sourceModelName": "gemini-2.5-flash",
+          "evaluationMode": "vendor-reported; not OpenHands-comparable",
+          "sourceUrl": "https://ai.google.dev/gemini-api/docs/models#gemini-2.5-flash",
+          "resultsUrl": "https://ai.google.dev/gemini-api/docs/models#gemini-2.5-flash",
+          "sourceVersion": "retrieved-2026-07-27",
+          "benchmarkDate": "2026-07-27",
+          "directForModel": false,
+          "configuredRelativeDelta": -0.1
+        }
+      ],
+      "evidenceConfidence": "low",
+      "uncertaintyWidth": 0.14,
+      "curveMethod": "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
+      "sourceNames": [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      "sourceRetrievedAt": "2026-07-27",
+      "notes": "Low-confidence same-family relative estimate from Gemini 3.5 Flash; retained so an actual fallback is never hidden from the chart.",
+      "curveProfile": "efficient_fast",
+      "curveTemperature": 0.095,
+      "curveFloor": 0.025,
+      "curveCeiling": 0.985,
+      "tierAdjustments": {
+        "low": 0.05,
+        "mid": 0.02,
+        "midHigh": -0.06,
+        "high": -0.08
+      },
+      "profileEvidence": [
+        "https://ai.google.dev/gemini-api/docs/models#gemini-2.5-flash",
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      "profileConfidence": "low"
+    },
+    {
+      "modelId": "meta-llama/llama-4-maverick",
+      "displayName": "Llama 4 Maverick",
+      "upstream": "openrouter",
+      "inputPricePerMillion": 0.2,
+      "outputPricePerMillion": 0.6,
+      "cachedInputPricePerMillion": 0.05,
+      "cacheWritePricePerMillion": 0.2,
+      "contextWindow": 1048576,
+      "maxOutputTokens": 32768,
+      "toolCallSupport": true,
+      "visionSupport": true,
+      "provider": "Meta",
+      "availability": "callable_preflight_or_repository",
+      "routingEligible": true,
+      "defaultDisplay": false,
+      "abilityAnchor": 0.6709999999999999,
+      "solvedAbilityParameter": 0.33233528857103356,
+      "fittingError": 0.0,
+      "sufficientLow": 0.9121799566038431,
+      "sufficientMid": 0.36093564354761387,
+      "sufficientMidHigh": 0.0,
+      "sufficientHigh": 0.0,
+      "benchmarkEvidence": [
+        {
+          "benchmarkName": "Fallback relative capability mapping",
+          "normalizedScore": 0.6709999999999999,
+          "scoreScale": "relative family mapping onto pinned OpenHands anchor scale",
+          "sampleSize": 0,
+          "sourceModelName": "meta-llama/llama-4-maverick",
+          "evaluationMode": "vendor-reported; not OpenHands-comparable",
+          "sourceUrl": "https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E-Instruct",
+          "resultsUrl": "https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E-Instruct",
+          "sourceVersion": "retrieved-2026-07-27",
+          "benchmarkDate": "2026-07-27",
+          "directForModel": false,
+          "configuredRelativeDelta": -0.015
+        }
+      ],
+      "evidenceConfidence": "low",
+      "uncertaintyWidth": 0.14,
+      "curveMethod": "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
+      "sourceNames": [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      "sourceRetrievedAt": "2026-07-27",
+      "notes": "Low-confidence relative estimate; included because this model is in the live fallback chain.",
+      "curveProfile": "efficient_fast",
+      "curveTemperature": 0.095,
+      "curveFloor": 0.025,
+      "curveCeiling": 0.985,
+      "tierAdjustments": {
+        "low": 0.05,
+        "mid": 0.02,
+        "midHigh": -0.06,
+        "high": -0.08
+      },
+      "profileEvidence": [
+        "https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E-Instruct",
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      "profileConfidence": "low"
+    },
+    {
+      "modelId": "deepseek/deepseek-chat-v3-0324",
+      "displayName": "DeepSeek V3 (OR)",
+      "upstream": "openrouter",
+      "inputPricePerMillion": 0.5,
+      "outputPricePerMillion": 1.54,
+      "cachedInputPricePerMillion": 0.07,
+      "cacheWritePricePerMillion": 0.5,
+      "contextWindow": 163840,
+      "maxOutputTokens": 163840,
+      "toolCallSupport": true,
+      "visionSupport": false,
+      "provider": "DeepSeek",
+      "availability": "callable_preflight_or_repository",
+      "routingEligible": true,
+      "defaultDisplay": false,
+      "abilityAnchor": 0.6019999999999999,
+      "solvedAbilityParameter": 0.27136198580110293,
+      "fittingError": -1.1102230246251565e-16,
+      "sufficientLow": 0.8257420780589249,
+      "sufficientMid": 0.2419952938290411,
+      "sufficientMidHigh": 0.0,
+      "sufficientHigh": 0.0,
+      "benchmarkEvidence": [
+        {
+          "benchmarkName": "DeepSeek family relative product mapping",
+          "normalizedScore": 0.6019999999999999,
+          "scoreScale": "relative family mapping onto pinned OpenHands anchor scale",
+          "sampleSize": 0,
+          "sourceModelName": "deepseek/deepseek-chat-v3-0324",
+          "evaluationMode": "vendor-reported; not OpenHands-comparable",
+          "sourceUrl": "https://api-docs.deepseek.com/news/news250325",
+          "resultsUrl": "https://api-docs.deepseek.com/news/news250325",
+          "sourceVersion": "retrieved-2026-07-27",
+          "benchmarkDate": "2026-07-27",
+          "directForModel": false,
+          "configuredRelativeDelta": -0.07
+        }
+      ],
+      "evidenceConfidence": "low",
+      "uncertaintyWidth": 0.14,
+      "curveMethod": "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
+      "sourceNames": [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      "sourceRetrievedAt": "2026-07-27",
+      "notes": "Low-confidence family-relative estimate; included because this model is in the live fallback chain.",
+      "curveProfile": "efficient_fast",
+      "curveTemperature": 0.095,
+      "curveFloor": 0.025,
+      "curveCeiling": 0.985,
+      "tierAdjustments": {
+        "low": 0.05,
+        "mid": 0.02,
+        "midHigh": -0.06,
+        "high": -0.08
+      },
+      "profileEvidence": [
+        "https://api-docs.deepseek.com/news/news250325",
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      "profileConfidence": "low"
+    },
+    {
+      "modelId": "meta-llama/llama-3.3-70b-instruct",
+      "displayName": "Llama 3.3 70B",
+      "upstream": "openrouter",
+      "inputPricePerMillion": 0.1,
+      "outputPricePerMillion": 0.1,
+      "cachedInputPricePerMillion": 0.025,
+      "cacheWritePricePerMillion": 0.1,
+      "contextWindow": 131072,
+      "maxOutputTokens": 16384,
+      "toolCallSupport": true,
+      "visionSupport": false,
+      "provider": "Meta",
+      "availability": "callable_preflight_or_repository",
+      "routingEligible": true,
+      "defaultDisplay": false,
+      "abilityAnchor": 0.6209999999999999,
+      "solvedAbilityParameter": 0.2862077219365291,
+      "fittingError": -2.220446049250313e-16,
+      "sufficientLow": 0.8501878516101128,
+      "sufficientMid": 0.2675898425908389,
+      "sufficientMidHigh": 0.0,
+      "sufficientHigh": 0.0,
+      "benchmarkEvidence": [
+        {
+          "benchmarkName": "Llama family relative product mapping",
+          "normalizedScore": 0.6209999999999999,
+          "scoreScale": "relative family mapping onto pinned OpenHands anchor scale",
+          "sampleSize": 0,
+          "sourceModelName": "meta-llama/llama-3.3-70b-instruct",
+          "evaluationMode": "vendor-reported; not OpenHands-comparable",
+          "sourceUrl": "https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct",
+          "resultsUrl": "https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct",
+          "sourceVersion": "retrieved-2026-07-27",
+          "benchmarkDate": "2026-07-27",
+          "directForModel": false,
+          "configuredRelativeDelta": -0.05
+        }
+      ],
+      "evidenceConfidence": "low",
+      "uncertaintyWidth": 0.14,
+      "curveMethod": "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
+      "sourceNames": [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      "sourceRetrievedAt": "2026-07-27",
+      "notes": "Low-confidence family-relative estimate; included because this model is in the live fallback chain.",
+      "curveProfile": "efficient_fast",
+      "curveTemperature": 0.095,
+      "curveFloor": 0.025,
+      "curveCeiling": 0.985,
+      "tierAdjustments": {
+        "low": 0.05,
+        "mid": 0.02,
+        "midHigh": -0.06,
+        "high": -0.08
+      },
+      "profileEvidence": [
+        "https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E-Instruct",
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      "profileConfidence": "low"
+    },
+    {
+      "modelId": "qwen/qwen3-235b-a22b",
+      "displayName": "Qwen3 235B (OR)",
+      "upstream": "openrouter",
+      "inputPricePerMillion": 0.2,
+      "outputPricePerMillion": 0.6,
+      "cachedInputPricePerMillion": 0.1,
+      "cacheWritePricePerMillion": 0.2,
+      "contextWindow": 131072,
+      "maxOutputTokens": 32768,
+      "toolCallSupport": true,
+      "visionSupport": false,
+      "provider": "Qwen",
+      "availability": "callable_preflight_or_repository",
+      "routingEligible": true,
+      "defaultDisplay": false,
+      "abilityAnchor": 0.65,
+      "solvedAbilityParameter": 0.3715726164998827,
+      "fittingError": 0.0,
+      "sufficientLow": 0.8505872079437978,
+      "sufficientMid": 0.48065345307022056,
+      "sufficientMidHigh": 0.1734225220822092,
+      "sufficientHigh": 0.03615997679024336,
+      "benchmarkEvidence": [
+        {
+          "benchmarkName": "Qwen family relative product mapping",
+          "normalizedScore": 0.65,
+          "scoreScale": "relative family mapping onto pinned OpenHands anchor scale",
+          "sampleSize": 0,
+          "sourceModelName": "qwen/qwen3-235b-a22b",
+          "evaluationMode": "vendor-reported; not OpenHands-comparable",
+          "sourceUrl": "https://huggingface.co/Qwen/Qwen3-235B-A22B",
+          "resultsUrl": "https://huggingface.co/Qwen/Qwen3-235B-A22B",
+          "sourceVersion": "retrieved-2026-07-27",
+          "benchmarkDate": "2026-07-27",
+          "directForModel": false,
+          "configuredRelativeDelta": 0.03
+        }
+      ],
+      "evidenceConfidence": "low",
+      "uncertaintyWidth": 0.14,
+      "curveMethod": "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
+      "sourceNames": [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      "sourceRetrievedAt": "2026-07-27",
+      "notes": "Low-confidence family-relative estimate; included because this model is in the live fallback chain.",
+      "curveProfile": "coding_specialist",
+      "curveTemperature": 0.125,
+      "curveFloor": 0.03,
+      "curveCeiling": 0.99,
+      "tierAdjustments": {
+        "low": 0.0,
+        "mid": 0.025,
+        "midHigh": 0.05,
+        "high": -0.01
+      },
+      "profileEvidence": [
+        "https://huggingface.co/Qwen/Qwen3-235B-A22B",
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      "profileConfidence": "low"
     }
   ]
 }

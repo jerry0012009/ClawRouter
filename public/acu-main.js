@@ -76,7 +76,7 @@
     return '通用任务';
   }
 
-  function maxTokensForTask(task, prompt = '') {
+  function estimatedOutputTokensForTask(task, prompt = '') {
     const detected = { 结构化抽取: 'structured_extraction', 写作: 'writing', 摘要: 'summary', 代码修复: 'code_fix', 复杂推理: 'reasoning', 通用任务: 'general' }[detectTaskType(prompt)] || 'general';
     return ({ structured_extraction: 256, writing: 600, summary: 600, code_fix: 900, reasoning: 4096, general: 800 })[task === 'auto' ? detected : task] || 800;
   }
@@ -92,10 +92,10 @@
     return payload;
   }
 
-  async function chatComplete(model, messages, qualityTarget, maxTokens, extra = {}) {
+  async function chatComplete(model, messages, qualityTarget, extra = {}) {
     const payload = model === ROUTER_MODEL
-      ? { model, messages, cache: false, acu_quality_target: qualityTarget, max_tokens: maxTokens, ...extra }
-      : { model, messages, max_tokens: maxTokens, ...extra };
+      ? { model, messages, cache: false, acu_quality_target: qualityTarget, ...extra }
+      : { model, messages, ...extra };
     const response = await safeFetch(`${API}/v1/chat/completions`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' }, body: JSON.stringify(payload),
     });
@@ -127,9 +127,6 @@
   }
   function exhaustedWithoutVisibleOutput(response) {
     return finishReason(response) === 'length' && responseText(response).trim().length === 0;
-  }
-  function expandedRetryBudget(maxTokens) {
-    return Math.min(8192, Math.max(4096, maxTokens * 2));
   }
   function renderAnswer(element, response, text) {
     if (!text && exhaustedWithoutVisibleOutput(response)) {
@@ -267,12 +264,12 @@
     $('baseline-answer').textContent = '正在评估当前任务并选择质量上界模型…';
     $('router-answer').textContent = '正在评估当前任务并规划质量成本路由…';
     const spec = getQualitySpec();
-    const maxTokens = maxTokensForTask(spec.task_type, prompt);
+    const expectedOutputTokens = estimatedOutputTokensForTask(spec.task_type, prompt);
     const messages = [{ role: 'system', content: qualitySpecPrompt(spec) }, { role: 'user', content: prompt }];
     renderQualityPreview();
     const state = { plan: null, ceiling: null, router: null, ceilingDone: false, routerDone: false, ledgerAdded: false, spec };
     try {
-      const plan = await planTask(messages, spec.threshold / 100, maxTokens);
+      const plan = await planTask(messages, spec.threshold / 100, expectedOutputTokens);
       state.plan = plan;
       window.__latestAcuPlan = plan;
       window.__acuPageContext = { taskType: spec.task_type === 'auto' ? detectTaskType(prompt) : ({ structured_extraction: '结构化抽取', code_fix: '代码修复', summary: '摘要', writing: '写作', reasoning: '复杂推理' }[spec.task_type] || '通用任务'), qualityTarget: spec.threshold, prompt };
@@ -283,14 +280,14 @@
       const finish = () => { if (state.ceilingDone && state.routerDone) { running = false; $('run-btn').disabled = false; } };
       const ceilingExtra = ceiling.thinkingMode === 'disabled' ? { enable_thinking: false } : {};
       const ceilingStarted = Date.now();
-      const ceilingPromise = chatComplete(ceiling.modelId, messages, undefined, maxTokens, ceilingExtra).then(async (firstResponse) => {
+      const ceilingPromise = chatComplete(ceiling.modelId, messages, undefined, ceilingExtra).then(async (firstResponse) => {
         let response = firstResponse;
         let emptyOutputRetry = false;
         let retryCost = 0;
         if (exhaustedWithoutVisibleOutput(firstResponse)) {
           emptyOutputRetry = true;
           retryCost = actualModelCost(firstResponse, ceiling.modelId);
-          response = await chatComplete(ceiling.modelId, messages, undefined, expandedRetryBudget(maxTokens), ceilingExtra);
+          response = await chatComplete(ceiling.modelId, messages, undefined, ceilingExtra);
         }
         const latency = Date.now() - ceilingStarted;
         const content = responseText(response);
@@ -306,7 +303,7 @@
       }).finally(() => { state.ceilingDone = true; updateComparisonSummary(state); finish(); });
 
       const routerStarted = Date.now();
-      const routerPromise = chatComplete(ROUTER_MODEL, messages, spec.threshold / 100, maxTokens, { acu_plan_id: plan.planId }).then((response) => {
+      const routerPromise = chatComplete(ROUTER_MODEL, messages, spec.threshold / 100, { acu_plan_id: plan.planId }).then((response) => {
         const wallLatency = Date.now() - routerStarted;
         const trace = getTrace(response);
         const model = trace?.actual_model_used || response.model || 'unknown';

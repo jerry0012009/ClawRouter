@@ -20,6 +20,8 @@ type CacheRecord = {
   createdAt: string;
   promptVersion: string;
   model: string;
+  promptTokens?: number;
+  completionTokens?: number;
 };
 
 type CacheFile = { schemaVersion: "acu-judge-cache-v1"; entries: Record<string, CacheRecord> };
@@ -29,6 +31,8 @@ export type JudgeRequestResult = {
   status: "success" | "cache_hit";
   latencyMs: number;
   cost: number;
+  promptTokens: number;
+  completionTokens: number;
   contextSha256: string;
   contextTokenEstimate: number;
   contextTruncated: boolean;
@@ -200,6 +204,8 @@ export class AcuJudgeClient {
         status: "cache_hit",
         latencyMs: 0,
         cost: 0,
+        promptTokens: cached.promptTokens ?? 0,
+        completionTokens: cached.completionTokens ?? 0,
         contextSha256,
         contextTokenEstimate: truncated.tokenEstimate,
         contextTruncated: truncated.truncated,
@@ -255,6 +261,8 @@ export class AcuJudgeClient {
       createdAt: new Date().toISOString(),
       promptVersion: this.config.promptVersion,
       model: this.config.judgeModel,
+      promptTokens,
+      completionTokens,
     };
     writeCache(path, cache);
     return {
@@ -262,6 +270,8 @@ export class AcuJudgeClient {
       status: "success",
       latencyMs,
       cost,
+      promptTokens,
+      completionTokens,
       contextSha256,
       contextTokenEstimate: truncated.tokenEstimate,
       contextTruncated: truncated.truncated,

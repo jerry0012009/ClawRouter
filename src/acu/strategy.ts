@@ -55,6 +55,8 @@ export class AcuDemoStrategy {
     let judgeStatus: AcuEvaluation["judgeStatus"];
     let judgeLatencyMs = 0;
     let judgeCost = 0;
+    let judgePromptTokens = 0;
+    let judgeCompletionTokens = 0;
     let contextSha256 = createHash("sha256").update(visible).digest("hex");
     let contextTokenEstimate = estimateVisibleTokens(fallbackContext.text);
     let contextTruncated = fallbackContext.truncated;
@@ -65,6 +67,8 @@ export class AcuDemoStrategy {
       judgeStatus = response.status;
       judgeLatencyMs = response.latencyMs;
       judgeCost = response.cost;
+      judgePromptTokens = response.promptTokens;
+      judgeCompletionTokens = response.completionTokens;
       contextSha256 = response.contextSha256;
       contextTokenEstimate = response.contextTokenEstimate;
       contextTruncated = response.contextTruncated;
@@ -91,11 +95,13 @@ export class AcuDemoStrategy {
       judgeStatus,
       judgeLatencyMs,
       judgeCost,
+      judgePromptTokens,
+      judgeCompletionTokens,
       contextSha256,
       contextTokenEstimate,
       contextTruncated,
       difficultyScore: difficultyScore(judge),
-      qualityTarget: input.qualityTarget ?? 0.9,
+      qualityTarget: input.qualityTarget ?? 0.8,
       recommendation,
       disclaimer: ACU_DEMO_DISCLAIMER,
     };

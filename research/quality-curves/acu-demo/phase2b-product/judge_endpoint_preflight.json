@@ -1,0 +1,33 @@
+{
+  "executed_at": "2026-07-27",
+  "credentials_persisted": false,
+  "preflight_prompt": "short classification; strict JSON; no task answer",
+  "endpoints": [
+    {
+      "name": "configured CloseAI-compatible proxy",
+      "model": "deepseek-v4-flash",
+      "listed": true,
+      "http_status": 200,
+      "actual_model": "deepseek-v4-flash",
+      "strict_json": true,
+      "prompt_tokens": 45,
+      "completion_tokens": 97,
+      "reasoning_tokens": 0,
+      "selected_for_dev": true
+    },
+    {
+      "name": "OpenRouter",
+      "model": "deepseek/deepseek-v4-flash",
+      "listed": true,
+      "http_status": 200,
+      "actual_model": "deepseek/deepseek-v4-flash",
+      "strict_json": true,
+      "prompt_tokens": 45,
+      "completion_tokens": 105,
+      "reasoning_tokens": 0,
+      "reported_cost_usd": 0.00002499,
+      "selected_for_dev": false,
+      "selection_note": "Kept as a verified fallback; CloseAI preserves the frozen model ID and existing request shape without code changes."
+    }
+  ]
+}

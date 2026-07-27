@@ -1,0 +1,48 @@
+{
+  "executed_at": "2026-07-27",
+  "upstream": "current PROXY_BASE_URL (credential and URL value not persisted)",
+  "secret_persisted": false,
+  "limits": { "prompt": "Reply OK", "max_output_tokens": 8 },
+  "model_list_http_status": 200,
+  "models": [
+    {
+      "requested_model_id": "gpt-5.6-sol",
+      "listed": true,
+      "chat_completions_http_status": 200,
+      "actual_model_id": "gpt-5.6-sol-2026-07-09",
+      "streaming_http_status": 200,
+      "streaming_sse_received": true,
+      "tool_call_status": "not_verified",
+      "tool_call_observation": "tool_choice=required and reasoning_effort variants returned HTTP 400",
+      "routing_constraint": "text-only; toolCallSupport=false"
+    },
+    {
+      "requested_model_id": "gpt-5.6-terra",
+      "listed": true,
+      "chat_completions_http_status": 200,
+      "actual_model_id": "gpt-5.6-terra-2026-07-09",
+      "streaming_http_status": 200,
+      "streaming_sse_received": true,
+      "tool_call_status": "not_verified",
+      "tool_call_observation": "request was accepted without forced tool choice but did not emit a tool call in the 8-token budget",
+      "routing_constraint": "text-only; toolCallSupport=false"
+    },
+    {
+      "requested_model_id": "gpt-5.6-luna",
+      "listed": true,
+      "chat_completions_http_status": 200,
+      "actual_model_id": "gpt-5.6-luna-2026-07-09",
+      "streaming_http_status": 200,
+      "streaming_sse_received": true,
+      "tool_call_status": "not_verified",
+      "tool_call_observation": "tool_choice=required and reasoning_effort variants returned HTTP 400",
+      "routing_constraint": "text-only; toolCallSupport=false"
+    }
+  ],
+  "protocol_notes": [
+    "max_tokens returned unsupported_parameter; max_completion_tokens succeeded.",
+    "The repository already transforms this parameter for useMaxCompletionTokens models.",
+    "The proxy model-list response did not expose pricing, context, or capability metadata.",
+    "Official list prices are stored for demonstration; actual proxy billing remains unverified."
+  ]
+}

@@ -366,6 +366,7 @@ type UpstreamProvider = "proxy" | "openrouter";
 type ExtendedModelDefinition = ModelDefinitionConfig & {
     upstream: UpstreamProvider;
     useMaxCompletionTokens?: boolean;
+    toolCalling?: boolean;
 };
 declare const BLOCKRUN_MODELS: ExtendedModelDefinition[];
 declare const OPENCLAW_MODELS: ExtendedModelDefinition[];
@@ -822,6 +823,18 @@ type AcuModelCatalogEntry = {
     evidenceConfidence: "low" | "medium" | "high";
     uncertaintyWidth: number;
     curveMethod: string;
+    curveProfile: "frontier_resilient" | "balanced_frontier" | "efficient_fast" | "coding_specialist";
+    curveTemperature: number;
+    curveFloor: number;
+    curveCeiling: number;
+    tierAdjustments: {
+        low: number;
+        mid: number;
+        midHigh: number;
+        high: number;
+    };
+    profileEvidence: string[];
+    profileConfidence: "low" | "medium" | "high";
     sourceNames: string[];
     sourceRetrievedAt: string;
     notes: string;
@@ -837,6 +850,17 @@ type AcuModelEstimate = {
     estimatedCallCost: number;
     expectedFallbackCost: number;
     expectedTotalCost: number;
+    predictedScore: number;
+    conservativeScore: number;
+    riskAdjustedCost: number;
+    riskAdjustedScore: number;
+    qualityUtility: number;
+    costUtility: number;
+    valueUtility: number;
+    scoreGapVsBest: number;
+    costSavingsVsBest: number;
+    paretoEfficient: boolean;
+    selectionReason: string;
     savingsVsFlagship: number;
     savingsPercentVsFlagship: number;
     meetsQualityTarget: boolean;
@@ -874,6 +898,8 @@ type AcuEvaluation = {
     judgeStatus: "success" | "cache_hit" | "rules_fallback";
     judgeLatencyMs: number;
     judgeCost: number;
+    judgePromptTokens: number;
+    judgeCompletionTokens: number;
     contextSha256: string;
     contextTokenEstimate: number;
     contextTruncated: boolean;
@@ -898,6 +924,8 @@ type JudgeRequestResult = {
     status: "success" | "cache_hit";
     latencyMs: number;
     cost: number;
+    promptTokens: number;
+    completionTokens: number;
     contextSha256: string;
     contextTokenEstimate: number;
     contextTruncated: boolean;
@@ -928,9 +956,9 @@ type AcuCatalogConfig = {
         mid_high: number;
         high: number;
     };
-    sharedTemperature: number;
-    commonFloor: number;
-    commonCeiling: number;
+    sharedTemperature: number | null;
+    commonFloor: number | null;
+    commonCeiling: number | null;
     curveThresholds: {
         above_low: number;
         above_mid: number;
@@ -990,6 +1018,21 @@ type AcuDecisionInput = {
     switchCost?: number;
 };
 declare function estimateCallCost(model: Pick<AcuModelCatalogEntry, "inputPricePerMillion" | "outputPricePerMillion">, inputTokens: number, outputTokens: number): number;
+type ValueCandidate = Pick<AcuModelEstimate, "modelId" | "displayName" | "predictedScore" | "riskAdjustedCost"> & {
+    conservativeScore?: number;
+};
+declare function isParetoEfficient(candidate: ValueCandidate, candidates: ValueCandidate[]): boolean;
+declare function selectValueRoute<T extends ValueCandidate>(candidates: T[], targetScore: number): {
+    selected: T;
+    bestScore: T;
+    reason: string;
+    utilities: Map<string, {
+        riskAdjustedScore: number;
+        qualityUtility: number;
+        costUtility: number;
+        valueUtility: number;
+    }>;
+};
 declare function recommendModel(input: AcuDecisionInput): AcuRecommendation;
 
 declare function normalizeProbabilities(value: Omit<AcuTierProbabilities, "confidence"> & {
@@ -1138,4 +1181,4 @@ declare const VERSION: string;
 
 declare const plugin: OpenClawPluginDefinition;
 
-export { ACU_TIERS, type AcuBenchmarkEvidence, type AcuCurvePoint, AcuDemoStrategy, type AcuEvaluateInput, type AcuEvaluation, AcuJudgeClient, type AcuJudgeResult, type AcuModelCatalogEntry, type AcuModelEstimate, type AcuRecommendation, type AcuRuntimeConfig, type AcuTier, type AcuTierProbabilities, type AcuVisibleMessage, BLOCKRUN_MODELS, type CachedResponse, DEFAULT_ROUTING_CONFIG, MODEL_ALIASES, OPENCLAW_MODELS, RequestDeduplicator, ResponseCache, type RoutingConfig, type RoutingDecision, type SessionConfig, type SessionEntry, SessionStore, type Tier, type UsageEntry, VERSION, blockrunProvider, buildModelCurve, buildProviderModels, calculateModelCost, continuousTierProbabilities, plugin as default, difficultyScore, estimateCallCost, estimatedQuality, getAcuCatalog, getAcuModel, getFallbackChain, getModelContextWindow, getProxyPort, getSessionId, hashRequestContent, isReasoningModel, logUsage, normalizeProbabilities, parseJudgeResult, publicCatalogPayload, readAcuRuntimeConfig, recommendModel, resolveApiKey, resolveModelAlias, route, rulesFallbackJudge, saveApiKey, serializeVisibleContext, solveAbilityParameter, startProxy, supportsToolCalling, supportsVision, tierSufficiency };
+export { ACU_TIERS, type AcuBenchmarkEvidence, type AcuCurvePoint, AcuDemoStrategy, type AcuEvaluateInput, type AcuEvaluation, AcuJudgeClient, type AcuJudgeResult, type AcuModelCatalogEntry, type AcuModelEstimate, type AcuRecommendation, type AcuRuntimeConfig, type AcuTier, type AcuTierProbabilities, type AcuVisibleMessage, BLOCKRUN_MODELS, type CachedResponse, DEFAULT_ROUTING_CONFIG, MODEL_ALIASES, OPENCLAW_MODELS, RequestDeduplicator, ResponseCache, type RoutingConfig, type RoutingDecision, type SessionConfig, type SessionEntry, SessionStore, type Tier, type UsageEntry, VERSION, blockrunProvider, buildModelCurve, buildProviderModels, calculateModelCost, continuousTierProbabilities, plugin as default, difficultyScore, estimateCallCost, estimatedQuality, getAcuCatalog, getAcuModel, getFallbackChain, getModelContextWindow, getProxyPort, getSessionId, hashRequestContent, isParetoEfficient, isReasoningModel, logUsage, normalizeProbabilities, parseJudgeResult, publicCatalogPayload, readAcuRuntimeConfig, recommendModel, resolveApiKey, resolveModelAlias, route, rulesFallbackJudge, saveApiKey, selectValueRoute, serializeVisibleContext, solveAbilityParameter, startProxy, supportsToolCalling, supportsVision, tierSufficiency };

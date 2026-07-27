@@ -88,7 +88,7 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
   it("serves the ACU frontend and complete model catalog", async () => {
     const page = await fetch(`${proxy.baseUrl}/acu`, { headers: { Authorization: AUTHORIZATION } });
     expect(page.status).toBe(200);
-    expect(await page.text()).toContain("请求难度与模型估算达标率");
+    expect(await page.text()).toContain("请求难度与模型价值路由");
 
     const response = await fetch(`${proxy.baseUrl}/acu/api/catalog`, {
       headers: { Authorization: AUTHORIZATION },
@@ -102,7 +102,7 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
       headers: { Authorization: AUTHORIZATION },
     });
     expect(gallery.status).toBe(200);
-    expect(await gallery.text()).toContain("模型难度—估算达标率图集");
+    expect(await gallery.text()).toContain("模型难度—预计得分图集");
   });
 
   it("evaluates the full API context and returns a cost-aware recommendation", async () => {

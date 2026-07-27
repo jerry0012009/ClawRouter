@@ -1684,6 +1684,45 @@ var BLOCKRUN_MODELS = [
     maxTokens: 4096
   },
   // ── OpenAI (GPT-5 series, need max_completion_tokens) ──
+  // GPT-5.6 prices are official list prices. The current proxy exposes no
+  // billing metadata; text and streaming were verified on 2026-07-27, while
+  // tool calling was not verified and is therefore disabled conservatively.
+  {
+    id: "gpt-5.6-sol",
+    name: "GPT-5.6 Sol",
+    upstream: "proxy",
+    useMaxCompletionTokens: true,
+    toolCalling: false,
+    reasoning: true,
+    input: ["text"],
+    cost: { input: 5, output: 30, cacheRead: 0.5, cacheWrite: 5 },
+    contextWindow: 105e4,
+    maxTokens: 128e3
+  },
+  {
+    id: "gpt-5.6-terra",
+    name: "GPT-5.6 Terra",
+    upstream: "proxy",
+    useMaxCompletionTokens: true,
+    toolCalling: false,
+    reasoning: true,
+    input: ["text"],
+    cost: { input: 2.5, output: 15, cacheRead: 0.25, cacheWrite: 2.5 },
+    contextWindow: 105e4,
+    maxTokens: 128e3
+  },
+  {
+    id: "gpt-5.6-luna",
+    name: "GPT-5.6 Luna",
+    upstream: "proxy",
+    useMaxCompletionTokens: true,
+    toolCalling: false,
+    reasoning: true,
+    input: ["text"],
+    cost: { input: 1, output: 6, cacheRead: 0.1, cacheWrite: 1 },
+    contextWindow: 105e4,
+    maxTokens: 128e3
+  },
   {
     id: "gpt-5.5",
     name: "GPT-5.5",
@@ -2166,6 +2205,9 @@ var MODEL_ALIASES = {
   nano: "gpt-4.1-nano",
   "gpt-5": "gpt-5.5",
   "gpt-5.5": "gpt-5.5",
+  sol: "gpt-5.6-sol",
+  terra: "gpt-5.6-terra",
+  luna: "gpt-5.6-luna",
   "openai/gpt-4o": "gpt-4o",
   "openai/gpt-4o-mini": "gpt-4o-mini",
   "openai/gpt-4.1": "gpt-4.1",
@@ -2239,7 +2281,8 @@ function usesMaxCompletionTokens(modelId) {
   return getModelDefinition(modelId)?.useMaxCompletionTokens ?? false;
 }
 function supportsToolCalling(modelId) {
-  return !(/* @__PURE__ */ new Set(["liquid/lfm-2.5-1.2b-thinking:free"])).has(modelId);
+  const configured = getModelDefinition(modelId)?.toolCalling;
+  return configured ?? !(/* @__PURE__ */ new Set(["liquid/lfm-2.5-1.2b-thinking:free"])).has(modelId);
 }
 function supportsVision(modelId) {
   return getModelDefinition(modelId)?.input.includes("image") ?? false;
@@ -4135,7 +4178,7 @@ var ACU_DEFAULT_JUDGE_MODE = "non-thinking";
 var ACU_DEFAULT_JUDGE_TIMEOUT_MS = 8e3;
 var ACU_DEFAULT_MAX_CONTEXT_TOKENS = 6e3;
 var ACU_DEFAULT_MAX_OUTPUT_TOKENS = 300;
-var ACU_DEFAULT_QUALITY_TARGET = 0.9;
+var ACU_DEFAULT_QUALITY_TARGET = 0.8;
 var ACU_DEFAULT_SWITCH_COST_USD = 2e-4;
 var ACU_CURVE_THRESHOLDS = {
   aboveLow: 0.275,
@@ -4143,7 +4186,7 @@ var ACU_CURVE_THRESHOLDS = {
   aboveMidHigh: 0.765
 };
 var ACU_CURVE_TEMPERATURE = 0.08;
-var ACU_DEMO_DISCLAIMER = "\u8BF7\u6C42\u96BE\u5EA6\u57FA\u4E8ETwinRouterBench\u6700\u4F4E\u5145\u5206\u6863\u4F4D\u4F53\u7CFB\uFF1B\u6A21\u578B\u66F2\u7EBF\u7531\u516C\u5F00Benchmark\u80FD\u529B\u951A\u70B9\u548C\u53D7\u7EA6\u675F\u80FD\u529B\u6A21\u578B\u751F\u6210\uFF0C\u7528\u4E8E\u4EA7\u54C1\u6F14\u793A\uFF0C\u4E0D\u4EE3\u8868\u5177\u4F53\u6A21\u578B\u5BF9\u5F53\u524D\u8BF7\u6C42\u7684\u9010\u9898\u5B9E\u6D4B\u6210\u529F\u7387\u3002";
+var ACU_DEMO_DISCLAIMER = "\u9884\u8BA1\u6A21\u578B\u5F97\u5206\u57FA\u4E8E\u4EFB\u52A1\u80FD\u529B\u9700\u6C42\u3001\u516C\u5F00Benchmark\u53CA\u53D7\u7EA6\u675F\u80FD\u529B\u6A21\u578B\uFF0C\u7528\u4E8E\u5C55\u793A\u6A21\u578B\u4E0E\u5F53\u524D\u4EFB\u52A1\u7684\u76F8\u5BF9\u5339\u914D\u7A0B\u5EA6\uFF0C\u4E0D\u4EE3\u8868\u9010\u8BF7\u6C42\u5B9E\u6D4B\u6210\u529F\u7387\u3002";
 function positiveInteger(value, fallback) {
   const parsed = Number.parseInt(value ?? "", 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
@@ -4227,10 +4270,10 @@ function continuousTierProbabilities(difficulty) {
 
 // src/acu/catalog/model-catalog.json
 var model_catalog_default = {
-  schemaVersion: "acu-model-catalog-v1",
+  schemaVersion: "acu-model-catalog-v2",
   generatedAt: "2026-07-27",
-  estimateLabel: "public-benchmark constrained estimate",
-  disclaimer: "\u7528\u4E8E\u4EA7\u54C1\u6F14\u793A\uFF0C\u4E0D\u4EE3\u8868\u5177\u4F53\u6A21\u578B\u5BF9\u5F53\u524D\u8BF7\u6C42\u7684\u9010\u9898\u5B9E\u6D4B\u6210\u529F\u7387\u3002",
+  estimateLabel: "public-benchmark constrained model score",
+  disclaimer: "\u9884\u8BA1\u6A21\u578B\u5F97\u5206\u7528\u4E8E\u76F8\u5BF9\u5339\u914D\u6F14\u793A\uFF0C\u4E0D\u4EE3\u8868\u9010\u8BF7\u6C42\u5B9E\u6D4B\u6210\u529F\u7387\u3002",
   config: {
     tierDifficulty: {
       low: 0.15,
@@ -4238,9 +4281,9 @@ var model_catalog_default = {
       mid_high: 0.65,
       high: 0.88
     },
-    sharedTemperature: 0.12,
-    commonFloor: 0.03,
-    commonCeiling: 0.99,
+    sharedTemperature: null,
+    commonFloor: null,
+    commonCeiling: null,
     curveThresholds: {
       above_low: 0.275,
       above_mid: 0.525,
@@ -4272,6 +4315,33 @@ var model_catalog_default = {
       judgeInputTokens: 6e3,
       judgeOutputTokens: 300,
       switchCostUsd: 2e-4
+    },
+    profileConstraints: {
+      temperature: [
+        0.09,
+        0.17
+      ],
+      floor: [
+        0.01,
+        0.06
+      ],
+      ceiling: [
+        0.96,
+        0.995
+      ],
+      maxAbsoluteTierAdjustment: 0.08
+    },
+    defaultQualityTarget: 0.8,
+    valueUtility: {
+      qualityWeightAtPreference60: 0.58,
+      qualityWeightAtPreference95: 0.82,
+      uncertaintyRiskWeightAtPreference60: 0.2,
+      uncertaintyRiskWeightAtPreference95: 0.45,
+      qualityExponentAtPreference60: 0.8,
+      qualityExponentAtPreference95: 2,
+      combination: "qualityUtility * (qualityWeight + costWeight * costUtility)",
+      costTransform: "pareto-frontier log-relative",
+      hardScoreThreshold: false
     }
   },
   provenance: {
@@ -4287,7 +4357,11 @@ var model_catalog_default = {
     },
     priceAndAvailabilitySource: "src/models.ts at build-time",
     priceAndAvailabilitySourceSha256: "105e2ceb8c9795faf9cd226bef5d703164dfc3824bfa2fc9caaf2d0c45fbfd32",
-    crossBenchmarkCaveat: "Product-demo constrained connection; not strict statistical equivalence across benchmarks."
+    crossBenchmarkCaveat: "Product-demo constrained connection; not strict statistical equivalence across benchmarks.",
+    phase2aCatalogSha256: "498a4561bb9a440e2fe5729087a0f3dd036011acaf145f2bcfeab7ea43c03db0",
+    phase2bBuilder: "scripts/build-acu-phase2b-catalog.py",
+    gpt56ProxyPricing: "not exposed; official list price used",
+    profileEvidence: "research/quality-curves/acu-demo/phase2b-product/curve_profile_evidence.csv"
   },
   models: [
     {
@@ -4303,16 +4377,16 @@ var model_catalog_default = {
       toolCallSupport: true,
       visionSupport: true,
       provider: "OpenAI",
-      availability: "callable_in_repository",
+      availability: "callable_preflight_or_repository",
       routingEligible: true,
-      defaultDisplay: true,
+      defaultDisplay: false,
       abilityAnchor: 0.782,
-      solvedAbilityParameter: 0.6000445560690806,
-      fittingError: 0,
-      sufficientLow: 0.9679497255290579,
-      sufficientMid: 0.8375332853989281,
-      sufficientMidHigh: 0.41150743243938315,
-      sufficientHigh: 0.11489241897773944,
+      solvedAbilityParameter: 0.6029079429640571,
+      fittingError: -2220446049250313e-31,
+      sufficientLow: 0.9576135050672705,
+      sufficientMid: 0.8203037450925588,
+      sufficientMidHigh: 0.44211951275274175,
+      sufficientHigh: 0.15424474522369108,
       benchmarkEvidence: [
         {
           benchmarkName: "SWE-bench Verified via OpenHands Index",
@@ -4331,13 +4405,27 @@ var model_catalog_default = {
       ],
       evidenceConfidence: "medium",
       uncertaintyWidth: 0.08,
-      curveMethod: "shared-slope constrained logistic calibrated to Twin published-label distribution",
+      curveMethod: "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
       sourceNames: [
         "OpenHands Index SWE-bench aggregate",
         "ClawRouter BLOCKRUN_MODELS"
       ],
       sourceRetrievedAt: "2026-07-27",
-      notes: "Direct aggregate anchor from the pinned OpenHands Index SWE-bench evaluation; agent-harness dependent."
+      notes: "Direct aggregate anchor from the pinned OpenHands Index SWE-bench evaluation; agent-harness dependent.",
+      curveProfile: "balanced_frontier",
+      curveTemperature: 0.135,
+      curveFloor: 0.03,
+      curveCeiling: 0.99,
+      tierAdjustments: {
+        low: 0,
+        mid: 5e-3,
+        midHigh: 0.015,
+        high: 0.015
+      },
+      profileEvidence: [
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      profileConfidence: "low"
     },
     {
       modelId: "gpt-5.4-mini",
@@ -4352,16 +4440,16 @@ var model_catalog_default = {
       toolCallSupport: true,
       visionSupport: true,
       provider: "OpenAI",
-      availability: "callable_in_repository",
+      availability: "callable_preflight_or_repository",
       routingEligible: true,
       defaultDisplay: false,
       abilityAnchor: 0.6559999999999999,
-      solvedAbilityParameter: 0.37542767996868553,
-      fittingError: -33306690738754696e-32,
-      sufficientLow: 0.8627482535246016,
-      sufficientMid: 0.46102636447178436,
-      sufficientMidHigh: 0.1184285739606725,
-      sufficientHigh: 0.044116580001326816,
+      solvedAbilityParameter: 0.3171541263252635,
+      fittingError: -11102230246251565e-32,
+      sufficientLow: 0.8940232055766547,
+      sufficientMid: 0.3280324412529797,
+      sufficientMidHigh: 0,
+      sufficientHigh: 0,
       benchmarkEvidence: [
         {
           benchmarkName: "SWE-bench Verified via OpenHands Index",
@@ -4380,13 +4468,27 @@ var model_catalog_default = {
       ],
       evidenceConfidence: "low",
       uncertaintyWidth: 0.14,
-      curveMethod: "shared-slope constrained logistic calibrated to Twin published-label distribution",
+      curveMethod: "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
       sourceNames: [
         "OpenHands Index SWE-bench aggregate",
         "ClawRouter BLOCKRUN_MODELS"
       ],
       sourceRetrievedAt: "2026-07-27",
-      notes: "Series-relative estimate: GPT-5.4 0.756 plus configured delta -0.100; not a direct benchmark result."
+      notes: "Series-relative estimate: GPT-5.4 0.756 plus configured delta -0.100; not a direct benchmark result.",
+      curveProfile: "efficient_fast",
+      curveTemperature: 0.095,
+      curveFloor: 0.025,
+      curveCeiling: 0.985,
+      tierAdjustments: {
+        low: 0.05,
+        mid: 0.02,
+        midHigh: -0.06,
+        high: -0.08
+      },
+      profileEvidence: [
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      profileConfidence: "low"
     },
     {
       modelId: "claude-opus-4-8",
@@ -4401,16 +4503,16 @@ var model_catalog_default = {
       toolCallSupport: true,
       visionSupport: true,
       provider: "Anthropic",
-      availability: "callable_in_repository",
+      availability: "callable_preflight_or_repository",
       routingEligible: true,
       defaultDisplay: true,
       abilityAnchor: 0.838,
-      solvedAbilityParameter: 0.7405368154801621,
-      fittingError: -2220446049250313e-31,
-      sufficientLow: 0.9830514792769127,
-      sufficientMid: 0.9368975687252181,
-      sufficientMidHigh: 0.6829465554428616,
-      sufficientHigh: 0.2587382370620185,
+      solvedAbilityParameter: 0.7501751478287932,
+      fittingError: -11102230246251565e-32,
+      sufficientLow: 0.9579653043641058,
+      sufficientMid: 0.8882517982256185,
+      sufficientMidHigh: 0.6755392782363226,
+      sufficientHigh: 0.3802874657033109,
       benchmarkEvidence: [
         {
           benchmarkName: "SWE-bench Verified via OpenHands Index",
@@ -4429,13 +4531,28 @@ var model_catalog_default = {
       ],
       evidenceConfidence: "medium",
       uncertaintyWidth: 0.08,
-      curveMethod: "shared-slope constrained logistic calibrated to Twin published-label distribution",
+      curveMethod: "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
       sourceNames: [
         "OpenHands Index SWE-bench aggregate",
         "ClawRouter BLOCKRUN_MODELS"
       ],
       sourceRetrievedAt: "2026-07-27",
-      notes: "Direct aggregate anchor from the pinned OpenHands Index SWE-bench evaluation; agent-harness dependent."
+      notes: "Direct aggregate anchor from the pinned OpenHands Index SWE-bench evaluation; agent-harness dependent.",
+      curveProfile: "frontier_resilient",
+      curveTemperature: 0.16,
+      curveFloor: 0.03,
+      curveCeiling: 0.99,
+      tierAdjustments: {
+        low: -0.01,
+        mid: -5e-3,
+        midHigh: 0.02,
+        high: 0.055
+      },
+      profileEvidence: [
+        "https://www.anthropic.com/claude/opus",
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      profileConfidence: "medium"
     },
     {
       modelId: "claude-sonnet-5",
@@ -4450,16 +4567,16 @@ var model_catalog_default = {
       toolCallSupport: true,
       visionSupport: true,
       provider: "Anthropic",
-      availability: "callable_in_repository",
+      availability: "callable_preflight_or_repository",
       routingEligible: true,
-      defaultDisplay: true,
+      defaultDisplay: false,
       abilityAnchor: 0.778,
-      solvedAbilityParameter: 0.5902419125429264,
+      solvedAbilityParameter: 0.5939799550182703,
       fittingError: 0,
-      sufficientLow: 0.9661195393909839,
-      sufficientMid: 0.826762340786717,
-      sufficientMidHigh: 0.3928939569621095,
-      sufficientHigh: 0.10877981376289587,
+      sufficientLow: 0.9554788935293893,
+      sufficientMid: 0.810653469424331,
+      sufficientMidHigh: 0.4268137104879507,
+      sufficientHigh: 0.14800385552960366,
       benchmarkEvidence: [
         {
           benchmarkName: "SWE-bench Verified via OpenHands Index",
@@ -4478,13 +4595,27 @@ var model_catalog_default = {
       ],
       evidenceConfidence: "low",
       uncertaintyWidth: 0.14,
-      curveMethod: "shared-slope constrained logistic calibrated to Twin published-label distribution",
+      curveMethod: "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
       sourceNames: [
         "OpenHands Index SWE-bench aggregate",
         "ClawRouter BLOCKRUN_MODELS"
       ],
       sourceRetrievedAt: "2026-07-27",
-      notes: "Series-relative estimate: claude-opus-4-8 0.838 plus configured delta -0.060; not a direct benchmark result."
+      notes: "Series-relative estimate: claude-opus-4-8 0.838 plus configured delta -0.060; not a direct benchmark result.",
+      curveProfile: "balanced_frontier",
+      curveTemperature: 0.135,
+      curveFloor: 0.03,
+      curveCeiling: 0.99,
+      tierAdjustments: {
+        low: 0,
+        mid: 5e-3,
+        midHigh: 0.015,
+        high: 0.015
+      },
+      profileEvidence: [
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      profileConfidence: "low"
     },
     {
       modelId: "gemini-3.5-flash",
@@ -4499,16 +4630,16 @@ var model_catalog_default = {
       toolCallSupport: true,
       visionSupport: true,
       provider: "Google",
-      availability: "callable_in_repository",
+      availability: "callable_preflight_or_repository",
       routingEligible: true,
-      defaultDisplay: true,
+      defaultDisplay: false,
       abilityAnchor: 0.7859999999999999,
-      solvedAbilityParameter: 0.6099577631117494,
+      solvedAbilityParameter: 0.6119493615513734,
       fittingError: 11102230246251565e-32,
-      sufficientLow: 0.9696610480291519,
-      sufficientMid: 0.8478320661619502,
-      sufficientMidHigh: 0.4306504341229589,
-      sufficientHigh: 0.1215063443167558,
+      sufficientLow: 0.9596451639759386,
+      sufficientMid: 0.8296716167103004,
+      sufficientMidHigh: 0.457798722587925,
+      sufficientHigh: 0.16089826104547839,
       benchmarkEvidence: [
         {
           benchmarkName: "SWE-bench Verified via OpenHands Index",
@@ -4527,13 +4658,28 @@ var model_catalog_default = {
       ],
       evidenceConfidence: "medium",
       uncertaintyWidth: 0.08,
-      curveMethod: "shared-slope constrained logistic calibrated to Twin published-label distribution",
+      curveMethod: "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
       sourceNames: [
         "OpenHands Index SWE-bench aggregate",
         "ClawRouter BLOCKRUN_MODELS"
       ],
       sourceRetrievedAt: "2026-07-27",
-      notes: "Direct aggregate anchor from the pinned OpenHands Index SWE-bench evaluation; agent-harness dependent."
+      notes: "Direct aggregate anchor from the pinned OpenHands Index SWE-bench evaluation; agent-harness dependent.",
+      curveProfile: "balanced_frontier",
+      curveTemperature: 0.135,
+      curveFloor: 0.03,
+      curveCeiling: 0.99,
+      tierAdjustments: {
+        low: 0,
+        mid: 5e-3,
+        midHigh: 0.015,
+        high: 0.015
+      },
+      profileEvidence: [
+        "https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-3-5/",
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      profileConfidence: "low"
     },
     {
       modelId: "deepseek-v4-flash",
@@ -4548,16 +4694,16 @@ var model_catalog_default = {
       toolCallSupport: true,
       visionSupport: false,
       provider: "DeepSeek",
-      availability: "callable_in_repository",
+      availability: "callable_preflight_or_repository",
       routingEligible: true,
       defaultDisplay: true,
       abilityAnchor: 0.6719999999999999,
-      solvedAbilityParameter: 0.395431465104481,
-      fittingError: -11102230246251565e-32,
-      sufficientLow: 0.8800492946367835,
-      sufficientMid: 0.5008640336627619,
-      sufficientMidHigh: 0.132752411327875,
-      sufficientHigh: 0.04663292795940523,
+      solvedAbilityParameter: 0.33339868413138773,
+      fittingError: 0,
+      sufficientLow: 0.913373885856422,
+      sufficientMid: 0.3633127845955678,
+      sufficientMidHigh: 0,
+      sufficientHigh: 0,
       benchmarkEvidence: [
         {
           benchmarkName: "SWE-bench Verified via OpenHands Index",
@@ -4576,13 +4722,28 @@ var model_catalog_default = {
       ],
       evidenceConfidence: "low",
       uncertaintyWidth: 0.14,
-      curveMethod: "shared-slope constrained logistic calibrated to Twin published-label distribution",
+      curveMethod: "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
       sourceNames: [
         "OpenHands Index SWE-bench aggregate",
         "ClawRouter BLOCKRUN_MODELS"
       ],
       sourceRetrievedAt: "2026-07-27",
-      notes: "Series-relative estimate: DeepSeek-V4-Pro 0.732 plus configured delta -0.060; not a direct benchmark result."
+      notes: "Series-relative estimate: DeepSeek-V4-Pro 0.732 plus configured delta -0.060; not a direct benchmark result.",
+      curveProfile: "efficient_fast",
+      curveTemperature: 0.095,
+      curveFloor: 0.025,
+      curveCeiling: 0.985,
+      tierAdjustments: {
+        low: 0.05,
+        mid: 0.02,
+        midHigh: -0.06,
+        high: -0.08
+      },
+      profileEvidence: [
+        "https://api-docs.deepseek.com/news/news260424/",
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      profileConfidence: "high"
     },
     {
       modelId: "deepseek-v4-pro",
@@ -4597,16 +4758,16 @@ var model_catalog_default = {
       toolCallSupport: true,
       visionSupport: false,
       provider: "DeepSeek",
-      availability: "callable_in_repository",
+      availability: "callable_preflight_or_repository",
       routingEligible: true,
-      defaultDisplay: true,
+      defaultDisplay: false,
       abilityAnchor: 0.732,
-      solvedAbilityParameter: 0.4898299253001487,
-      fittingError: -2220446049250313e-31,
-      sufficientLow: 0.936601283501504,
-      sufficientMid: 0.6817150085462865,
-      sufficientMidHigh: 0.23003965656687225,
-      sufficientHigh: 0.06578495274009998,
+      solvedAbilityParameter: 0.5014247741357529,
+      fittingError: -11102230246251565e-32,
+      sufficientLow: 0.9238212548309142,
+      sufficientMid: 0.687282296609387,
+      sufficientMidHigh: 0.2846500810610676,
+      sufficientHigh: 0.09981058270426857,
       benchmarkEvidence: [
         {
           benchmarkName: "SWE-bench Verified via OpenHands Index",
@@ -4625,13 +4786,28 @@ var model_catalog_default = {
       ],
       evidenceConfidence: "medium",
       uncertaintyWidth: 0.08,
-      curveMethod: "shared-slope constrained logistic calibrated to Twin published-label distribution",
+      curveMethod: "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
       sourceNames: [
         "OpenHands Index SWE-bench aggregate",
         "ClawRouter BLOCKRUN_MODELS"
       ],
       sourceRetrievedAt: "2026-07-27",
-      notes: "Direct aggregate anchor from the pinned OpenHands Index SWE-bench evaluation; agent-harness dependent."
+      notes: "Direct aggregate anchor from the pinned OpenHands Index SWE-bench evaluation; agent-harness dependent.",
+      curveProfile: "balanced_frontier",
+      curveTemperature: 0.135,
+      curveFloor: 0.03,
+      curveCeiling: 0.99,
+      tierAdjustments: {
+        low: 0,
+        mid: 5e-3,
+        midHigh: 0.015,
+        high: 0.015
+      },
+      profileEvidence: [
+        "https://api-docs.deepseek.com/news/news260424/",
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      profileConfidence: "high"
     },
     {
       modelId: "glm-5.1",
@@ -4646,16 +4822,16 @@ var model_catalog_default = {
       toolCallSupport: true,
       visionSupport: false,
       provider: "Zhipu AI",
-      availability: "callable_in_repository",
+      availability: "callable_preflight_or_repository",
       routingEligible: true,
-      defaultDisplay: true,
+      defaultDisplay: false,
       abilityAnchor: 0.75,
-      solvedAbilityParameter: 0.5260528779602989,
-      fittingError: -11102230246251565e-32,
-      sufficientLow: 0.9499340057215506,
-      sufficientMid: 0.7412251267540898,
-      sufficientMidHigh: 0.282022734300432,
-      sufficientHigh: 0.07776704834339279,
+      solvedAbilityParameter: 0.535266097743285,
+      fittingError: 0,
+      sufficientLow: 0.9376953212576794,
+      sufficientMid: 0.7371881050531351,
+      sufficientMidHigh: 0.332479557090131,
+      sufficientHigh: 0.11429860495734119,
       benchmarkEvidence: [
         {
           benchmarkName: "SWE-bench Verified via OpenHands Index",
@@ -4674,13 +4850,27 @@ var model_catalog_default = {
       ],
       evidenceConfidence: "medium",
       uncertaintyWidth: 0.08,
-      curveMethod: "shared-slope constrained logistic calibrated to Twin published-label distribution",
+      curveMethod: "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
       sourceNames: [
         "OpenHands Index SWE-bench aggregate",
         "ClawRouter BLOCKRUN_MODELS"
       ],
       sourceRetrievedAt: "2026-07-27",
-      notes: "Direct aggregate anchor from the pinned OpenHands Index SWE-bench evaluation; agent-harness dependent."
+      notes: "Direct aggregate anchor from the pinned OpenHands Index SWE-bench evaluation; agent-harness dependent.",
+      curveProfile: "balanced_frontier",
+      curveTemperature: 0.135,
+      curveFloor: 0.03,
+      curveCeiling: 0.99,
+      tierAdjustments: {
+        low: 0,
+        mid: 5e-3,
+        midHigh: 0.015,
+        high: 0.015
+      },
+      profileEvidence: [
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      profileConfidence: "low"
     },
     {
       modelId: "kimi-k2.6",
@@ -4695,16 +4885,16 @@ var model_catalog_default = {
       toolCallSupport: true,
       visionSupport: false,
       provider: "Moonshot AI",
-      availability: "callable_in_repository",
+      availability: "callable_preflight_or_repository",
       routingEligible: true,
-      defaultDisplay: true,
+      defaultDisplay: false,
       abilityAnchor: 0.746,
-      solvedAbilityParameter: 0.5176439518588729,
-      fittingError: -11102230246251565e-32,
-      sufficientLow: 0.9471554937915162,
-      sufficientMid: 0.7280936499597717,
-      sufficientMidHigh: 0.2692169934411507,
-      sufficientHigh: 0.07468485765601768,
+      solvedAbilityParameter: 0.5186889477479781,
+      fittingError: 11102230246251565e-32,
+      sufficientLow: 0.9422307833909942,
+      sufficientMid: 0.7471762649029163,
+      sufficientMidHigh: 0.328766069295487,
+      sufficientHigh: 0.07052073190673756,
       benchmarkEvidence: [
         {
           benchmarkName: "SWE-bench Verified via OpenHands Index",
@@ -4723,13 +4913,27 @@ var model_catalog_default = {
       ],
       evidenceConfidence: "medium",
       uncertaintyWidth: 0.08,
-      curveMethod: "shared-slope constrained logistic calibrated to Twin published-label distribution",
+      curveMethod: "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
       sourceNames: [
         "OpenHands Index SWE-bench aggregate",
         "ClawRouter BLOCKRUN_MODELS"
       ],
       sourceRetrievedAt: "2026-07-27",
-      notes: "Direct aggregate anchor from the pinned OpenHands Index SWE-bench evaluation; agent-harness dependent."
+      notes: "Direct aggregate anchor from the pinned OpenHands Index SWE-bench evaluation; agent-harness dependent.",
+      curveProfile: "coding_specialist",
+      curveTemperature: 0.125,
+      curveFloor: 0.03,
+      curveCeiling: 0.99,
+      tierAdjustments: {
+        low: 0,
+        mid: 0.025,
+        midHigh: 0.05,
+        high: -0.01
+      },
+      profileEvidence: [
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      profileConfidence: "low"
     },
     {
       modelId: "qwen3.5-flash",
@@ -4744,16 +4948,16 @@ var model_catalog_default = {
       toolCallSupport: true,
       visionSupport: false,
       provider: "Alibaba Cloud",
-      availability: "callable_in_repository",
+      availability: "callable_preflight_or_repository",
       routingEligible: true,
-      defaultDisplay: true,
+      defaultDisplay: false,
       abilityAnchor: 0.62,
-      solvedAbilityParameter: 0.33571102109254747,
+      solvedAbilityParameter: 0.2853970289929326,
       fittingError: -11102230246251565e-32,
-      sufficientLow: 0.8215830210062496,
-      sufficientMid: 0.3844116239029469,
-      sufficientMidHigh: 0.09520400719339295,
-      sufficientHigh: 0.04018106760138174,
+      sufficientLow: 0.8489110087209144,
+      sufficientMid: 0.26613411276273974,
+      sufficientMidHigh: 0,
+      sufficientHigh: 0,
       benchmarkEvidence: [
         {
           benchmarkName: "SWE-bench Verified via OpenHands Index",
@@ -4772,13 +4976,28 @@ var model_catalog_default = {
       ],
       evidenceConfidence: "medium",
       uncertaintyWidth: 0.08,
-      curveMethod: "shared-slope constrained logistic calibrated to Twin published-label distribution",
+      curveMethod: "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
       sourceNames: [
         "OpenHands Index SWE-bench aggregate",
         "ClawRouter BLOCKRUN_MODELS"
       ],
       sourceRetrievedAt: "2026-07-27",
-      notes: "Direct aggregate anchor from the pinned OpenHands Index SWE-bench evaluation; agent-harness dependent."
+      notes: "Direct aggregate anchor from the pinned OpenHands Index SWE-bench evaluation; agent-harness dependent.",
+      curveProfile: "efficient_fast",
+      curveTemperature: 0.095,
+      curveFloor: 0.025,
+      curveCeiling: 0.985,
+      tierAdjustments: {
+        low: 0.05,
+        mid: 0.02,
+        midHigh: -0.06,
+        high: -0.08
+      },
+      profileEvidence: [
+        "https://qwenlm.github.io/qwen-code-docs/en/users/configuration/model-providers/",
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      profileConfidence: "low"
     },
     {
       modelId: "qwen3.6-plus",
@@ -4793,16 +5012,16 @@ var model_catalog_default = {
       toolCallSupport: true,
       visionSupport: false,
       provider: "Alibaba Cloud",
-      availability: "callable_in_repository",
+      availability: "callable_preflight_or_repository",
       routingEligible: true,
-      defaultDisplay: true,
+      defaultDisplay: false,
       abilityAnchor: 0.742,
-      solvedAbilityParameter: 0.5094407048215279,
+      solvedAbilityParameter: 0.5198384471543831,
       fittingError: -11102230246251565e-32,
-      sufficientLow: 0.9442685981340386,
-      sufficientMid: 0.7148740330388823,
-      sufficientMidHigh: 0.25715051855293314,
-      sufficientHigh: 0.07186100251848729,
+      sufficientLow: 0.9317473093401957,
+      sufficientMid: 0.7150771466318007,
+      sufficientMidHigh: 0.3100042914659642,
+      sufficientHigh: 0.10730064995059502,
       benchmarkEvidence: [
         {
           benchmarkName: "SWE-bench Verified via OpenHands Index",
@@ -4821,13 +5040,28 @@ var model_catalog_default = {
       ],
       evidenceConfidence: "medium",
       uncertaintyWidth: 0.08,
-      curveMethod: "shared-slope constrained logistic calibrated to Twin published-label distribution",
+      curveMethod: "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
       sourceNames: [
         "OpenHands Index SWE-bench aggregate",
         "ClawRouter BLOCKRUN_MODELS"
       ],
       sourceRetrievedAt: "2026-07-27",
-      notes: "Direct aggregate anchor from the pinned OpenHands Index SWE-bench evaluation; agent-harness dependent."
+      notes: "Direct aggregate anchor from the pinned OpenHands Index SWE-bench evaluation; agent-harness dependent.",
+      curveProfile: "balanced_frontier",
+      curveTemperature: 0.135,
+      curveFloor: 0.03,
+      curveCeiling: 0.99,
+      tierAdjustments: {
+        low: 0,
+        mid: 5e-3,
+        midHigh: 0.015,
+        high: 0.015
+      },
+      profileEvidence: [
+        "https://qwenlm.github.io/qwen-code-docs/en/users/configuration/model-providers/",
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      profileConfidence: "low"
     },
     {
       modelId: "qwen3.7-max",
@@ -4842,16 +5076,16 @@ var model_catalog_default = {
       toolCallSupport: true,
       visionSupport: false,
       provider: "Alibaba Cloud",
-      availability: "callable_in_repository",
+      availability: "callable_preflight_or_repository",
       routingEligible: true,
-      defaultDisplay: true,
+      defaultDisplay: false,
       abilityAnchor: 0.762,
-      solvedAbilityParameter: 0.5524840411863314,
-      fittingError: 0,
-      sufficientLow: 0.9575872086698267,
-      sufficientMid: 0.7796281070882295,
-      sufficientMidHigh: 0.32503651723147053,
-      sufficientHigh: 0.08881577201574785,
+      solvedAbilityParameter: 0.5522710614607833,
+      fittingError: -11102230246251565e-32,
+      sufficientLow: 0.9530518024563952,
+      sufficientMid: 0.7958714342947167,
+      sufficientMidHigh: 0.3813682768545961,
+      sufficientHigh: 0.08503666832585827,
       benchmarkEvidence: [
         {
           benchmarkName: "SWE-bench Verified via OpenHands Index",
@@ -4870,13 +5104,28 @@ var model_catalog_default = {
       ],
       evidenceConfidence: "low",
       uncertaintyWidth: 0.14,
-      curveMethod: "shared-slope constrained logistic calibrated to Twin published-label distribution",
+      curveMethod: "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
       sourceNames: [
         "OpenHands Index SWE-bench aggregate",
         "ClawRouter BLOCKRUN_MODELS"
       ],
       sourceRetrievedAt: "2026-07-27",
-      notes: "Series-relative estimate: Qwen3.6-Plus 0.742 plus configured delta +0.020; not a direct benchmark result."
+      notes: "Series-relative estimate: Qwen3.6-Plus 0.742 plus configured delta +0.020; not a direct benchmark result.",
+      curveProfile: "coding_specialist",
+      curveTemperature: 0.125,
+      curveFloor: 0.03,
+      curveCeiling: 0.99,
+      tierAdjustments: {
+        low: 0,
+        mid: 0.025,
+        midHigh: 0.05,
+        high: -0.01
+      },
+      profileEvidence: [
+        "https://qwenlm.github.io/qwen-code-docs/en/users/configuration/model-providers/",
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      profileConfidence: "low"
     },
     {
       modelId: "minimax-m3",
@@ -4895,12 +5144,12 @@ var model_catalog_default = {
       routingEligible: false,
       defaultDisplay: false,
       abilityAnchor: 0.764,
-      solvedAbilityParameter: 0.5570571678943699,
-      fittingError: 0,
-      sufficientLow: 0.9587597590467984,
-      sufficientMid: 0.7858213563704296,
-      sufficientMidHigh: 0.33288131895246353,
-      sufficientHigh: 0.09095539584187315,
+      solvedAbilityParameter: 0.5637420461488398,
+      fittingError: -2220446049250313e-31,
+      sufficientLow: 0.947198709803343,
+      sufficientMid: 0.7749798877375116,
+      sufficientMidHigh: 0.37666505081260704,
+      sufficientHigh: 0.1291455789173707,
       benchmarkEvidence: [
         {
           benchmarkName: "SWE-bench Verified via OpenHands Index",
@@ -4919,13 +5168,566 @@ var model_catalog_default = {
       ],
       evidenceConfidence: "medium",
       uncertaintyWidth: 0.08,
-      curveMethod: "shared-slope constrained logistic calibrated to Twin published-label distribution",
+      curveMethod: "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
       sourceNames: [
         "OpenHands Index SWE-bench aggregate",
         "ClawRouter BLOCKRUN_MODELS"
       ],
       sourceRetrievedAt: "2026-07-27",
-      notes: "Direct aggregate anchor from the pinned OpenHands Index SWE-bench evaluation; agent-harness dependent. Benchmark-only entry: no matching callable text model exists in BLOCKRUN_MODELS, so routing eligibility is false."
+      notes: "Direct aggregate anchor from the pinned OpenHands Index SWE-bench evaluation; agent-harness dependent. Benchmark-only entry: no matching callable text model exists in BLOCKRUN_MODELS, so routing eligibility is false.",
+      curveProfile: "balanced_frontier",
+      curveTemperature: 0.135,
+      curveFloor: 0.03,
+      curveCeiling: 0.99,
+      tierAdjustments: {
+        low: 0,
+        mid: 5e-3,
+        midHigh: 0.015,
+        high: 0.015
+      },
+      profileEvidence: [
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      profileConfidence: "low"
+    },
+    {
+      modelId: "gpt-5.6-sol",
+      displayName: "GPT-5.6 Sol",
+      upstream: "proxy",
+      inputPricePerMillion: 5,
+      outputPricePerMillion: 30,
+      cachedInputPricePerMillion: 0.5,
+      cacheWritePricePerMillion: 5,
+      contextWindow: 105e4,
+      maxOutputTokens: 128e3,
+      toolCallSupport: false,
+      visionSupport: false,
+      provider: "OpenAI",
+      availability: "callable_preflight_or_repository",
+      routingEligible: true,
+      defaultDisplay: true,
+      abilityAnchor: 0.8420000000000001,
+      solvedAbilityParameter: 0.759664839738035,
+      fittingError: -11102230246251565e-32,
+      sufficientLow: 0.959206709866638,
+      sufficientMid: 0.8932909051908762,
+      sufficientMidHigh: 0.6883462622036792,
+      sufficientHigh: 0.3925504348945394,
+      benchmarkEvidence: [
+        {
+          benchmarkName: "GPT-5.6 official capability suite",
+          normalizedScore: 0.8420000000000001,
+          scoreScale: "relative family mapping onto pinned OpenHands anchor scale",
+          sampleSize: 0,
+          sourceModelName: "gpt-5.6-sol",
+          evaluationMode: "vendor-reported; not OpenHands-comparable",
+          sourceUrl: "https://openai.com/index/gpt-5-6/",
+          resultsUrl: "https://openai.com/index/gpt-5-6/",
+          sourceVersion: "retrieved-2026-07-27",
+          benchmarkDate: "2026-07-09",
+          directForModel: false,
+          configuredRelativeDelta: 0.06
+        }
+      ],
+      evidenceConfidence: "low",
+      uncertaintyWidth: 0.14,
+      curveMethod: "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
+      sourceNames: [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      sourceRetrievedAt: "2026-07-27",
+      notes: "Family-relative product mapping from GPT-5.5; official results are not OpenHands-harness results.",
+      curveProfile: "frontier_resilient",
+      curveTemperature: 0.16,
+      curveFloor: 0.03,
+      curveCeiling: 0.99,
+      tierAdjustments: {
+        low: -0.01,
+        mid: -5e-3,
+        midHigh: 0.02,
+        high: 0.055
+      },
+      profileEvidence: [
+        "https://openai.com/index/gpt-5-6/",
+        "https://openai.com/index/previewing-gpt-5-6-sol/",
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      profileConfidence: "medium"
+    },
+    {
+      modelId: "gpt-5.6-terra",
+      displayName: "GPT-5.6 Terra",
+      upstream: "proxy",
+      inputPricePerMillion: 2.5,
+      outputPricePerMillion: 15,
+      cachedInputPricePerMillion: 0.25,
+      cacheWritePricePerMillion: 2.5,
+      contextWindow: 105e4,
+      maxOutputTokens: 128e3,
+      toolCallSupport: false,
+      visionSupport: false,
+      provider: "OpenAI",
+      availability: "callable_preflight_or_repository",
+      routingEligible: true,
+      defaultDisplay: true,
+      abilityAnchor: 0.812,
+      solvedAbilityParameter: 0.6727914978033782,
+      fittingError: -11102230246251565e-32,
+      sufficientLow: 0.9704336455672251,
+      sufficientMid: 0.8826330300081707,
+      sufficientMidHigh: 0.5654222536725201,
+      sufficientHigh: 0.21518988184542204,
+      benchmarkEvidence: [
+        {
+          benchmarkName: "GPT-5.6 official capability suite",
+          normalizedScore: 0.812,
+          scoreScale: "relative family mapping onto pinned OpenHands anchor scale",
+          sampleSize: 0,
+          sourceModelName: "gpt-5.6-terra",
+          evaluationMode: "vendor-reported; not OpenHands-comparable",
+          sourceUrl: "https://openai.com/index/gpt-5-6/",
+          resultsUrl: "https://openai.com/index/gpt-5-6/",
+          sourceVersion: "retrieved-2026-07-27",
+          benchmarkDate: "2026-07-09",
+          directForModel: false,
+          configuredRelativeDelta: 0.03
+        }
+      ],
+      evidenceConfidence: "low",
+      uncertaintyWidth: 0.14,
+      curveMethod: "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
+      sourceNames: [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      sourceRetrievedAt: "2026-07-27",
+      notes: "Family-relative product mapping from GPT-5.5; proxy price metadata unavailable.",
+      curveProfile: "balanced_frontier",
+      curveTemperature: 0.135,
+      curveFloor: 0.03,
+      curveCeiling: 0.99,
+      tierAdjustments: {
+        low: 0,
+        mid: 5e-3,
+        midHigh: 0.015,
+        high: 0.015
+      },
+      profileEvidence: [
+        "https://openai.com/index/gpt-5-6/",
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      profileConfidence: "medium"
+    },
+    {
+      modelId: "gpt-5.6-luna",
+      displayName: "GPT-5.6 Luna",
+      upstream: "proxy",
+      inputPricePerMillion: 1,
+      outputPricePerMillion: 6,
+      cachedInputPricePerMillion: 0.1,
+      cacheWritePricePerMillion: 1,
+      contextWindow: 105e4,
+      maxOutputTokens: 128e3,
+      toolCallSupport: false,
+      visionSupport: false,
+      provider: "OpenAI",
+      availability: "callable_preflight_or_repository",
+      routingEligible: true,
+      defaultDisplay: false,
+      abilityAnchor: 0.792,
+      solvedAbilityParameter: 0.6330257052523451,
+      fittingError: 0,
+      sufficientLow: 1,
+      sufficientMid: 0.9289424844844617,
+      sufficientMidHigh: 0.402231294647791,
+      sufficientHigh: 0.01138960308365651,
+      benchmarkEvidence: [
+        {
+          benchmarkName: "GPT-5.6 official capability suite",
+          normalizedScore: 0.792,
+          scoreScale: "relative family mapping onto pinned OpenHands anchor scale",
+          sampleSize: 0,
+          sourceModelName: "gpt-5.6-luna",
+          evaluationMode: "vendor-reported; not OpenHands-comparable",
+          sourceUrl: "https://openai.com/index/gpt-5-6/",
+          resultsUrl: "https://openai.com/index/gpt-5-6/",
+          sourceVersion: "retrieved-2026-07-27",
+          benchmarkDate: "2026-07-09",
+          directForModel: false,
+          configuredRelativeDelta: 0.01
+        }
+      ],
+      evidenceConfidence: "low",
+      uncertaintyWidth: 0.14,
+      curveMethod: "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
+      sourceNames: [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      sourceRetrievedAt: "2026-07-27",
+      notes: "Family-relative product mapping from GPT-5.5; efficient profile follows official positioning.",
+      curveProfile: "efficient_fast",
+      curveTemperature: 0.095,
+      curveFloor: 0.025,
+      curveCeiling: 0.985,
+      tierAdjustments: {
+        low: 0.05,
+        mid: 0.02,
+        midHigh: -0.06,
+        high: -0.08
+      },
+      profileEvidence: [
+        "https://openai.com/index/gpt-5-6/",
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      profileConfidence: "low"
+    },
+    {
+      modelId: "glm-5.2",
+      displayName: "GLM 5.2",
+      upstream: "proxy",
+      inputPricePerMillion: 1.2,
+      outputPricePerMillion: 4.2,
+      cachedInputPricePerMillion: 0.6,
+      cacheWritePricePerMillion: 1.2,
+      contextWindow: 128e3,
+      maxOutputTokens: 16384,
+      toolCallSupport: true,
+      visionSupport: false,
+      provider: "Zhipu AI",
+      availability: "callable_preflight_or_repository",
+      routingEligible: true,
+      defaultDisplay: true,
+      abilityAnchor: 0.775,
+      solvedAbilityParameter: 0.5873636486848062,
+      fittingError: -2220446049250313e-31,
+      sufficientLow: 0.9538102488561416,
+      sufficientMid: 0.8032432662800806,
+      sufficientMidHigh: 0.41560199859398517,
+      sufficientHigh: 0.14358328292734096,
+      benchmarkEvidence: [
+        {
+          benchmarkName: "GLM-5.2 official coding-agent positioning",
+          normalizedScore: 0.775,
+          scoreScale: "relative family mapping onto pinned OpenHands anchor scale",
+          sampleSize: 0,
+          sourceModelName: "glm-5.2",
+          evaluationMode: "vendor-reported; not OpenHands-comparable",
+          sourceUrl: "https://zcode.z.ai/en/docs/agents",
+          resultsUrl: "https://zcode.z.ai/en/docs/agents",
+          sourceVersion: "retrieved-2026-07-27",
+          benchmarkDate: "2026-07-27",
+          directForModel: false,
+          configuredRelativeDelta: 0.025
+        }
+      ],
+      evidenceConfidence: "low",
+      uncertaintyWidth: 0.14,
+      curveMethod: "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
+      sourceNames: [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      sourceRetrievedAt: "2026-07-27",
+      notes: "Series-relative estimate from GLM 5.1; no directly comparable pinned OpenHands row.",
+      curveProfile: "balanced_frontier",
+      curveTemperature: 0.135,
+      curveFloor: 0.03,
+      curveCeiling: 0.99,
+      tierAdjustments: {
+        low: 0,
+        mid: 5e-3,
+        midHigh: 0.015,
+        high: 0.015
+      },
+      profileEvidence: [
+        "https://zcode.z.ai/en/docs/agents",
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      profileConfidence: "medium"
+    },
+    {
+      modelId: "kimi-k2.7-code",
+      displayName: "Kimi K2.7 Code",
+      upstream: "proxy",
+      inputPricePerMillion: 0.95,
+      outputPricePerMillion: 4,
+      cachedInputPricePerMillion: 0.475,
+      cacheWritePricePerMillion: 0.95,
+      contextWindow: 256e3,
+      maxOutputTokens: 32768,
+      toolCallSupport: true,
+      visionSupport: false,
+      provider: "Moonshot AI",
+      availability: "callable_preflight_or_repository",
+      routingEligible: true,
+      defaultDisplay: true,
+      abilityAnchor: 0.776,
+      solvedAbilityParameter: 0.5839101949915135,
+      fittingError: 0,
+      sufficientLow: 0.9610651235526767,
+      sufficientMid: 0.8357220147344683,
+      sufficientMidHigh: 0.43598320746351266,
+      sufficientHigh: 0.10216581054680302,
+      benchmarkEvidence: [
+        {
+          benchmarkName: "Kimi K2.7 Code official model-card suites",
+          normalizedScore: 0.776,
+          scoreScale: "relative family mapping onto pinned OpenHands anchor scale",
+          sampleSize: 0,
+          sourceModelName: "kimi-k2.7-code",
+          evaluationMode: "vendor-reported; not OpenHands-comparable",
+          sourceUrl: "https://huggingface.co/moonshotai/Kimi-K2.7-Code",
+          resultsUrl: "https://huggingface.co/moonshotai/Kimi-K2.7-Code",
+          sourceVersion: "retrieved-2026-07-27",
+          benchmarkDate: "2026-07-27",
+          directForModel: false,
+          configuredRelativeDelta: 0.03
+        }
+      ],
+      evidenceConfidence: "low",
+      uncertaintyWidth: 0.14,
+      curveMethod: "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
+      sourceNames: [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      sourceRetrievedAt: "2026-07-27",
+      notes: "Series-relative estimate from K2.6; vendor comparisons use different agent harnesses.",
+      curveProfile: "coding_specialist",
+      curveTemperature: 0.125,
+      curveFloor: 0.03,
+      curveCeiling: 0.99,
+      tierAdjustments: {
+        low: 0,
+        mid: 0.025,
+        midHigh: 0.05,
+        high: -0.01
+      },
+      profileEvidence: [
+        "https://huggingface.co/moonshotai/Kimi-K2.7-Code",
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      profileConfidence: "medium"
+    }
+  ]
+};
+
+// src/acu/catalog/twin-product-presets.json
+var twin_product_presets_default = {
+  schemaVersion: "acu-twin-presets-v1",
+  examples: [
+    {
+      id: "low-1",
+      title: "\u7B80\u5355\u660E\u786E\u4EFB\u52A1 A",
+      category: "\u5355\u4E00\u660E\u786E\u6267\u884C",
+      source: "TwinRouterBench",
+      publishedTier: "low",
+      request: {
+        model: "auto",
+        messages: [
+          {
+            role: "user",
+            content: "[SYSTEM]\nYou are a helpful assistant that can use tools.\n\n[USER]\nguide me"
+          }
+        ]
+      }
+    },
+    {
+      id: "low-2",
+      title: "\u7B80\u5355\u660E\u786E\u4EFB\u52A1 B",
+      category: "\u4F4E\u7EA6\u675F\u56DE\u5E94",
+      source: "TwinRouterBench",
+      publishedTier: "low",
+      request: {
+        model: "auto",
+        messages: [
+          {
+            role: "user",
+            content: "[SYSTEM]\nYou are a helpful assistant that can use tools.\n\n[USER]\ndelete all txt files"
+          }
+        ]
+      }
+    },
+    {
+      id: "mid-1",
+      title: "\u5E38\u89C4\u591A\u7EA6\u675F\u4EFB\u52A1 A",
+      category: "\u591A\u6761\u4EF6\u6574\u5408",
+      source: "TwinRouterBench",
+      publishedTier: "mid",
+      request: {
+        model: "auto",
+        messages: [
+          {
+            role: "user",
+            content: "[SYSTEM]\nYou are a helpful assistant that can use tools.\n\n[USER]\nI'd like to know how to retrieve a weather forecast for New York City on the 4th of July this year."
+          }
+        ]
+      }
+    },
+    {
+      id: "mid-2",
+      title: "\u5E38\u89C4\u591A\u7EA6\u675F\u4EFB\u52A1 B",
+      category: "\u5DE5\u5177\u53C2\u6570\u4E0E\u4E00\u81F4\u6027",
+      source: "TwinRouterBench",
+      publishedTier: "mid",
+      request: {
+        model: "auto",
+        messages: [
+          {
+            role: "user",
+            content: "[SYSTEM]\nYou are a helpful assistant that can use tools.\n\n[USER]\nCould you kindly show me the list of files in tmp directory in my file system including the hidden one?"
+          }
+        ]
+      }
+    },
+    {
+      id: "mid_high-1",
+      title: "\u591A\u5DE5\u5177/\u8C03\u8BD5\u4EFB\u52A1 A",
+      category: "\u6267\u884C\u72B6\u6001\u6574\u5408",
+      source: "TwinRouterBench",
+      publishedTier: "mid_high",
+      request: {
+        model: "auto",
+        messages: [
+          {
+            role: "user",
+            content: "[SYSTEM]\nYou are a helpful assistant that can use tools.\n\n[USER]\nDelete all the files in the 'Drafts' directory including the directory."
+          }
+        ]
+      }
+    },
+    {
+      id: "mid_high-2",
+      title: "\u591A\u5DE5\u5177/\u8C03\u8BD5\u4EFB\u52A1 B",
+      category: "\u4E0A\u4E0B\u6587\u4F9D\u8D56\u8C03\u8BD5",
+      source: "TwinRouterBench",
+      publishedTier: "mid_high",
+      request: {
+        model: "auto",
+        messages: [
+          {
+            role: "user",
+            content: "[SYSTEM]\nYou are a helpful assistant for query-based meeting summarization ([TASK]). Answer the user's query using the meeting transcript below. Be accurate, concise, and faithful to what was discussed in the transcript.\n\n[USER]\n## Meeting transcript\nIndustrial Designer: {vocalsound} Okay . Okay , so that's basically the the voice recognition item we were searching for . Okay . This sample sensor uh requires an regular chip , I thought . Um no op I'm not very sure . No , it's not in here . If we want to use the L_C_D_ display , we really need the advanced version , which is a bit l little bit more costly . If we want to use the scroll-wheels we need the regular version . And if we don't want to use uh any of these uh more advanced functions we can keep with the simple uh chip , which is a bit cheaper .\nProject Manager: Okay . Uh well {disfmarker} uh\nIndustrial Designer: Okay .\nProject Manager: d did we already decide on the display ? To {disfmarker}\nIndustrial Designer: Um no , but I think that's something for uh Roo here to think about .\nUser Interface: Yeah . Well , I don't have um {disfmarker} I haven't looked for uh for information about it , but I don't think information {disfmarker} uh y I don't think you need it on a display .\nProject Manager: No .\nUser Interface: Especially when when we have to look at a cost , I don't think uh {disfmarker}\nIndustrial Designer: I I don't think either .\nUser Interface: 'cause uh {gap} uh all {disfmarker} any T_V_ can uh can uh view a digit on uh on screen ,\nIndustrial Designer: No . I don't think you need it .\nProject Manager: On screen display . Yeah .\nUser Interface: yeah .\nProject Manager: Okay\nIndustrial Designer: Okay . Okay ,\n[...deterministic middle truncation...]\nIndustrial Designer: Mm-hmm .\nProject Manager: because it it adds a little ext extra high-tech feeling to it .\nIndustrial Designer: Yes .\nUser Interface: But we already have the scroll-wheels , the sp uh the speaker uh the speak recognition , the rubber , the fancy colours .\nProject Manager: Mm yeah .\nIndustrial Designer: Uh I think our customers will go insane .\nProject Manager: Okay , okay .\nIndustrial Designer: {vocalsound} It's it's too much .\n\n## Query\nWhy did the team decide not to use LCD displays when discussing interface controls?\n\nAnswer this query based only on the transcript above."
+          }
+        ]
+      }
+    },
+    {
+      id: "high-1",
+      title: "\u9AD8\u98CE\u9669\u957F\u7A0B Agent \u4EFB\u52A1 A",
+      category: "\u957F\u7A0B\u591A\u6B65\u63A8\u7406",
+      source: "TwinRouterBench",
+      publishedTier: "high",
+      request: {
+        model: "auto",
+        messages: [
+          {
+            role: "user",
+            content: `[SYSTEM]
+You are a helpful, accurate assistant. You are given a multi-turn conversation and reference passages retrieved from a knowledge base. Answer the user's latest question based on the reference passages and conversation history. Be concise and factual. If the passages do not contain enough information, say so honestly.
+
+[USER]
+Here are reference passages from the knowledge base:
+
+[Passage 1]
+
+This command returns either cc, cd, ci, or pr, depending on which pipeline is running. This way, you can reuse the setup script between pipelines if necessary.
+
+ Static code scan
+
+The static code scan stage runs a static code analyzer tool on the specified app repo codebases.
+
+CC pipeline provides the repos that are found in the inventory for the scanner.
+
+You can use any of the following methods to add static code to your pipeline:
+
+* Provide an already running SonarQube instance name, URL, and credentials by adding the SonarQube tool to your toolchain. The static-scan task runs a scan on the specified repos.
+* Add your code to the static-scan custom stage in your .pipeline-config.yaml file for a custom implementation.
+
+ Dynamic scan
+
+The Dynamic scan stage runs a dynamic application security testing tool to find vulnerabilities in the deployed application.
+
+* Add your own dynamic scan code to the dynamic-scan custom stage in your .pipeline-config.yaml file for a custom implementation.
+
+To learn more about configuring dynamic scan by using OWASP-ZAP, see [Configuring ZAP scan for CC pipeline]([URL]
+
+ Scans and checks in compliance checks
+
+Table 3. Compliance scans and checks
+
+ Scan or check Description
+
+ Detect secrets The [IBM Detect Secrets]([URL] tool identifies where secr
+[...deterministic middle truncation...]
+USER]
+Is Dynamic secret better than Static secret?
+
+[ASSISTANT]
+You can not compare dynamic and static secrets in terms of one being "better" than another. There are differences between them. Dynamic secrets have their expiration date and time enforced when their secret data is read or accessed, while static secrets have their expiration date and time enforced at secret creation or rotation time. With a Secrets Manager, you can create, lease, and centrally manage secrets that are used in IBM Cloud services or your custom-built applications.
+
+[USER]
+Which one protects more from vulnerabilities?`
+          }
+        ]
+      }
+    },
+    {
+      id: "high-2",
+      title: "\u9AD8\u98CE\u9669\u957F\u7A0B Agent \u4EFB\u52A1 B",
+      category: "\u9AD8\u98CE\u9669\u5DE5\u5177\u94FE",
+      source: "TwinRouterBench",
+      publishedTier: "high",
+      request: {
+        model: "auto",
+        messages: [
+          {
+            role: "user",
+            content: `[SYSTEM]
+You are a personal assistant running inside OpenClaw.
+## Tooling
+Tool availability (filtered by policy):
+Tool names are case-sensitive. Call tools exactly as listed.
+- read: Read file contents
+- write: Create or overwrite files
+- edit: Make precise edits to files
+- exec: Run shell commands (pty available for TTY-required CLIs)
+- process: Manage background exec sessions
+- web_search: Search the web (Brave API)
+- web_fetch: Fetch and extract readable content from a URL
+- browser: Control web browser
+- canvas: Present/eval/snapshot the Canvas
+- nodes: List/describe/notify/camera/screen on paired nodes
+- cron: Manage cron jobs and wake events (use for reminders; when scheduling a reminder, write the systemEvent text as something that will read like a reminder when it fires, and mention that it is a reminder depending on the time gap between setting and firing; include recent context in reminder text if appropriate)
+- message: Send messages and channel actions
+- gateway: Restart, apply config, or run updates on the running OpenClaw process
+- agents_list: List OpenClaw agent ids allowed for sessions_spawn when runtime="subagent" (not ACP harness ids)
+- sessions_list: List other sessions (incl. sub-agents) with filters/last
+- sessions_history: Fetch history for another session/sub-agent
+- sessions_send: Send a message to another session/sub-agent
+- subagents: List, steer, or kill sub-agent runs for this requester session
+- session_status: Show a /status-equivalent status card (usage + time + Reasoning/Verbose/Elevated); use for model-use questions (\u{1F4CA} session_status); optional per-session model override
+- memory_get: Safe snippet read from MEMORY.md or memory/*.md with o
+[...deterministic middle truncation...]
+he empathy, ethical judgment, and contextual understanding that human healthcare providers bring to patient care. This collaborative approach promises to improve outcomes, reduce costs, and make quality healthcare more accessible to populations around the world.
+
+[ASSISTANT]
+[TOOL_CALL name=write]
+{"path":"/tmp/[TASK]/smartroute-task_05_summary/agent_workspace/summary_output.txt"}
+
+[TOOL name=write]
+Validation failed for tool "write":
+  - content: must have required property 'content'
+
+Received arguments:
+{
+  "path": "/tmp/[TASK]/smartroute-task_05_summary/agent_workspace/summary_output.txt"
+}`
+          }
+        ]
+      }
     }
   ]
 };
@@ -4963,6 +5765,7 @@ function publicCatalogPayload() {
     config: catalog.config,
     provenance: catalog.provenance,
     models: catalog.models,
+    twinPresets: twin_product_presets_default.examples,
     curves: Object.fromEntries(catalog.models.map((model) => [model.modelId, buildModelCurve(model)]))
   };
 }
@@ -4992,9 +5795,53 @@ function estimateOne(model, probabilities, inputTokens, outputTokens, judgeCost,
     estimatedCallCost: callCost,
     expectedFallbackCost,
     expectedTotalCost: total,
+    predictedScore: quality * 100,
+    conservativeScore: lower * 100,
+    riskAdjustedCost: total,
+    riskAdjustedScore: quality * 100,
+    qualityUtility: 0,
+    costUtility: 0,
+    valueUtility: 0,
+    scoreGapVsBest: 0,
+    costSavingsVsBest: 0,
+    paretoEfficient: false,
+    selectionReason: "",
     savingsVsFlagship: 0,
     savingsPercentVsFlagship: 0,
-    meetsQualityTarget: lower >= qualityTarget
+    meetsQualityTarget: quality >= qualityTarget
+  };
+}
+function isParetoEfficient(candidate, candidates) {
+  return !candidates.some((other) => other.modelId !== candidate.modelId && other.predictedScore >= candidate.predictedScore && other.riskAdjustedCost <= candidate.riskAdjustedCost && (other.predictedScore > candidate.predictedScore || other.riskAdjustedCost < candidate.riskAdjustedCost));
+}
+function selectValueRoute(candidates, targetScore) {
+  if (candidates.length === 0) throw new Error("Value routing requires at least one candidate");
+  const bestScore = candidates.reduce((best, item) => item.predictedScore > best.predictedScore ? item : best);
+  const frontier = candidates.filter((candidate) => isParetoEfficient(candidate, candidates));
+  const preference = clamp((targetScore - 60) / 35);
+  const qualityWeight = 0.58 + 0.24 * preference;
+  const riskWeight = 0.2 + 0.25 * preference;
+  const qualityExponent = 0.8 + 1.2 * preference;
+  const finiteCosts = frontier.map((candidate) => Math.max(1e-9, candidate.riskAdjustedCost));
+  const minCost = Math.min(...finiteCosts);
+  const maxCost = Math.max(...finiteCosts);
+  const logRange = Math.log(maxCost / minCost);
+  const utilities = /* @__PURE__ */ new Map();
+  for (const candidate of frontier) {
+    const conservative = candidate.conservativeScore ?? candidate.predictedScore;
+    const riskAdjustedScore = candidate.predictedScore - riskWeight * Math.max(0, candidate.predictedScore - conservative);
+    const qualityUtility = Math.pow(Math.max(0, riskAdjustedScore) / Math.max(1, targetScore), qualityExponent);
+    const costUtility = logRange <= 1e-12 ? 1 : 1 - Math.log(Math.max(1e-9, candidate.riskAdjustedCost) / minCost) / logRange;
+    const valueUtility = qualityUtility * (qualityWeight + (1 - qualityWeight) * costUtility);
+    utilities.set(candidate.modelId, { riskAdjustedScore, qualityUtility, costUtility, valueUtility });
+  }
+  const selected = frontier.reduce((best, item) => utilities.get(item.modelId).valueUtility > utilities.get(best.modelId).valueUtility ? item : best);
+  const saving = bestScore.riskAdjustedCost > 0 ? (1 - selected.riskAdjustedCost / bestScore.riskAdjustedCost) * 100 : 0;
+  return {
+    selected,
+    bestScore,
+    utilities,
+    reason: selected.modelId === bestScore.modelId ? `\u7EFC\u5408\u98CE\u9669\u8C03\u6574\u5F97\u5206\u3001\u60A8\u7684\u8D28\u91CF\u504F\u597D\u4E0E\u5BF9\u6570\u6210\u672C\u6548\u7528\u540E\uFF0C${selected.displayName}\u7684\u8D28\u91CF\u6548\u7528\u4F18\u52BF\u8DB3\u4EE5\u62B5\u6D88\u6210\u672C\u3002` : `\u7EFC\u5408\u98CE\u9669\u8C03\u6574\u5F97\u5206\u3001\u60A8\u7684\u8D28\u91CF\u504F\u597D\u4E0E\u5BF9\u6570\u6210\u672C\u6548\u7528\u540E\uFF0C${selected.displayName}\u4EF7\u503C\u6548\u7528\u6700\u9AD8\uFF1B\u76F8\u5BF9\u6700\u9AD8\u5F97\u5206\u6A21\u578B\u9884\u8BA1\u7EFC\u5408\u6210\u672C${saving >= 0 ? "\u964D\u4F4E" : "\u589E\u52A0"}${Math.abs(saving).toFixed(0)}%\u3002`
   };
 }
 function recommendModel(input) {
@@ -5026,18 +5873,29 @@ function recommendModel(input) {
     estimate.savingsVsFlagship = flagshipEstimate.expectedTotalCost - estimate.expectedTotalCost;
     estimate.savingsPercentVsFlagship = flagshipEstimate.expectedTotalCost > 0 ? estimate.savingsVsFlagship / flagshipEstimate.expectedTotalCost : 0;
   }
-  const qualified = estimates.filter((estimate) => estimate.meetsQualityTarget);
-  const recommended = qualified.length > 0 ? qualified.reduce((best, estimate) => estimate.expectedTotalCost < best.expectedTotalCost ? estimate : best) : estimates.reduce((best, estimate) => estimate.estimatedQuality > best.estimatedQuality ? estimate : best);
-  const valuePool = estimates.filter((estimate) => estimate.modelId !== recommended.modelId);
-  const valueAlternative = valuePool.length > 0 ? valuePool.reduce((best, estimate) => estimate.expectedTotalCost < best.expectedTotalCost ? estimate : best) : null;
+  const route2 = selectValueRoute(estimates, qualityTarget * 100);
+  const recommended = route2.selected;
+  for (const estimate of estimates) {
+    const utility = route2.utilities.get(estimate.modelId);
+    estimate.paretoEfficient = isParetoEfficient(estimate, estimates);
+    estimate.riskAdjustedScore = utility?.riskAdjustedScore ?? estimate.conservativeScore;
+    estimate.qualityUtility = utility?.qualityUtility ?? 0;
+    estimate.costUtility = utility?.costUtility ?? 0;
+    estimate.valueUtility = utility?.valueUtility ?? 0;
+    estimate.scoreGapVsBest = route2.bestScore.predictedScore - estimate.predictedScore;
+    estimate.costSavingsVsBest = route2.bestScore.riskAdjustedCost - estimate.riskAdjustedCost;
+    estimate.selectionReason = estimate.modelId === recommended.modelId ? route2.reason : estimate.paretoEfficient ? "\u4F4D\u4E8E\u5F53\u524D\u6210\u672C\u2014\u5F97\u5206\u6709\u6548\u524D\u6CBF\u3002" : "\u5B58\u5728\u5F97\u5206\u66F4\u9AD8\u4E14\u9884\u8BA1\u7EFC\u5408\u6210\u672C\u66F4\u4F4E\u7684\u5019\u9009\u3002";
+  }
+  const valuePool = estimates.filter((estimate) => estimate.modelId !== recommended.modelId && estimate.paretoEfficient);
+  const valueAlternative = valuePool.length > 0 ? valuePool.reduce((best, estimate) => estimate.riskAdjustedCost < best.riskAdjustedCost ? estimate : best) : null;
   const flagshipAlternative = flagshipEstimate;
   return {
     recommended,
     valueAlternative,
     flagshipAlternative,
     fallbackModel: flagshipAlternative,
-    estimates: estimates.sort((left, right) => left.expectedTotalCost - right.expectedTotalCost),
-    reason: qualified.length > 0 ? `\u4FDD\u5B88\u4F30\u7B97\u8FBE\u5230 ${(qualityTarget * 100).toFixed(0)}% \u76EE\u6807\u7684\u5019\u9009\u4E2D\uFF0C\u9884\u8BA1\u603B\u6210\u672C\u6700\u4F4E\u3002` : `\u6CA1\u6709\u5019\u9009\u7684\u4FDD\u5B88\u4F30\u7B97\u8FBE\u5230 ${(qualityTarget * 100).toFixed(0)}% \u76EE\u6807\uFF0C\u9009\u62E9\u4F30\u7B97\u8FBE\u6807\u7387\u6700\u9AD8\u8005\u3002`
+    estimates: estimates.sort((left, right) => left.riskAdjustedCost - right.riskAdjustedCost),
+    reason: route2.reason
   };
 }
 function judgeModelPrice() {
@@ -5346,6 +6204,8 @@ ${contextSha256}`).digest("hex");
         status: "cache_hit",
         latencyMs: 0,
         cost: 0,
+        promptTokens: cached.promptTokens ?? 0,
+        completionTokens: cached.completionTokens ?? 0,
         contextSha256,
         contextTokenEstimate: truncated.tokenEstimate,
         contextTruncated: truncated.truncated
@@ -5397,7 +6257,9 @@ ${truncated.text}` }
       result,
       createdAt: (/* @__PURE__ */ new Date()).toISOString(),
       promptVersion: this.config.promptVersion,
-      model: this.config.judgeModel
+      model: this.config.judgeModel,
+      promptTokens,
+      completionTokens
     };
     writeCache(path, cache);
     return {
@@ -5405,6 +6267,8 @@ ${truncated.text}` }
       status: "success",
       latencyMs,
       cost,
+      promptTokens,
+      completionTokens,
       contextSha256,
       contextTokenEstimate: truncated.tokenEstimate,
       contextTruncated: truncated.truncated
@@ -5451,6 +6315,8 @@ var AcuDemoStrategy = class {
     let judgeStatus;
     let judgeLatencyMs = 0;
     let judgeCost = 0;
+    let judgePromptTokens = 0;
+    let judgeCompletionTokens = 0;
     let contextSha256 = createHash5("sha256").update(visible).digest("hex");
     let contextTokenEstimate = estimateVisibleTokens(fallbackContext.text);
     let contextTruncated = fallbackContext.truncated;
@@ -5461,6 +6327,8 @@ var AcuDemoStrategy = class {
       judgeStatus = response.status;
       judgeLatencyMs = response.latencyMs;
       judgeCost = response.cost;
+      judgePromptTokens = response.promptTokens;
+      judgeCompletionTokens = response.completionTokens;
       contextSha256 = response.contextSha256;
       contextTokenEstimate = response.contextTokenEstimate;
       contextTruncated = response.contextTruncated;
@@ -5487,11 +6355,13 @@ var AcuDemoStrategy = class {
       judgeStatus,
       judgeLatencyMs,
       judgeCost,
+      judgePromptTokens,
+      judgeCompletionTokens,
       contextSha256,
       contextTokenEstimate,
       contextTruncated,
       difficultyScore: difficultyScore(judge),
-      qualityTarget: input.qualityTarget ?? 0.9,
+      qualityTarget: input.qualityTarget ?? 0.8,
       recommendation,
       disclaimer: ACU_DEMO_DISCLAIMER
     };
@@ -6147,7 +7017,7 @@ async function handleRequest(req, res, ctx) {
       const lastUser = [...messages].reverse().find((message) => message.role === "user");
       const system = messages.find((message) => message.role === "system");
       const expectedOutputTokens = Number(parsed.expected_output_tokens ?? 800);
-      const qualityTarget = Number(parsed.quality_target ?? 0.9);
+      const qualityTarget = Number(parsed.quality_target ?? 0.8);
       const requireTools = tools.length > 0;
       const requireVision = messages.some((message) => Array.isArray(message.content) && message.content.some((part) => Boolean(part && typeof part === "object" && part.type === "image_url")));
       const rulesDecision = route(
@@ -6160,7 +7030,7 @@ async function handleRequest(req, res, ctx) {
       const evaluation = await ctx.acuStrategy.evaluate({
         messages,
         tools,
-        qualityTarget: Number.isFinite(qualityTarget) ? qualityTarget : 0.9,
+        qualityTarget: Number.isFinite(qualityTarget) ? qualityTarget : 0.8,
         expectedOutputTokens: Number.isFinite(expectedOutputTokens) ? expectedOutputTokens : 800,
         eligibleModelIds,
         requireToolCallSupport: requireTools,

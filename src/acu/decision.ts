@@ -61,9 +61,88 @@ function estimateOne(
     estimatedCallCost: callCost,
     expectedFallbackCost,
     expectedTotalCost: total,
+    predictedScore: quality * 100,
+    conservativeScore: lower * 100,
+    riskAdjustedCost: total,
+    riskAdjustedScore: quality * 100,
+    qualityUtility: 0,
+    costUtility: 0,
+    valueUtility: 0,
+    scoreGapVsBest: 0,
+    costSavingsVsBest: 0,
+    paretoEfficient: false,
+    selectionReason: "",
     savingsVsFlagship: 0,
     savingsPercentVsFlagship: 0,
-    meetsQualityTarget: lower >= qualityTarget,
+    meetsQualityTarget: quality >= qualityTarget,
+  };
+}
+
+type ValueCandidate = Pick<
+  AcuModelEstimate,
+  "modelId" | "displayName" | "predictedScore" | "riskAdjustedCost"
+> & { conservativeScore?: number };
+
+export function isParetoEfficient(candidate: ValueCandidate, candidates: ValueCandidate[]): boolean {
+  return !candidates.some((other) => other.modelId !== candidate.modelId
+    && other.predictedScore >= candidate.predictedScore
+    && other.riskAdjustedCost <= candidate.riskAdjustedCost
+    && (other.predictedScore > candidate.predictedScore
+      || other.riskAdjustedCost < candidate.riskAdjustedCost));
+}
+
+export function selectValueRoute<T extends ValueCandidate>(
+  candidates: T[],
+  targetScore: number,
+): {
+  selected: T;
+  bestScore: T;
+  reason: string;
+  utilities: Map<string, { riskAdjustedScore: number; qualityUtility: number; costUtility: number; valueUtility: number }>;
+} {
+  if (candidates.length === 0) throw new Error("Value routing requires at least one candidate");
+  const bestScore = candidates.reduce((best, item) => (
+    item.predictedScore > best.predictedScore ? item : best
+  ));
+  const frontier = candidates.filter((candidate) => isParetoEfficient(candidate, candidates));
+  const preference = clamp((targetScore - 60) / 35);
+  const qualityWeight = 0.58 + 0.24 * preference;
+  const riskWeight = 0.20 + 0.25 * preference;
+  const qualityExponent = 0.8 + 1.2 * preference;
+  const finiteCosts = frontier.map((candidate) => Math.max(1e-9, candidate.riskAdjustedCost));
+  const minCost = Math.min(...finiteCosts);
+  const maxCost = Math.max(...finiteCosts);
+  const logRange = Math.log(maxCost / minCost);
+  const utilities = new Map<string, {
+    riskAdjustedScore: number;
+    qualityUtility: number;
+    costUtility: number;
+    valueUtility: number;
+  }>();
+  for (const candidate of frontier) {
+    const conservative = candidate.conservativeScore ?? candidate.predictedScore;
+    const riskAdjustedScore = candidate.predictedScore
+      - riskWeight * Math.max(0, candidate.predictedScore - conservative);
+    const qualityUtility = Math.pow(Math.max(0, riskAdjustedScore) / Math.max(1, targetScore), qualityExponent);
+    const costUtility = logRange <= 1e-12
+      ? 1
+      : 1 - Math.log(Math.max(1e-9, candidate.riskAdjustedCost) / minCost) / logRange;
+    const valueUtility = qualityUtility * (qualityWeight + (1 - qualityWeight) * costUtility);
+    utilities.set(candidate.modelId, { riskAdjustedScore, qualityUtility, costUtility, valueUtility });
+  }
+  const selected = frontier.reduce((best, item) => (
+    utilities.get(item.modelId)!.valueUtility > utilities.get(best.modelId)!.valueUtility ? item : best
+  ));
+  const saving = bestScore.riskAdjustedCost > 0
+    ? (1 - selected.riskAdjustedCost / bestScore.riskAdjustedCost) * 100
+    : 0;
+  return {
+    selected,
+    bestScore,
+    utilities,
+    reason: selected.modelId === bestScore.modelId
+      ? `综合风险调整得分、您的质量偏好与对数成本效用后，${selected.displayName}的质量效用优势足以抵消成本。`
+      : `综合风险调整得分、您的质量偏好与对数成本效用后，${selected.displayName}价值效用最高；相对最高得分模型预计综合成本${saving >= 0 ? "降低" : "增加"}${Math.abs(saving).toFixed(0)}%。`,
   };
 }
 
@@ -101,18 +180,25 @@ export function recommendModel(input: AcuDecisionInput): AcuRecommendation {
       ? estimate.savingsVsFlagship / flagshipEstimate.expectedTotalCost
       : 0;
   }
-  const qualified = estimates.filter((estimate) => estimate.meetsQualityTarget);
-  const recommended = qualified.length > 0
-    ? qualified.reduce((best, estimate) => (
-      estimate.expectedTotalCost < best.expectedTotalCost ? estimate : best
-    ))
-    : estimates.reduce((best, estimate) => (
-      estimate.estimatedQuality > best.estimatedQuality ? estimate : best
-    ));
-  const valuePool = estimates.filter((estimate) => estimate.modelId !== recommended.modelId);
+  const route = selectValueRoute(estimates, qualityTarget * 100);
+  const recommended = route.selected;
+  for (const estimate of estimates) {
+    const utility = route.utilities.get(estimate.modelId);
+    estimate.paretoEfficient = isParetoEfficient(estimate, estimates);
+    estimate.riskAdjustedScore = utility?.riskAdjustedScore ?? estimate.conservativeScore;
+    estimate.qualityUtility = utility?.qualityUtility ?? 0;
+    estimate.costUtility = utility?.costUtility ?? 0;
+    estimate.valueUtility = utility?.valueUtility ?? 0;
+    estimate.scoreGapVsBest = route.bestScore.predictedScore - estimate.predictedScore;
+    estimate.costSavingsVsBest = route.bestScore.riskAdjustedCost - estimate.riskAdjustedCost;
+    estimate.selectionReason = estimate.modelId === recommended.modelId
+      ? route.reason
+      : estimate.paretoEfficient ? "位于当前成本—得分有效前沿。" : "存在得分更高且预计综合成本更低的候选。";
+  }
+  const valuePool = estimates.filter((estimate) => estimate.modelId !== recommended.modelId && estimate.paretoEfficient);
   const valueAlternative = valuePool.length > 0
     ? valuePool.reduce((best, estimate) => (
-      estimate.expectedTotalCost < best.expectedTotalCost ? estimate : best
+      estimate.riskAdjustedCost < best.riskAdjustedCost ? estimate : best
     ))
     : null;
   const flagshipAlternative = flagshipEstimate;
@@ -121,10 +207,8 @@ export function recommendModel(input: AcuDecisionInput): AcuRecommendation {
     valueAlternative,
     flagshipAlternative,
     fallbackModel: flagshipAlternative,
-    estimates: estimates.sort((left, right) => left.expectedTotalCost - right.expectedTotalCost),
-    reason: qualified.length > 0
-      ? `保守估算达到 ${(qualityTarget * 100).toFixed(0)}% 目标的候选中，预计总成本最低。`
-      : `没有候选的保守估算达到 ${(qualityTarget * 100).toFixed(0)}% 目标，选择估算达标率最高者。`,
+    estimates: estimates.sort((left, right) => left.riskAdjustedCost - right.riskAdjustedCost),
+    reason: route.reason,
   };
 }
 

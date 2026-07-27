@@ -9,8 +9,8 @@
 <body>
   <header class="topbar">
     <div>
-      <p class="eyebrow">CLAWROUTER · PHASE 2A</p>
-      <h1>请求难度与模型估算达标率</h1>
+      <p class="eyebrow">CLAWROUTER · PHASE 2B</p>
+      <h1>请求难度与模型价值路由</h1>
     </div>
     <div class="top-actions"><a id="curve-gallery-link" class="gallery-link" href="/acu/curves/">曲线图集</a><div class="status"><span class="status-dot"></span><span id="runtime-status">加载目录…</span></div></div>
   </header>
@@ -20,21 +20,16 @@
       <article class="panel input-panel">
         <div class="panel-heading">
           <div><p class="section-kicker">01 · REQUEST</p><h2>完整可见 API 上下文</h2></div>
-          <select id="preset" aria-label="示例上下文">
-            <option value="tool">工具调用</option>
-            <option value="analysis">多约束分析</option>
-            <option value="simple">简单改写</option>
-            <option value="agent">Agent 执行反馈</option>
-          </select>
+          <select id="preset" aria-label="TwinRouterBench 演示上下文"><option value="">加载 Twin 案例…</option></select>
         </div>
         <textarea id="context-input" spellcheck="false" aria-label="OpenAI-compatible request JSON"></textarea>
         <div class="input-actions">
-          <label>质量目标 <strong id="quality-target-label">90%</strong>
-            <input id="quality-target" type="range" min="70" max="99" step="1" value="90">
+          <label>您的质量偏好 <strong id="quality-target-label">80分</strong>
+            <input id="quality-target" type="range" min="60" max="95" step="1" value="80">
           </label>
           <button id="evaluate-button" type="button">评估并推荐</button>
         </div>
-        <p class="privacy-note">仅发送到本机 ACU 接口；缓存保存上下文 SHA-256，不保存完整请求正文。</p>
+        <p id="preset-meta" class="privacy-note">来源：TwinRouterBench 冻结发布标签案例。缓存只保存上下文 SHA-256。</p>
       </article>
 
       <article class="panel difficulty-panel">
@@ -55,7 +50,7 @@
 
     <section class="panel chart-panel">
       <div class="panel-heading chart-heading">
-        <div><p class="section-kicker">03 · CURVES</p><h2>模型难度—估算达标率曲线</h2></div>
+        <div><p class="section-kicker">03 · CURVES</p><h2>模型难度—预计得分曲线</h2></div>
         <div class="chart-controls">
           <select id="provider-filter" aria-label="厂商筛选"><option value="all">全部厂商</option></select>
           <button id="expand-models" type="button" class="secondary">展开全部</button>
@@ -63,7 +58,7 @@
       </div>
       <div class="chart-layout">
         <div class="canvas-wrap">
-          <canvas id="curve-chart" aria-label="模型估算达标率曲线"></canvas>
+          <canvas id="curve-chart" aria-label="模型预计得分曲线"></canvas>
           <div id="chart-tooltip" class="chart-tooltip" hidden></div>
         </div>
         <aside id="model-legend" class="model-legend"></aside>
@@ -75,17 +70,17 @@
       <article class="panel recommendation-card featured">
         <p class="section-kicker">04 · RECOMMENDATION</p>
         <h2 id="recommended-model">等待评估</h2>
-        <p id="recommendation-reason" class="recommendation-reason">设置质量目标后选择预计总成本最低的合格模型。</p>
+        <p id="recommendation-reason" class="recommendation-reason">在有效前沿上连续整合风险调整得分、您的质量偏好和对数成本效用。</p>
         <div class="quality-pair">
-          <div><span>估算达标率</span><strong id="estimated-quality">—</strong></div>
-          <div><span>保守达标率</span><strong id="conservative-quality">—</strong></div>
+          <div><span>预计模型得分</span><strong id="estimated-quality">—</strong></div>
+          <div><span>保守预计得分</span><strong id="conservative-quality">—</strong></div>
         </div>
         <dl class="cost-list">
           <div><dt>首次调用</dt><dd id="call-cost">—</dd></div>
-          <div><dt>含 Fallback 预计总成本</dt><dd id="total-cost">—</dd></div>
+          <div><dt>预计综合成本</dt><dd id="total-cost">—</dd></div>
           <div><dt>相比旗舰</dt><dd id="flagship-savings">—</dd></div>
-          <div><dt>Fallback</dt><dd id="fallback-model">—</dd></div>
         </dl>
+        <details class="technical-details"><summary>技术详情</summary><p>Fallback 模型：<span id="fallback-model">—</span>；风险成本已计入预计综合成本。</p></details>
       </article>
       <article class="panel alternatives-card">
         <p class="section-kicker">ALTERNATIVES</p>
@@ -94,7 +89,7 @@
     </section>
 
     <section class="disclaimer" id="disclaimer">
-      请求难度基于TwinRouterBench最低充分档位体系；模型曲线由公开Benchmark能力锚点和受约束能力模型生成，用于产品演示，不代表具体模型对当前请求的逐题实测成功率。
+      预计模型得分基于任务能力需求、公开Benchmark及受约束能力模型，用于展示模型与当前任务的相对匹配程度，不代表逐请求实测成功率。
     </section>
   </main>
   <script type="module" src="./public/acu.js"></script>

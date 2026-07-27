@@ -1,7 +1,7 @@
 export { AcuDemoStrategy, rulesFallbackJudge } from "./strategy.js";
 export { AcuJudgeClient, parseJudgeResult, serializeVisibleContext } from "./judge.js";
 export { getAcuCatalog, getAcuModel, buildModelCurve, publicCatalogPayload } from "./catalog.js";
-export { recommendModel, estimateCallCost } from "./decision.js";
+export { recommendModel, estimateCallCost, isParetoEfficient, selectValueRoute } from "./decision.js";
 export {
   difficultyScore,
   estimatedQuality,

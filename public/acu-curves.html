@@ -8,18 +8,18 @@
 </head>
 <body>
   <header>
-    <div><p>CLAWROUTER · PHASE 2A</p><h1>模型难度—估算达标率图集</h1></div>
+    <div><p>CLAWROUTER · PHASE 2B</p><h1>模型难度—预计得分图集</h1></div>
     <a href="../">返回交互式 Demo</a>
   </header>
   <main>
     <section class="intro">
       <strong>阅读方式</strong>
-      <span>横轴为 Twin 档位体系下的展示难度，纵轴为公开 Benchmark 能力锚点经受约束模型生成的估算达标率。曲线不是逐请求实测成功率。</span>
+      <span>横轴为 Twin 档位体系下的展示难度，纵轴为公开 Benchmark 能力锚点经受约束模型生成的预计模型得分。曲线不是逐请求实测成功率。</span>
     </section>
-    <article><div><p>01 · REPRESENTATIVE</p><h2>代表模型能力梯度</h2><span>五个不同能力位置的模型使用同一档位中心和共享斜率，便于比较曲线水平与下降位置。</span></div><a href="../../public/acu-curves/representative-model-curves.png"><img src="../../public/acu-curves/representative-model-curves.png" alt="代表模型难度质量曲线"></a></article>
-    <article><div><p>02 · VALUE</p><h2>低成本与性价比模型</h2><span>展示价格较低候选的质量曲线；成本优势不能替代保守质量门槛。</span></div><a href="../../public/acu-curves/value-model-curves.png"><img src="../../public/acu-curves/value-model-curves.png" alt="低成本与性价比模型曲线"></a></article>
-    <article><div><p>03 · CATALOG</p><h2>全部可调用模型，按厂商分面</h2><span>共 12 个仓库可调用模型。按厂商分面避免在一张图中依赖过多颜色。</span></div><a href="../../public/acu-curves/provider-model-curves.png"><img src="../../public/acu-curves/provider-model-curves.png" alt="按厂商分面的模型曲线"></a></article>
-    <footer>请求难度基于TwinRouterBench最低充分档位体系；模型曲线由公开Benchmark能力锚点和受约束能力模型生成，用于产品演示，不代表具体模型对当前请求的逐题实测成功率。</footer>
+    <article><div><p>01 · HERO MODELS</p><h2>拳头模型差异化曲线</h2><span>总体锚点保持不变；官方证据支持的 Profile 重新分配了简单与高难度区域的预计得分。</span></div><a href="../../public/acu-curves/representative-model-curves.png"><img src="../../public/acu-curves/representative-model-curves.png" alt="拳头模型难度预计得分曲线"></a></article>
+    <article><div><p>02 · VALUE FRONTIER</p><h2>性价比有效前沿模型</h2><span>只展示未被“得分更高且成本更低”候选严格支配的模型。</span></div><a href="../../public/acu-curves/value-model-curves.png"><img src="../../public/acu-curves/value-model-curves.png" alt="性价比有效前沿模型曲线"></a></article>
+    <article><div><p>03 · CATALOG</p><h2>全部可调用模型，按厂商分面</h2><span>按厂商分面展示全部路由候选，避免在一张图中依赖过多颜色。</span></div><a href="../../public/acu-curves/provider-model-curves.png"><img src="../../public/acu-curves/provider-model-curves.png" alt="按厂商分面的模型曲线"></a></article>
+    <footer>预计模型得分基于任务能力需求、公开Benchmark及受约束能力模型，用于展示模型与当前任务的相对匹配程度，不代表逐请求实测成功率。</footer>
   </main>
 </body>
 </html>

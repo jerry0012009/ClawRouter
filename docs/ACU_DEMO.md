@@ -1,8 +1,8 @@
-# ACU Phase 2A Demo
+# ACU Phase 2B 价值路由 Demo
 
-ACU Demo 把一次 OpenAI-compatible API 请求的完整可见上下文转换为四档最低充分能力需求概率，再将概率与公开 Benchmark 约束生成的模型档位充分率结合，给出模型与成本建议。
+ACU Demo 把一次 OpenAI-compatible API 请求的完整可见上下文转换为四档最低充分能力需求概率，再将概率与公开 Benchmark 约束生成的模型档位充分率结合，给出预计模型得分、预计综合成本与价值路由建议。
 
-> 请求难度基于TwinRouterBench最低充分档位体系；模型曲线由公开Benchmark能力锚点和受约束能力模型生成，用于产品演示，不代表具体模型对当前请求的逐题实测成功率。
+> 预计模型得分基于任务能力需求、公开Benchmark及受约束能力模型，用于展示模型与当前任务的相对匹配程度，不代表逐请求实测成功率。
 
 ## 启用
 
@@ -45,7 +45,7 @@ npm run build
     { "role": "user", "content": "Inspect the failure and fix it." }
   ],
   "tools": [],
-  "quality_target": 0.9,
+  "quality_target": 0.8,
   "expected_output_tokens": 800
 }
 ```
@@ -60,7 +60,9 @@ Judge 返回 `pLow`、`pMid`、`pMidHigh`、`pHigh`。展示难度是四档中�
 estimatedQuality = Σ p(tier) × sufficient(model, tier)
 ```
 
-模型档位充分率来自共享斜率 Logistic 模型。TwinRouterBench 970 条发布标签只提供档位分布和 few-shot 上下文，OpenHands Index SWE-bench 聚合分数只作为模型位置锚点。两者的连接是产品 Demo 的受约束估算，不是跨 Benchmark 的严格统计等价，也不是当前请求的实测成功率。
+模型档位充分率来自四类受约束 Profile：`frontier_resilient`、`balanced_frontier`、`efficient_fast` 和 `coding_specialist`。每个 Profile 只改变曲线形状；构建器会重新求解 ability parameter，使 Twin 970 条发布标签分布下的加权均值保持 ability anchor。这是产品 Demo 的受约束估算，不是跨 Benchmark 的严格统计等价。
+
+默认质量偏好为 80 分。选模先删除被严格支配候选，再在有效前沿上计算连续价值效用：风险调整得分相对用户偏好做幂效用转换，成本按前沿内的对数相对成本转换为成本效用。最终价值是质量效用与成本调整因子的乘积，因此低价不能补偿近乎为零的任务匹配。偏好越高，质量权重、幂指数和不确定性惩罚连续增加；整个决策不存在固定分差或硬过线。
 
 当 Judge 失败、超时、缺少密钥或返回无效 JSON 时，聊天请求维持原 `RulesStrategy` 决策；streaming、tool calls、thinking blocks 与 session pinning 不因失败而中断。评估接口仍返回带 `rules_fallback` 标记的估算，便于页面说明降级状态。
 
@@ -69,8 +71,8 @@ estimatedQuality = Σ p(tier) × sufficient(model, tier)
 构建器不调用模型 API，不执行 Benchmark：
 
 ```bash
-research/quality-curves/twinrouterbench/phase1d-foundation/.cache/venv/bin/python \
-  scripts/build-acu-model-catalog.py
+research/quality-curves/.cache/venv/bin/python \
+  scripts/build-acu-phase2b-catalog.py
 ```
 
-它读取 Phase 1D Parquet、已有 OpenHands 官方数据审计输出及 `src/models.ts`，重建运行时目录、固定 few-shot 和 Phase 2A 研究表。MiniMax M3 只有 Benchmark 证据，仓库没有可调用文本模型 ID，因此不会进入路由候选。
+它以 Phase 2A 冻结表为输入，不运行 Benchmark 或模型 API；重建 v2 运行目录、四类 Profile、8 个 Twin 预置案例、研究 CSV 和三张图。Phase 2A 研究结果不会被改写。

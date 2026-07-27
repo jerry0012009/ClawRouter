@@ -1,12 +1,13 @@
 import rawCatalog from "./catalog/model-catalog.json";
+import rawPresets from "./catalog/twin-product-presets.json";
 import type { AcuCurvePoint, AcuModelCatalogEntry } from "./types.js";
 import { continuousTierProbabilities, estimatedQuality } from "./math.js";
 
 export type AcuCatalogConfig = {
   tierDifficulty: { low: number; mid: number; mid_high: number; high: number };
-  sharedTemperature: number;
-  commonFloor: number;
-  commonCeiling: number;
+  sharedTemperature: number | null;
+  commonFloor: number | null;
+  commonCeiling: number | null;
   curveThresholds: { above_low: number; above_mid: number; above_mid_high: number };
   curveTemperature: number;
   distributionWeights: { low: number; mid: number; mid_high: number; high: number };
@@ -73,6 +74,7 @@ export function publicCatalogPayload(): Record<string, unknown> {
     config: catalog.config,
     provenance: catalog.provenance,
     models: catalog.models,
+    twinPresets: rawPresets.examples,
     curves: Object.fromEntries(catalog.models.map((model) => [model.modelId, buildModelCurve(model)])),
   };
 }

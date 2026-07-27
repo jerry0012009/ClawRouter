@@ -12,6 +12,7 @@ import {
   normalizeProbabilities,
   parseJudgeResult,
   recommendModel,
+  selectValueRoute,
   solveAbilityParameter,
   tierSufficiency,
 } from "../src/acu/index.js";
@@ -120,7 +121,7 @@ describe("Phase 2A constrained tier model", () => {
     );
   });
 
-  it("selects the cheapest qualifying model and falls back to highest quality", () => {
+  it("selects the highest continuous value utility on the score-cost frontier", () => {
     const easy = {
       pLow: 1,
       pMid: 0,
@@ -135,24 +136,47 @@ describe("Phase 2A constrained tier model", () => {
       judgeCost: 0.001,
       qualityTarget: 0.65,
     });
-    const qualified = economical.estimates.filter((item) => item.meetsQualityTarget);
-    expect(economical.recommended.expectedTotalCost)
-      .toBe(Math.min(...qualified.map((item) => item.expectedTotalCost)));
+    expect(economical.recommended.paretoEfficient).toBe(true);
+    expect(economical.recommended.predictedScore).toBeGreaterThanOrEqual(65);
     expect(economical.recommended.qualityLower).toBeGreaterThanOrEqual(0);
     expect(economical.recommended.qualityUpper).toBeLessThanOrEqual(1);
     expect(economical.recommended.expectedTotalCost).toBeGreaterThan(0.001);
 
     const impossible = recommendModel({
-      probabilities: easy,
+      probabilities: { pLow: 0, pMid: 0, pMidHigh: 0, pHigh: 1, confidence: 1 },
       inputTokens: 1_000,
       expectedOutputTokens: 500,
       judgeCost: 0,
       qualityTarget: 1,
     });
-    expect(impossible.recommended.estimatedQuality)
-      .toBe(Math.max(...impossible.estimates.map((item) => item.estimatedQuality)));
+    expect(impossible.recommended.paretoEfficient).toBe(true);
+    expect(impossible.recommended.valueUtility)
+      .toBe(Math.max(...impossible.estimates.map((item) => item.valueUtility)));
     expect(impossible.flagshipAlternative.savingsVsFlagship).toBeCloseTo(0, 12);
-    expect(impossible.reason).toMatch(/没有候选/);
+    expect(impossible.reason).toMatch(/风险调整得分/);
+  });
+
+  it("integrates a small score difference and an 80% cost reduction continuously", () => {
+    const result = selectValueRoute([
+      { modelId: "a", displayName: "A", predictedScore: 87.8, riskAdjustedCost: 0.05 },
+      { modelId: "b", displayName: "B", predictedScore: 87.7, riskAdjustedCost: 0.01 },
+    ], 80);
+    expect(result.selected.modelId).toBe("b");
+    expect(result.reason).toContain("对数成本效用");
+    expect(result.reason).toContain("降低80%");
+  });
+
+  it("keeps every Phase 2B profile and final tier sufficiency within constraints", () => {
+    const defaults = getAcuCatalog().models.filter((model) => model.defaultDisplay);
+    expect(defaults).toHaveLength(6);
+    for (const model of getAcuCatalog().models) {
+      expect(model.curveTemperature).toBeGreaterThanOrEqual(0.09);
+      expect(model.curveTemperature).toBeLessThanOrEqual(0.17);
+      expect(Math.max(...Object.values(model.tierAdjustments).map((value) => Math.abs(value)))).toBeLessThanOrEqual(0.08);
+      expect(model.sufficientLow).toBeGreaterThanOrEqual(model.sufficientMid);
+      expect(model.sufficientMid).toBeGreaterThanOrEqual(model.sufficientMidHigh);
+      expect(model.sufficientMidHigh).toBeGreaterThanOrEqual(model.sufficientHigh);
+    }
   });
 
   it("never exposes the non-callable MiniMax evidence row as a route", () => {

@@ -1022,7 +1022,7 @@ async function handleRequest(
       const lastUser = [...messages].reverse().find((message) => message.role === "user");
       const system = messages.find((message) => message.role === "system");
       const expectedOutputTokens = Number(parsed.expected_output_tokens ?? 800);
-      const qualityTarget = Number(parsed.quality_target ?? 0.9);
+      const qualityTarget = Number(parsed.quality_target ?? 0.8);
       const requireTools = tools.length > 0;
       const requireVision = messages.some((message) => Array.isArray(message.content)
         && message.content.some((part) => Boolean(part && typeof part === "object" && (part as { type?: string }).type === "image_url")));
@@ -1040,7 +1040,7 @@ async function handleRequest(
       const evaluation = await ctx.acuStrategy.evaluate({
         messages,
         tools,
-        qualityTarget: Number.isFinite(qualityTarget) ? qualityTarget : 0.9,
+        qualityTarget: Number.isFinite(qualityTarget) ? qualityTarget : 0.8,
         expectedOutputTokens: Number.isFinite(expectedOutputTokens) ? expectedOutputTokens : 800,
         eligibleModelIds,
         requireToolCallSupport: requireTools,

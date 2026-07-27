@@ -5,7 +5,7 @@ export const ACU_DEFAULT_JUDGE_MODE = "non-thinking" as const;
 export const ACU_DEFAULT_JUDGE_TIMEOUT_MS = 8_000;
 export const ACU_DEFAULT_MAX_CONTEXT_TOKENS = 6_000;
 export const ACU_DEFAULT_MAX_OUTPUT_TOKENS = 300;
-export const ACU_DEFAULT_QUALITY_TARGET = 0.9;
+export const ACU_DEFAULT_QUALITY_TARGET = 0.8;
 export const ACU_DEFAULT_SWITCH_COST_USD = 0.0002;
 
 export const ACU_TIER_DIFFICULTY = {
@@ -28,7 +28,7 @@ export const ACU_CURVE_THRESHOLDS = {
 export const ACU_CURVE_TEMPERATURE = 0.08;
 
 export const ACU_DEMO_DISCLAIMER =
-  "请求难度基于TwinRouterBench最低充分档位体系；模型曲线由公开Benchmark能力锚点和受约束能力模型生成，用于产品演示，不代表具体模型对当前请求的逐题实测成功率。";
+  "预计模型得分基于任务能力需求、公开Benchmark及受约束能力模型，用于展示模型与当前任务的相对匹配程度，不代表逐请求实测成功率。";
 
 function positiveInteger(value: string | undefined, fallback: number): number {
   const parsed = Number.parseInt(value ?? "", 10);

@@ -12,6 +12,7 @@ export type UpstreamProvider = "proxy" | "openrouter";
 export type ExtendedModelDefinition = ModelDefinitionConfig & {
   upstream: UpstreamProvider;
   useMaxCompletionTokens?: boolean;
+  toolCalling?: boolean;
 };
 
 export class UnknownModelError extends Error {
@@ -43,6 +44,15 @@ export const BLOCKRUN_MODELS: ExtendedModelDefinition[] = [
     cost: { input: 10, output: 30, cacheRead: 5, cacheWrite: 10 }, contextWindow: 128_000, maxTokens: 4_096 },
 
   // ── OpenAI (GPT-5 series, need max_completion_tokens) ──
+  // GPT-5.6 prices are official list prices. The current proxy exposes no
+  // billing metadata; text and streaming were verified on 2026-07-27, while
+  // tool calling was not verified and is therefore disabled conservatively.
+  { id: "gpt-5.6-sol", name: "GPT-5.6 Sol", upstream: "proxy", useMaxCompletionTokens: true, toolCalling: false, reasoning: true, input: ["text"],
+    cost: { input: 5, output: 30, cacheRead: 0.5, cacheWrite: 5 }, contextWindow: 1_050_000, maxTokens: 128_000 },
+  { id: "gpt-5.6-terra", name: "GPT-5.6 Terra", upstream: "proxy", useMaxCompletionTokens: true, toolCalling: false, reasoning: true, input: ["text"],
+    cost: { input: 2.5, output: 15, cacheRead: 0.25, cacheWrite: 2.5 }, contextWindow: 1_050_000, maxTokens: 128_000 },
+  { id: "gpt-5.6-luna", name: "GPT-5.6 Luna", upstream: "proxy", useMaxCompletionTokens: true, toolCalling: false, reasoning: true, input: ["text"],
+    cost: { input: 1, output: 6, cacheRead: 0.1, cacheWrite: 1 }, contextWindow: 1_050_000, maxTokens: 128_000 },
   { id: "gpt-5.5", name: "GPT-5.5", upstream: "proxy", useMaxCompletionTokens: true, reasoning: true, input: ["text", "image"],
     cost: { input: 5, output: 30, cacheRead: 2.5, cacheWrite: 5 }, contextWindow: 1_048_576, maxTokens: 65_536 },
   { id: "gpt-5.4-nano", name: "GPT-5.4 Nano", upstream: "proxy", useMaxCompletionTokens: true, reasoning: false, input: ["text", "image"],
@@ -170,6 +180,7 @@ export const MODEL_ALIASES: Record<string, string> = {
   gpt: "gpt-4o", gpt4: "gpt-4o", mini: "gpt-4o-mini",
   o1: "o3", o3: "o3", o4: "o4-mini", nano: "gpt-4.1-nano",
   "gpt-5": "gpt-5.5", "gpt-5.5": "gpt-5.5",
+  sol: "gpt-5.6-sol", terra: "gpt-5.6-terra", luna: "gpt-5.6-luna",
   "openai/gpt-4o": "gpt-4o", "openai/gpt-4o-mini": "gpt-4o-mini",
   "openai/gpt-4.1": "gpt-4.1", "openai/gpt-4.1-mini": "gpt-4.1-mini",
   "openai/gpt-4.1-nano": "gpt-4.1-nano", "openai/o3": "o3", "openai/o4-mini": "o4-mini",
@@ -237,7 +248,8 @@ export function buildProviderModels(baseUrl: string): ModelProviderConfig {
 }
 
 export function supportsToolCalling(modelId: string): boolean {
-  return !new Set(["liquid/lfm-2.5-1.2b-thinking:free"]).has(modelId);
+  const configured = getModelDefinition(modelId)?.toolCalling;
+  return configured ?? !new Set(["liquid/lfm-2.5-1.2b-thinking:free"]).has(modelId);
 }
 export function supportsVision(modelId: string): boolean {
   return getModelDefinition(modelId)?.input.includes("image") ?? false;

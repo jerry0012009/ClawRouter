@@ -1,0 +1,151 @@
+{
+  "study": "TwinRouterBench Phase 1E RouteLLM MF and P2L validation",
+  "execution_mode": "offline_cache_replay",
+  "input": {
+    "path": "../phase1d-foundation/outputs/acu_step_contexts.parquet",
+    "sha256": "287ae2e5087bbd731c1513a81a94ccf936ad356c25ca3a78f652dcb91129b6e4",
+    "rows": 970,
+    "twinrouterbench_github_commit": "430acecac71141de77afd8e5e13690d236d58e93",
+    "twinrouterbench_hf_revision": "c2907f006455d9d3b4bf69472a527536c7baa195"
+  },
+  "routers": {
+    "routellm_mf": {
+      "repository": "https://github.com/lm-sys/RouteLLM.git",
+      "commit": "0b64fdafe049e596a3f5657c219329f24af24198",
+      "checkpoint": "routellm/mf_gpt4_augmented",
+      "revision": "5eb3dc745cbe7cb16ca342ceb83b7f6ecf8c77c5",
+      "checkpoint_sha256": "bfc93d473b48f8b85ce719f0d7e8bb86a139fa052e8b0c3ac387eabf45e47293",
+      "strong_model": "gpt-4-1106-preview",
+      "weak_model": "mixtral-8x7b-instruct-v0.1",
+      "embedding_model": "text-embedding-3-small",
+      "dimensions": 1536
+    },
+    "p2l_135m": {
+      "repository": "https://github.com/lmarena/p2l.git",
+      "commit": "a905fa5ea94a75fdf157d73e27bd3c63ac1ebeb1",
+      "model": "lmarena-ai/p2l-135m-grk-01112025",
+      "revision": "2b642ae1ce114fb54e468e4c676f122135bcf11b",
+      "model_sha256": "1ac660b56b95e08fdc48523423c23d8c21d50cd65005d079c781e0cdffba4790",
+      "cpu_threads": 4,
+      "dtype": "float32",
+      "attention_implementation": "sdpa"
+    }
+  },
+  "asset_audit": {
+    "routellm_source_sha256": "81072b840e6dd389888e9f7a7198342693beab37b06aeab690083d67663da7ba",
+    "p2l_model_source_sha256": "795834768bce4bb6e38b2deeccc8ab514d506c29d3576248b96c324de7ce8017",
+    "p2l_eval_source_sha256": "bedf4a338365dc713e3940a9039805a6ae8288a143c8c1f9858ff56dffd71f39",
+    "p2l_model_list_sha256": "7a4e145dbbe841b986d570e5be36fd634f7451f9f0676599cf465cac32601e52"
+  },
+  "request_audits": {
+    "preflight__routellm_mf__last_message": {
+      "request_count": 0,
+      "embedding_request_count": 0,
+      "completion_request_count": 0,
+      "request_paths": {}
+    },
+    "preflight__routellm_mf__full_agent_context": {
+      "request_count": 0,
+      "embedding_request_count": 0,
+      "completion_request_count": 0,
+      "request_paths": {}
+    },
+    "full__routellm_mf__last_message": {
+      "request_count": 0,
+      "embedding_request_count": 0,
+      "completion_request_count": 0,
+      "request_paths": {}
+    },
+    "full__routellm_mf__full_agent_context": {
+      "request_count": 0,
+      "embedding_request_count": 0,
+      "completion_request_count": 0,
+      "request_paths": {}
+    }
+  },
+  "runtime": {
+    "python": "3.12.3",
+    "platform": "Linux-6.8.0-134-generic-x86_64-with-glibc2.39",
+    "dependencies": {
+      "numpy": "1.26.4",
+      "pandas": "2.2.3",
+      "pyarrow": "21.0.0",
+      "scipy": "1.15.3",
+      "scikit-learn": "1.7.1",
+      "matplotlib": "3.10.3",
+      "PyYAML": "6.0.3",
+      "psutil": "6.1.1",
+      "safetensors": "0.5.3",
+      "openai": "1.97.1",
+      "httpx": "0.28.1",
+      "tiktoken": "0.9.0",
+      "torch": "2.4.0+cpu",
+      "transformers": "4.47.1",
+      "huggingface-hub": "0.27.1"
+    }
+  },
+  "parameters": {
+    "bootstrap_samples": 10000,
+    "bootstrap_unit": "instance_id",
+    "random_seed": 20260726,
+    "preflight_count": 20,
+    "embedding_max_tokens": 8191,
+    "p2l_max_tokens": 8192
+  },
+  "input_file_sha256": "287ae2e5087bbd731c1513a81a94ccf936ad356c25ca3a78f652dcb91129b6e4",
+  "chart_map": [
+    {
+      "file": "figures/router_score_by_tier.png",
+      "family": "distribution",
+      "source": "router_raw_scores.parquet"
+    },
+    {
+      "file": "figures/context_gain_comparison.png",
+      "family": "comparison",
+      "source": "context_gain_metrics.csv"
+    },
+    {
+      "file": "figures/ordinal_roc_comparison.png",
+      "family": "comparison",
+      "source": "zero_shot_metrics.csv"
+    },
+    {
+      "file": "figures/router_vs_simple_baselines.png",
+      "family": "ranking",
+      "source": "zero_shot_metrics.csv + simple_baseline_metrics.csv"
+    },
+    {
+      "file": "figures/calibration_curves.png",
+      "family": "uncertainty",
+      "source": "calibrated_probabilities.parquet"
+    },
+    {
+      "file": "figures/balanced_confusion_matrix.png",
+      "family": "matrix",
+      "source": "balanced_challenge_metrics.csv"
+    },
+    {
+      "file": "figures/difficulty_sufficiency_curves.png",
+      "family": "ordered relationship",
+      "source": "calibrated_probabilities.parquet"
+    },
+    {
+      "file": "figures/cost_quality_frontier.png",
+      "family": "relationship",
+      "source": "product_policy_metrics.csv"
+    },
+    {
+      "file": "figures/representative_model_selection.png",
+      "family": "comparison",
+      "source": "representative_decisions.csv"
+    }
+  ],
+  "execution_boundary": {
+    "completion_calls": 0,
+    "llm_judge_calls": 0,
+    "answers_generated": 0,
+    "docker_tasks": 0,
+    "production_code_modified": false,
+    "cost_field_from_benchmark_used": false
+  }
+}

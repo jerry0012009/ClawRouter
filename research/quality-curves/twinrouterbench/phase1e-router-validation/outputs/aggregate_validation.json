@@ -1,0 +1,95 @@
+{
+  "study": "TwinRouterBench Phase 1E RouteLLM MF and P2L validation",
+  "primary_analysis_name": "published-label product analysis",
+  "data": {
+    "record_count": 970,
+    "instance_count": 520,
+    "tier_counts": {
+      "low": 689,
+      "mid": 62,
+      "mid_high": 49,
+      "high": 170
+    },
+    "strong_label_count": 634,
+    "weak_swebench_count": 336,
+    "split_counts": {
+      "train": 586,
+      "validation": 218,
+      "test": 166
+    }
+  },
+  "headline_metrics": {
+    "routellm_mf": {
+      "ordinal_auc": 0.7870273803106663,
+      "spearman": 0.44932758712633186,
+      "context_auc_gain": -0.047511059962165536,
+      "incremental_auc": -0.004715340820977798,
+      "balanced_auc": 0.5337543884925888,
+      "swebench_auc": 0.48673916387606714
+    },
+    "p2l_135m": {
+      "ordinal_auc": 0.8435197815987664,
+      "spearman": 0.5314415098112245,
+      "context_auc_gain": -0.023197980395906592,
+      "incremental_auc": -0.001818181740714686,
+      "balanced_auc": 0.618208538843351,
+      "swebench_auc": 0.5490644928059601
+    }
+  },
+  "go_no_go": {
+    "router_outcomes": {
+      "routellm_mf": {
+        "status": "NO-GO",
+        "go_conditions": {
+          "ordinal_auc_at_least_0_60": true,
+          "spearman_positive": true,
+          "full_context_auc_gain_positive": false,
+          "incremental_auc_positive": false,
+          "balanced_challenge_above_random": true
+        },
+        "full_context_ordinal_auc": 0.7870273803106663,
+        "full_context_spearman": 0.44932758712633186,
+        "full_minus_last_ordinal_auc": -0.047511059962165536,
+        "incremental_ordinal_auc": -0.004715340820977798,
+        "balanced_ordinal_auc": 0.5337543884925888,
+        "swebench_ordinal_auc": 0.48673916387606714
+      },
+      "p2l_135m": {
+        "status": "NO-GO",
+        "go_conditions": {
+          "ordinal_auc_at_least_0_60": true,
+          "spearman_positive": true,
+          "full_context_auc_gain_positive": false,
+          "incremental_auc_positive": false,
+          "balanced_challenge_above_random": true
+        },
+        "full_context_ordinal_auc": 0.8435197815987664,
+        "full_context_spearman": 0.5314415098112245,
+        "full_minus_last_ordinal_auc": -0.023197980395906592,
+        "incremental_ordinal_auc": -0.001818181740714686,
+        "balanced_ordinal_auc": 0.618208538843351,
+        "swebench_ordinal_auc": 0.5490644928059601
+      }
+    },
+    "recommendation": "Stop general pretrained-router experiments and proceed to Phase 1F LLM Judge.",
+    "enter_llm_judge": true
+  },
+  "validation": {
+    "raw_context_router_rows": 3880,
+    "each_router_view_has_970": true,
+    "finite_raw_scores": true,
+    "probabilities_sum_to_one": true,
+    "sufficiency_monotone": true,
+    "same_instance_cross_split_count": 0,
+    "same_leakage_group_cross_split_count": 0,
+    "completion_calls": 0,
+    "p2l_peak_rss_under_7_gib": true,
+    "figures_from_committed_csv_or_parquet": true
+  },
+  "limitations": [
+    "Published labels are the product target, not strict ground truth.",
+    "336 SWE-bench rows retain weak_degradation_search confidence.",
+    "Compatible-gateway embeddings cannot independently attest the upstream OpenAI snapshot.",
+    "Synthetic tier prices and model IDs validate interfaces only."
+  ]
+}

@@ -81,11 +81,11 @@
     return ({ structured_extraction: 256, writing: 600, summary: 600, code_fix: 900, reasoning: 4096, general: 800 })[task === 'auto' ? detected : task] || 800;
   }
 
-  async function planTask(messages, qualityTarget, maxTokens) {
+  async function planTask(messages, qualityTarget, expectedOutputTokens) {
     const response = await safeFetch(`${API}/acu/api/plan`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
-      body: JSON.stringify({ messages, quality_target: qualityTarget, expected_output_tokens: maxTokens }),
+      body: JSON.stringify({ messages, quality_target: qualityTarget, expected_output_tokens: expectedOutputTokens }),
     });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error?.message || '任务评估失败');

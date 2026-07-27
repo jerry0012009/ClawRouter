@@ -58,9 +58,10 @@
   }
 
   function autoFit(mode = state.mode) {
-    if (!state.evaluation) return;
+    const evaluation = state.evaluation || state.plan;
+    if (!evaluation) return;
     state.views[mode] = mode === 'all'
-      ? { x: core.autoDifficultyDomain(state.evaluation.difficultyScore), global: false }
+      ? { x: core.autoDifficultyDomain(evaluation.difficultyScore), global: false }
       : { x: [0, 100], global: true };
     drawChart();
   }
@@ -289,6 +290,18 @@
     drawChart();
   }
 
+  function centerCurrentDifficulty() {
+    const evaluation = state.evaluation || state.plan;
+    if (!evaluation) return;
+    const view = currentView(), span = view.x[1] - view.x[0];
+    view.x = core.normalizeDomain([
+      evaluation.difficultyScore - span / 2,
+      evaluation.difficultyScore + span / 2,
+    ], span);
+    view.global = view.x[0] === 0 && view.x[1] === 100;
+    drawChart();
+  }
+
   function nearestModel(event) {
     const geometry = state.geometry;
     if (!geometry) return null;
@@ -359,7 +372,7 @@
       else if (action === 'global') { state.views[state.mode] = { x: [0, 100], global: true }; drawChart(); }
     }));
     $('acu-model-sort').addEventListener('change', renderModelList);
-    $('acu-integrated-legend').addEventListener('click', (event) => { const row = event.target.closest('[data-model-id]'); if (row) { lockModel(row.dataset.modelId); const point = state.geometry?.points.find((item) => item.modelId === row.dataset.modelId); if (point) { const rect = $('acu-integrated-chart').getBoundingClientRect(); showTooltip(row.dataset.modelId, rect.left + point.px, rect.top + point.py, true); } } });
+    $('acu-integrated-legend').addEventListener('click', (event) => { const row = event.target.closest('[data-model-id]'); if (row) { lockModel(row.dataset.modelId); if (state.mode === 'all') centerCurrentDifficulty(); const point = state.geometry?.points.find((item) => item.modelId === row.dataset.modelId); if (point) { const rect = $('acu-integrated-chart').getBoundingClientRect(); showTooltip(row.dataset.modelId, rect.left + point.px, rect.top + point.py, true); } } });
   }
 
   window.addEventListener('acu:plan', (event) => {

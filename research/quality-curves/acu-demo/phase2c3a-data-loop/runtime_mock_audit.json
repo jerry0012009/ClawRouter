@@ -1,0 +1,18 @@
+{
+  "audited_at": "2026-07-27T10:34:00Z",
+  "scope": [
+    "src",
+    "dist",
+    "public",
+    "/opt/clawrouter-dev"
+  ],
+  "excluded_from_runtime_scan": [
+    "source maps",
+    "test files"
+  ],
+  "mock_provider_or_fixture_matches": 0,
+  "allow_mock_runtime_configuration": false,
+  "production_guard_present": true,
+  "guard_message": "Mock ACU Judge providers are forbidden outside tests unless ACU_ALLOW_MOCK=true",
+  "conclusion": "No fixed Judge result, fixture, or mock provider is present in the non-test runtime paths. The only mock-related runtime match is the fail-closed guard."
+}

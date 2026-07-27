@@ -1,4 +1,5 @@
-export const ACU_PROMPT_VERSION = "acu-tier-requirement-v1";
+export const ACU_PROMPT_VERSION = "acu-tier-requirement-v2";
+export const ACU_ROUTING_MODEL_VERSION = "acu-routing-model-v0.1";
 export const ACU_DEFAULT_JUDGE_MODEL = "deepseek-v4-flash";
 export const ACU_DEFAULT_JUDGE_BASE_URL = "https://api.deepseek.com";
 export const ACU_DEFAULT_JUDGE_MODE = "non-thinking" as const;
@@ -7,6 +8,8 @@ export const ACU_DEFAULT_MAX_CONTEXT_TOKENS = 6_000;
 export const ACU_DEFAULT_MAX_OUTPUT_TOKENS = 300;
 export const ACU_DEFAULT_QUALITY_TARGET = 0.8;
 export const ACU_DEFAULT_SWITCH_COST_USD = 0.0002;
+export const ACU_DEFAULT_JUDGE_ENTROPY_PENALTY = 3;
+export const ACU_DEFAULT_DATABASE_PATH = "/var/lib/clawrouter-dev/acu-routing.db";
 
 export const ACU_TIER_DIFFICULTY = {
   low: 0.15,
@@ -35,6 +38,11 @@ function positiveInteger(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function booleanValue(value: string | undefined, fallback = false): boolean {
+  if (value === undefined) return fallback;
+  return value.trim().toLowerCase() === "true";
+}
+
 export type AcuRuntimeConfig = {
   enabled: boolean;
   judgeModel: string;
@@ -46,10 +54,15 @@ export type AcuRuntimeConfig = {
   maxOutputTokens: number;
   apiKey?: string;
   cachePath?: string;
+  allowMock: boolean;
+  shadowMode: boolean;
+  allowForceRefresh: boolean;
+  databasePath: string;
+  judgeEntropyPenalty: number;
 };
 
 export function readAcuRuntimeConfig(overrides: Partial<AcuRuntimeConfig> = {}): AcuRuntimeConfig {
-  const enabled = process.env.ACU_DEMO_ROUTER_ENABLED?.trim().toLowerCase() === "true";
+  const enabled = booleanValue(process.env.ACU_DEMO_ROUTER_ENABLED);
   return {
     enabled,
     judgeModel: process.env.ACU_JUDGE_MODEL?.trim() || ACU_DEFAULT_JUDGE_MODEL,
@@ -64,6 +77,13 @@ export function readAcuRuntimeConfig(overrides: Partial<AcuRuntimeConfig> = {}):
     maxOutputTokens: ACU_DEFAULT_MAX_OUTPUT_TOKENS,
     apiKey: process.env.ACU_JUDGE_API_KEY?.trim() || process.env.DEEPSEEK_API_KEY?.trim(),
     cachePath: process.env.ACU_JUDGE_CACHE_PATH?.trim(),
+    allowMock: booleanValue(process.env.ACU_ALLOW_MOCK),
+    shadowMode: booleanValue(process.env.ACU_SHADOW_MODE, true),
+    allowForceRefresh: booleanValue(process.env.ACU_ALLOW_FORCE_JUDGE_REFRESH, false),
+    databasePath: process.env.ACU_DATABASE_PATH?.trim() || ACU_DEFAULT_DATABASE_PATH,
+    judgeEntropyPenalty: Number.isFinite(Number(process.env.ACU_JUDGE_ENTROPY_PENALTY))
+      ? Math.max(0, Number(process.env.ACU_JUDGE_ENTROPY_PENALTY))
+      : ACU_DEFAULT_JUDGE_ENTROPY_PENALTY,
     ...overrides,
   };
 }

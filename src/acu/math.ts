@@ -54,6 +54,13 @@ export function difficultyScore(probabilities: AcuTierProbabilities): number {
   );
 }
 
+export function normalizedEntropy(probabilities: AcuTierProbabilities): number {
+  const normalized = normalizeProbabilities(probabilities);
+  const values = [normalized.pLow, normalized.pMid, normalized.pMidHigh, normalized.pHigh];
+  const entropy = -values.reduce((sum, value) => sum + (value > 0 ? value * Math.log(value) : 0), 0);
+  return entropy / Math.log(values.length);
+}
+
 export function tierSufficiency(abilityParameter: number): {
   sufficientLow: number;
   sufficientMid: number;

@@ -37,6 +37,7 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
         const content = visible.includes("JUDGE_FAILURE")
           ? "not valid judge json"
           : JSON.stringify({
+            difficulty_score: 14,
             p_low: 0.7,
             p_mid: 0.2,
             p_mid_high: 0.08,
@@ -75,6 +76,8 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
         apiKey: "test-deepseek-key",
         judgeBaseUrl: baseUrl,
         cachePath: join(temporaryDirectory, "judge-cache.json"),
+        databasePath: join(temporaryDirectory, "acu-routing.db"),
+        allowForceRefresh: true,
       },
     });
   });
@@ -88,9 +91,13 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
   it("serves the ACU frontend and complete model catalog", async () => {
     const page = await fetch(`${proxy.baseUrl}/acu`, { headers: { Authorization: AUTHORIZATION } });
     expect(page.status).toBe(200);
-    expect(await page.text()).toContain("请求难度与模型价值路由");
+    expect(await page.text()).toContain("成本 × 质量优化演示");
 
-    for (const assetPath of ["/public/acu.css", "/public/acu.js", "/acu/public/acu.css", "/acu/public/acu.js"]) {
+    const debugPage = await fetch(`${proxy.baseUrl}/acu-debug`, { headers: { Authorization: AUTHORIZATION } });
+    expect(debugPage.status).toBe(200);
+    expect(await debugPage.text()).toContain("请求难度与模型价值路由");
+
+    for (const assetPath of ["/public/acu.css", "/public/acu.js", "/acu/public/acu.css", "/acu/public/acu.js", "/acu-debug/public/acu.css", "/acu-debug/public/acu.js"]) {
       const asset = await fetch(`${proxy.baseUrl}${assetPath}`, { headers: { Authorization: AUTHORIZATION } });
       expect(asset.status, assetPath).toBe(200);
     }
@@ -125,14 +132,43 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
     });
     expect(response.status).toBe(200);
     const evaluation = await response.json() as {
+      requestId: string;
       judgeStatus: string;
       difficultyScore: number;
       recommendation: { recommended: { modelId: string; expectedTotalCost: number } };
     };
-    expect(evaluation.judgeStatus).toBe("success");
+    expect(evaluation.judgeStatus).toBe("live");
     expect(evaluation.difficultyScore).toBeCloseTo(14, 10);
     expect(evaluation.recommendation.recommended.modelId).toBeTruthy();
     expect(evaluation.recommendation.recommended.expectedTotalCost).toBeGreaterThan(0);
+
+    const feedback = await fetch(`${proxy.baseUrl}/acu/api/feedback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: AUTHORIZATION },
+      body: JSON.stringify({ request_id: evaluation.requestId, accepted: true, rating: 5, required_upgrade: false }),
+    });
+    expect(feedback.status).toBe(201);
+    const summary = await fetch(`${proxy.baseUrl}/acu/api/data-summary`, { headers: { Authorization: AUTHORIZATION } });
+    const data = await summary.json() as { realRequestCount: number; labeledRequestCount: number; sampleNotice: string };
+    expect(data.realRequestCount).toBeGreaterThanOrEqual(1);
+    expect(data.labeledRequestCount).toBeGreaterThanOrEqual(1);
+    expect(data.sampleNotice).toContain("样本量较小");
+  });
+
+  it("bypasses only the Judge cache when force_judge_refresh is requested", async () => {
+    const body = { messages: [{ role: "user", content: "A unique cache refresh check." }], expected_output_tokens: 40 };
+    const call = (force = false) => fetch(`${proxy.baseUrl}/acu/api/evaluate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: AUTHORIZATION },
+      body: JSON.stringify({ ...body, force_judge_refresh: force }),
+    }).then((response) => response.json()) as Promise<{ judgeStatus: string; contextSha256: string }>;
+    const first = await call();
+    const cached = await call();
+    const refreshed = await call(true);
+    expect(first.judgeStatus).toBe("live");
+    expect(cached.judgeStatus).toBe("cache_hit");
+    expect(refreshed.judgeStatus).toBe("live");
+    expect(new Set([first.contextSha256, cached.contextSha256, refreshed.contextSha256]).size).toBe(1);
   });
 
   it("routes an auto request through the Judge without a Completion call to the Judge model", async () => {
@@ -152,7 +188,7 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
     const payload = await response.json() as {
       acu_trace?: { acu_demo?: { judgeStatus: string }; selected_model?: string };
     };
-    expect(payload.acu_trace?.acu_demo?.judgeStatus).toBe("success");
+    expect(payload.acu_trace?.acu_demo?.judgeStatus).toBe("live");
     expect(receivedModels[0]).toBe("deepseek-v4-flash");
     expect(receivedModels).toHaveLength(2);
     expect(receivedModels[1]).toBe(payload.acu_trace?.selected_model);

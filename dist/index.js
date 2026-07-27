@@ -8,7 +8,7 @@ var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require
 
 // src/proxy.ts
 import { createServer } from "http";
-import { createHash as createHash6, randomUUID } from "crypto";
+import { createHash as createHash7, randomUUID as randomUUID2 } from "crypto";
 
 // src/router/rules.ts
 function scoreTokenCount(estimatedTokens, thresholds) {
@@ -4182,10 +4182,11 @@ function validateAssistantOutput(args) {
 }
 
 // src/acu/strategy.ts
-import { createHash as createHash5 } from "crypto";
+import { createHash as createHash5, randomUUID } from "crypto";
 
 // src/acu/config.ts
-var ACU_PROMPT_VERSION = "acu-tier-requirement-v1";
+var ACU_PROMPT_VERSION = "acu-tier-requirement-v2";
+var ACU_ROUTING_MODEL_VERSION = "acu-routing-model-v0.1";
 var ACU_DEFAULT_JUDGE_MODEL = "deepseek-v4-flash";
 var ACU_DEFAULT_JUDGE_BASE_URL = "https://api.deepseek.com";
 var ACU_DEFAULT_JUDGE_MODE = "non-thinking";
@@ -4194,6 +4195,8 @@ var ACU_DEFAULT_MAX_CONTEXT_TOKENS = 6e3;
 var ACU_DEFAULT_MAX_OUTPUT_TOKENS = 300;
 var ACU_DEFAULT_QUALITY_TARGET = 0.8;
 var ACU_DEFAULT_SWITCH_COST_USD = 2e-4;
+var ACU_DEFAULT_JUDGE_ENTROPY_PENALTY = 3;
+var ACU_DEFAULT_DATABASE_PATH = "/var/lib/clawrouter-dev/acu-routing.db";
 var ACU_TIER_DIFFICULTY = {
   low: 0.15,
   mid: 0.4,
@@ -4214,8 +4217,12 @@ function positiveInteger(value, fallback) {
   const parsed = Number.parseInt(value ?? "", 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
+function booleanValue(value, fallback = false) {
+  if (value === void 0) return fallback;
+  return value.trim().toLowerCase() === "true";
+}
 function readAcuRuntimeConfig(overrides = {}) {
-  const enabled = process.env.ACU_DEMO_ROUTER_ENABLED?.trim().toLowerCase() === "true";
+  const enabled = booleanValue(process.env.ACU_DEMO_ROUTER_ENABLED);
   return {
     enabled,
     judgeModel: process.env.ACU_JUDGE_MODEL?.trim() || ACU_DEFAULT_JUDGE_MODEL,
@@ -4230,6 +4237,11 @@ function readAcuRuntimeConfig(overrides = {}) {
     maxOutputTokens: ACU_DEFAULT_MAX_OUTPUT_TOKENS,
     apiKey: process.env.ACU_JUDGE_API_KEY?.trim() || process.env.DEEPSEEK_API_KEY?.trim(),
     cachePath: process.env.ACU_JUDGE_CACHE_PATH?.trim(),
+    allowMock: booleanValue(process.env.ACU_ALLOW_MOCK),
+    shadowMode: booleanValue(process.env.ACU_SHADOW_MODE, true),
+    allowForceRefresh: booleanValue(process.env.ACU_ALLOW_FORCE_JUDGE_REFRESH, false),
+    databasePath: process.env.ACU_DATABASE_PATH?.trim() || ACU_DEFAULT_DATABASE_PATH,
+    judgeEntropyPenalty: Number.isFinite(Number(process.env.ACU_JUDGE_ENTROPY_PENALTY)) ? Math.max(0, Number(process.env.ACU_JUDGE_ENTROPY_PENALTY)) : ACU_DEFAULT_JUDGE_ENTROPY_PENALTY,
     ...overrides
   };
 }
@@ -4270,6 +4282,12 @@ function normalizeProbabilities(value) {
 function difficultyScore(probabilities) {
   const normalized = normalizeProbabilities(probabilities);
   return 100 * (normalized.pMid / 3 + 2 * normalized.pMidHigh / 3 + normalized.pHigh);
+}
+function normalizedEntropy(probabilities) {
+  const normalized = normalizeProbabilities(probabilities);
+  const values = [normalized.pLow, normalized.pMid, normalized.pMidHigh, normalized.pHigh];
+  const entropy = -values.reduce((sum, value) => sum + (value > 0 ? value * Math.log(value) : 0), 0);
+  return entropy / Math.log(values.length);
 }
 function tierSufficiency(abilityParameter) {
   const calculate = (difficulty) => ACU_COMMON_FLOOR + (ACU_COMMON_CEILING - ACU_COMMON_FLOOR) * sigmoid((abilityParameter - difficulty) / ACU_SHARED_TEMPERATURE);
@@ -4359,7 +4377,7 @@ var model_catalog_default = {
       model: "deepseek-v4-flash",
       baseUrl: "https://api.deepseek.com",
       mode: "non-thinking",
-      promptVersion: "acu-tier-requirement-v1",
+      promptVersion: "acu-tier-requirement-v2",
       timeoutMs: 8e3,
       maxContextTokens: 6e3,
       maxOutputTokens: 300
@@ -5812,6 +5830,27 @@ function buildModelCurve(model) {
   }
   return points;
 }
+function interpolateModelCurve(model, difficultyScore2) {
+  const bounded = Math.max(0, Math.min(100, difficultyScore2));
+  const lowerIndex = Math.floor(bounded);
+  const upperIndex = Math.ceil(bounded);
+  const curve = buildModelCurve(model);
+  if (lowerIndex === upperIndex) return curve[lowerIndex];
+  const fraction = bounded - lowerIndex;
+  const lower = curve[lowerIndex];
+  const upper = curve[upperIndex];
+  const interpolate = (left, right) => left + (right - left) * fraction;
+  return {
+    difficultyScore: bounded,
+    pLow: interpolate(lower.pLow, upper.pLow),
+    pMid: interpolate(lower.pMid, upper.pMid),
+    pMidHigh: interpolate(lower.pMidHigh, upper.pMidHigh),
+    pHigh: interpolate(lower.pHigh, upper.pHigh),
+    estimatedQuality: interpolate(lower.estimatedQuality, upper.estimatedQuality),
+    qualityLower: interpolate(lower.qualityLower, upper.qualityLower),
+    qualityUpper: interpolate(lower.qualityUpper, upper.qualityUpper)
+  };
+}
 function publicCatalogPayload() {
   return {
     schemaVersion: catalog.schemaVersion,
@@ -5833,9 +5872,10 @@ function estimateCallCost(model, inputTokens, outputTokens) {
   }
   return (Math.max(0, inputTokens) * model.inputPricePerMillion + Math.max(0, outputTokens) * model.outputPricePerMillion) / 1e6;
 }
-function estimateOne(model, probabilities, inputTokens, outputTokens, judgeCost, fallbackCallCost, qualityTarget, switchCost) {
-  const quality = estimatedQuality(probabilities, model);
-  const lower = clamp(quality - model.uncertaintyWidth);
+function estimateOne(model, difficultyScore2, entropyPenalty, inputTokens, outputTokens, judgeCost, fallbackCallCost, qualityTarget, switchCost) {
+  const curvePoint = interpolateModelCurve(model, difficultyScore2);
+  const quality = curvePoint.estimatedQuality;
+  const lower = clamp(quality - model.uncertaintyWidth - entropyPenalty / 100);
   const upper = clamp(quality + model.uncertaintyWidth);
   const callCost = estimateCallCost(model, inputTokens, outputTokens);
   const expectedFallbackCost = (1 - lower) * (fallbackCallCost + switchCost);
@@ -5902,6 +5942,9 @@ function selectValueRoute(candidates, targetScore) {
 }
 function recommendModel(input) {
   const probabilities = normalizeProbabilities(input.probabilities);
+  const entropy = normalizedEntropy(probabilities);
+  const entropyPenalty = entropy * Math.max(0, input.judgeEntropyPenalty ?? 0);
+  const difficulty = Math.max(0, Math.min(100, input.difficultyScore));
   const qualityTarget = clamp(input.qualityTarget ?? ACU_DEFAULT_QUALITY_TARGET);
   const inputTokens = Math.max(1, Math.round(input.inputTokens));
   const outputTokens = Math.max(1, Math.round(input.expectedOutputTokens));
@@ -5915,7 +5958,8 @@ function recommendModel(input) {
   const fallbackCallCost = estimateCallCost(fallback, inputTokens, outputTokens);
   const estimates = models.map((model) => estimateOne(
     model,
-    probabilities,
+    difficulty,
+    entropyPenalty,
     inputTokens,
     outputTokens,
     Math.max(0, input.judgeCost),
@@ -5969,7 +6013,7 @@ import { dirname as dirname2, join as join5 } from "path";
 
 // src/acu/catalog/twin-few-shots.json
 var twin_few_shots_default = {
-  promptVersion: "acu-tier-requirement-v1",
+  promptVersion: "acu-tier-requirement-v2",
   examples: [
     {
       exampleId: "low-1",
@@ -6106,30 +6150,77 @@ Received arguments:
 };
 
 // src/acu/judge.ts
+function canonicalValue(value) {
+  if (Array.isArray(value)) return value.map(canonicalValue);
+  if (!value || typeof value !== "object") return value;
+  const record = value;
+  if (record.type === "image_url" || "image_url" in record) return "[IMAGE]";
+  return Object.fromEntries(Object.keys(record).sort().map((key) => [key, canonicalValue(record[key])]));
+}
+function stableJson(value) {
+  return JSON.stringify(canonicalValue(value));
+}
 function contentText(content) {
   if (typeof content === "string") return content;
+  if (content === null || content === void 0) return "";
   if (Array.isArray(content)) {
     return content.map((part) => {
       if (typeof part === "string") return part;
       if (!part || typeof part !== "object") return String(part ?? "");
       const value = part;
+      if (value.type === "image_url" || "image_url" in value) return "[IMAGE]";
       if (typeof value.text === "string") return value.text;
-      if (typeof value.content === "string") return value.content;
-      if (value.type === "image_url") return "[IMAGE]";
-      return JSON.stringify(value);
+      return stableJson(value);
     }).join("\n");
   }
-  return content === void 0 ? "" : JSON.stringify(content);
+  return stableJson(content);
+}
+function serializeToolCall(call) {
+  const value = call && typeof call === "object" ? call : {};
+  const fn = value.function && typeof value.function === "object" ? value.function : {};
+  const id = String(value.id ?? "unknown");
+  const name = String(fn.name ?? value.name ?? "unknown");
+  let args = fn.arguments ?? value.arguments ?? {};
+  if (typeof args === "string") {
+    try {
+      args = JSON.parse(args);
+    } catch {
+    }
+  }
+  return `[ASSISTANT_TOOL_CALL id=${id}]
+name=${name}
+arguments=${typeof args === "string" ? args : stableJson(args)}`;
 }
 function serializeVisibleContext(messages, tools = []) {
-  const sections = messages.map((message) => {
-    const role = message.role.toUpperCase();
+  const sections = [];
+  for (const message of messages) {
+    const role = String(message.role || "unknown").toLowerCase();
+    const text = contentText(message.content);
+    if (role === "tool") {
+      const id = String(message.tool_call_id ?? "unknown");
+      const name2 = String(message.name ?? "unknown");
+      const extra = Object.fromEntries(
+        Object.entries(message).filter(([key]) => !["role", "name", "content", "tool_call_id"].includes(key)).sort(([left], [right]) => left.localeCompare(right))
+      );
+      sections.push(`[TOOL_RESULT id=${id} name=${name2}]
+${text}${Object.keys(extra).length ? `
+metadata=${stableJson(extra)}` : ""}`);
+      continue;
+    }
     const name = message.name ? ` name=${message.name}` : "";
-    return `[${role}${name}]
-${contentText(message.content)}`;
-  });
+    if (text || !Array.isArray(message.tool_calls)) sections.push(`[${role.toUpperCase()}${name}]
+${text}`);
+    if (Array.isArray(message.tool_calls)) {
+      for (const call of message.tool_calls) sections.push(serializeToolCall(call));
+    }
+    const structured = Object.fromEntries(
+      Object.entries(message).filter(([key]) => !["role", "name", "content", "tool_calls", "tool_call_id"].includes(key)).sort(([left], [right]) => left.localeCompare(right))
+    );
+    if (Object.keys(structured).length) sections.push(`[${role.toUpperCase()}_METADATA]
+${stableJson(structured)}`);
+  }
   if (tools.length > 0) sections.push(`[AVAILABLE_TOOLS]
-${JSON.stringify(tools)}`);
+${stableJson(tools)}`);
   return sections.join("\n\n").trim();
 }
 function estimateVisibleTokens(text) {
@@ -6168,11 +6259,12 @@ function buildJudgeSystemPrompt() {
     `\u89E3\u91CA\uFF1A${example.explanation}`
   ].join("\n")).join("\n\n---\n\n");
   return [
-    "\u4F60\u662F ACU \u4EFB\u52A1\u80FD\u529B\u9700\u6C42\u5206\u7C7B\u5668\u3002\u5224\u65AD\u5F53\u524D\u5B8C\u6574\u3001\u53EF\u89C1 API \u4E0A\u4E0B\u6587\u4E2D\uFF0C\u5B8C\u6210\u4E0B\u4E00\u6B21\u6A21\u578B\u54CD\u5E94\u6240\u9700\u7684\u6700\u4F4E\u5145\u5206\u80FD\u529B\u6863\u4F4D\u3002",
-    "\u4E0D\u5F97\u56DE\u7B54\u539F\u4EFB\u52A1\uFF0C\u4E0D\u5F97\u63A8\u8350\u5177\u4F53\u6A21\u578B\uFF0C\u4E0D\u5F97\u8F93\u51FA\u4EE3\u7801\uFF0C\u4E0D\u5F97\u8F93\u51FA\u601D\u7EF4\u8FC7\u7A0B\u3002",
-    '\u53EA\u8F93\u51FA\u4E25\u683C JSON\uFF1A{"p_low":0,"p_mid":0,"p_mid_high":0,"p_high":0,"confidence":0,"signals":[],"explanation":""}',
+    "\u4F60\u662F ACU \u4EFB\u52A1\u80FD\u529B\u9700\u6C42\u5206\u7C7B\u5668\u3002\u5224\u65AD\u5F53\u524D\u5B8C\u6574\u3001\u53EF\u89C1 API \u4E0A\u4E0B\u6587\u4E2D\uFF0C\u5B8C\u6210\u4E0B\u4E00\u6B21\u6A21\u578B\u54CD\u5E94\u6240\u9700\u7684\u6700\u4F4E\u5145\u5206\u80FD\u529B\u3002",
+    "\u4E0D\u5F97\u56DE\u7B54\u539F\u4EFB\u52A1\uFF0C\u4E0D\u5F97\u63A8\u8350\u5177\u4F53\u6A21\u578B\uFF0C\u4E0D\u5F97\u6839\u636E\u6A21\u578B\u54C1\u724C\u5224\u65AD\uFF0C\u4E0D\u5F97\u8F93\u51FA\u4EE3\u7801\u6216\u601D\u7EF4\u8FC7\u7A0B\u3002",
+    '\u53EA\u8F93\u51FA\u4E25\u683C JSON\uFF1A{"difficulty_score":0,"p_low":0,"p_mid":0,"p_mid_high":0,"p_high":0,"confidence":0,"signals":[],"explanation":""}',
+    "difficulty_score\u662F0\u5230100\u7684\u8FDE\u7EED\u5224\u65AD\uFF0C\u4FDD\u7559\u4E00\u4F4D\u5C0F\u6570\uFF1Alow=0\u201429\uFF0Cmid=30\u201454\uFF0Cmid_high=55\u201479\uFF0Chigh=80\u2014100\u3002",
+    "\u6982\u7387\u8868\u8FBE\u5206\u7C7B\u4E0D\u786E\u5B9A\u6027\uFF1B\u9664\u6781\u5176\u660E\u786E\u5916\u4E0D\u8981\u673A\u68B0\u8F93\u51FA\u5355\u6863100%\uFF0C\u76F8\u90BB\u6863\u5B58\u5728\u5408\u7406\u53EF\u80FD\u65F6\u5E94\u7ED9\u8F6F\u6982\u7387\u3002difficulty_score\u4E0E\u4E3B\u8981\u6863\u4F4D\u5E94\u5927\u4F53\u4E00\u81F4\uFF0C\u4F46\u4E0D\u8981\u6C42\u7B49\u4E8E\u6982\u7387\u671F\u671B\u3002",
     "\u56DB\u6863\u6982\u7387\u5FC5\u987B\u57280\u52301\u4E14\u603B\u548C\u4E3A1\uFF1Bsignals\u6700\u591A5\u4E2A\uFF1Bexplanation\u4E0D\u8D85\u8FC780\u4E2A\u4E2D\u6587\u5B57\u7B26\u3002",
-    "low=\u5355\u4E00\u660E\u786E\u6267\u884C\uFF1Bmid=\u4E2D\u7B49\u7EA6\u675F\u6574\u5408\uFF1Bmid_high=\u590D\u6742\u4E0A\u4E0B\u6587\u4E0E\u5DE5\u5177\u72B6\u6001\u6574\u5408\uFF1Bhigh=\u9AD8\u98CE\u9669\u6216\u6DF1\u5C42\u591A\u6B65\u63A8\u7406\u3002",
     "\u4EE5\u4E0B\u793A\u4F8B\u53EA\u5305\u542B\u5F53\u65F6\u53EF\u89C1\u4E0A\u4E0B\u6587\uFF0C\u4E0D\u542B\u672A\u6765\u6D88\u606F\uFF1A",
     examples
   ].join("\n\n");
@@ -6183,13 +6275,26 @@ function extractJson(text) {
   const end = cleaned.lastIndexOf("}");
   if (start < 0 || end <= start) throw new Error("Judge response does not contain a JSON object");
   const parsed = JSON.parse(cleaned.slice(start, end + 1));
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("Judge response JSON must be an object");
-  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Judge response JSON must be an object");
   return parsed;
+}
+function scoreTier(score) {
+  if (score < 30) return 0;
+  if (score < 55) return 1;
+  if (score < 80) return 2;
+  return 3;
+}
+function dominantTier(result) {
+  const values = [result.pLow, result.pMid, result.pMidHigh, result.pHigh];
+  return values.indexOf(Math.max(...values));
+}
+function hasSevereTierConflict(result) {
+  return Math.abs(scoreTier(result.difficultyScore) - dominantTier(result)) >= 2;
 }
 function parseJudgeResult(text) {
   const parsed = extractJson(text);
+  const score = Number(parsed.difficulty_score);
+  if (!Number.isFinite(score) || score < 0 || score > 100) throw new Error("Judge difficulty_score must be finite and in [0, 100]");
   const probabilities = normalizeProbabilities({
     pLow: Number(parsed.p_low),
     pMid: Number(parsed.p_mid),
@@ -6203,28 +6308,24 @@ function parseJudgeResult(text) {
   if (typeof parsed.explanation !== "string" || Array.from(parsed.explanation).length > 80) {
     throw new Error("Judge explanation must be a string no longer than 80 characters");
   }
-  return {
-    ...probabilities,
-    signals: parsed.signals,
-    explanation: parsed.explanation
-  };
+  return { ...probabilities, difficultyScore: Math.round(score * 10) / 10, signals: parsed.signals, explanation: parsed.explanation };
 }
 function cachePath(config) {
-  return config.cachePath || join5(homedir4(), ".claw-router", "acu-judge-cache-v1.json");
+  return config.cachePath || join5(homedir4(), ".claw-router", "acu-judge-cache-v2.json");
 }
 function readCache(path) {
-  if (!existsSync(path)) return { schemaVersion: "acu-judge-cache-v1", entries: {} };
+  if (!existsSync(path)) return { schemaVersion: "acu-judge-cache-v2", entries: {} };
   try {
     const parsed = JSON.parse(readFileSync(path, "utf8"));
-    if (parsed.schemaVersion !== "acu-judge-cache-v1" || !parsed.entries) throw new Error("wrong schema");
+    if (parsed.schemaVersion !== "acu-judge-cache-v2" || !parsed.entries) throw new Error("wrong schema");
     return parsed;
   } catch {
-    return { schemaVersion: "acu-judge-cache-v1", entries: {} };
+    return { schemaVersion: "acu-judge-cache-v2", entries: {} };
   }
 }
 function writeCache(path, cache) {
   try {
-    mkdirSync(dirname2(path), { recursive: true });
+    mkdirSync(dirname2(path), { recursive: true, mode: 448 });
     const entries = Object.entries(cache.entries).slice(-2e3);
     const temporary = `${path}.${process.pid}.tmp`;
     writeFileSync(temporary, `${JSON.stringify({ ...cache, entries: Object.fromEntries(entries) }, null, 2)}
@@ -6233,18 +6334,24 @@ function writeCache(path, cache) {
   } catch {
   }
 }
+function endpointMetadata(baseUrl) {
+  const host = new URL(baseUrl).host;
+  const provider = host.includes("openrouter") ? "openrouter" : host.includes("deepseek") ? "deepseek" : "openai_compatible";
+  return { host, provider };
+}
 var AcuJudgeClient = class {
   constructor(config, fetchImplementation = fetch) {
     this.config = config;
     this.fetchImplementation = fetchImplementation;
+    if (fetchImplementation !== fetch && process.env.NODE_ENV !== "test" && !config.allowMock) {
+      throw new Error("Mock ACU Judge providers are forbidden outside tests unless ACU_ALLOW_MOCK=true");
+    }
   }
   config;
   fetchImplementation;
-  async judge(messages, tools = []) {
+  async judge(messages, tools = [], forceRefresh = false) {
     if (!this.config.apiKey) throw new Error("ACU Judge API key is not configured");
-    if (this.config.promptVersion !== twin_few_shots_default.promptVersion) {
-      throw new Error("ACU Judge prompt version does not match frozen few-shot data");
-    }
+    if (this.config.promptVersion !== twin_few_shots_default.promptVersion) throw new Error("ACU Judge prompt version does not match frozen few-shot data");
     const visible = serializeVisibleContext(messages, tools);
     const contextSha256 = createHash4("sha256").update(visible).digest("hex");
     const truncated = truncateVisibleContext(visible, this.config.maxContextTokens);
@@ -6254,38 +6361,44 @@ ${contextSha256}`).digest("hex");
     const path = cachePath(this.config);
     const cache = readCache(path);
     const cached = cache.entries[key];
-    if (cached) {
+    if (cached && !forceRefresh) {
       return {
         result: cached.result,
         status: "cache_hit",
+        resultSource: "disk_cache",
+        provider: cached.provider,
+        endpointHost: cached.endpointHost,
+        upstreamRequestId: cached.upstreamRequestId,
         latencyMs: 0,
         cost: 0,
-        promptTokens: cached.promptTokens ?? 0,
-        completionTokens: cached.completionTokens ?? 0,
+        promptTokens: cached.promptTokens,
+        completionTokens: cached.completionTokens,
+        usageStatus: cached.usageStatus,
         contextSha256,
+        cacheKeySha256: key,
+        cacheCreatedAt: cached.createdAt,
         contextTokenEstimate: truncated.tokenEstimate,
         contextTruncated: truncated.truncated
       };
     }
+    const metadata = endpointMetadata(this.config.judgeBaseUrl);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.config.timeoutMs);
     const started = Date.now();
-    let response;
     try {
-      response = await this.fetchImplementation(
-        `${this.config.judgeBaseUrl.replace(/\/$/, "")}/chat/completions`,
-        {
+      let lastPayload;
+      let lastResponse;
+      let result;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const response = await this.fetchImplementation(`${this.config.judgeBaseUrl.replace(/\/$/, "")}/chat/completions`, {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${this.config.apiKey}`,
-            "Content-Type": "application/json"
-          },
+          headers: { Authorization: `Bearer ${this.config.apiKey}`, "Content-Type": "application/json" },
           body: JSON.stringify({
             model: this.config.judgeModel,
             messages: [
               { role: "system", content: buildJudgeSystemPrompt() },
               { role: "user", content: `\u5F53\u524DAPI\u4E0A\u4E0B\u6587\uFF1A
-${truncated.text}` }
+${truncated.text}${attempt ? "\n\n\u4E0A\u6B21\u7ED3\u679C\u7684\u8FDE\u7EED\u5206\u6570\u4E0E\u4E3B\u8981\u6863\u4F4D\u4E25\u91CD\u51B2\u7A81\uFF0C\u8BF7\u91CD\u65B0\u68C0\u67E5\u5E76\u8F93\u51FA\u4E00\u81F4\u7ED3\u679C\u3002" : ""}` }
             ],
             temperature: 0,
             max_tokens: Math.min(300, this.config.maxOutputTokens),
@@ -6294,41 +6407,60 @@ ${truncated.text}` }
             stream: false
           }),
           signal: controller.signal
+        });
+        if (!response.ok) throw new Error(`ACU Judge HTTP ${response.status}`);
+        const payload = await response.json();
+        const content = payload?.choices?.[0]?.message?.content;
+        if (!content) throw new Error("ACU Judge returned no content");
+        const parsed = parseJudgeResult(content);
+        lastPayload = payload;
+        lastResponse = response;
+        if (!hasSevereTierConflict(parsed)) {
+          result = parsed;
+          break;
         }
-      );
+      }
+      if (!result || !lastPayload || !lastResponse) throw new Error("ACU Judge score remained inconsistent with its dominant tier after retry");
+      const usageStatus = lastPayload.usage?.prompt_tokens !== void 0 && lastPayload.usage?.completion_tokens !== void 0 ? "reported" : "usage_missing";
+      const promptTokens = lastPayload.usage?.prompt_tokens ?? truncated.tokenEstimate;
+      const completionTokens = lastPayload.usage?.completion_tokens ?? this.config.maxOutputTokens;
+      const cost = estimateCallCost(judgeModelPrice(), promptTokens, completionTokens);
+      const upstreamRequestId = lastPayload.id ?? lastResponse.headers.get("x-request-id");
+      const createdAt = (/* @__PURE__ */ new Date()).toISOString();
+      cache.entries[key] = {
+        result,
+        createdAt,
+        promptVersion: this.config.promptVersion,
+        model: this.config.judgeModel,
+        provider: metadata.provider,
+        endpointHost: metadata.host,
+        upstreamRequestId,
+        promptTokens,
+        completionTokens,
+        usageStatus
+      };
+      writeCache(path, cache);
+      return {
+        result,
+        status: "live",
+        resultSource: "upstream_live",
+        provider: metadata.provider,
+        endpointHost: metadata.host,
+        upstreamRequestId,
+        latencyMs: Date.now() - started,
+        cost,
+        promptTokens,
+        completionTokens,
+        usageStatus,
+        contextSha256,
+        cacheKeySha256: key,
+        cacheCreatedAt: createdAt,
+        contextTokenEstimate: truncated.tokenEstimate,
+        contextTruncated: truncated.truncated
+      };
     } finally {
       clearTimeout(timeout);
     }
-    const latencyMs = Date.now() - started;
-    if (!response.ok) throw new Error(`ACU Judge HTTP ${response.status}`);
-    const payload = await response.json();
-    const content = payload.choices?.[0]?.message?.content;
-    if (!content) throw new Error("ACU Judge returned no content");
-    const result = parseJudgeResult(content);
-    const price = judgeModelPrice();
-    const promptTokens = payload.usage?.prompt_tokens ?? truncated.tokenEstimate;
-    const completionTokens = payload.usage?.completion_tokens ?? this.config.maxOutputTokens;
-    const cost = estimateCallCost(price, promptTokens, completionTokens);
-    cache.entries[key] = {
-      result,
-      createdAt: (/* @__PURE__ */ new Date()).toISOString(),
-      promptVersion: this.config.promptVersion,
-      model: this.config.judgeModel,
-      promptTokens,
-      completionTokens
-    };
-    writeCache(path, cache);
-    return {
-      result,
-      status: "success",
-      latencyMs,
-      cost,
-      promptTokens,
-      completionTokens,
-      contextSha256,
-      contextTokenEstimate: truncated.tokenEstimate,
-      contextTruncated: truncated.truncated
-    };
   }
 };
 
@@ -6349,6 +6481,7 @@ function rulesFallbackJudge(decision) {
   });
   return {
     ...probabilities,
+    difficultyScore: { low: 15, mid: 42, mid_high: 67, high: 90 }[selected],
     signals: ["rules_strategy_fallback", decision.tier.toLowerCase()],
     explanation: "Difficulty Judge\u4E0D\u53EF\u7528\uFF0C\u5DF2\u4F7F\u7528\u73B0\u6709RulesStrategy\u5B89\u5168\u56DE\u9000\u3002"
   };
@@ -6364,6 +6497,15 @@ var AcuDemoStrategy = class {
   get enabled() {
     return this.config.enabled;
   }
+  get shadowMode() {
+    return this.config.shadowMode;
+  }
+  get allowForceRefresh() {
+    return this.config.allowForceRefresh;
+  }
+  get databasePath() {
+    return this.config.databasePath;
+  }
   async evaluate(input, rulesDecision) {
     const visible = serializeVisibleContext(input.messages, input.tools);
     const fallbackContext = truncateVisibleContext(visible, this.config.maxContextTokens);
@@ -6373,14 +6515,29 @@ var AcuDemoStrategy = class {
     let judgeCost = 0;
     let judgePromptTokens = 0;
     let judgeCompletionTokens = 0;
+    let judgeResultSource = "rules_strategy";
+    let judgeProvider = "rules_strategy";
+    let judgeEndpointHost = "none";
+    let upstreamRequestId = null;
+    let cacheKeySha256;
+    let cacheCreatedAt = (/* @__PURE__ */ new Date()).toISOString();
+    let usageStatus = "not_applicable";
+    let judgeErrorCategory;
     let contextSha256 = createHash5("sha256").update(visible).digest("hex");
     let contextTokenEstimate = estimateVisibleTokens(fallbackContext.text);
     let contextTruncated = fallbackContext.truncated;
     try {
       if (!this.config.enabled) throw new Error("ACU Demo Router feature flag is disabled");
-      const response = await this.judgeClient.judge(input.messages, input.tools);
+      const response = await this.judgeClient.judge(input.messages, input.tools, input.forceJudgeRefresh === true);
       judge = response.result;
       judgeStatus = response.status;
+      judgeResultSource = response.resultSource;
+      judgeProvider = response.provider;
+      judgeEndpointHost = response.endpointHost;
+      upstreamRequestId = response.upstreamRequestId;
+      cacheKeySha256 = response.cacheKeySha256;
+      cacheCreatedAt = response.cacheCreatedAt;
+      usageStatus = response.usageStatus;
       judgeLatencyMs = response.latencyMs;
       judgeCost = response.cost;
       judgePromptTokens = response.promptTokens;
@@ -6388,19 +6545,26 @@ var AcuDemoStrategy = class {
       contextSha256 = response.contextSha256;
       contextTokenEstimate = response.contextTokenEstimate;
       contextTruncated = response.contextTruncated;
-    } catch {
+    } catch (error) {
       judge = rulesFallbackJudge(rulesDecision);
       judgeStatus = "rules_fallback";
+      judgeErrorCategory = error instanceof Error ? error.message.slice(0, 160) : "unknown_live_error";
+      cacheKeySha256 = createHash5("sha256").update(`${this.config.promptVersion}
+${this.config.judgeModel}
+${contextSha256}`).digest("hex");
     }
+    const entropy = normalizedEntropy(judge);
     const recommendation = recommendModel({
       probabilities: judge,
+      difficultyScore: judge.difficultyScore,
       inputTokens: contextTokenEstimate,
       expectedOutputTokens: input.expectedOutputTokens ?? 800,
       judgeCost,
       qualityTarget: input.qualityTarget,
       eligibleModelIds: input.eligibleModelIds,
       requireToolCallSupport: input.requireToolCallSupport,
-      requireVisionSupport: input.requireVisionSupport
+      requireVisionSupport: input.requireVisionSupport,
+      judgeEntropyPenalty: this.config.judgeEntropyPenalty
     });
     return {
       estimateLabel: "public-benchmark constrained estimate",
@@ -6409,6 +6573,14 @@ var AcuDemoStrategy = class {
       judgeMode: "non-thinking",
       judge,
       judgeStatus,
+      judgeResultSource,
+      judgeProvider,
+      judgeEndpointHost,
+      upstreamRequestId,
+      cacheKeySha256,
+      cacheCreatedAt,
+      usageStatus,
+      ...judgeErrorCategory && { judgeErrorCategory },
       judgeLatencyMs,
       judgeCost,
       judgePromptTokens,
@@ -6416,13 +6588,305 @@ var AcuDemoStrategy = class {
       contextSha256,
       contextTokenEstimate,
       contextTruncated,
-      difficultyScore: difficultyScore(judge),
+      difficultyScore: judge.difficultyScore,
+      judgeEntropy: entropy,
+      routingModelVersion: ACU_ROUTING_MODEL_VERSION,
+      shadowMode: this.config.shadowMode,
+      requestId: input.requestId || randomUUID(),
       qualityTarget: input.qualityTarget ?? 0.8,
       recommendation,
       disclaimer: ACU_DEMO_DISCLAIMER
     };
   }
 };
+
+// src/acu/storage.ts
+import { createHash as createHash6 } from "crypto";
+import { chmodSync, mkdirSync as mkdirSync2 } from "fs";
+import { createRequire as createRequire2 } from "module";
+import { dirname as dirname3 } from "path";
+var require3 = createRequire2(import.meta.url);
+function bool(value) {
+  return value === void 0 ? null : value ? 1 : 0;
+}
+function quantile(values, fraction) {
+  if (values.length === 0) return null;
+  const ordered = [...values].sort((left, right) => left - right);
+  const index = (ordered.length - 1) * fraction;
+  const lower = Math.floor(index);
+  const upper = Math.ceil(index);
+  return ordered[lower] + (ordered[upper] - ordered[lower]) * (index - lower);
+}
+function hashSession(value) {
+  return value ? createHash6("sha256").update(value).digest("hex") : void 0;
+}
+var AcuRoutingStore = class {
+  constructor(path) {
+    this.path = path;
+    mkdirSync2(dirname3(path), { recursive: true, mode: 448 });
+    chmodSync(dirname3(path), 448);
+    const sqlite = require3("node:sqlite");
+    this.database = new sqlite.DatabaseSync(path);
+    this.database.exec("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA synchronous=NORMAL;");
+    this.database.exec(`
+      CREATE TABLE IF NOT EXISTS routing_requests (
+        request_id TEXT PRIMARY KEY,
+        created_at TEXT NOT NULL,
+        session_hash TEXT,
+        context_sha256 TEXT NOT NULL,
+        prompt_version TEXT NOT NULL,
+        routing_model_version TEXT NOT NULL,
+        judge_status TEXT NOT NULL CHECK(judge_status IN ('live','cache_hit','rules_fallback','live_error')),
+        judge_model TEXT NOT NULL,
+        judge_provider TEXT NOT NULL,
+        difficulty_score REAL NOT NULL CHECK(difficulty_score BETWEEN 0 AND 100),
+        p_low REAL NOT NULL, p_mid REAL NOT NULL, p_mid_high REAL NOT NULL, p_high REAL NOT NULL,
+        judge_confidence REAL NOT NULL,
+        judge_latency_ms INTEGER NOT NULL,
+        judge_tokens INTEGER,
+        judge_cost REAL NOT NULL,
+        requested_model TEXT,
+        recommended_model TEXT,
+        actual_model TEXT,
+        input_tokens INTEGER,
+        output_tokens INTEGER,
+        actual_cost REAL,
+        latency_ms INTEGER,
+        final_status TEXT,
+        had_tools INTEGER NOT NULL DEFAULT 0,
+        error_category TEXT
+      );
+      CREATE TABLE IF NOT EXISTS model_candidate_scores (
+        request_id TEXT NOT NULL REFERENCES routing_requests(request_id) ON DELETE CASCADE,
+        model_id TEXT NOT NULL,
+        predicted_score REAL NOT NULL,
+        conservative_score REAL NOT NULL,
+        expected_call_cost REAL NOT NULL,
+        expected_total_cost REAL NOT NULL,
+        value_utility REAL NOT NULL,
+        pareto_efficient INTEGER NOT NULL,
+        selected INTEGER NOT NULL,
+        PRIMARY KEY(request_id, model_id)
+      );
+      CREATE TABLE IF NOT EXISTS user_feedback (
+        feedback_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        request_id TEXT NOT NULL REFERENCES routing_requests(request_id) ON DELETE CASCADE,
+        accepted INTEGER,
+        rating INTEGER CHECK(rating BETWEEN 1 AND 5),
+        required_upgrade INTEGER,
+        final_model TEXT,
+        created_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS execution_outcomes (
+        outcome_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        request_id TEXT NOT NULL REFERENCES routing_requests(request_id) ON DELETE CASCADE,
+        validator_result TEXT,
+        test_result TEXT,
+        tool_error_count INTEGER,
+        retry_count INTEGER,
+        model_switched INTEGER,
+        user_retried INTEGER,
+        outcome_score REAL,
+        outcome_source TEXT NOT NULL CHECK(outcome_source IN ('explicit_user_feedback','validator','test_result','retry_signal','model_upgrade_signal')),
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_routing_created ON routing_requests(created_at);
+      CREATE INDEX IF NOT EXISTS idx_routing_hash ON routing_requests(context_sha256);
+      CREATE INDEX IF NOT EXISTS idx_feedback_request ON user_feedback(request_id);
+      CREATE INDEX IF NOT EXISTS idx_outcomes_request ON execution_outcomes(request_id);
+    `);
+    chmodSync(path, 384);
+  }
+  path;
+  database;
+  recordEvaluation(evaluation, metadata = {}) {
+    const judgeTokens = evaluation.usageStatus === "not_applicable" ? null : evaluation.judgePromptTokens + evaluation.judgeCompletionTokens;
+    this.database.prepare(`
+      INSERT INTO routing_requests (
+        request_id,created_at,session_hash,context_sha256,prompt_version,routing_model_version,
+        judge_status,judge_model,judge_provider,difficulty_score,p_low,p_mid,p_mid_high,p_high,
+        judge_confidence,judge_latency_ms,judge_tokens,judge_cost,requested_model,recommended_model,
+        actual_model,input_tokens,output_tokens,actual_cost,latency_ms,final_status,had_tools,error_category
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      ON CONFLICT(request_id) DO UPDATE SET
+        actual_model=COALESCE(excluded.actual_model,routing_requests.actual_model),
+        input_tokens=COALESCE(excluded.input_tokens,routing_requests.input_tokens),
+        output_tokens=COALESCE(excluded.output_tokens,routing_requests.output_tokens),
+        actual_cost=COALESCE(excluded.actual_cost,routing_requests.actual_cost),
+        latency_ms=COALESCE(excluded.latency_ms,routing_requests.latency_ms),
+        final_status=COALESCE(excluded.final_status,routing_requests.final_status),
+        error_category=COALESCE(excluded.error_category,routing_requests.error_category)
+    `).run(
+      evaluation.requestId,
+      (/* @__PURE__ */ new Date()).toISOString(),
+      metadata.sessionHash ?? null,
+      evaluation.contextSha256,
+      evaluation.promptVersion,
+      evaluation.routingModelVersion,
+      evaluation.judgeStatus,
+      evaluation.judgeModel,
+      evaluation.judgeProvider,
+      evaluation.difficultyScore,
+      evaluation.judge.pLow,
+      evaluation.judge.pMid,
+      evaluation.judge.pMidHigh,
+      evaluation.judge.pHigh,
+      evaluation.judge.confidence,
+      evaluation.judgeLatencyMs,
+      judgeTokens,
+      evaluation.judgeCost,
+      metadata.requestedModel ?? null,
+      evaluation.recommendation.recommended.modelId,
+      metadata.actualModel ?? null,
+      metadata.inputTokens ?? null,
+      metadata.outputTokens ?? null,
+      metadata.actualCost ?? null,
+      metadata.latencyMs ?? null,
+      metadata.finalStatus ?? null,
+      bool(metadata.hadTools) ?? 0,
+      metadata.errorCategory ?? evaluation.judgeErrorCategory ?? null
+    );
+    const statement = this.database.prepare(`
+      INSERT INTO model_candidate_scores (
+        request_id,model_id,predicted_score,conservative_score,expected_call_cost,expected_total_cost,
+        value_utility,pareto_efficient,selected
+      ) VALUES (?,?,?,?,?,?,?,?,?)
+      ON CONFLICT(request_id,model_id) DO UPDATE SET
+        predicted_score=excluded.predicted_score,conservative_score=excluded.conservative_score,
+        expected_call_cost=excluded.expected_call_cost,expected_total_cost=excluded.expected_total_cost,
+        value_utility=excluded.value_utility,pareto_efficient=excluded.pareto_efficient,selected=excluded.selected
+    `);
+    for (const candidate of evaluation.recommendation.estimates) {
+      statement.run(
+        evaluation.requestId,
+        candidate.modelId,
+        candidate.predictedScore,
+        candidate.conservativeScore,
+        candidate.estimatedCallCost,
+        candidate.expectedTotalCost,
+        candidate.valueUtility,
+        bool(candidate.paretoEfficient) ?? 0,
+        candidate.modelId === evaluation.recommendation.recommended.modelId ? 1 : 0
+      );
+    }
+    if (metadata.sessionHash) {
+      const recent = this.database.prepare(`SELECT COUNT(*) AS n FROM routing_requests
+        WHERE session_hash=? AND request_id<>? AND unixepoch(created_at)>=unixepoch('now')-600`).get(metadata.sessionHash, evaluation.requestId);
+      if (Number(recent?.n ?? 0) > 0) {
+        this.recordOutcome({ requestId: evaluation.requestId, retryCount: 1, userRetried: true, outcomeSource: "retry_signal" });
+      }
+    }
+  }
+  finalizeRequest(requestId, metadata) {
+    this.database.prepare(`UPDATE routing_requests SET
+      actual_model=COALESCE(?,actual_model), input_tokens=COALESCE(?,input_tokens),
+      output_tokens=COALESCE(?,output_tokens), actual_cost=COALESCE(?,actual_cost),
+      latency_ms=COALESCE(?,latency_ms), final_status=COALESCE(?,final_status),
+      error_category=COALESCE(?,error_category) WHERE request_id=?`).run(
+      metadata.actualModel ?? null,
+      metadata.inputTokens ?? null,
+      metadata.outputTokens ?? null,
+      metadata.actualCost ?? null,
+      metadata.latencyMs ?? null,
+      metadata.finalStatus ?? null,
+      metadata.errorCategory ?? null,
+      requestId
+    );
+  }
+  recordFeedback(input) {
+    if (input.rating !== void 0 && (!Number.isInteger(input.rating) || input.rating < 1 || input.rating > 5)) {
+      throw new Error("rating must be an integer from 1 to 5");
+    }
+    this.database.prepare(`INSERT INTO user_feedback
+      (request_id,accepted,rating,required_upgrade,final_model,created_at) VALUES (?,?,?,?,?,?)`).run(
+      input.requestId,
+      bool(input.accepted),
+      input.rating ?? null,
+      bool(input.requiredUpgrade),
+      input.finalModel ?? null,
+      (/* @__PURE__ */ new Date()).toISOString()
+    );
+    this.recordOutcome({
+      requestId: input.requestId,
+      outcomeSource: "explicit_user_feedback",
+      outcomeScore: input.rating === void 0 ? void 0 : input.rating / 5,
+      modelSwitched: input.requiredUpgrade
+    });
+  }
+  recordOutcome(input) {
+    this.database.prepare(`INSERT INTO execution_outcomes
+      (request_id,validator_result,test_result,tool_error_count,retry_count,model_switched,user_retried,outcome_score,outcome_source,created_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?)`).run(
+      input.requestId,
+      input.validatorResult ?? null,
+      input.testResult ?? null,
+      input.toolErrorCount ?? null,
+      input.retryCount ?? null,
+      bool(input.modelSwitched),
+      bool(input.userRetried),
+      input.outcomeScore ?? null,
+      input.outcomeSource,
+      (/* @__PURE__ */ new Date()).toISOString()
+    );
+  }
+  summary() {
+    const requests = this.database.prepare("SELECT * FROM routing_requests").all();
+    const feedback = this.database.prepare("SELECT * FROM user_feedback").all();
+    const outcomes = this.database.prepare("SELECT * FROM execution_outcomes").all();
+    const count = requests.length;
+    const latencies = requests.filter((row) => row.judge_status === "live").map((row) => Number(row.judge_latency_ms)).filter(Number.isFinite);
+    const group = (field) => Object.fromEntries(
+      [...new Set(requests.map((row) => String(row[field] ?? "unknown")))].sort().map((key) => [key, requests.filter((row) => String(row[field] ?? "unknown") === key).length])
+    );
+    const difficultyDistribution = { low: 0, mid: 0, mid_high: 0, high: 0 };
+    for (const row of requests) {
+      const score = Number(row.difficulty_score);
+      difficultyDistribution[score < 30 ? "low" : score < 55 ? "mid" : score < 80 ? "mid_high" : "high"] += 1;
+    }
+    const labeled = new Set([...feedback, ...outcomes].map((row) => String(row.request_id))).size;
+    const ratings = feedback.map((row) => Number(row.rating)).filter(Number.isFinite);
+    const accepted = feedback.filter((row) => row.accepted !== null);
+    const upgrades = feedback.filter((row) => row.required_upgrade !== null);
+    const requestsWithActualModel = requests.filter((row) => typeof row.actual_model === "string" && row.actual_model.length > 0);
+    const bucketCounts = this.database.prepare(`SELECT c.model_id,
+      CASE WHEN r.difficulty_score<30 THEN 'low' WHEN r.difficulty_score<55 THEN 'mid' WHEN r.difficulty_score<80 THEN 'mid_high' ELSE 'high' END AS difficulty_bucket,
+      COUNT(DISTINCT r.request_id) AS n
+      FROM model_candidate_scores c JOIN routing_requests r USING(request_id)
+      WHERE EXISTS(SELECT 1 FROM user_feedback f WHERE f.request_id=r.request_id)
+         OR EXISTS(SELECT 1 FROM execution_outcomes o WHERE o.request_id=r.request_id)
+      GROUP BY c.model_id,difficulty_bucket ORDER BY c.model_id,difficulty_bucket`).all();
+    return {
+      generatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      realRequestCount: count,
+      realJudgeRequestCount: requests.filter((row) => row.judge_status === "live").length,
+      cacheHitRate: count ? requests.filter((row) => row.judge_status === "cache_hit").length / count : 0,
+      rulesFallbackRate: count ? requests.filter((row) => row.judge_status === "rules_fallback").length / count : 0,
+      judgeLatencyMs: { mean: latencies.length ? latencies.reduce((sum, value) => sum + value, 0) / latencies.length : null, p50: quantile(latencies, 0.5), p95: quantile(latencies, 0.95) },
+      difficultyDistribution,
+      recommendedModelDistribution: group("recommended_model"),
+      actualModelDistribution: group("actual_model"),
+      recommendationActualAgreementRate: requestsWithActualModel.length ? requestsWithActualModel.filter((row) => row.recommended_model && row.recommended_model === row.actual_model).length / requestsWithActualModel.length : null,
+      userSatisfactionRate: accepted.length ? accepted.filter((row) => Number(row.accepted) === 1).length / accepted.length : null,
+      averageRating: ratings.length ? ratings.reduce((sum, value) => sum + value, 0) / ratings.length : null,
+      upgradeRate: upgrades.length ? upgrades.filter((row) => Number(row.required_upgrade) === 1).length / upgrades.length : null,
+      labeledRequestCount: labeled,
+      effectiveLabeledOutcomeCount: labeled,
+      modelDifficultyLabelCounts: bucketCounts,
+      sampleNotice: count < 20 ? "\u5F53\u524D\u6837\u672C\u91CF\u8F83\u5C0F\uFF0C\u4EC5\u7528\u4E8E\u4EA7\u54C1\u9A8C\u8BC1\u3002" : null
+    };
+  }
+  close() {
+    this.database.close();
+  }
+};
+function openAcuRoutingStore(path) {
+  try {
+    return new AcuRoutingStore(path);
+  } catch (error) {
+    console.error(`[ClawRouter] ACU SQLite disabled: ${error instanceof Error ? error.message : "unknown error"}`);
+    return null;
+  }
+}
 
 // src/proxy.ts
 var DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
@@ -6545,7 +7009,7 @@ function isDemoAuthorized(req, demoAccessToken) {
 }
 function hashPrompt(messages) {
   const text = messages.map((message) => JSON.stringify(message.content ?? "")).join("\n");
-  return createHash6("sha256").update(text).digest("hex").slice(0, 24);
+  return createHash7("sha256").update(text).digest("hex").slice(0, 24);
 }
 async function readJsonRequest(req) {
   const chunks = [];
@@ -6730,7 +7194,7 @@ function normalizeMessagesForThinking(messages) {
 }
 function stripDemoOnlyRequestFields(parsed) {
   let changed = false;
-  for (const key of ["baseline_model", "cache", "expected_schema", "acu_quality_target"]) {
+  for (const key of ["baseline_model", "cache", "expected_schema", "acu_quality_target", "acu_execute_recommended"]) {
     if (key in parsed) {
       delete parsed[key];
       changed = true;
@@ -6916,6 +7380,7 @@ async function startProxy(options) {
   const routerOpts = { config: routingConfig, modelPricing };
   const demoAccessToken = options.demoAccessToken?.trim() ?? getEnvDemoAccessToken();
   const acuStrategy = new AcuDemoStrategy(readAcuRuntimeConfig(options.acuRuntimeConfig));
+  const acuStore = acuStrategy.enabled ? openAcuRoutingStore(acuStrategy.databasePath) : null;
   const deduplicator = new RequestDeduplicator();
   const responseCache = new ResponseCache(options.cacheConfig);
   const sessionStore = new SessionStore(options.sessionConfig);
@@ -6939,7 +7404,8 @@ async function startProxy(options) {
         onRouted: options.onRouted,
         walletAddress,
         demoAccessToken,
-        acuStrategy
+        acuStrategy,
+        acuStore
       });
     } catch (err) {
       console.error(`[ClawRouter] Unhandled error: ${err instanceof Error ? err.message : err}`);
@@ -6976,7 +7442,10 @@ async function startProxy(options) {
     port: boundPort,
     baseUrl: `http://127.0.0.1:${boundPort}`,
     ...walletAddress && { walletAddress },
-    close: () => new Promise((resolve) => server.close(() => resolve()))
+    close: () => new Promise((resolve) => server.close(() => {
+      acuStore?.close();
+      resolve();
+    }))
   };
 }
 async function handleRequest(req, res, ctx) {
@@ -7064,6 +7533,65 @@ async function handleRequest(req, res, ctx) {
     res.end(JSON.stringify(publicCatalogPayload()));
     return;
   }
+  if (pathname === "/acu/api/data-summary" && req.method === "GET") {
+    const summary = ctx.acuStore?.summary() ?? {
+      generatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      realRequestCount: 0,
+      sampleNotice: "\u5F53\u524D\u6837\u672C\u91CF\u8F83\u5C0F\uFF0C\u4EC5\u7528\u4E8E\u4EA7\u54C1\u9A8C\u8BC1\u3002",
+      storageStatus: "unavailable"
+    };
+    res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+    res.end(JSON.stringify(summary));
+    return;
+  }
+  if (pathname === "/acu/api/feedback" && req.method === "POST") {
+    try {
+      if (!ctx.acuStore) throw new Error("ACU data store is unavailable");
+      const parsed = await readJsonRequest(req);
+      const requestId2 = String(parsed.request_id ?? "");
+      if (!requestId2) throw new Error("request_id is required");
+      ctx.acuStore.recordFeedback({
+        requestId: requestId2,
+        accepted: typeof parsed.accepted === "boolean" ? parsed.accepted : void 0,
+        rating: parsed.rating === void 0 ? void 0 : Number(parsed.rating),
+        requiredUpgrade: typeof parsed.required_upgrade === "boolean" ? parsed.required_upgrade : void 0,
+        finalModel: typeof parsed.final_model === "string" ? parsed.final_model : void 0
+      });
+      res.writeHead(201, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ saved: true, request_id: requestId2 }));
+    } catch (error) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: { message: error instanceof Error ? error.message : "feedback rejected" } }));
+    }
+    return;
+  }
+  if (pathname === "/acu/api/outcome" && req.method === "POST") {
+    try {
+      if (!ctx.acuStore) throw new Error("ACU data store is unavailable");
+      const parsed = await readJsonRequest(req);
+      const source = String(parsed.outcome_source ?? "");
+      if (!(/* @__PURE__ */ new Set(["validator", "test_result", "retry_signal", "model_upgrade_signal"])).has(source)) {
+        throw new Error("invalid outcome_source");
+      }
+      ctx.acuStore.recordOutcome({
+        requestId: String(parsed.request_id ?? ""),
+        outcomeSource: source,
+        validatorResult: typeof parsed.validator_result === "string" ? parsed.validator_result : void 0,
+        testResult: typeof parsed.test_result === "string" ? parsed.test_result : void 0,
+        toolErrorCount: parsed.tool_error_count === void 0 ? void 0 : Number(parsed.tool_error_count),
+        retryCount: parsed.retry_count === void 0 ? void 0 : Number(parsed.retry_count),
+        modelSwitched: typeof parsed.model_switched === "boolean" ? parsed.model_switched : void 0,
+        userRetried: typeof parsed.user_retried === "boolean" ? parsed.user_retried : void 0,
+        outcomeScore: parsed.outcome_score === void 0 ? void 0 : Number(parsed.outcome_score)
+      });
+      res.writeHead(201, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ saved: true }));
+    } catch (error) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: { message: error instanceof Error ? error.message : "outcome rejected" } }));
+    }
+    return;
+  }
   if (pathname === "/acu/api/evaluate" && req.method === "POST") {
     try {
       const parsed = await readJsonRequest(req);
@@ -7074,6 +7602,8 @@ async function handleRequest(req, res, ctx) {
       const system = messages.find((message) => message.role === "system");
       const expectedOutputTokens = Number(parsed.expected_output_tokens ?? 800);
       const qualityTarget = Number(parsed.quality_target ?? 0.8);
+      const forceJudgeRefresh = parsed.force_judge_refresh === true;
+      if (forceJudgeRefresh && !ctx.acuStrategy.allowForceRefresh) throw new Error("force_judge_refresh is disabled");
       const requireTools = tools.length > 0;
       const requireVision = messages.some((message) => Array.isArray(message.content) && message.content.some((part) => Boolean(part && typeof part === "object" && part.type === "image_url")));
       const rulesDecision = route(
@@ -7090,8 +7620,20 @@ async function handleRequest(req, res, ctx) {
         expectedOutputTokens: Number.isFinite(expectedOutputTokens) ? expectedOutputTokens : 800,
         eligibleModelIds,
         requireToolCallSupport: requireTools,
-        requireVisionSupport: requireVision
+        requireVisionSupport: requireVision,
+        forceJudgeRefresh,
+        requestId: randomUUID2(),
+        requestedModel: typeof parsed.model === "string" ? parsed.model : "evaluation_only"
       }, rulesDecision);
+      try {
+        ctx.acuStore?.recordEvaluation(evaluation, {
+          requestedModel: typeof parsed.model === "string" ? parsed.model : "evaluation_only",
+          finalStatus: "evaluated_only",
+          hadTools: requireTools
+        });
+      } catch (error) {
+        console.error(`[ClawRouter] ACU SQLite evaluation write failed: ${error instanceof Error ? error.message : "unknown"}`);
+      }
       res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
       res.end(JSON.stringify(evaluation));
     } catch (error) {
@@ -7132,13 +7674,13 @@ async function handleRequest(req, res, ctx) {
     }
     return;
   }
-  if (req.method === "GET" && (pathname === "/" || pathname === "/index.html" || pathname === "/acu" || pathname === "/acu/" || pathname === "/acu/curves" || pathname === "/acu/curves/" || pathname.startsWith("/public/") || pathname.startsWith("/acu/public/"))) {
+  if (req.method === "GET" && (pathname === "/" || pathname === "/index.html" || pathname === "/acu" || pathname === "/acu/" || pathname === "/acu-debug" || pathname === "/acu-debug/" || pathname === "/acu/curves" || pathname === "/acu/curves/" || pathname.startsWith("/public/") || pathname.startsWith("/acu/public/") || pathname.startsWith("/acu-debug/public/"))) {
     const { readFileSync: readFileSync3, existsSync: existsSync4 } = await import("fs");
-    const { join: join8, dirname: dirname4 } = await import("path");
+    const { join: join8, dirname: dirname5 } = await import("path");
     const { fileURLToPath: fileURLToPath3 } = await import("url");
-    const __dirname2 = dirname4(fileURLToPath3(import.meta.url));
+    const __dirname2 = dirname5(fileURLToPath3(import.meta.url));
     const publicDir = join8(__dirname2, "..", "public");
-    const filePath = pathname === "/" || pathname === "/index.html" ? join8(publicDir, "index.html") : pathname === "/acu" || pathname === "/acu/" ? join8(publicDir, "acu.html") : pathname === "/acu/curves" || pathname === "/acu/curves/" ? join8(publicDir, "acu-curves.html") : join8(publicDir, pathname.replace(/^\/acu\/public\//, "").replace(/^\/public\//, ""));
+    const filePath = pathname === "/" || pathname === "/index.html" || pathname === "/acu" || pathname === "/acu/" ? join8(publicDir, "index.html") : pathname === "/acu-debug" || pathname === "/acu-debug/" ? join8(publicDir, "acu.html") : pathname === "/acu/curves" || pathname === "/acu/curves/" ? join8(publicDir, "acu-curves.html") : join8(publicDir, pathname.replace(/^\/acu-debug\/public\//, "").replace(/^\/acu\/public\//, "").replace(/^\/public\//, ""));
     if (existsSync4(filePath)) {
       const ext = filePath.split(".").pop() || "html";
       const mime = { html: "text/html", css: "text/css", js: "application/javascript", json: "application/json", png: "image/png", svg: "image/svg+xml" };
@@ -7153,7 +7695,7 @@ async function handleRequest(req, res, ctx) {
     return;
   }
   const startTime = Date.now();
-  const requestId = randomUUID();
+  const requestId = randomUUID2();
   const debugHeader = req.headers["x-acu-debug"] ?? req.headers["x-clawrouter-debug"];
   const debugMode = debugHeader !== "false";
   const bodyChunks = [];
@@ -7190,7 +7732,8 @@ async function handleRequest(req, res, ctx) {
   const parsedMessages = [];
   let responseFormat;
   let expectedSchema;
-  let acuQualityTarget = 0.9;
+  let acuQualityTarget = 0.8;
+  let executeAcuRecommended;
   try {
     const parsed = JSON.parse(body.toString());
     isStreaming = parsed.stream === true;
@@ -7200,6 +7743,7 @@ async function handleRequest(req, res, ctx) {
     expectedSchema = parsed.expected_schema;
     const requestedQualityTarget = Number(parsed.acu_quality_target);
     if (Number.isFinite(requestedQualityTarget)) acuQualityTarget = requestedQualityTarget;
+    executeAcuRecommended = parsed.acu_execute_recommended === true;
     if (stripDemoOnlyRequestFields(parsed)) bodyModified = true;
     const messages = Array.isArray(parsed.messages) ? parsed.messages : [];
     parsedMessages.push(...messages);
@@ -7236,9 +7780,22 @@ async function handleRequest(req, res, ctx) {
           expectedOutputTokens: maxTokens,
           eligibleModelIds,
           requireToolCallSupport: hasTools,
-          requireVisionSupport: hasVision
+          requireVisionSupport: hasVision,
+          requestId,
+          requestedModel: modelId,
+          sessionHash: hashSession(effectiveSessionId)
         }, rulesDecision);
-        if (acuEvaluation.judgeStatus !== "rules_fallback") {
+        try {
+          ctx.acuStore?.recordEvaluation(acuEvaluation, {
+            sessionHash: hashSession(effectiveSessionId),
+            requestedModel: modelId,
+            finalStatus: "routing_pending",
+            hadTools: hasTools
+          });
+        } catch (error) {
+          console.error(`[ClawRouter] ACU SQLite routing write failed: ${error instanceof Error ? error.message : "unknown"}`);
+        }
+        if (acuEvaluation.judgeStatus !== "rules_fallback" && (!ctx.acuStrategy.shadowMode || executeAcuRecommended)) {
           const selected = acuEvaluation.recommendation.recommended;
           const fallback = acuEvaluation.recommendation.fallbackModel.modelId;
           const tier = routingTierFromAcu(acuEvaluation);
@@ -7373,6 +7930,19 @@ async function handleRequest(req, res, ctx) {
       validator_result: "not_applicable",
       cache_hit: true
     });
+    if (acuEvaluation) {
+      try {
+        ctx.acuStore?.finalizeRequest(requestId, {
+          actualModel: respCached.model,
+          inputTokens: usage.inputTokens,
+          outputTokens: usage.outputTokens,
+          actualCost: 0,
+          latencyMs: Date.now() - startTime,
+          finalStatus: "response_cache_hit"
+        });
+      } catch {
+      }
+    }
     ctx.deduplicator.complete(dedupKey, { status: 200, headers, body: Buffer.from(respCached.body), completedAt: Date.now() });
     return;
   }
@@ -7534,6 +8104,12 @@ data: [DONE]
       res.end(errorPayload);
     }
     ctx.deduplicator.removeInflight(dedupKey);
+    if (acuEvaluation) {
+      try {
+        ctx.acuStore?.finalizeRequest(requestId, { finalStatus: "upstream_error", errorCategory: lastErrorCategory });
+      } catch {
+      }
+    }
     return;
   }
   if (debugMode && routingDecision) {
@@ -7771,6 +8347,34 @@ data: ${JSON.stringify(trace)}
         ...lastErrorCategory && { error_category: lastErrorCategory }
       };
       await appendLedgerEntry(ledgerEntry);
+      if (acuEvaluation) {
+        try {
+          ctx.acuStore?.finalizeRequest(requestId, {
+            actualModel: actualModelUsed,
+            inputTokens: usage.inputTokens,
+            outputTokens: usage.outputTokens,
+            actualCost: costEstimate2,
+            latencyMs: latencyMs2,
+            finalStatus: "completed",
+            errorCategory: lastErrorCategory
+          });
+          if (validator.result !== "not_applicable") {
+            ctx.acuStore?.recordOutcome({
+              requestId,
+              validatorResult: validator.result,
+              outcomeSource: "validator",
+              outcomeScore: validator.result === "pass" ? 1 : 0
+            });
+          }
+          if (attempts.length > 1) {
+            ctx.acuStore?.recordOutcome({ requestId, retryCount: attempts.length - 1, outcomeSource: "retry_signal" });
+          }
+          if (actualModelUsed !== routingDecision?.model) {
+            ctx.acuStore?.recordOutcome({ requestId, modelSwitched: true, outcomeSource: "model_upgrade_signal" });
+          }
+        } catch {
+        }
+      }
     }
     if (isStreaming && canWrite(res)) {
       let parsed;
@@ -7870,6 +8474,20 @@ data: ${JSON.stringify(trace)}
     latencyMs
   }).catch(() => {
   });
+  if (acuEvaluation && isStreaming) {
+    try {
+      ctx.acuStore?.finalizeRequest(requestId, {
+        actualModel: actualModelUsed,
+        inputTokens: estimatedInputTokens,
+        outputTokens: maxTokens,
+        actualCost: costEstimate,
+        latencyMs,
+        finalStatus: "completed_streaming",
+        errorCategory: lastErrorCategory
+      });
+    } catch {
+    }
+  }
   if (allowResponseCache && responseBody && responseBody.length < 1048576) {
     ctx.responseCache.set(dedupKey, { body: Buffer.from(responseBody), status: 200, headers: { "Content-Type": contentType }, model: actualModelUsed });
   }
@@ -7905,7 +8523,7 @@ var blockrunProvider = {
 };
 
 // src/auth.ts
-import { readFileSync as readFileSync2, existsSync as existsSync2, writeFileSync as writeFileSync2, mkdirSync as mkdirSync2 } from "fs";
+import { readFileSync as readFileSync2, existsSync as existsSync2, writeFileSync as writeFileSync2, mkdirSync as mkdirSync3 } from "fs";
 import { join as join6 } from "path";
 import { homedir as homedir5 } from "os";
 import { randomBytes } from "crypto";
@@ -7927,18 +8545,18 @@ function resolveProxyBaseUrl() {
   return process.env.PROXY_BASE_URL?.trim() || void 0;
 }
 function saveApiKey(key) {
-  mkdirSync2(CONFIG_DIR, { recursive: true });
+  mkdirSync3(CONFIG_DIR, { recursive: true });
   writeFileSync2(join6(CONFIG_DIR, "api-key"), key.trim() + "\n", { mode: 384 });
   console.log(`[ClawRouter] API key saved to ${join6(CONFIG_DIR, "api-key")}`);
 }
 
 // src/index.ts
-import { existsSync as existsSync3, readdirSync, mkdirSync as mkdirSync3, copyFileSync } from "fs";
+import { existsSync as existsSync3, readdirSync, mkdirSync as mkdirSync4, copyFileSync } from "fs";
 import { homedir as homedir6 } from "os";
-import { join as join7, dirname as dirname3 } from "path";
+import { join as join7, dirname as dirname4 } from "path";
 import { fileURLToPath as fileURLToPath2 } from "url";
 function getPackageRoot() {
-  return join7(dirname3(fileURLToPath2(import.meta.url)), "..");
+  return join7(dirname4(fileURLToPath2(import.meta.url)), "..");
 }
 function installSkillsToWorkspace(logger) {
   try {
@@ -7948,7 +8566,7 @@ function installSkillsToWorkspace(logger) {
     const profile = (process["env"].OPENCLAW_PROFILE ?? "").trim().toLowerCase();
     const workspaceDirName = profile && profile !== "default" ? `workspace-${profile}` : "workspace";
     const workspaceSkillsDir = join7(homedir6(), ".openclaw", workspaceDirName, "skills");
-    mkdirSync3(workspaceSkillsDir, { recursive: true });
+    mkdirSync4(workspaceSkillsDir, { recursive: true });
     const entries = readdirSync(bundledSkillsDir, { withFileTypes: true });
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
@@ -7961,7 +8579,7 @@ function installSkillsToWorkspace(logger) {
         const dst = __require("fs").readFileSync(dstSkillFile, "utf-8");
         if (src === dst) continue;
       }
-      mkdirSync3(dstSkillDir, { recursive: true });
+      mkdirSync4(dstSkillDir, { recursive: true });
       copyFileSync(srcSkillFile, dstSkillFile);
       logger.info(`Installed skill: ${entry.name}`);
     }
@@ -8003,6 +8621,7 @@ var index_default = plugin;
 export {
   AcuDemoStrategy,
   AcuJudgeClient,
+  AcuRoutingStore,
   BLOCKRUN_MODELS,
   DEFAULT_ROUTING_CONFIG,
   MODEL_ALIASES,
@@ -8027,10 +8646,14 @@ export {
   getProxyPort,
   getSessionId,
   hashRequestContent,
+  hashSession,
+  interpolateModelCurve,
   isParetoEfficient,
   isReasoningModel,
   logUsage,
   normalizeProbabilities,
+  normalizedEntropy,
+  openAcuRoutingStore,
   parseJudgeResult,
   publicCatalogPayload,
   readAcuRuntimeConfig,

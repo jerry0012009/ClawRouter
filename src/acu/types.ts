@@ -11,9 +11,13 @@ export type AcuTierProbabilities = {
 };
 
 export type AcuJudgeResult = AcuTierProbabilities & {
+  difficultyScore: number;
   signals: string[];
   explanation: string;
 };
+
+export type AcuJudgeStatus = "live" | "cache_hit" | "rules_fallback" | "live_error";
+export type AcuJudgeResultSource = "upstream_live" | "disk_cache" | "rules_strategy";
 
 export type AcuBenchmarkEvidence = {
   benchmarkName: string;
@@ -121,6 +125,10 @@ export type AcuEvaluateInput = {
   eligibleModelIds?: string[];
   requireToolCallSupport?: boolean;
   requireVisionSupport?: boolean;
+  forceJudgeRefresh?: boolean;
+  requestId?: string;
+  requestedModel?: string;
+  sessionHash?: string;
 };
 
 export type AcuEvaluation = {
@@ -129,7 +137,15 @@ export type AcuEvaluation = {
   judgeModel: string;
   judgeMode: "non-thinking";
   judge: AcuJudgeResult;
-  judgeStatus: "success" | "cache_hit" | "rules_fallback";
+  judgeStatus: AcuJudgeStatus;
+  judgeResultSource: AcuJudgeResultSource;
+  judgeProvider: string;
+  judgeEndpointHost: string;
+  upstreamRequestId: string | null;
+  cacheKeySha256: string;
+  cacheCreatedAt: string;
+  usageStatus: "reported" | "usage_missing" | "not_applicable";
+  judgeErrorCategory?: string;
   judgeLatencyMs: number;
   judgeCost: number;
   judgePromptTokens: number;
@@ -138,6 +154,10 @@ export type AcuEvaluation = {
   contextTokenEstimate: number;
   contextTruncated: boolean;
   difficultyScore: number;
+  judgeEntropy: number;
+  routingModelVersion: string;
+  shadowMode: boolean;
+  requestId: string;
   qualityTarget: number;
   recommendation: AcuRecommendation;
   disclaimer: string;

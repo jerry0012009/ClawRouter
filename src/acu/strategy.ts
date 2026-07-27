@@ -1,6 +1,6 @@
-import { createHash } from "node:crypto";
-import { ACU_DEMO_DISCLAIMER, type AcuRuntimeConfig } from "./config.js";
-import { difficultyScore, normalizeProbabilities } from "./math.js";
+import { createHash, randomUUID } from "node:crypto";
+import { ACU_DEMO_DISCLAIMER, ACU_ROUTING_MODEL_VERSION, type AcuRuntimeConfig } from "./config.js";
+import { normalizeProbabilities, normalizedEntropy } from "./math.js";
 import { recommendModel } from "./decision.js";
 import {
   AcuJudgeClient,
@@ -28,6 +28,7 @@ export function rulesFallbackJudge(decision: RoutingDecision): AcuJudgeResult {
   });
   return {
     ...probabilities,
+    difficultyScore: ({ low: 15, mid: 42, mid_high: 67, high: 90 } as const)[selected],
     signals: ["rules_strategy_fallback", decision.tier.toLowerCase()],
     explanation: "Difficulty Judge不可用，已使用现有RulesStrategy安全回退。",
   };
@@ -45,6 +46,18 @@ export class AcuDemoStrategy {
     return this.config.enabled;
   }
 
+  get shadowMode(): boolean {
+    return this.config.shadowMode;
+  }
+
+  get allowForceRefresh(): boolean {
+    return this.config.allowForceRefresh;
+  }
+
+  get databasePath(): string {
+    return this.config.databasePath;
+  }
+
   async evaluate(
     input: AcuEvaluateInput,
     rulesDecision: RoutingDecision,
@@ -57,14 +70,29 @@ export class AcuDemoStrategy {
     let judgeCost = 0;
     let judgePromptTokens = 0;
     let judgeCompletionTokens = 0;
+    let judgeResultSource: AcuEvaluation["judgeResultSource"] = "rules_strategy";
+    let judgeProvider = "rules_strategy";
+    let judgeEndpointHost = "none";
+    let upstreamRequestId: string | null = null;
+    let cacheKeySha256: string;
+    let cacheCreatedAt = new Date().toISOString();
+    let usageStatus: AcuEvaluation["usageStatus"] = "not_applicable";
+    let judgeErrorCategory: string | undefined;
     let contextSha256 = createHash("sha256").update(visible).digest("hex");
     let contextTokenEstimate = estimateVisibleTokens(fallbackContext.text);
     let contextTruncated = fallbackContext.truncated;
     try {
       if (!this.config.enabled) throw new Error("ACU Demo Router feature flag is disabled");
-      const response = await this.judgeClient.judge(input.messages, input.tools);
+      const response = await this.judgeClient.judge(input.messages, input.tools, input.forceJudgeRefresh === true);
       judge = response.result;
       judgeStatus = response.status;
+      judgeResultSource = response.resultSource;
+      judgeProvider = response.provider;
+      judgeEndpointHost = response.endpointHost;
+      upstreamRequestId = response.upstreamRequestId;
+      cacheKeySha256 = response.cacheKeySha256;
+      cacheCreatedAt = response.cacheCreatedAt;
+      usageStatus = response.usageStatus;
       judgeLatencyMs = response.latencyMs;
       judgeCost = response.cost;
       judgePromptTokens = response.promptTokens;
@@ -72,12 +100,16 @@ export class AcuDemoStrategy {
       contextSha256 = response.contextSha256;
       contextTokenEstimate = response.contextTokenEstimate;
       contextTruncated = response.contextTruncated;
-    } catch {
+    } catch (error) {
       judge = rulesFallbackJudge(rulesDecision);
       judgeStatus = "rules_fallback";
+      judgeErrorCategory = error instanceof Error ? error.message.slice(0, 160) : "unknown_live_error";
+      cacheKeySha256 = createHash("sha256").update(`${this.config.promptVersion}\n${this.config.judgeModel}\n${contextSha256}`).digest("hex");
     }
+    const entropy = normalizedEntropy(judge);
     const recommendation = recommendModel({
       probabilities: judge,
+      difficultyScore: judge.difficultyScore,
       inputTokens: contextTokenEstimate,
       expectedOutputTokens: input.expectedOutputTokens ?? 800,
       judgeCost,
@@ -85,6 +117,7 @@ export class AcuDemoStrategy {
       eligibleModelIds: input.eligibleModelIds,
       requireToolCallSupport: input.requireToolCallSupport,
       requireVisionSupport: input.requireVisionSupport,
+      judgeEntropyPenalty: this.config.judgeEntropyPenalty,
     });
     return {
       estimateLabel: "public-benchmark constrained estimate",
@@ -93,6 +126,14 @@ export class AcuDemoStrategy {
       judgeMode: "non-thinking",
       judge,
       judgeStatus,
+      judgeResultSource,
+      judgeProvider,
+      judgeEndpointHost,
+      upstreamRequestId,
+      cacheKeySha256,
+      cacheCreatedAt,
+      usageStatus,
+      ...(judgeErrorCategory && { judgeErrorCategory }),
       judgeLatencyMs,
       judgeCost,
       judgePromptTokens,
@@ -100,7 +141,11 @@ export class AcuDemoStrategy {
       contextSha256,
       contextTokenEstimate,
       contextTruncated,
-      difficultyScore: difficultyScore(judge),
+      difficultyScore: judge.difficultyScore,
+      judgeEntropy: entropy,
+      routingModelVersion: ACU_ROUTING_MODEL_VERSION,
+      shadowMode: this.config.shadowMode,
+      requestId: input.requestId || randomUUID(),
       qualityTarget: input.qualityTarget ?? 0.8,
       recommendation,
       disclaimer: ACU_DEMO_DISCLAIMER,

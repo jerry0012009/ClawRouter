@@ -1,0 +1,23 @@
+{
+  "validated_at": "2026-07-27T10:21:00Z",
+  "shadow_request": {
+    "request_id": "9adb06c7-65e2-4cef-8fe2-61a072dc94dc",
+    "judge_status": "live",
+    "difficulty_score": 0,
+    "shadow_mode": true,
+    "recommended_model": "qwen3.6-plus",
+    "selected_model": "gemini-2.5-flash",
+    "actual_model": "gemini-2.5-flash",
+    "main_request_unchanged": true
+  },
+  "explicit_execute_request": {
+    "request_id": "d562b455-011b-47da-a623-a976a4d6ae2f",
+    "judge_status": "cache_hit",
+    "difficulty_score": 0,
+    "shadow_mode": true,
+    "recommended_model": "qwen3.6-plus",
+    "selected_model": "qwen3.6-plus",
+    "actual_model": "qwen3.6-plus",
+    "explicit_opt_in_honored": true
+  }
+}

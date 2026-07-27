@@ -1,0 +1,34 @@
+{
+  "captured_at": "2026-07-27T10:34:03.981Z",
+  "real_request_count": 18,
+  "real_judge_request_count": 6,
+  "cache_hit_rate": 0.6666666666666666,
+  "rules_fallback_rate": 0,
+  "judge_latency_ms": {
+    "mean": 3165.3333333333335,
+    "p50": 3574,
+    "p95": 3640
+  },
+  "difficulty_distribution": {
+    "low": 11,
+    "mid": 0,
+    "mid_high": 7,
+    "high": 0
+  },
+  "recommended_model_distribution": {
+    "claude-opus-4-8": 6,
+    "kimi-k2.7-code": 1,
+    "qwen3.6-plus": 11
+  },
+  "actual_model_distribution": {
+    "gemini-2.5-flash": 1,
+    "qwen3.6-plus": 1,
+    "unknown": 16
+  },
+  "recommendation_actual_agreement_rate_among_known_actuals": 0.5,
+  "user_satisfaction_rate": 1,
+  "average_rating": 5,
+  "upgrade_rate": 0,
+  "effective_labeled_outcome_count": 1,
+  "sample_notice": "当前样本量较小，仅用于产品验证。"
+}

@@ -1,6 +1,6 @@
 import { ACU_DEFAULT_QUALITY_TARGET, ACU_DEFAULT_SWITCH_COST_USD } from "./config.js";
-import { getAcuCatalog, getRoutingEligibleModels } from "./catalog.js";
-import { clamp, estimatedQuality, normalizeProbabilities } from "./math.js";
+import { getAcuCatalog, getRoutingEligibleModels, interpolateModelCurve } from "./catalog.js";
+import { clamp, normalizeProbabilities, normalizedEntropy } from "./math.js";
 import type {
   AcuModelCatalogEntry,
   AcuModelEstimate,
@@ -10,6 +10,7 @@ import type {
 
 export type AcuDecisionInput = {
   probabilities: AcuTierProbabilities;
+  difficultyScore: number;
   inputTokens: number;
   expectedOutputTokens: number;
   judgeCost: number;
@@ -18,6 +19,7 @@ export type AcuDecisionInput = {
   requireToolCallSupport?: boolean;
   requireVisionSupport?: boolean;
   switchCost?: number;
+  judgeEntropyPenalty?: number;
 };
 
 export function estimateCallCost(
@@ -36,7 +38,8 @@ export function estimateCallCost(
 
 function estimateOne(
   model: AcuModelCatalogEntry,
-  probabilities: AcuTierProbabilities,
+  difficultyScore: number,
+  entropyPenalty: number,
   inputTokens: number,
   outputTokens: number,
   judgeCost: number,
@@ -44,8 +47,9 @@ function estimateOne(
   qualityTarget: number,
   switchCost: number,
 ): AcuModelEstimate {
-  const quality = estimatedQuality(probabilities, model);
-  const lower = clamp(quality - model.uncertaintyWidth);
+  const curvePoint = interpolateModelCurve(model, difficultyScore);
+  const quality = curvePoint.estimatedQuality;
+  const lower = clamp(quality - model.uncertaintyWidth - entropyPenalty / 100);
   const upper = clamp(quality + model.uncertaintyWidth);
   const callCost = estimateCallCost(model, inputTokens, outputTokens);
   const expectedFallbackCost = (1 - lower) * (fallbackCallCost + switchCost);
@@ -148,6 +152,9 @@ export function selectValueRoute<T extends ValueCandidate>(
 
 export function recommendModel(input: AcuDecisionInput): AcuRecommendation {
   const probabilities = normalizeProbabilities(input.probabilities);
+  const entropy = normalizedEntropy(probabilities);
+  const entropyPenalty = entropy * Math.max(0, input.judgeEntropyPenalty ?? 0);
+  const difficulty = Math.max(0, Math.min(100, input.difficultyScore));
   const qualityTarget = clamp(input.qualityTarget ?? ACU_DEFAULT_QUALITY_TARGET);
   const inputTokens = Math.max(1, Math.round(input.inputTokens));
   const outputTokens = Math.max(1, Math.round(input.expectedOutputTokens));
@@ -164,7 +171,8 @@ export function recommendModel(input: AcuDecisionInput): AcuRecommendation {
   const fallbackCallCost = estimateCallCost(fallback, inputTokens, outputTokens);
   const estimates = models.map((model) => estimateOne(
     model,
-    probabilities,
+    difficulty,
+    entropyPenalty,
     inputTokens,
     outputTokens,
     Math.max(0, input.judgeCost),

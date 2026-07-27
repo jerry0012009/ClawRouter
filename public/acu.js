@@ -146,10 +146,10 @@ function renderEvaluation() {
 
 function renderAll(){renderLegend();drawChart()}
 
-async function evaluate() {
+async function evaluate(forceJudgeRefresh=false) {
   let request; try { request=JSON.parse($('context-input').value); } catch(error) { alert(`JSON格式错误：${error.message}`); return; }
   const button=$('evaluate-button');button.disabled=true;button.textContent='Judge评估中…';
-  try { const response=await fetch(`${API}/evaluate`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...request,quality_target:Number($('quality-target').value)/100,expected_output_tokens:request.max_tokens||800})});const payload=await response.json();if(!response.ok)throw new Error(payload.error?.message||'ACU评估失败');evaluation=payload;renderEvaluation(); }
+  try { const response=await fetch(`${API}/evaluate`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...request,quality_target:Number($('quality-target').value)/100,expected_output_tokens:request.max_tokens||800,force_judge_refresh:forceJudgeRefresh})});const payload=await response.json();if(!response.ok)throw new Error(payload.error?.message||'ACU评估失败');evaluation=payload;renderEvaluation(); }
   catch(error){alert(error.message)} finally{button.disabled=false;button.textContent='评估并推荐'}
 }
 
@@ -163,7 +163,8 @@ async function load() {
 
 $('preset').addEventListener('change',event=>setPreset(event.target.value));
 $('quality-target').addEventListener('input',event=>$('quality-target-label').textContent=`${event.target.value}分`);
-$('evaluate-button').addEventListener('click',evaluate); $('provider-filter').addEventListener('change',renderAll);
+$('evaluate-button').addEventListener('click',()=>evaluate(false)); $('provider-filter').addEventListener('change',renderAll);
+$('force-evaluate-button').addEventListener('click',()=>evaluate(true));
 $('expand-models').addEventListener('click',()=>{showAll=!showAll;$('expand-models').textContent=showAll?'仅看拳头模型':'查看全部模型';renderAll()});
 $('curve-chart').addEventListener('mousemove',event=>{const rect=event.target.getBoundingClientRect(),mx=event.clientX-rect.left,my=event.clientY-rect.top,nearest=chartState.map(point=>({...point,distance:Math.hypot(point.px-mx,point.py-my)})).sort((a,b)=>a.distance-b.distance)[0],tip=$('chart-tooltip');if(!nearest||nearest.distance>22){tip.hidden=true;return}const estimate=estimateFor(nearest.model.modelId), evidence=nearest.model.benchmarkEvidence[0];tip.innerHTML=`<strong>${nearest.model.displayName}</strong><br>预计得分 ${score(nearest.quality)} · 区间 ${score(estimate.qualityLower)}–${score(estimate.qualityUpper)}<br>预计综合成本 ${usd(estimate.expectedTotalCost)}<br>${nearest.model.curveProfile.replaceAll('_',' ')} · ${nearest.model.profileConfidence}<br>${evidence.benchmarkName}`;tip.style.left=`${Math.min(rect.width-280,mx+14)}px`;tip.style.top=`${Math.max(8,my-65)}px`;tip.hidden=false});
 $('curve-chart').addEventListener('mouseleave',()=>$('chart-tooltip').hidden=true); window.addEventListener('resize',drawChart);

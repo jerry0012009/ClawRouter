@@ -65,6 +65,28 @@ export function buildModelCurve(model: AcuModelCatalogEntry): AcuCurvePoint[] {
   return points;
 }
 
+export function interpolateModelCurve(model: AcuModelCatalogEntry, difficultyScore: number): AcuCurvePoint {
+  const bounded = Math.max(0, Math.min(100, difficultyScore));
+  const lowerIndex = Math.floor(bounded);
+  const upperIndex = Math.ceil(bounded);
+  const curve = buildModelCurve(model);
+  if (lowerIndex === upperIndex) return curve[lowerIndex];
+  const fraction = bounded - lowerIndex;
+  const lower = curve[lowerIndex];
+  const upper = curve[upperIndex];
+  const interpolate = (left: number, right: number): number => left + (right - left) * fraction;
+  return {
+    difficultyScore: bounded,
+    pLow: interpolate(lower.pLow, upper.pLow),
+    pMid: interpolate(lower.pMid, upper.pMid),
+    pMidHigh: interpolate(lower.pMidHigh, upper.pMidHigh),
+    pHigh: interpolate(lower.pHigh, upper.pHigh),
+    estimatedQuality: interpolate(lower.estimatedQuality, upper.estimatedQuality),
+    qualityLower: interpolate(lower.qualityLower, upper.qualityLower),
+    qualityUpper: interpolate(lower.qualityUpper, upper.qualityUpper),
+  };
+}
+
 export function publicCatalogPayload(): Record<string, unknown> {
   return {
     schemaVersion: catalog.schemaVersion,

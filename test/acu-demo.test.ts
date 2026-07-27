@@ -235,7 +235,9 @@ describe("ACU Router demo reliability", () => {
       headers: { Authorization: BASIC_AUTH },
     });
     expect(allowed.status).toBe(200);
-    expect(await allowed.text()).toContain("Baseline Model:");
+    const html = await allowed.text();
+    expect(html).toContain("模型能力与成本决策说明");
+    expect(html).toContain("acu-integrated.js");
   });
 
   it("rejects unauthenticated destructive demo requests", async () => {
@@ -246,20 +248,16 @@ describe("ACU Router demo reliability", () => {
     expect(ledger.status).toBe(401);
   });
 
-  it("frontend cost logic prefers acu_trace over usage fallback", async () => {
+  it("integrated frontend consumes the ACU trace without embedding credentials", async () => {
     const html = await readFrontend();
-    expect(html).toContain("const BASELINE_MODEL = 'claude-opus-4-7'");
-    expect(html).toContain("Baseline Model:");
-    expect(html).toContain("typeof trace?.estimated_cost === 'number'");
-    expect(html.indexOf("typeof trace?.estimated_cost === 'number'")).toBeLessThan(html.indexOf("estimateCost(fallbackModel"));
-    expect(html).toContain("trace?.fallback_used ?? ((trace?.attempts?.length || 0) > 1)");
-    expect(html).toContain("function validatorLabelFromTrace(trace)");
-    expect(html).toContain("if (result === 'not_applicable') return '-'");
-    expect(html).toContain("chatComplete(BASELINE_MODEL, messages)");
-    expect(html).toContain("chatComplete(ROUTER_MODEL, messages)");
-    expect(html).toContain("function finishReasonFromResponse(response)");
-    expect(html).toContain("模型返回 finish_reason=length");
-    expect(html).toContain("cache: false");
+    expect(html).toContain("const BASELINE_MODEL='claude-opus-4-7'");
+    expect(html).toContain("acu-decision-module");
+    expect(html).toContain("window.dispatchEvent(new CustomEvent('acu:evaluation'");
+    expect(html).toContain("t?.estimated_cost");
+    expect(html).toContain("trace?.fallback_used");
+    expect(html).toContain("chatComplete(BASELINE_MODEL,messages)");
+    expect(html).toContain("chatComplete(ROUTER_MODEL,messages)");
+    expect(html).toContain("cache:false");
     expect(html).not.toContain("max_tokens: maxTokens || 600");
     expect(html).not.toContain("payload.max_tokens");
     expect(html).not.toContain("acu_demo_key");

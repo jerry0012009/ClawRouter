@@ -766,6 +766,11 @@ type AcuRuntimeConfig = {
     maxOutputTokens: number;
     apiKey?: string;
     cachePath?: string;
+    allowMock: boolean;
+    shadowMode: boolean;
+    allowForceRefresh: boolean;
+    databasePath: string;
+    judgeEntropyPenalty: number;
 };
 declare function readAcuRuntimeConfig(overrides?: Partial<AcuRuntimeConfig>): AcuRuntimeConfig;
 
@@ -779,9 +784,12 @@ type AcuTierProbabilities = {
     confidence: number;
 };
 type AcuJudgeResult = AcuTierProbabilities & {
+    difficultyScore: number;
     signals: string[];
     explanation: string;
 };
+type AcuJudgeStatus = "live" | "cache_hit" | "rules_fallback" | "live_error";
+type AcuJudgeResultSource = "upstream_live" | "disk_cache" | "rules_strategy";
 type AcuBenchmarkEvidence = {
     benchmarkName: string;
     normalizedScore: number;
@@ -888,6 +896,10 @@ type AcuEvaluateInput = {
     eligibleModelIds?: string[];
     requireToolCallSupport?: boolean;
     requireVisionSupport?: boolean;
+    forceJudgeRefresh?: boolean;
+    requestId?: string;
+    requestedModel?: string;
+    sessionHash?: string;
 };
 type AcuEvaluation = {
     estimateLabel: "public-benchmark constrained estimate";
@@ -895,7 +907,15 @@ type AcuEvaluation = {
     judgeModel: string;
     judgeMode: "non-thinking";
     judge: AcuJudgeResult;
-    judgeStatus: "success" | "cache_hit" | "rules_fallback";
+    judgeStatus: AcuJudgeStatus;
+    judgeResultSource: AcuJudgeResultSource;
+    judgeProvider: string;
+    judgeEndpointHost: string;
+    upstreamRequestId: string | null;
+    cacheKeySha256: string;
+    cacheCreatedAt: string;
+    usageStatus: "reported" | "usage_missing" | "not_applicable";
+    judgeErrorCategory?: string;
     judgeLatencyMs: number;
     judgeCost: number;
     judgePromptTokens: number;
@@ -904,6 +924,10 @@ type AcuEvaluation = {
     contextTokenEstimate: number;
     contextTruncated: boolean;
     difficultyScore: number;
+    judgeEntropy: number;
+    routingModelVersion: string;
+    shadowMode: boolean;
+    requestId: string;
     qualityTarget: number;
     recommendation: AcuRecommendation;
     disclaimer: string;
@@ -921,12 +945,19 @@ type AcuCurvePoint = {
 
 type JudgeRequestResult = {
     result: AcuJudgeResult;
-    status: "success" | "cache_hit";
+    status: "live" | "cache_hit";
+    resultSource: "upstream_live" | "disk_cache";
+    provider: string;
+    endpointHost: string;
+    upstreamRequestId: string | null;
     latencyMs: number;
     cost: number;
     promptTokens: number;
     completionTokens: number;
+    usageStatus: "reported" | "usage_missing";
     contextSha256: string;
+    cacheKeySha256: string;
+    cacheCreatedAt: string;
     contextTokenEstimate: number;
     contextTruncated: boolean;
 };
@@ -936,7 +967,7 @@ declare class AcuJudgeClient {
     private readonly config;
     private readonly fetchImplementation;
     constructor(config: AcuRuntimeConfig, fetchImplementation?: typeof fetch);
-    judge(messages: AcuVisibleMessage[], tools?: unknown[]): Promise<JudgeRequestResult>;
+    judge(messages: AcuVisibleMessage[], tools?: unknown[], forceRefresh?: boolean): Promise<JudgeRequestResult>;
 }
 
 declare function rulesFallbackJudge(decision: RoutingDecision): AcuJudgeResult;
@@ -946,6 +977,9 @@ declare class AcuDemoStrategy {
     readonly name = "acu-demo";
     constructor(config: AcuRuntimeConfig, judgeClient?: AcuJudgeClient);
     get enabled(): boolean;
+    get shadowMode(): boolean;
+    get allowForceRefresh(): boolean;
+    get databasePath(): string;
     evaluate(input: AcuEvaluateInput, rulesDecision: RoutingDecision): Promise<AcuEvaluation>;
 }
 
@@ -1004,10 +1038,12 @@ type AcuModelCatalog = {
 declare function getAcuCatalog(): AcuModelCatalog;
 declare function getAcuModel(modelId: string): AcuModelCatalogEntry | undefined;
 declare function buildModelCurve(model: AcuModelCatalogEntry): AcuCurvePoint[];
+declare function interpolateModelCurve(model: AcuModelCatalogEntry, difficultyScore: number): AcuCurvePoint;
 declare function publicCatalogPayload(): Record<string, unknown>;
 
 type AcuDecisionInput = {
     probabilities: AcuTierProbabilities;
+    difficultyScore: number;
     inputTokens: number;
     expectedOutputTokens: number;
     judgeCost: number;
@@ -1016,6 +1052,7 @@ type AcuDecisionInput = {
     requireToolCallSupport?: boolean;
     requireVisionSupport?: boolean;
     switchCost?: number;
+    judgeEntropyPenalty?: number;
 };
 declare function estimateCallCost(model: Pick<AcuModelCatalogEntry, "inputPricePerMillion" | "outputPricePerMillion">, inputTokens: number, outputTokens: number): number;
 type ValueCandidate = Pick<AcuModelEstimate, "modelId" | "displayName" | "predictedScore" | "riskAdjustedCost"> & {
@@ -1039,6 +1076,7 @@ declare function normalizeProbabilities(value: Omit<AcuTierProbabilities, "confi
     confidence?: number;
 }): AcuTierProbabilities;
 declare function difficultyScore(probabilities: AcuTierProbabilities): number;
+declare function normalizedEntropy(probabilities: AcuTierProbabilities): number;
 declare function tierSufficiency(abilityParameter: number): {
     sufficientLow: number;
     sufficientMid: number;
@@ -1051,6 +1089,50 @@ declare function solveAbilityParameter(abilityAnchor: number, distribution: AcuT
 };
 declare function estimatedQuality(probabilities: AcuTierProbabilities, model: Pick<AcuModelCatalogEntry, "sufficientLow" | "sufficientMid" | "sufficientMidHigh" | "sufficientHigh">): number;
 declare function continuousTierProbabilities(difficulty: number): AcuTierProbabilities;
+
+type RoutingRecordMetadata = {
+    sessionHash?: string;
+    requestedModel?: string;
+    actualModel?: string;
+    inputTokens?: number;
+    outputTokens?: number;
+    actualCost?: number;
+    latencyMs?: number;
+    finalStatus?: string;
+    hadTools?: boolean;
+    errorCategory?: string;
+};
+type FeedbackInput = {
+    requestId: string;
+    accepted?: boolean;
+    rating?: number;
+    requiredUpgrade?: boolean;
+    finalModel?: string;
+};
+type OutcomeInput = {
+    requestId: string;
+    validatorResult?: string;
+    testResult?: string;
+    toolErrorCount?: number;
+    retryCount?: number;
+    modelSwitched?: boolean;
+    userRetried?: boolean;
+    outcomeScore?: number;
+    outcomeSource: "explicit_user_feedback" | "validator" | "test_result" | "retry_signal" | "model_upgrade_signal";
+};
+declare function hashSession(value: string | undefined): string | undefined;
+declare class AcuRoutingStore {
+    readonly path: string;
+    private readonly database;
+    constructor(path: string);
+    recordEvaluation(evaluation: AcuEvaluation, metadata?: RoutingRecordMetadata): void;
+    finalizeRequest(requestId: string, metadata: RoutingRecordMetadata): void;
+    recordFeedback(input: FeedbackInput): void;
+    recordOutcome(input: OutcomeInput): void;
+    summary(): Record<string, unknown>;
+    close(): void;
+}
+declare function openAcuRoutingStore(path: string): AcuRoutingStore | null;
 
 type ProxyOptions = {
     apiKey?: string;
@@ -1181,4 +1263,4 @@ declare const VERSION: string;
 
 declare const plugin: OpenClawPluginDefinition;
 
-export { ACU_TIERS, type AcuBenchmarkEvidence, type AcuCurvePoint, AcuDemoStrategy, type AcuEvaluateInput, type AcuEvaluation, AcuJudgeClient, type AcuJudgeResult, type AcuModelCatalogEntry, type AcuModelEstimate, type AcuRecommendation, type AcuRuntimeConfig, type AcuTier, type AcuTierProbabilities, type AcuVisibleMessage, BLOCKRUN_MODELS, type CachedResponse, DEFAULT_ROUTING_CONFIG, MODEL_ALIASES, OPENCLAW_MODELS, RequestDeduplicator, ResponseCache, type RoutingConfig, type RoutingDecision, type SessionConfig, type SessionEntry, SessionStore, type Tier, type UsageEntry, VERSION, blockrunProvider, buildModelCurve, buildProviderModels, calculateModelCost, continuousTierProbabilities, plugin as default, difficultyScore, estimateCallCost, estimatedQuality, getAcuCatalog, getAcuModel, getFallbackChain, getModelContextWindow, getProxyPort, getSessionId, hashRequestContent, isParetoEfficient, isReasoningModel, logUsage, normalizeProbabilities, parseJudgeResult, publicCatalogPayload, readAcuRuntimeConfig, recommendModel, resolveApiKey, resolveModelAlias, route, rulesFallbackJudge, saveApiKey, selectValueRoute, serializeVisibleContext, solveAbilityParameter, startProxy, supportsToolCalling, supportsVision, tierSufficiency };
+export { ACU_TIERS, type AcuBenchmarkEvidence, type AcuCurvePoint, AcuDemoStrategy, type AcuEvaluateInput, type AcuEvaluation, AcuJudgeClient, type AcuJudgeResult, type AcuJudgeResultSource, type AcuJudgeStatus, type AcuModelCatalogEntry, type AcuModelEstimate, type AcuRecommendation, AcuRoutingStore, type AcuRuntimeConfig, type AcuTier, type AcuTierProbabilities, type AcuVisibleMessage, BLOCKRUN_MODELS, type CachedResponse, DEFAULT_ROUTING_CONFIG, type FeedbackInput, MODEL_ALIASES, OPENCLAW_MODELS, type OutcomeInput, RequestDeduplicator, ResponseCache, type RoutingConfig, type RoutingDecision, type RoutingRecordMetadata, type SessionConfig, type SessionEntry, SessionStore, type Tier, type UsageEntry, VERSION, blockrunProvider, buildModelCurve, buildProviderModels, calculateModelCost, continuousTierProbabilities, plugin as default, difficultyScore, estimateCallCost, estimatedQuality, getAcuCatalog, getAcuModel, getFallbackChain, getModelContextWindow, getProxyPort, getSessionId, hashRequestContent, hashSession, interpolateModelCurve, isParetoEfficient, isReasoningModel, logUsage, normalizeProbabilities, normalizedEntropy, openAcuRoutingStore, parseJudgeResult, publicCatalogPayload, readAcuRuntimeConfig, recommendModel, resolveApiKey, resolveModelAlias, route, rulesFallbackJudge, saveApiKey, selectValueRoute, serializeVisibleContext, solveAbilityParameter, startProxy, supportsToolCalling, supportsVision, tierSufficiency };

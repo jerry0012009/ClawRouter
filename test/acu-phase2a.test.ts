@@ -9,9 +9,11 @@ import {
   difficultyScore,
   estimatedQuality,
   getAcuCatalog,
+  interpolateModelCurve,
   normalizeProbabilities,
   parseJudgeResult,
   recommendModel,
+  serializeVisibleContext,
   selectValueRoute,
   solveAbilityParameter,
   tierSufficiency,
@@ -49,6 +51,7 @@ describe("Phase 2A constrained tier model", () => {
 
   it("rejects malformed strict Judge JSON", () => {
     expect(() => parseJudgeResult(JSON.stringify({
+      difficulty_score: 40,
       p_low: 0.4,
       p_mid: 0.3,
       p_mid_high: 0.2,
@@ -103,6 +106,21 @@ describe("Phase 2A constrained tier model", () => {
     }
   });
 
+  it("uses the identical interpolated curve point for recommendation scores", () => {
+    const difficulty = 47.35;
+    const recommendation = recommendModel({
+      probabilities: { pLow: 0.1, pMid: 0.6, pMidHigh: 0.25, pHigh: 0.05, confidence: 0.8 },
+      difficultyScore: difficulty,
+      inputTokens: 500,
+      expectedOutputTokens: 300,
+      judgeCost: 0,
+    });
+    for (const estimate of recommendation.estimates) {
+      const model = getAcuCatalog().models.find((item) => item.modelId === estimate.modelId)!;
+      expect(estimate.predictedScore).toBeCloseTo(interpolateModelCurve(model, difficulty).estimatedQuality * 100, 12);
+    }
+  });
+
   it("uses all four Judge probabilities rather than the scalar difficulty", () => {
     const model = getAcuCatalog().models[0];
     const quality = estimatedQuality({
@@ -131,6 +149,7 @@ describe("Phase 2A constrained tier model", () => {
     };
     const economical = recommendModel({
       probabilities: easy,
+      difficultyScore: 12.5,
       inputTokens: 1_000,
       expectedOutputTokens: 500,
       judgeCost: 0.001,
@@ -144,6 +163,7 @@ describe("Phase 2A constrained tier model", () => {
 
     const impossible = recommendModel({
       probabilities: { pLow: 0, pMid: 0, pMidHigh: 0, pHigh: 1, confidence: 1 },
+      difficultyScore: 96,
       inputTokens: 1_000,
       expectedOutputTokens: 500,
       judgeCost: 0,
@@ -187,6 +207,7 @@ describe("Phase 2A constrained tier model", () => {
     });
     const decision = recommendModel({
       probabilities: { pLow: 1, pMid: 0, pMidHigh: 0, pHigh: 0, confidence: 1 },
+      difficultyScore: 5,
       inputTokens: 100,
       expectedOutputTokens: 100,
       judgeCost: 0,
@@ -196,12 +217,25 @@ describe("Phase 2A constrained tier model", () => {
 });
 
 describe("Phase 2A Judge transport", () => {
+  it("rejects injected Judge providers outside tests unless explicitly allowed", () => {
+    const previous = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+    try {
+      const config = readAcuRuntimeConfig({ enabled: true, apiKey: "secret", allowMock: false });
+      expect(() => new AcuJudgeClient(config, vi.fn<typeof fetch>())).toThrow(/Mock ACU Judge providers are forbidden/);
+    } finally {
+      if (previous === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = previous;
+    }
+  });
+
   it("sends a non-thinking JSON-only request and reuses the hash cache", async () => {
     const directory = await mkdtemp(join(tmpdir(), "acu-judge-test-"));
     temporaryDirectories.push(directory);
     const cachePath = join(directory, "cache.json");
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
       choices: [{ message: { content: JSON.stringify({
+        difficulty_score: 68.4,
         p_low: 0.1,
         p_mid: 0.2,
         p_mid_high: 0.6,
@@ -218,7 +252,7 @@ describe("Phase 2A Judge transport", () => {
 
     const first = await client.judge(messages);
     const second = await client.judge(messages);
-    expect(first.status).toBe("success");
+    expect(first.status).toBe("live");
     expect(second.status).toBe("cache_hit");
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const request = fetchMock.mock.calls[0][1];
@@ -234,5 +268,20 @@ describe("Phase 2A Judge transport", () => {
     const cache = await readFile(cachePath, "utf8");
     expect(cache).not.toContain("Inspect the failing tests");
     expect(cache).not.toContain("secret");
+  });
+
+  it("serializes tool calls, tool results, structured content, and tools deterministically", () => {
+    const messages = [
+      { role: "assistant", content: null, tool_calls: [{ id: "call_123", type: "function", function: { name: "run_shell", arguments: '{"command":"npm test"}' } }] },
+      { role: "tool", tool_call_id: "call_123", name: "run_shell", content: "FAIL duplicate rows after retry", error: { code: "TEST_FAILURE" } },
+    ];
+    const tools = [{ type: "function", function: { parameters: { required: ["command"], type: "object" }, name: "run_shell" } }];
+    const first = serializeVisibleContext(messages, tools);
+    const second = serializeVisibleContext(messages, tools);
+    expect(first).toBe(second);
+    expect(first).toContain("[ASSISTANT_TOOL_CALL id=call_123]");
+    expect(first).toContain('arguments={"command":"npm test"}');
+    expect(first).toContain("[TOOL_RESULT id=call_123 name=run_shell]");
+    expect(first).toContain("TEST_FAILURE");
   });
 });

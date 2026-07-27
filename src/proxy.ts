@@ -67,11 +67,14 @@ import {
 import { validateAssistantOutput, type ValidatorResult } from "./validator/index.js";
 import {
   AcuDemoStrategy,
+  hashSession,
+  openAcuRoutingStore,
   publicCatalogPayload,
   readAcuRuntimeConfig,
   type AcuEvaluation,
   type AcuRuntimeConfig,
   type AcuVisibleMessage,
+  type AcuRoutingStore,
 } from "./acu/index.js";
 
 export const DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
@@ -615,7 +618,7 @@ function normalizeMessagesForThinking(messages: ChatMessage[]): ChatMessage[] {
 
 function stripDemoOnlyRequestFields(parsed: Record<string, unknown>): boolean {
   let changed = false;
-  for (const key of ["baseline_model", "cache", "expected_schema", "acu_quality_target"]) {
+  for (const key of ["baseline_model", "cache", "expected_schema", "acu_quality_target", "acu_execute_recommended"]) {
     if (key in parsed) {
       delete parsed[key];
       changed = true;
@@ -835,6 +838,7 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
   const routerOpts: RouterOptions = { config: routingConfig, modelPricing };
   const demoAccessToken = options.demoAccessToken?.trim() ?? getEnvDemoAccessToken();
   const acuStrategy = new AcuDemoStrategy(readAcuRuntimeConfig(options.acuRuntimeConfig));
+  const acuStore = acuStrategy.enabled ? openAcuRoutingStore(acuStrategy.databasePath) : null;
 
   const deduplicator = new RequestDeduplicator();
   const responseCache = new ResponseCache(options.cacheConfig);
@@ -850,7 +854,7 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
       await handleRequest(req, res, {
         apiKey, proxyApiKey: options.proxyApiKey, proxyBaseUrl, routerOpts, deduplicator, responseCache, sessionStore,
         sessionJournal, excludeList, onRouted: options.onRouted, walletAddress, demoAccessToken,
-        acuStrategy,
+        acuStrategy, acuStore,
       });
     } catch (err) {
       console.error(`[ClawRouter] Unhandled error: ${err instanceof Error ? err.message : err}`);
@@ -891,7 +895,7 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
     port: boundPort,
     baseUrl: `http://127.0.0.1:${boundPort}`,
     ...(walletAddress && { walletAddress }),
-    close: () => new Promise((resolve) => server.close(() => resolve())),
+    close: () => new Promise((resolve) => server.close(() => { acuStore?.close(); resolve(); })),
   };
 }
 
@@ -914,6 +918,7 @@ async function handleRequest(
     walletAddress?: string;
     demoAccessToken: string;
     acuStrategy: AcuDemoStrategy;
+    acuStore: AcuRoutingStore | null;
   },
 ): Promise<void> {
   req.url = stripAcuPrefix(req.url);
@@ -1013,6 +1018,65 @@ async function handleRequest(
     res.end(JSON.stringify(publicCatalogPayload()));
     return;
   }
+  if (pathname === "/acu/api/data-summary" && req.method === "GET") {
+    const summary = ctx.acuStore?.summary() ?? {
+      generatedAt: new Date().toISOString(),
+      realRequestCount: 0,
+      sampleNotice: "当前样本量较小，仅用于产品验证。",
+      storageStatus: "unavailable",
+    };
+    res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+    res.end(JSON.stringify(summary));
+    return;
+  }
+  if (pathname === "/acu/api/feedback" && req.method === "POST") {
+    try {
+      if (!ctx.acuStore) throw new Error("ACU data store is unavailable");
+      const parsed = await readJsonRequest(req);
+      const requestId = String(parsed.request_id ?? "");
+      if (!requestId) throw new Error("request_id is required");
+      ctx.acuStore.recordFeedback({
+        requestId,
+        accepted: typeof parsed.accepted === "boolean" ? parsed.accepted : undefined,
+        rating: parsed.rating === undefined ? undefined : Number(parsed.rating),
+        requiredUpgrade: typeof parsed.required_upgrade === "boolean" ? parsed.required_upgrade : undefined,
+        finalModel: typeof parsed.final_model === "string" ? parsed.final_model : undefined,
+      });
+      res.writeHead(201, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ saved: true, request_id: requestId }));
+    } catch (error) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: { message: error instanceof Error ? error.message : "feedback rejected" } }));
+    }
+    return;
+  }
+  if (pathname === "/acu/api/outcome" && req.method === "POST") {
+    try {
+      if (!ctx.acuStore) throw new Error("ACU data store is unavailable");
+      const parsed = await readJsonRequest(req);
+      const source = String(parsed.outcome_source ?? "");
+      if (!new Set(["validator", "test_result", "retry_signal", "model_upgrade_signal"]).has(source)) {
+        throw new Error("invalid outcome_source");
+      }
+      ctx.acuStore.recordOutcome({
+        requestId: String(parsed.request_id ?? ""),
+        outcomeSource: source as "validator" | "test_result" | "retry_signal" | "model_upgrade_signal",
+        validatorResult: typeof parsed.validator_result === "string" ? parsed.validator_result : undefined,
+        testResult: typeof parsed.test_result === "string" ? parsed.test_result : undefined,
+        toolErrorCount: parsed.tool_error_count === undefined ? undefined : Number(parsed.tool_error_count),
+        retryCount: parsed.retry_count === undefined ? undefined : Number(parsed.retry_count),
+        modelSwitched: typeof parsed.model_switched === "boolean" ? parsed.model_switched : undefined,
+        userRetried: typeof parsed.user_retried === "boolean" ? parsed.user_retried : undefined,
+        outcomeScore: parsed.outcome_score === undefined ? undefined : Number(parsed.outcome_score),
+      });
+      res.writeHead(201, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ saved: true }));
+    } catch (error) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: { message: error instanceof Error ? error.message : "outcome rejected" } }));
+    }
+    return;
+  }
   if (pathname === "/acu/api/evaluate" && req.method === "POST") {
     try {
       const parsed = await readJsonRequest(req);
@@ -1023,6 +1087,8 @@ async function handleRequest(
       const system = messages.find((message) => message.role === "system");
       const expectedOutputTokens = Number(parsed.expected_output_tokens ?? 800);
       const qualityTarget = Number(parsed.quality_target ?? 0.8);
+      const forceJudgeRefresh = parsed.force_judge_refresh === true;
+      if (forceJudgeRefresh && !ctx.acuStrategy.allowForceRefresh) throw new Error("force_judge_refresh is disabled");
       const requireTools = tools.length > 0;
       const requireVision = messages.some((message) => Array.isArray(message.content)
         && message.content.some((part) => Boolean(part && typeof part === "object" && (part as { type?: string }).type === "image_url")));
@@ -1045,7 +1111,19 @@ async function handleRequest(
         eligibleModelIds,
         requireToolCallSupport: requireTools,
         requireVisionSupport: requireVision,
+        forceJudgeRefresh,
+        requestId: randomUUID(),
+        requestedModel: typeof parsed.model === "string" ? parsed.model : "evaluation_only",
       }, rulesDecision);
+      try {
+        ctx.acuStore?.recordEvaluation(evaluation, {
+          requestedModel: typeof parsed.model === "string" ? parsed.model : "evaluation_only",
+          finalStatus: "evaluated_only",
+          hadTools: requireTools,
+        });
+      } catch (error) {
+        console.error(`[ClawRouter] ACU SQLite evaluation write failed: ${error instanceof Error ? error.message : "unknown"}`);
+      }
       res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
       res.end(JSON.stringify(evaluation));
     } catch (error) {
@@ -1086,19 +1164,19 @@ async function handleRequest(
   // ── Only handle chat completions from here ──
 
   // ── Static file serving (frontend) ──
-  if (req.method === "GET" && (pathname === "/" || pathname === "/index.html" || pathname === "/acu" || pathname === "/acu/" || pathname === "/acu/curves" || pathname === "/acu/curves/" || pathname.startsWith("/public/") || pathname.startsWith("/acu/public/"))) {
+  if (req.method === "GET" && (pathname === "/" || pathname === "/index.html" || pathname === "/acu" || pathname === "/acu/" || pathname === "/acu-debug" || pathname === "/acu-debug/" || pathname === "/acu/curves" || pathname === "/acu/curves/" || pathname.startsWith("/public/") || pathname.startsWith("/acu/public/") || pathname.startsWith("/acu-debug/public/"))) {
     const { readFileSync, existsSync } = await import("node:fs");
     const { join, dirname } = await import("node:path");
     const { fileURLToPath } = await import("node:url");
     const __dirname = dirname(fileURLToPath(import.meta.url));
     const publicDir = join(__dirname, "..", "public");
-    const filePath = pathname === "/" || pathname === "/index.html"
+    const filePath = pathname === "/" || pathname === "/index.html" || pathname === "/acu" || pathname === "/acu/"
       ? join(publicDir, "index.html")
-      : pathname === "/acu" || pathname === "/acu/"
+      : pathname === "/acu-debug" || pathname === "/acu-debug/"
         ? join(publicDir, "acu.html")
       : pathname === "/acu/curves" || pathname === "/acu/curves/"
         ? join(publicDir, "acu-curves.html")
-      : join(publicDir, pathname.replace(/^\/acu\/public\//, "").replace(/^\/public\//, ""));
+      : join(publicDir, pathname.replace(/^\/acu-debug\/public\//, "").replace(/^\/acu\/public\//, "").replace(/^\/public\//, ""));
     if (existsSync(filePath)) {
       const ext = filePath.split(".").pop() || "html";
       const mime: Record<string, string> = { html: "text/html", css: "text/css", js: "application/javascript", json: "application/json", png: "image/png", svg: "image/svg+xml" };
@@ -1157,7 +1235,8 @@ async function handleRequest(
   const parsedMessages: ChatMessage[] = [];
   let responseFormat: unknown;
   let expectedSchema: unknown;
-  let acuQualityTarget = 0.9;
+  let acuQualityTarget = 0.8;
+  let executeAcuRecommended: boolean;
 
   try {
     const parsed = JSON.parse(body.toString()) as Record<string, unknown>;
@@ -1168,6 +1247,7 @@ async function handleRequest(
     expectedSchema = parsed.expected_schema;
     const requestedQualityTarget = Number(parsed.acu_quality_target);
     if (Number.isFinite(requestedQualityTarget)) acuQualityTarget = requestedQualityTarget;
+    executeAcuRecommended = parsed.acu_execute_recommended === true;
     if (stripDemoOnlyRequestFields(parsed)) bodyModified = true;
 
     const messages = Array.isArray(parsed.messages) ? (parsed.messages as ChatMessage[]) : [];
@@ -1221,8 +1301,21 @@ async function handleRequest(
           eligibleModelIds,
           requireToolCallSupport: hasTools,
           requireVisionSupport: hasVision,
+          requestId,
+          requestedModel: modelId,
+          sessionHash: hashSession(effectiveSessionId),
         }, rulesDecision);
-        if (acuEvaluation.judgeStatus !== "rules_fallback") {
+        try {
+          ctx.acuStore?.recordEvaluation(acuEvaluation, {
+            sessionHash: hashSession(effectiveSessionId),
+            requestedModel: modelId,
+            finalStatus: "routing_pending",
+            hadTools: hasTools,
+          });
+        } catch (error) {
+          console.error(`[ClawRouter] ACU SQLite routing write failed: ${error instanceof Error ? error.message : "unknown"}`);
+        }
+        if (acuEvaluation.judgeStatus !== "rules_fallback" && (!ctx.acuStrategy.shadowMode || executeAcuRecommended)) {
           const selected = acuEvaluation.recommendation.recommended;
           const fallback = acuEvaluation.recommendation.fallbackModel.modelId;
           const tier = routingTierFromAcu(acuEvaluation);
@@ -1374,6 +1467,14 @@ async function handleRequest(
       validator_result: "not_applicable",
       cache_hit: true,
     });
+    if (acuEvaluation) {
+      try {
+        ctx.acuStore?.finalizeRequest(requestId, {
+          actualModel: respCached.model, inputTokens: usage.inputTokens, outputTokens: usage.outputTokens,
+          actualCost: 0, latencyMs: Date.now() - startTime, finalStatus: "response_cache_hit",
+        });
+      } catch { /* telemetry must not affect the response */ }
+    }
     ctx.deduplicator.complete(dedupKey, { status: 200, headers, body: Buffer.from(respCached.body), completedAt: Date.now() });
     return;
   }
@@ -1553,6 +1654,10 @@ async function handleRequest(
       res.end(errorPayload);
     }
     ctx.deduplicator.removeInflight(dedupKey);
+    if (acuEvaluation) {
+      try { ctx.acuStore?.finalizeRequest(requestId, { finalStatus: "upstream_error", errorCategory: lastErrorCategory }); }
+      catch { /* telemetry must not affect the response */ }
+    }
     return;
   }
 
@@ -1803,6 +1908,26 @@ async function handleRequest(
         ...(lastErrorCategory && { error_category: lastErrorCategory }),
       };
       await appendLedgerEntry(ledgerEntry);
+      if (acuEvaluation) {
+        try {
+          ctx.acuStore?.finalizeRequest(requestId, {
+            actualModel: actualModelUsed, inputTokens: usage.inputTokens, outputTokens: usage.outputTokens,
+            actualCost: costEstimate, latencyMs, finalStatus: "completed", errorCategory: lastErrorCategory,
+          });
+          if (validator.result !== "not_applicable") {
+            ctx.acuStore?.recordOutcome({
+              requestId, validatorResult: validator.result, outcomeSource: "validator",
+              outcomeScore: validator.result === "pass" ? 1 : 0,
+            });
+          }
+          if (attempts.length > 1) {
+            ctx.acuStore?.recordOutcome({ requestId, retryCount: attempts.length - 1, outcomeSource: "retry_signal" });
+          }
+          if (actualModelUsed !== routingDecision?.model) {
+            ctx.acuStore?.recordOutcome({ requestId, modelSwitched: true, outcomeSource: "model_upgrade_signal" });
+          }
+        } catch { /* telemetry must not affect the response */ }
+      }
     }
 
     if (isStreaming && canWrite(res)) {
@@ -1899,6 +2024,15 @@ async function handleRequest(
     savings,
     latencyMs,
   }).catch(() => {});
+
+  if (acuEvaluation && isStreaming) {
+    try {
+      ctx.acuStore?.finalizeRequest(requestId, {
+        actualModel: actualModelUsed, inputTokens: estimatedInputTokens, outputTokens: maxTokens,
+        actualCost: costEstimate, latencyMs, finalStatus: "completed_streaming", errorCategory: lastErrorCategory,
+      });
+    } catch { /* telemetry must not affect the response */ }
+  }
 
   // Cache response
   if (allowResponseCache && responseBody && responseBody.length < 1_048_576) {

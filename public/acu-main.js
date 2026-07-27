@@ -78,7 +78,7 @@
 
   function maxTokensForTask(task, prompt = '') {
     const detected = { 结构化抽取: 'structured_extraction', 写作: 'writing', 摘要: 'summary', 代码修复: 'code_fix', 复杂推理: 'reasoning', 通用任务: 'general' }[detectTaskType(prompt)] || 'general';
-    return ({ structured_extraction: 256, writing: 600, summary: 600, code_fix: 900, reasoning: 1200, general: 800 })[task === 'auto' ? detected : task] || 800;
+    return ({ structured_extraction: 256, writing: 600, summary: 600, code_fix: 900, reasoning: 4096, general: 800 })[task === 'auto' ? detected : task] || 800;
   }
 
   async function planTask(messages, qualityTarget, maxTokens) {
@@ -119,9 +119,25 @@
   }
 
   function finishReason(response) { return response?.choices?.[0]?.finish_reason || null; }
+  function responseText(response) {
+    const content = response?.choices?.[0]?.message?.content;
+    if (typeof content === 'string') return content;
+    if (Array.isArray(content)) return content.map((part) => typeof part === 'string' ? part : (part?.text || '')).join('');
+    return response?.error?.message || '';
+  }
+  function exhaustedWithoutVisibleOutput(response) {
+    return finishReason(response) === 'length' && responseText(response).trim().length === 0;
+  }
+  function expandedRetryBudget(maxTokens) {
+    return Math.min(8192, Math.max(4096, maxTokens * 2));
+  }
   function renderAnswer(element, response, text) {
-    element.textContent = text || '(empty)';
-    if (finishReason(response) === 'length') element.textContent += '\n\n[提示：输出可能被长度截断。]';
+    if (!text && exhaustedWithoutVisibleOutput(response)) {
+      element.textContent = '本次未生成完整回答，请重新运行。';
+      return;
+    }
+    element.textContent = text || '模型未返回可见文本。';
+    if (finishReason(response) === 'length') element.textContent += '\n\n[回答未完整生成，请重新运行。]';
   }
 
   function estimateCost(model, usage) {
@@ -267,14 +283,22 @@
       const finish = () => { if (state.ceilingDone && state.routerDone) { running = false; $('run-btn').disabled = false; } };
       const ceilingExtra = ceiling.thinkingMode === 'disabled' ? { enable_thinking: false } : {};
       const ceilingStarted = Date.now();
-      const ceilingPromise = chatComplete(ceiling.modelId, messages, undefined, maxTokens, ceilingExtra).then((response) => {
+      const ceilingPromise = chatComplete(ceiling.modelId, messages, undefined, maxTokens, ceilingExtra).then(async (firstResponse) => {
+        let response = firstResponse;
+        let emptyOutputRetry = false;
+        let retryCost = 0;
+        if (exhaustedWithoutVisibleOutput(firstResponse)) {
+          emptyOutputRetry = true;
+          retryCost = actualModelCost(firstResponse, ceiling.modelId);
+          response = await chatComplete(ceiling.modelId, messages, undefined, expandedRetryBudget(maxTokens), ceilingExtra);
+        }
         const latency = Date.now() - ceilingStarted;
-        const content = response.choices?.[0]?.message?.content || response.error?.message || '(empty)';
-        const cost = actualModelCost(response, ceiling.modelId);
+        const content = responseText(response);
+        const cost = retryCost + actualModelCost(response, ceiling.modelId);
         const quality = evaluateQuality(content, prompt, spec, null);
         renderAnswer($('baseline-answer'), response, content);
         renderQualityResult('baseline-quality', '质量上界模型', quality, spec);
-        $('baseline-meta').innerHTML = `<span class="pill warn">${ceiling.displayName}</span><span class="pill">预计 ${ceiling.predictedScore.toFixed(1)}分</span><span class="pill">${modeLabel(ceiling)}</span><span class="pill">模型调用 ${latency}ms</span><span class="pill warn">本次实际成本 US$${cost.toFixed(5)}</span><span class="pill">${usageSourceLabel(response)}</span>`;
+        $('baseline-meta').innerHTML = `<span class="pill warn">${ceiling.displayName}</span><span class="pill">预计 ${ceiling.predictedScore.toFixed(1)}分</span><span class="pill">${modeLabel(ceiling)}</span><span class="pill">模型调用 ${latency}ms</span><span class="pill warn">本次实际成本 US$${cost.toFixed(5)}</span><span class="pill">${usageSourceLabel(response)}</span>${emptyOutputRetry ? '<span class="pill warn">已自动重试，成本含两次调用</span>' : ''}`;
         state.ceiling = { response, model: ceiling.modelId, cost, quality, latency, predictedScore: ceiling.predictedScore };
       }).catch((error) => {
         $('baseline-answer').textContent = `质量上界模型调用失败：${error.message}`;
@@ -286,7 +310,7 @@
         const wallLatency = Date.now() - routerStarted;
         const trace = getTrace(response);
         const model = trace?.actual_model_used || response.model || 'unknown';
-        const content = response.choices?.[0]?.message?.content || response.error?.message || '(empty)';
+        const content = responseText(response);
         const cost = actualModelCost(response, model);
         const quality = evaluateQuality(content, prompt, spec, trace);
         const latency = trace?.latency_breakdown || {};

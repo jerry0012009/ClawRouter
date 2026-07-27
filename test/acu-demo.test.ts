@@ -281,6 +281,13 @@ describe("ACU Router demo reliability", () => {
     expect(main).toContain("acu_plan_id: plan.planId");
     expect(main).toContain("window.dispatchEvent(new CustomEvent('acu:evaluation'");
     expect(main).toContain("Promise.allSettled");
+    expect(main).toContain("exhaustedWithoutVisibleOutput");
+    expect(main).toContain("expandedRetryBudget");
+    expect(main).toContain("已自动重试，成本含两次调用");
+    expect(main).not.toContain("推理过程耗尽");
+    expect(main).toContain("reasoning: 4096");
+    expect(main).not.toContain("reasoning: 1200");
+    expect(main).not.toContain("element.textContent = text || '(empty)'");
     expect(main).not.toContain("BASELINE_MODEL");
     expect(main).not.toContain("localStorage");
     expect(html).not.toContain("acu_demo_key");

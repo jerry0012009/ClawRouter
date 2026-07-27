@@ -10,6 +10,7 @@ let upstream: Server;
 let proxy: ProxyHandle;
 let temporaryDirectory = "";
 const receivedModels: string[] = [];
+const receivedRequests: Array<{ model: string; enable_thinking?: boolean }> = [];
 const DEMO_TOKEN = "phase2a-demo-token";
 const AUTHORIZATION = `Basic ${Buffer.from(`demo:${DEMO_TOKEN}`).toString("base64")}`;
 
@@ -29,9 +30,11 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
       for await (const chunk of request) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
       const body = JSON.parse(Buffer.concat(chunks).toString()) as {
         model: string;
+        enable_thinking?: boolean;
         messages?: Array<{ content?: string }>;
       };
       receivedModels.push(body.model);
+      receivedRequests.push({ model: body.model, enable_thinking: body.enable_thinking });
       if (body.model === "deepseek-v4-flash") {
         const visible = JSON.stringify(body.messages);
         const content = visible.includes("JUDGE_FAILURE")
@@ -53,13 +56,17 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
         }));
         return;
       }
+      const visible = JSON.stringify(body.messages);
+      const content = visible.includes("QUALITY_REPAIR_ESCALATION")
+        ? body.model === "qwen3.6-plus" ? "not json" : JSON.stringify({ ok: true })
+        : "ok";
       response.writeHead(200, { "Content-Type": "application/json" });
       response.end(JSON.stringify({
         id: "chatcmpl-phase2a",
         object: "chat.completion",
         created: 1,
         model: body.model,
-        choices: [{ index: 0, message: { role: "assistant", content: "ok" }, finish_reason: "stop" }],
+        choices: [{ index: 0, message: { role: "assistant", content }, finish_reason: "stop" }],
         usage: { prompt_tokens: 20, completion_tokens: 5, total_tokens: 25 },
       }));
     });
@@ -181,6 +188,7 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
 
   it("routes an auto request through the Judge without a Completion call to the Judge model", async () => {
     receivedModels.length = 0;
+    receivedRequests.length = 0;
     const response = await fetch(`${proxy.baseUrl}/v1/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: AUTHORIZATION },
@@ -206,14 +214,26 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
         actual_model_used?: string;
         attempts?: Array<{ model: string; status: string; latency_ms: number }>;
         latency_breakdown?: { judge_latency_ms: number; upstream_latency_ms: number; total_router_latency_ms: number };
-        usage_audit?: { usageSource: string; completionTokens: number; visibleOutputTokens: number; usageRawKeys: string[] };
+        usage_audit?: { usageSource: string; completionTokens: number; visibleOutputTokens: number; reasoningTokens: number; usageRawKeys: string[] };
         cost_audit?: { model_call_cost: number; judge_cost: number; total_acu_cost: number };
+        execution_profile_id?: string;
+        thinking_mode?: string;
+        request_parameter_applied?: boolean;
+        upstream_model?: string;
       };
     };
     expect(payload.acu_trace?.acu_demo?.judgeStatus).toBe("live");
     expect(receivedModels[0]).toBe("deepseek-v4-flash");
     expect(receivedModels).toHaveLength(2);
     expect(receivedModels[1]).toBe(payload.acu_trace?.selected_model);
+    if (receivedModels[1] === "qwen3.6-plus") {
+      expect(receivedRequests[1]?.enable_thinking).toBe(false);
+      expect(payload.acu_trace?.execution_profile_id).toBe("qwen3.6-plus:non-thinking");
+      expect(payload.acu_trace?.thinking_mode).toBe("disabled");
+      expect(payload.acu_trace?.request_parameter_applied).toBe(true);
+      expect(payload.acu_trace?.usage_audit?.reasoningTokens).toBe(0);
+      expect(payload.acu_trace?.upstream_model).toBe("qwen3.6-plus");
+    }
     expect(payload.acu_trace?.selected_model).toBe(payload.acu_trace?.acu_demo?.recommendation.recommended.modelId);
     expect(payload.acu_trace?.actual_model_used).toBe(payload.acu_trace?.selected_model);
     expect(payload.acu_trace?.acu_demo?.actualModel).toBe(payload.acu_trace?.actual_model_used);
@@ -244,6 +264,31 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
     });
     expect(response.status).toBe(200);
     expect((await summary()).realRequestCount).toBe(before.realRequestCount);
+  });
+
+  it("repairs JSON with the same model before selecting a non-decreasing quality candidate", async () => {
+    const response = await fetch(`${proxy.baseUrl}/v1/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: AUTHORIZATION },
+      body: JSON.stringify({
+        model: "auto",
+        messages: [{ role: "user", content: "QUALITY_REPAIR_ESCALATION: 只返回合法 JSON。" }],
+        response_format: { type: "json_object" }, acu_quality_target: 0.7, max_tokens: 100, cache: false,
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = await response.json() as { acu_trace?: {
+      actual_model_used: string; quality_fallback_used: boolean; format_repair_used: boolean;
+      attempts: Array<{ model: string; attempt_type: string; status: string }>;
+      acu_demo: { recommendation: { estimates: Array<{ modelId: string; predictedScore: number }> } };
+    } };
+    const trace = payload.acu_trace!;
+    expect(trace.format_repair_used).toBe(true);
+    expect(trace.quality_fallback_used).toBe(true);
+    expect(trace.attempts.map((attempt) => attempt.attempt_type)).toEqual(["initial", "format_repair", "quality_upgrade"]);
+    expect(trace.attempts[1]).toMatchObject({ model: "qwen3.6-plus", status: "error" });
+    const scores = new Map(trace.acu_demo.recommendation.estimates.map((estimate) => [estimate.modelId, estimate.predictedScore]));
+    expect(scores.get(trace.actual_model_used)!).toBeGreaterThanOrEqual(scores.get("qwen3.6-plus")!);
   });
 
   it("keeps the request alive and reports RulesStrategy fallback on Judge errors", async () => {

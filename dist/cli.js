@@ -4108,10 +4108,13 @@ function textFromContent(content) {
   }).join(" ");
 }
 function promptNeedsJsonValidation(messages, responseFormat, expectedSchema) {
-  if (responseFormat || expectedSchema) return true;
-  const prompt = messages.map((message) => textFromContent(message.content)).join("\n").toLowerCase();
+  const format = responseFormat && typeof responseFormat === "object" ? responseFormat : void 0;
+  if (format?.type === "json_object" || format?.type === "json_schema" || expectedSchema) return true;
+  const prompt = messages.filter((message) => message.role === "user").map((message) => textFromContent(message.content)).join("\n").toLowerCase();
   if (/不要\s*(输出|返回)?\s*json|do\s+not\s+(output|return)\s+json|no\s+json/.test(prompt)) return false;
-  return /\bjson\b|schema|structured|fields?|字段|结构化|提取/.test(prompt);
+  const explicitJson = /(?:只|请)?\s*(?:返回|输出|生成|提供|响应(?:为|成)?)\s*(?:严格|合法|有效)?\s*json\b|\bjson\s*(?:格式|对象|数组|输出|响应)|(?:return|output|respond\s+with|produce|generate)\s+(?:only\s+|valid\s+)?json\b/i.test(prompt);
+  const structuredFieldExtraction = /(?:提取|抽取)[\s\S]{0,120}(?:字段(?:包括|包含|为|：|:)|字段列表)[\s\S]{0,120}(?:结构化(?:输出|结果)|按结构输出)|(?:字段(?:包括|包含|为|：|:)|字段列表)[\s\S]{0,120}(?:提取|抽取)[\s\S]{0,120}(?:结构化(?:输出|结果)|按结构输出)|(?:extract|parse)[\s\S]{0,120}(?:fields?\s*(?:include|:)|field list)[\s\S]{0,120}structured\s+output/i.test(prompt);
+  return explicitJson || structuredFieldExtraction;
 }
 function extractJsonCandidate(text) {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1]?.trim();
@@ -4137,7 +4140,11 @@ function validateAssistantOutput(args) {
   }
   const candidate = extractJsonCandidate(args.assistantText);
   if (!candidate) {
-    return { result: "fail", validator: "json_validator", reason: "No JSON object or array found" };
+    return {
+      result: "fail",
+      validator: requiredFields.length > 0 ? "schema_validator" : "json_validator",
+      reason: "\u672A\u627E\u5230JSON\u5BF9\u8C61\u6216\u6570\u7EC4"
+    };
   }
   let parsed;
   try {
@@ -6071,6 +6078,9 @@ var catalog = model_catalog_default;
 function getAcuCatalog() {
   return catalog;
 }
+function getAcuModel(modelId) {
+  return catalog.models.find((model) => model.modelId === modelId);
+}
 function getRoutingEligibleModels(eligibleModelIds) {
   const allowed = eligibleModelIds ? new Set(eligibleModelIds) : null;
   return catalog.models.filter((model) => model.routingEligible && (!allowed || allowed.has(model.modelId)));
@@ -6960,8 +6970,31 @@ var AcuRoutingStore = class {
         latency_ms INTEGER NOT NULL,
         billed_cost REAL,
         usage_source TEXT,
+        attempt_type TEXT,
+        execution_profile_id TEXT,
+        thinking_mode TEXT,
+        request_parameter_applied INTEGER,
+        upstream_model TEXT,
+        reasoning_tokens INTEGER,
         created_at TEXT NOT NULL,
         PRIMARY KEY(request_id, attempt_index)
+      );
+      CREATE TABLE IF NOT EXISTS execution_profile_health (
+        execution_profile_id TEXT PRIMARY KEY,
+        sample_count INTEGER NOT NULL,
+        recent_success_rate REAL,
+        consecutive_failures INTEGER NOT NULL,
+        consecutive_timeouts INTEGER NOT NULL,
+        p50_latency_ms REAL,
+        p95_latency_ms REAL,
+        timeout_rate REAL,
+        rate_limit_rate REAL,
+        server_error_rate REAL,
+        last_success_at TEXT,
+        cooldown_until TEXT,
+        availability TEXT NOT NULL,
+        priority_penalty REAL NOT NULL,
+        updated_at TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_routing_created ON routing_requests(created_at);
       CREATE INDEX IF NOT EXISTS idx_routing_hash ON routing_requests(context_sha256);
@@ -6981,6 +7014,17 @@ var AcuRoutingStore = class {
     this.ensureColumn("routing_requests", "total_acu_cost", "REAL");
     this.ensureColumn("routing_attempts", "billed_cost", "REAL");
     this.ensureColumn("routing_attempts", "usage_source", "TEXT");
+    this.ensureColumn("routing_requests", "execution_profile_id", "TEXT");
+    this.ensureColumn("routing_requests", "thinking_mode", "TEXT");
+    this.ensureColumn("routing_requests", "request_parameter_applied", "INTEGER");
+    this.ensureColumn("routing_requests", "upstream_model", "TEXT");
+    this.ensureColumn("routing_attempts", "attempt_type", "TEXT");
+    this.ensureColumn("routing_attempts", "execution_profile_id", "TEXT");
+    this.ensureColumn("routing_attempts", "thinking_mode", "TEXT");
+    this.ensureColumn("routing_attempts", "request_parameter_applied", "INTEGER");
+    this.ensureColumn("routing_attempts", "upstream_model", "TEXT");
+    this.ensureColumn("routing_attempts", "reasoning_tokens", "INTEGER");
+    this.ensureColumn("execution_outcomes", "execution_profile_id", "TEXT");
     chmodSync(path, 384);
   }
   path;
@@ -7080,7 +7124,9 @@ var AcuRoutingStore = class {
       cached_input_tokens=COALESCE(?,cached_input_tokens), usage_source=COALESCE(?,usage_source),
       usage_raw_keys=COALESCE(?,usage_raw_keys), input_price_per_million=COALESCE(?,input_price_per_million),
       output_price_per_million=COALESCE(?,output_price_per_million),
-      model_call_cost=COALESCE(?,model_call_cost), total_acu_cost=COALESCE(?,total_acu_cost)
+      model_call_cost=COALESCE(?,model_call_cost), total_acu_cost=COALESCE(?,total_acu_cost),
+      execution_profile_id=COALESCE(?,execution_profile_id), thinking_mode=COALESCE(?,thinking_mode),
+      request_parameter_applied=COALESCE(?,request_parameter_applied), upstream_model=COALESCE(?,upstream_model)
       WHERE request_id=?`).run(
       metadata.actualModel ?? null,
       metadata.inputTokens ?? null,
@@ -7099,17 +7145,25 @@ var AcuRoutingStore = class {
       metadata.outputPricePerMillion ?? null,
       metadata.modelCallCost ?? null,
       metadata.totalAcuCost ?? null,
+      metadata.executionProfileId ?? null,
+      metadata.thinkingMode ?? null,
+      bool(metadata.requestParameterApplied),
+      metadata.upstreamModel ?? null,
       requestId
     );
   }
   recordAttempts(requestId, attempts) {
     const statement = this.database.prepare(`INSERT INTO routing_attempts
-      (request_id,attempt_index,model_id,upstream,status,error_category,latency_ms,billed_cost,usage_source,created_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?)
+      (request_id,attempt_index,model_id,upstream,status,error_category,latency_ms,billed_cost,usage_source,
+       attempt_type,execution_profile_id,thinking_mode,request_parameter_applied,upstream_model,reasoning_tokens,created_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(request_id,attempt_index) DO UPDATE SET
         model_id=excluded.model_id,upstream=excluded.upstream,status=excluded.status,
         error_category=excluded.error_category,latency_ms=excluded.latency_ms,
-        billed_cost=excluded.billed_cost,usage_source=excluded.usage_source`);
+        billed_cost=excluded.billed_cost,usage_source=excluded.usage_source,
+        attempt_type=excluded.attempt_type,execution_profile_id=excluded.execution_profile_id,
+        thinking_mode=excluded.thinking_mode,request_parameter_applied=excluded.request_parameter_applied,
+        upstream_model=excluded.upstream_model,reasoning_tokens=excluded.reasoning_tokens`);
     attempts.forEach((attempt, index) => statement.run(
       requestId,
       index + 1,
@@ -7120,8 +7174,17 @@ var AcuRoutingStore = class {
       attempt.latency_ms,
       attempt.billed_cost ?? null,
       attempt.usage_source ?? null,
+      attempt.attempt_type ?? "initial",
+      attempt.execution_profile_id,
+      attempt.thinking_mode,
+      bool(attempt.request_parameter_applied),
+      attempt.upstream_model ?? null,
+      attempt.reasoning_tokens ?? null,
       (/* @__PURE__ */ new Date()).toISOString()
     ));
+    for (const profileId of new Set(attempts.map((attempt) => attempt.execution_profile_id))) {
+      this.refreshExecutionProfileHealth(profileId);
+    }
   }
   recordFeedback(input) {
     if (input.rating !== void 0 && (!Number.isInteger(input.rating) || input.rating < 1 || input.rating > 5)) {
@@ -7144,9 +7207,12 @@ var AcuRoutingStore = class {
     });
   }
   recordOutcome(input) {
+    const storedProfile = this.database.prepare("SELECT execution_profile_id FROM routing_requests WHERE request_id=?").get(input.requestId)?.execution_profile_id;
+    const executionProfileId = input.executionProfileId ?? (typeof storedProfile === "string" ? storedProfile : void 0);
     this.database.prepare(`INSERT INTO execution_outcomes
-      (request_id,validator_result,test_result,tool_error_count,retry_count,model_switched,user_retried,outcome_score,outcome_source,created_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?)`).run(
+      (request_id,validator_result,test_result,tool_error_count,retry_count,model_switched,user_retried,
+       outcome_score,outcome_source,execution_profile_id,created_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?)`).run(
       input.requestId,
       input.validatorResult ?? null,
       input.testResult ?? null,
@@ -7156,8 +7222,135 @@ var AcuRoutingStore = class {
       bool(input.userRetried),
       input.outcomeScore ?? null,
       input.outcomeSource,
+      executionProfileId ?? null,
       (/* @__PURE__ */ new Date()).toISOString()
     );
+  }
+  refreshExecutionProfileHealth(executionProfileId) {
+    const rows = this.database.prepare(`SELECT status,error_category,latency_ms,created_at
+      FROM routing_attempts WHERE execution_profile_id=?
+      ORDER BY datetime(created_at) DESC,attempt_index DESC LIMIT 20`).all(executionProfileId);
+    if (rows.length === 0) return;
+    const statuses = rows.map((row) => String(row.status));
+    const categories = rows.map((row) => String(row.error_category ?? ""));
+    const latencies = rows.map((row) => Number(row.latency_ms)).filter(Number.isFinite);
+    const recentFive = statuses.slice(0, 5);
+    let consecutiveFailures = 0;
+    let consecutiveTimeouts = 0;
+    for (const row of rows) {
+      if (row.status === "success") break;
+      consecutiveFailures += 1;
+    }
+    for (const row of rows) {
+      if (row.status !== "timeout") break;
+      consecutiveTimeouts += 1;
+    }
+    const latestCreated = String(rows[0].created_at);
+    const cooldownCandidate = consecutiveTimeouts >= 2 ? new Date(new Date(latestCreated).getTime() + 6e4).toISOString() : null;
+    const cooldownUntil = cooldownCandidate && Date.parse(cooldownCandidate) > Date.now() ? cooldownCandidate : null;
+    const successRate = statuses.filter((status) => status === "success").length / statuses.length;
+    const recentFiveRate = recentFive.filter((status) => status === "success").length / recentFive.length;
+    const availability = cooldownUntil ? "cooldown" : recentFive.length >= 5 && recentFiveRate < 0.6 ? "degraded" : "healthy";
+    const lastSuccess = rows.find((row) => row.status === "success")?.created_at;
+    const ratio = (predicate) => rows.filter((_row, index) => predicate(index)).length / rows.length;
+    this.database.prepare(`INSERT INTO execution_profile_health (
+      execution_profile_id,sample_count,recent_success_rate,consecutive_failures,consecutive_timeouts,
+      p50_latency_ms,p95_latency_ms,timeout_rate,rate_limit_rate,server_error_rate,last_success_at,
+      cooldown_until,availability,priority_penalty,updated_at
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    ON CONFLICT(execution_profile_id) DO UPDATE SET
+      sample_count=excluded.sample_count,recent_success_rate=excluded.recent_success_rate,
+      consecutive_failures=excluded.consecutive_failures,consecutive_timeouts=excluded.consecutive_timeouts,
+      p50_latency_ms=excluded.p50_latency_ms,p95_latency_ms=excluded.p95_latency_ms,
+      timeout_rate=excluded.timeout_rate,rate_limit_rate=excluded.rate_limit_rate,
+      server_error_rate=excluded.server_error_rate,last_success_at=excluded.last_success_at,
+      cooldown_until=excluded.cooldown_until,availability=excluded.availability,
+      priority_penalty=excluded.priority_penalty,updated_at=excluded.updated_at`).run(
+      executionProfileId,
+      rows.length,
+      successRate,
+      consecutiveFailures,
+      consecutiveTimeouts,
+      quantile(latencies, 0.5),
+      quantile(latencies, 0.95),
+      ratio((index) => statuses[index] === "timeout"),
+      ratio((index) => categories[index] === "rate_limited"),
+      ratio((index) => categories[index] === "server_error"),
+      typeof lastSuccess === "string" ? lastSuccess : null,
+      cooldownUntil,
+      availability,
+      availability === "cooldown" ? 1 : availability === "degraded" ? 0.25 : 0,
+      (/* @__PURE__ */ new Date()).toISOString()
+    );
+  }
+  getExecutionProfileHealth(executionProfileId) {
+    this.refreshExecutionProfileHealth(executionProfileId);
+    const row = this.database.prepare("SELECT * FROM execution_profile_health WHERE execution_profile_id=?").get(executionProfileId);
+    if (!row) return {
+      executionProfileId,
+      sampleCount: 0,
+      recentSuccessRate: null,
+      consecutiveFailures: 0,
+      consecutiveTimeouts: 0,
+      p50LatencyMs: null,
+      p95LatencyMs: null,
+      timeoutRate: null,
+      rateLimitRate: null,
+      serverErrorRate: null,
+      lastSuccessAt: null,
+      cooldownUntil: null,
+      availability: "unknown",
+      priorityPenalty: 0
+    };
+    return {
+      executionProfileId,
+      sampleCount: Number(row.sample_count),
+      recentSuccessRate: row.recent_success_rate === null ? null : Number(row.recent_success_rate),
+      consecutiveFailures: Number(row.consecutive_failures),
+      consecutiveTimeouts: Number(row.consecutive_timeouts),
+      p50LatencyMs: row.p50_latency_ms === null ? null : Number(row.p50_latency_ms),
+      p95LatencyMs: row.p95_latency_ms === null ? null : Number(row.p95_latency_ms),
+      timeoutRate: row.timeout_rate === null ? null : Number(row.timeout_rate),
+      rateLimitRate: row.rate_limit_rate === null ? null : Number(row.rate_limit_rate),
+      serverErrorRate: row.server_error_rate === null ? null : Number(row.server_error_rate),
+      lastSuccessAt: typeof row.last_success_at === "string" ? row.last_success_at : null,
+      cooldownUntil: typeof row.cooldown_until === "string" ? row.cooldown_until : null,
+      availability: String(row.availability),
+      priorityPenalty: Number(row.priority_penalty)
+    };
+  }
+  executionProfileSummaries(requests, feedback, outcomes) {
+    const profileIds = [...new Set(requests.map((row) => row.execution_profile_id).filter((value) => typeof value === "string" && value.length > 0))].sort();
+    return profileIds.map((executionProfileId) => {
+      const profileRequests = requests.filter((row) => row.execution_profile_id === executionProfileId);
+      const ids = new Set(profileRequests.map((row) => String(row.request_id)));
+      const profileFeedback = feedback.filter((row) => ids.has(String(row.request_id)));
+      const profileOutcomes = outcomes.filter((row) => ids.has(String(row.request_id)));
+      const ratings = profileFeedback.map((row) => Number(row.rating)).filter(Number.isFinite);
+      const validator = profileOutcomes.filter((row) => row.outcome_source === "validator" && row.validator_result);
+      const values = (field) => profileRequests.map((row) => Number(row[field])).filter(Number.isFinite);
+      const average = (items) => items.length ? items.reduce((sum, item) => sum + item, 0) / items.length : null;
+      const difficulty = { low: 0, mid: 0, mid_high: 0, high: 0 };
+      profileRequests.forEach((row) => {
+        const value = Number(row.difficulty_score);
+        difficulty[value < 30 ? "low" : value < 55 ? "mid" : value < 80 ? "mid_high" : "high"] += 1;
+      });
+      const upgrades = profileFeedback.filter((row) => row.required_upgrade !== null).map((row) => Number(row.required_upgrade));
+      return {
+        executionProfileId,
+        requestCount: profileRequests.length,
+        difficultyDistribution: difficulty,
+        averageUserRating: average(ratings),
+        validatorPassRate: validator.length ? validator.filter((row) => row.validator_result === "pass").length / validator.length : null,
+        averageCost: average(values("total_acu_cost")),
+        averageReasoningTokens: average(values("reasoning_tokens")),
+        latencyMs: { p50: quantile(values("latency_ms"), 0.5), p95: quantile(values("latency_ms"), 0.95) },
+        upgradeRate: upgrades.length ? upgrades.filter((value) => value === 1).length / upgrades.length : null,
+        independentCurveEligible: profileRequests.length >= 30,
+        curveNotice: profileRequests.length < 30 ? "\u6837\u672C\u5C11\u4E8E30\u6761\uFF0C\u4E0D\u5F97\u62DF\u5408\u72EC\u7ACB\u66F2\u7EBF\u3002" : null,
+        health: this.getExecutionProfileHealth(executionProfileId)
+      };
+    });
   }
   summary() {
     const requests = this.database.prepare("SELECT * FROM routing_requests").all();
@@ -7202,6 +7395,7 @@ var AcuRoutingStore = class {
       labeledRequestCount: labeled,
       effectiveLabeledOutcomeCount: labeled,
       modelDifficultyLabelCounts: bucketCounts,
+      executionProfileSummaries: this.executionProfileSummaries(requests, feedback, outcomes),
       sampleNotice: count < 20 ? "\u5F53\u524D\u6837\u672C\u91CF\u8F83\u5C0F\uFF0C\u4EC5\u7528\u4E8E\u4EA7\u54C1\u9A8C\u8BC1\u3002" : null
     };
   }
@@ -7216,6 +7410,23 @@ function openAcuRoutingStore(path) {
     console.error(`[ClawRouter] ACU SQLite disabled: ${error instanceof Error ? error.message : "unknown error"}`);
     return null;
   }
+}
+
+// src/acu/execution-profile.ts
+function executionProfileFor(modelId, enableThinking) {
+  if (modelId === "qwen3.6-plus") {
+    const disabled = enableThinking === false;
+    return {
+      executionProfileId: `${modelId}:${disabled ? "non-thinking" : "thinking"}`,
+      thinkingMode: disabled ? "disabled" : "enabled",
+      requestParameterApplied: typeof enableThinking === "boolean"
+    };
+  }
+  return {
+    executionProfileId: `${modelId}:default`,
+    thinkingMode: "default",
+    requestParameterApplied: false
+  };
 }
 
 // src/proxy.ts
@@ -7295,6 +7506,21 @@ function categorizeError(status, body) {
   if (status >= 500) return "server_error";
   if (status === 400 || status === 413) return "config_error";
   return null;
+}
+function attemptProfileFields(modelId, requestBody, attemptType) {
+  let enableThinking;
+  try {
+    enableThinking = JSON.parse(requestBody.toString()).enable_thinking;
+  } catch {
+  }
+  const profile = executionProfileFor(modelId, enableThinking);
+  return {
+    attempt_type: attemptType,
+    execution_profile_id: profile.executionProfileId,
+    thinking_mode: profile.thinkingMode,
+    request_parameter_applied: profile.requestParameterApplied,
+    upstream_model: modelId
+  };
 }
 function stripAcuPrefix(url) {
   if (!url) return "/";
@@ -7479,7 +7705,7 @@ function parseUsage(responseBody, estimatedInputTokens, maxOutputTokens, pricing
   }
 }
 function getFallbackUsed(attempts, actualModelUsed, selectedModel) {
-  return attempts.length > 1 || Boolean(selectedModel && selectedModel !== actualModelUsed);
+  return attempts.some((attempt) => attempt.attempt_type === "fallback" || attempt.attempt_type === "quality_upgrade") || Boolean(selectedModel && selectedModel !== actualModelUsed);
 }
 function setAcuExecutionResult(evaluation, recommendationSelected, actualModel) {
   evaluation.actualModel = actualModel;
@@ -7487,6 +7713,7 @@ function setAcuExecutionResult(evaluation, recommendationSelected, actualModel) 
 }
 function buildStreamingTrace(args) {
   const fallbackUsed = getFallbackUsed(args.attempts, args.actualModelUsed, args.routingDecision?.model);
+  const finalAttempt = [...args.attempts].reverse().find((attempt) => attempt.model === args.actualModelUsed && attempt.status === "success");
   return {
     ...buildRuleTraceSignals(args.parsedMessages, args.maxTokens, args.config),
     request_id: args.requestId,
@@ -7503,6 +7730,10 @@ function buildStreamingTrace(args) {
     attempt_count: args.attempts.length,
     fallback_used: fallbackUsed,
     quality_fallback_used: false,
+    execution_profile_id: finalAttempt?.execution_profile_id,
+    thinking_mode: finalAttempt?.thinking_mode,
+    request_parameter_applied: finalAttempt?.request_parameter_applied,
+    upstream_model: finalAttempt?.upstream_model ?? args.actualModelUsed,
     streaming: true,
     estimated_input_tokens: args.estimatedInputTokens,
     estimated_output_tokens: args.estimatedOutputTokens,
@@ -7524,11 +7755,55 @@ function injectTraceIntoJsonResponse(responseBody, trace) {
     return responseBody;
   }
 }
-function selectQualityFallbackModel(routingDecision, routingConfig, actualModelUsed, modelsTried) {
-  if (!routingDecision) return void 0;
-  const premiumTiers = routingConfig.premiumTiers ?? routingConfig.tiers;
-  const premiumChain = getFallbackChain(routingDecision.tier, premiumTiers);
-  return premiumChain.find((model) => model !== actualModelUsed && !modelsTried.includes(model));
+var QUALITY_FALLBACK_CONSERVATIVE_TOLERANCE_POINTS = 1;
+function executionHealthForModel(store2, modelId) {
+  if (!store2) return void 0;
+  const profile = executionProfileFor(modelId, modelId === "qwen3.6-plus" ? false : void 0);
+  return store2.getExecutionProfileHealth(profile.executionProfileId);
+}
+function applyPassiveHealthAvailability(modelIds, store2) {
+  if (!store2) return modelIds;
+  const assessed = modelIds.map((modelId) => ({ modelId, health: executionHealthForModel(store2, modelId) }));
+  const healthy = assessed.filter(({ health }) => health?.availability === "healthy" || health?.availability === "unknown");
+  if (healthy.length > 0) return healthy.map(({ modelId }) => modelId);
+  const degraded = assessed.filter(({ health }) => health?.availability === "degraded");
+  if (degraded.length > 0) return degraded.map(({ modelId }) => modelId);
+  return modelIds;
+}
+function selectQualityFallbackModel(args) {
+  if (!args.evaluation) return void 0;
+  const current = args.evaluation.recommendation.estimates.find((estimate) => estimate.modelId === args.currentModel);
+  if (!current) return void 0;
+  const compatible = args.evaluation.recommendation.estimates.filter((estimate) => {
+    const model = getAcuModel(estimate.modelId);
+    return Boolean(model?.routingEligible) && !args.modelsTried.includes(estimate.modelId) && (!args.hasTools || model?.toolCallSupport) && (!args.hasVision || model?.visionSupport) && (model?.contextWindow === null || (model?.contextWindow ?? 0) >= args.requiredContextTokens) && estimate.predictedScore >= current.predictedScore && estimate.conservativeScore >= current.conservativeScore - QUALITY_FALLBACK_CONSERVATIVE_TOLERANCE_POINTS;
+  }).map((estimate) => ({ estimate, health: executionHealthForModel(args.store, estimate.modelId) }));
+  if (compatible.length === 0) return void 0;
+  const available = compatible.filter(({ health }) => health?.availability !== "cooldown");
+  const pool = available.length > 0 ? available : compatible;
+  return pool.sort((left, right) => right.estimate.predictedScore - left.estimate.predictedScore || (left.health?.priorityPenalty ?? 0) - (right.health?.priorityPenalty ?? 0) || left.estimate.estimatedCallCost - right.estimate.estimatedCallCost || (left.health?.p50LatencyMs ?? Number.POSITIVE_INFINITY) - (right.health?.p50LatencyMs ?? Number.POSITIVE_INFINITY))[0]?.estimate.modelId;
+}
+function buildFormatRepairBody(body, validator, maxTokens) {
+  const parsed = JSON.parse(body.toString());
+  const messages = Array.isArray(parsed.messages) ? [...parsed.messages] : [];
+  messages.push({
+    role: "user",
+    content: `\u4E0A\u4E00\u6761\u54CD\u5E94\u672A\u901A\u8FC7${validator.validator === "schema_validator" ? "Schema" : "JSON"}\u683C\u5F0F\u6821\u9A8C\uFF08${validator.reason ?? "\u683C\u5F0F\u65E0\u6548"}\uFF09\u3002\u53EA\u4FEE\u590D\u683C\u5F0F\uFF0C\u4E0D\u91CD\u65B0\u6269\u5199\u5185\u5BB9\uFF1B\u53EA\u8FD4\u56DE\u76EE\u6807\u683C\u5F0F\uFF0C\u4E0D\u8981\u9644\u52A0\u8BF4\u660E\u3002`
+  });
+  parsed.messages = messages;
+  parsed.stream = false;
+  parsed.enable_thinking = false;
+  parsed.max_tokens = Math.min(384, Math.max(64, maxTokens));
+  delete parsed.max_completion_tokens;
+  return Buffer.from(JSON.stringify(parsed));
+}
+function upstreamModelFromBody(responseBody, fallback) {
+  try {
+    const model = JSON.parse(responseBody).model;
+    return typeof model === "string" && model ? model : fallback;
+  } catch {
+    return fallback;
+  }
 }
 async function fetchUpstreamChatCompletion(args) {
   const upstreamProvider = getUpstream(args.model);
@@ -8008,7 +8283,7 @@ async function handleRequest(req, res, ctx) {
         Number.isFinite(expectedOutputTokens) ? expectedOutputTokens : 800,
         { ...ctx.routerOpts, routingProfile: "auto", hasTools: requireTools }
       );
-      const eligibleModelIds = BLOCKRUN_MODELS.filter((model) => !ctx.excludeList.has(model.id) && (!requireTools || supportsToolCalling(model.id)) && (!requireVision || supportsVision(model.id))).map((model) => model.id);
+      const eligibleModelIds = applyPassiveHealthAvailability(BLOCKRUN_MODELS.filter((model) => !ctx.excludeList.has(model.id) && (!requireTools || supportsToolCalling(model.id)) && (!requireVision || supportsVision(model.id))).map((model) => model.id), ctx.acuStore);
       const evaluation = await ctx.acuStrategy.evaluate({
         messages,
         tools,
@@ -8171,7 +8446,7 @@ async function handleRequest(req, res, ctx) {
       routingDecision = rulesDecision;
       if (ctx.acuStrategy.enabled) {
         const acuRouteStart = Date.now();
-        const eligibleModelIds = BLOCKRUN_MODELS.filter((model) => !ctx.excludeList.has(model.id) && (!hasTools || supportsToolCalling(model.id)) && (!hasVision || supportsVision(model.id))).map((model) => model.id);
+        const eligibleModelIds = applyPassiveHealthAvailability(BLOCKRUN_MODELS.filter((model) => !ctx.excludeList.has(model.id) && (!hasTools || supportsToolCalling(model.id)) && (!hasVision || supportsVision(model.id))).map((model) => model.id), ctx.acuStore);
         acuEvaluation = await ctx.acuStrategy.evaluate({
           messages,
           tools: Array.isArray(parsed.tools) ? parsed.tools : [],
@@ -8427,6 +8702,7 @@ async function handleRequest(req, res, ctx) {
         actualModelUsed = tryModel;
         upstreamProviderUsed = upstreamProvider;
         attempts.push({
+          ...attemptProfileFields(tryModel, body, i === 0 ? "initial" : "fallback"),
           model: tryModel,
           upstream: upstreamProvider,
           status: "success",
@@ -8439,6 +8715,7 @@ async function handleRequest(req, res, ctx) {
       lastErrorCategory = category ?? "upstream_error";
       lastError = { body: errorBody, status: response.status };
       attempts.push({
+        ...attemptProfileFields(tryModel, body, i === 0 ? "initial" : "fallback"),
         model: tryModel,
         upstream: upstreamProvider,
         status: "error",
@@ -8465,6 +8742,7 @@ async function handleRequest(req, res, ctx) {
         lastError = { body: err.message, status: 500 };
         lastErrorCategory = "unknown_model";
         attempts.push({
+          ...attemptProfileFields(tryModel, body, i === 0 ? "initial" : "fallback"),
           model: tryModel,
           upstream: "unknown",
           status: "skipped",
@@ -8477,6 +8755,7 @@ async function handleRequest(req, res, ctx) {
       if (modelController.signal.aborted && i < modelsToTry.length - 1) {
         lastErrorCategory = "timeout";
         attempts.push({
+          ...attemptProfileFields(tryModel, body, i === 0 ? "initial" : "fallback"),
           model: tryModel,
           upstream: "unknown",
           status: "timeout",
@@ -8489,6 +8768,7 @@ async function handleRequest(req, res, ctx) {
       lastError = { body: String(err), status: 500 };
       lastErrorCategory = "server_error";
       attempts.push({
+        ...attemptProfileFields(tryModel, body, i === 0 ? "initial" : "fallback"),
         model: tryModel,
         upstream: "unknown",
         status: "error",
@@ -8622,91 +8902,203 @@ data: ${JSON.stringify(trace)}
       });
       let validatorLatencyMs = Date.now() - initialValidatorStart;
       let qualityFallbackUsed = false;
-      if (validator.result === "fail" && routingDecision) {
-        const qualityFallbackModel = selectQualityFallbackModel(
-          routingDecision,
-          ctx.routerOpts.config,
-          actualModelUsed,
-          attempts.map((attempt) => attempt.model)
-        );
-        if (qualityFallbackModel) {
-          const qualityStart = Date.now();
-          const qualityController = new AbortController();
-          const qualityTimeout = setTimeout(() => qualityController.abort(), timeoutForModel(qualityFallbackModel));
-          try {
-            const { response, upstreamProvider } = await fetchUpstreamChatCompletion({
-              body,
-              model: qualityFallbackModel,
-              apiKey: ctx.apiKey,
-              proxyApiKey: ctx.proxyApiKey,
-              proxyBaseUrl: ctx.proxyBaseUrl,
-              signal: AbortSignal.any([globalController.signal, qualityController.signal])
+      let qualityReviewRequired = false;
+      let formatRepairUsed = false;
+      let formatRepairSucceeded = false;
+      const originalResponseBody = responseBody;
+      const originalModel = actualModelUsed;
+      const originalProvider = upstreamProviderUsed;
+      const originalAttempt = [...attempts].reverse().find((attempt) => attempt.model === originalModel && attempt.status === "success");
+      const billAttempt = (attempt, payload, model) => {
+        if (!attempt) return;
+        const attemptUsage = parseUsage(payload, Math.ceil(body.length / 4), maxTokens, ctx.routerOpts.modelPricing.get(model));
+        attempt.billed_cost = attemptUsage.modelCallCost;
+        attempt.usage_source = attemptUsage.usageSource;
+        attempt.reasoning_tokens = attemptUsage.reasoningTokens;
+        attempt.upstream_model = upstreamModelFromBody(payload, model);
+      };
+      if (validator.result === "fail" && (validator.validator === "json_validator" || validator.validator === "schema_validator")) {
+        formatRepairUsed = true;
+        const repairBody = buildFormatRepairBody(body, validator, maxTokens);
+        const repairStart = Date.now();
+        const repairController = new AbortController();
+        const repairTimeout = setTimeout(() => repairController.abort(), timeoutForModel(originalModel));
+        try {
+          const { response, upstreamProvider } = await fetchUpstreamChatCompletion({
+            body: repairBody,
+            model: originalModel,
+            apiKey: ctx.apiKey,
+            proxyApiKey: ctx.proxyApiKey,
+            proxyBaseUrl: ctx.proxyBaseUrl,
+            signal: AbortSignal.any([globalController.signal, repairController.signal])
+          });
+          if (response.status === 200) {
+            const repairedBody = await readResponseText(response);
+            const repairAttempt = {
+              ...attemptProfileFields(originalModel, repairBody, "format_repair"),
+              model: originalModel,
+              upstream: upstreamProvider,
+              status: "success",
+              latency_ms: Date.now() - repairStart
+            };
+            attempts.push(repairAttempt);
+            const checkStart = Date.now();
+            const repairedValidator = validateAssistantOutput({
+              messages: parsedMessages,
+              assistantText: extractAssistantText(repairedBody),
+              responseFormat,
+              expectedSchema
             });
-            if (response.status === 200) {
-              const replacedModel = actualModelUsed;
-              const replacedUsage = parseUsage(
-                responseBody,
-                Math.ceil(body.length / 4),
-                maxTokens,
-                ctx.routerOpts.modelPricing.get(replacedModel)
-              );
-              const replacedAttempt = [...attempts].reverse().find((attempt) => attempt.model === replacedModel && attempt.status === "success");
-              if (replacedAttempt) {
-                replacedAttempt.billed_cost = replacedUsage.modelCallCost;
-                replacedAttempt.usage_source = replacedUsage.usageSource;
-              }
-              responseBody = await readResponseText(response);
-              actualModelUsed = qualityFallbackModel;
+            validatorLatencyMs += Date.now() - checkStart;
+            if (repairedValidator.result === "pass") {
+              billAttempt(originalAttempt, originalResponseBody, originalModel);
+              responseBody = repairedBody;
+              validator = repairedValidator;
               upstreamProviderUsed = upstreamProvider;
-              qualityFallbackUsed = true;
-              attempts.push({
+              formatRepairSucceeded = true;
+            } else {
+              repairAttempt.status = "error";
+              repairAttempt.error_category = "format_repair_validation_failed";
+              billAttempt(repairAttempt, repairedBody, originalModel);
+              validator = repairedValidator;
+            }
+          } else {
+            const errorBody = await response.text().catch(() => "");
+            const category = categorizeError(response.status, errorBody) ?? "format_repair_error";
+            attempts.push({
+              ...attemptProfileFields(originalModel, repairBody, "format_repair"),
+              model: originalModel,
+              upstream: upstreamProvider,
+              status: "error",
+              error_category: category,
+              latency_ms: Date.now() - repairStart,
+              ...extractExplicitUpstreamCost(errorBody) !== void 0 && {
+                billed_cost: extractExplicitUpstreamCost(errorBody),
+                usage_source: "upstream_cost"
+              }
+            });
+          }
+        } catch {
+          const category = repairController.signal.aborted ? "timeout" : "format_repair_error";
+          attempts.push({
+            ...attemptProfileFields(originalModel, repairBody, "format_repair"),
+            model: originalModel,
+            upstream: "unknown",
+            status: repairController.signal.aborted ? "timeout" : "error",
+            error_category: category,
+            latency_ms: Date.now() - repairStart
+          });
+        } finally {
+          clearTimeout(repairTimeout);
+        }
+        if (!formatRepairSucceeded) {
+          const qualityFallbackModel = selectQualityFallbackModel({
+            evaluation: acuEvaluation,
+            currentModel: originalModel,
+            modelsTried: attempts.map((attempt) => attempt.model),
+            store: ctx.acuStore,
+            hasTools,
+            hasVision,
+            requiredContextTokens: Math.ceil(body.length / 4) + maxTokens
+          });
+          if (qualityFallbackModel) {
+            const qualityStart = Date.now();
+            const qualityController = new AbortController();
+            const qualityTimeout = setTimeout(() => qualityController.abort(), timeoutForModel(qualityFallbackModel));
+            try {
+              const { response, upstreamProvider } = await fetchUpstreamChatCompletion({
+                body: repairBody,
                 model: qualityFallbackModel,
-                upstream: upstreamProvider,
-                status: "success",
+                apiKey: ctx.apiKey,
+                proxyApiKey: ctx.proxyApiKey,
+                proxyBaseUrl: ctx.proxyBaseUrl,
+                signal: AbortSignal.any([globalController.signal, qualityController.signal])
+              });
+              if (response.status === 200) {
+                const replacementBody = await readResponseText(response);
+                const replacementAttempt = {
+                  ...attemptProfileFields(qualityFallbackModel, repairBody, "quality_upgrade"),
+                  model: qualityFallbackModel,
+                  upstream: upstreamProvider,
+                  status: "success",
+                  latency_ms: Date.now() - qualityStart
+                };
+                attempts.push(replacementAttempt);
+                const checkStart = Date.now();
+                const replacementValidator = validateAssistantOutput({
+                  messages: parsedMessages,
+                  assistantText: extractAssistantText(replacementBody),
+                  responseFormat,
+                  expectedSchema
+                });
+                validatorLatencyMs += Date.now() - checkStart;
+                if (replacementValidator.result === "pass") {
+                  billAttempt(originalAttempt, originalResponseBody, originalModel);
+                  responseBody = replacementBody;
+                  actualModelUsed = qualityFallbackModel;
+                  upstreamProviderUsed = upstreamProvider;
+                  validator = replacementValidator;
+                  qualityFallbackUsed = true;
+                } else {
+                  replacementAttempt.status = "error";
+                  replacementAttempt.error_category = "quality_upgrade_validation_failed";
+                  billAttempt(replacementAttempt, replacementBody, qualityFallbackModel);
+                  qualityReviewRequired = true;
+                }
+              } else {
+                const errorBody = await response.text().catch(() => "");
+                const category = categorizeError(response.status, errorBody) ?? "quality_upgrade_error";
+                attempts.push({
+                  ...attemptProfileFields(qualityFallbackModel, repairBody, "quality_upgrade"),
+                  model: qualityFallbackModel,
+                  upstream: upstreamProvider,
+                  status: "error",
+                  error_category: category,
+                  latency_ms: Date.now() - qualityStart,
+                  ...extractExplicitUpstreamCost(errorBody) !== void 0 && {
+                    billed_cost: extractExplicitUpstreamCost(errorBody),
+                    usage_source: "upstream_cost"
+                  }
+                });
+                qualityReviewRequired = true;
+              }
+            } catch {
+              const category = qualityController.signal.aborted ? "timeout" : "quality_upgrade_error";
+              attempts.push({
+                ...attemptProfileFields(qualityFallbackModel, repairBody, "quality_upgrade"),
+                model: qualityFallbackModel,
+                upstream: "unknown",
+                status: qualityController.signal.aborted ? "timeout" : "error",
+                error_category: category,
                 latency_ms: Date.now() - qualityStart
               });
-              const fallbackValidatorStart = Date.now();
-              validator = validateAssistantOutput({
-                messages: parsedMessages,
-                assistantText: extractAssistantText(responseBody),
-                responseFormat,
-                expectedSchema
-              });
-              validatorLatencyMs += Date.now() - fallbackValidatorStart;
-            } else {
-              const errorBody = await response.text().catch(() => "");
-              const category = categorizeError(response.status, errorBody) ?? "validation_fallback_error";
-              lastErrorCategory = category;
-              attempts.push({
-                model: qualityFallbackModel,
-                upstream: upstreamProvider,
-                status: "error",
-                error_category: category,
-                latency_ms: Date.now() - qualityStart,
-                ...extractExplicitUpstreamCost(errorBody) !== void 0 && {
-                  billed_cost: extractExplicitUpstreamCost(errorBody),
-                  usage_source: "upstream_cost"
-                }
-              });
+              qualityReviewRequired = true;
+            } finally {
+              clearTimeout(qualityTimeout);
             }
-          } catch (err) {
-            const category = qualityController.signal.aborted ? "timeout" : "validation_fallback_error";
-            lastErrorCategory = category;
-            attempts.push({
-              model: qualityFallbackModel,
-              upstream: "unknown",
-              status: qualityController.signal.aborted ? "timeout" : "error",
-              error_category: category,
-              latency_ms: Date.now() - qualityStart
-            });
-          } finally {
-            clearTimeout(qualityTimeout);
+          } else {
+            qualityReviewRequired = true;
+          }
+          if (!qualityFallbackUsed) {
+            responseBody = originalResponseBody;
+            actualModelUsed = originalModel;
+            upstreamProviderUsed = originalProvider;
           }
         }
       }
       const latencyMs2 = Date.now() - startTime;
       const estimatedInputTokens2 = Math.ceil(body.length / 4);
       const usage = parseUsage(responseBody, estimatedInputTokens2, maxTokens, ctx.routerOpts.modelPricing.get(actualModelUsed));
+      const finalAttempt = [...attempts].reverse().find((attempt) => attempt.model === actualModelUsed && attempt.status === "success");
+      if (finalAttempt) {
+        finalAttempt.reasoning_tokens = usage.reasoningTokens;
+        finalAttempt.upstream_model = upstreamModelFromBody(responseBody, actualModelUsed);
+      }
+      const finalExecutionProfile = finalAttempt ? {
+        executionProfileId: finalAttempt.execution_profile_id,
+        thinkingMode: finalAttempt.thinking_mode,
+        requestParameterApplied: finalAttempt.request_parameter_applied
+      } : executionProfileFor(actualModelUsed, void 0);
       let costEstimate2 = 0;
       let baselineCost2 = 0;
       let savings2 = 0;
@@ -8750,6 +9142,13 @@ data: ${JSON.stringify(trace)}
         attempt_count: attempts.length,
         fallback_used: fallbackUsed,
         quality_fallback_used: qualityFallbackUsed,
+        quality_review_required: qualityReviewRequired,
+        format_repair_used: formatRepairUsed,
+        format_repair_succeeded: formatRepairSucceeded,
+        execution_profile_id: finalExecutionProfile.executionProfileId,
+        thinking_mode: finalExecutionProfile.thinkingMode,
+        request_parameter_applied: finalExecutionProfile.requestParameterApplied,
+        upstream_model: upstreamModelFromBody(responseBody, actualModelUsed),
         estimated_input_tokens: usage.inputTokens,
         estimated_output_tokens: usage.completionTokens,
         estimated_cost: costEstimate2,
@@ -8827,21 +9226,26 @@ data: ${JSON.stringify(trace)}
             inputPricePerMillion: usage.inputPricePerMillion,
             outputPricePerMillion: usage.outputPricePerMillion,
             modelCallCost: usage.modelCallCost,
-            totalAcuCost
+            totalAcuCost,
+            executionProfileId: finalExecutionProfile.executionProfileId,
+            thinkingMode: finalExecutionProfile.thinkingMode,
+            requestParameterApplied: finalExecutionProfile.requestParameterApplied,
+            upstreamModel: upstreamModelFromBody(responseBody, actualModelUsed)
           });
           if (validator.result !== "not_applicable") {
             ctx.acuStore?.recordOutcome({
               requestId,
               validatorResult: validator.result,
               outcomeSource: "validator",
-              outcomeScore: validator.result === "pass" ? 1 : 0
+              outcomeScore: validator.result === "pass" ? 1 : 0,
+              executionProfileId: finalExecutionProfile.executionProfileId
             });
           }
           if (attempts.length > 1) {
-            ctx.acuStore?.recordOutcome({ requestId, retryCount: attempts.length - 1, outcomeSource: "retry_signal" });
+            ctx.acuStore?.recordOutcome({ requestId, retryCount: attempts.length - 1, outcomeSource: "retry_signal", executionProfileId: finalExecutionProfile.executionProfileId });
           }
           if (actualModelUsed !== routingDecision?.model) {
-            ctx.acuStore?.recordOutcome({ requestId, modelSwitched: true, outcomeSource: "model_upgrade_signal" });
+            ctx.acuStore?.recordOutcome({ requestId, modelSwitched: true, outcomeSource: "model_upgrade_signal", executionProfileId: finalExecutionProfile.executionProfileId });
           }
         } catch {
         }
@@ -8953,6 +9357,12 @@ data: ${JSON.stringify(trace)}
     try {
       const streamingUsage = parseUsage(responseBody, estimatedInputTokens, maxTokens, ctx.routerOpts.modelPricing.get(actualModelUsed));
       const streamingTotalAcuCost = streamingUsage.modelCallCost + acuEvaluation.judgeCost;
+      const finalAttempt = [...attempts].reverse().find((attempt) => attempt.model === actualModelUsed && attempt.status === "success");
+      if (finalAttempt) {
+        finalAttempt.reasoning_tokens = streamingUsage.reasoningTokens;
+        finalAttempt.upstream_model = upstreamModelFromBody(responseBody, actualModelUsed);
+      }
+      const finalProfile = finalAttempt ?? attemptProfileFields(actualModelUsed, body, "initial");
       ctx.acuStore?.recordAttempts(requestId, attempts);
       ctx.acuStore?.finalizeRequest(requestId, {
         actualModel: actualModelUsed,
@@ -8971,7 +9381,11 @@ data: ${JSON.stringify(trace)}
         inputPricePerMillion: streamingUsage.inputPricePerMillion,
         outputPricePerMillion: streamingUsage.outputPricePerMillion,
         modelCallCost: streamingUsage.modelCallCost,
-        totalAcuCost: streamingTotalAcuCost
+        totalAcuCost: streamingTotalAcuCost,
+        executionProfileId: finalProfile.execution_profile_id,
+        thinkingMode: finalProfile.thinking_mode,
+        requestParameterApplied: finalProfile.request_parameter_applied,
+        upstreamModel: upstreamModelFromBody(responseBody, actualModelUsed)
       });
     } catch {
     }

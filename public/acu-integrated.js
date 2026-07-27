@@ -61,7 +61,8 @@
   }
 
   function executionStatus(evaluation, trace) {
-    if (evaluation.recommendationApplied === true) return '推荐已执行';
+    if (trace?.format_repair_succeeded === true) return '同模型格式修复成功';
+    if (trace?.quality_review_required === true) return '当前结果需要复核';
     if (trace?.quality_fallback_used === true) return '质量复核后升级';
     const attempts = trace?.attempts || [];
     if (attempts.length > 1 && ['error','timeout'].includes(attempts[0]?.status) && attempts.some((item) => item.status === 'success')) {
@@ -69,6 +70,7 @@
       return `推荐模型调用失败（${reason}），已切换`;
     }
     if ((evaluation.actualModel || trace?.actual_model_used) !== evaluation.recommendation.recommended.modelId) return '执行模型发生切换';
+    if (evaluation.recommendationApplied === true) return '推荐已执行';
     return evaluation.shadowMode ? 'Shadow模式未执行推荐' : '推荐未执行';
   }
 
@@ -112,13 +114,14 @@
     $('acu-tier-probabilities').innerHTML=[['Low',evaluation.judge.pLow],['Mid',evaluation.judge.pMid],['Mid-high',evaluation.judge.pMidHigh],['High',evaluation.judge.pHigh]].map(([name,value])=>`<div><span>${name}</span><b>${(value*100).toFixed(1)}%</b></div>`).join('');
     const rec=evaluation.recommendation.recommended, actual=evaluation.actualModel||trace?.actual_model_used||'—', fallback=trace?.fallback_used===true;
     $('acu-live-recommendation').textContent=`ACU推荐：${rec.displayName} · ${score(rec.predictedScore)} · ${money(rec.expectedTotalCost)}`;
-    $('acu-live-actual').textContent=`实际执行：${actual}`;
+    const modeLabel=trace?.thinking_mode==='disabled'?' · Non-thinking':trace?.thinking_mode==='enabled'?' · Thinking':'';
+    $('acu-live-actual').textContent=`实际执行：${actual}${modeLabel}`;
     $('acu-live-application').textContent=executionStatus(evaluation,trace);
     $('acu-live-reason').textContent=`质量偏好 ${(evaluation.qualityTarget*100).toFixed(0)}分 · ${evaluation.recommendation.reason}`;
     $('acu-server-feedback').hidden=false;
     const latency=trace?.latency_breakdown||{},usage=trace?.usage_audit||{},costs=trace?.cost_audit||{};
-    const attempts=(trace?.attempts||[]).map((item,index)=>`#${index+1} ${item.model}: ${item.status}${item.error_category?`/${item.error_category}`:''} · ${item.latency_ms}ms`).join('<br>')||'—';
-    $('acu-technical-details').innerHTML=[['状态',label],['执行状态',executionStatus(evaluation,trace)],['路由模式',evaluation.shadowMode?'Shadow观察':'ACU实际执行'],['ACU推荐',rec.modelId],['实际执行',actual],['Attempts',attempts],['recommendationApplied',String(evaluation.recommendationApplied===true)],['当前质量偏好',`${(evaluation.qualityTarget*100).toFixed(0)}分`],['Judge延迟',`${latency.judge_latency_ms??evaluation.judgeLatencyMs} ms`],['推荐模型调用',`${trace?.attempts?.[0]?.latency_ms??0} ms`],['切换耗时',`${latency.fallback_latency_ms??0} ms`],['Router总耗时',`${latency.total_router_latency_ms??0} ms`],['输入 / 可见输出Token',`${usage.inputTokens??'—'} / ${usage.visibleOutputTokens??'—'}`],['Completion / Reasoning Token',`${usage.completionTokens??'—'} / ${usage.reasoningTokens??'—'}`],['Usage来源',usage.usageSource??'—'],['Usage字段',(usage.usageRawKeys||[]).join(', ')||'—'],['Judge成本',money(costs.judge_cost)],['模型成本',money(costs.model_call_cost)],['切换成本',money(costs.failed_attempt_cost)],['ACU总成本',money(costs.total_acu_cost)],['上游模型',evaluation.judgeModel],['Provider',evaluation.judgeProvider],['Endpoint Host',evaluation.judgeEndpointHost],['Context hash',`…${evaluation.contextSha256.slice(-8)}`],['评估时间',evaluation.cacheCreatedAt],['Request ID',evaluation.requestId],['曲线版本',evaluation.routingModelVersion]].map(([key,value])=>`<div><dt>${key}</dt><dd>${value??'—'}</dd></div>`).join('');
+    const attempts=(trace?.attempts||[]).map((item,index)=>`#${index+1} ${item.model}: ${item.status}${item.error_category?`/${item.error_category}`:''} · ${item.attempt_type||'initial'} · ${item.execution_profile_id||'default'} · ${item.latency_ms}ms`).join('<br>')||'—';
+    $('acu-technical-details').innerHTML=[['状态',label],['执行状态',executionStatus(evaluation,trace)],['路由模式',evaluation.shadowMode?'Shadow观察':'ACU实际执行'],['ACU推荐',rec.modelId],['实际执行',actual],['Attempts',attempts],['recommendationApplied',String(evaluation.recommendationApplied===true)],['validator_result',trace?.validator_result??'—'],['validator',trace?.validator??'—'],['validator_reason',trace?.validator_reason??'—'],['quality_fallback_used',String(trace?.quality_fallback_used===true)],['format_repair_used',String(trace?.format_repair_used===true)],['format_repair_succeeded',String(trace?.format_repair_succeeded===true)],['executionProfileId',trace?.execution_profile_id??'—'],['运行模式',trace?.thinking_mode??'—'],['requestParameterApplied',String(trace?.request_parameter_applied===true)],['实际上游模型',trace?.upstream_model??'—'],['当前质量偏好',`${(evaluation.qualityTarget*100).toFixed(0)}分`],['Judge延迟',`${latency.judge_latency_ms??evaluation.judgeLatencyMs} ms`],['推荐模型调用',`${trace?.attempts?.[0]?.latency_ms??0} ms`],['切换耗时',`${latency.fallback_latency_ms??0} ms`],['Router总耗时',`${latency.total_router_latency_ms??0} ms`],['输入 / 可见输出Token',`${usage.inputTokens??'—'} / ${usage.visibleOutputTokens??'—'}`],['Completion / Reasoning Token',`${usage.completionTokens??'—'} / ${usage.reasoningTokens??'—'}`],['Usage来源',usage.usageSource??'—'],['Usage字段',(usage.usageRawKeys||[]).join(', ')||'—'],['Judge成本',money(costs.judge_cost)],['模型成本',money(costs.model_call_cost)],['切换成本',money(costs.failed_attempt_cost)],['ACU总成本',money(costs.total_acu_cost)],['上游模型',evaluation.judgeModel],['Provider',evaluation.judgeProvider],['Endpoint Host',evaluation.judgeEndpointHost],['Context hash',`…${evaluation.contextSha256.slice(-8)}`],['评估时间',evaluation.cacheCreatedAt],['Request ID',evaluation.requestId],['曲线版本',evaluation.routingModelVersion]].map(([key,value])=>`<div><dt>${key}</dt><dd>${value??'—'}</dd></div>`).join('');
     drawChart(evaluation);
   }
 

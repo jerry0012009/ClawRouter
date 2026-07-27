@@ -148,7 +148,7 @@ describe("ACU Router demo reliability", () => {
     expect(typeof body.acu_trace?.estimated_cost).toBe("number");
   });
 
-  it("JSON validator failure triggers quality fallback", async () => {
+  it("repairs a deterministic JSON format failure with the same model", async () => {
     const res = await fetch(`${proxy.baseUrl}/v1/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Cache-Control": "no-cache", Authorization: BASIC_AUTH },
@@ -167,8 +167,10 @@ describe("ACU Router demo reliability", () => {
       validator_result: "pass",
       validator: "json_validator",
       validator_reason: "Valid JSON",
-      quality_fallback_used: true,
-      fallback_used: true,
+      quality_fallback_used: false,
+      format_repair_used: true,
+      format_repair_succeeded: true,
+      fallback_used: false,
       attempt_count: 2,
     });
   });
@@ -194,7 +196,7 @@ describe("ACU Router demo reliability", () => {
     expect(summary.total_savings).toBeCloseTo(summary.total_baseline_cost - summary.total_cost, 12);
     expect(summary.baseline_cost).toBe(summary.total_baseline_cost);
     expect(summary.savings).toBe(summary.total_savings);
-    expect(summary.fallback_rate).toBeGreaterThan(0);
+    expect(summary.fallback_rate).toBe(0);
   });
 
   it("does not run json validator for table-only prompts that reject JSON", async () => {

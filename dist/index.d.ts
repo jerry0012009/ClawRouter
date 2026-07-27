@@ -1113,6 +1113,10 @@ type RoutingRecordMetadata = {
     outputPricePerMillion?: number;
     modelCallCost?: number;
     totalAcuCost?: number;
+    executionProfileId?: string;
+    thinkingMode?: "disabled" | "enabled" | "default";
+    requestParameterApplied?: boolean;
+    upstreamModel?: string;
 };
 type RoutingAttemptInput = {
     model: string;
@@ -1122,6 +1126,12 @@ type RoutingAttemptInput = {
     latency_ms: number;
     billed_cost?: number;
     usage_source?: "upstream_usage" | "upstream_cost" | "response_text_estimate" | "max_token_estimate";
+    attempt_type?: "initial" | "fallback" | "format_repair" | "quality_upgrade";
+    execution_profile_id: string;
+    thinking_mode: "disabled" | "enabled" | "default";
+    request_parameter_applied: boolean;
+    upstream_model?: string;
+    reasoning_tokens?: number;
 };
 type FeedbackInput = {
     requestId: string;
@@ -1139,7 +1149,24 @@ type OutcomeInput = {
     modelSwitched?: boolean;
     userRetried?: boolean;
     outcomeScore?: number;
+    executionProfileId?: string;
     outcomeSource: "explicit_user_feedback" | "validator" | "test_result" | "retry_signal" | "model_upgrade_signal";
+};
+type ExecutionProfileHealth = {
+    executionProfileId: string;
+    sampleCount: number;
+    recentSuccessRate: number | null;
+    consecutiveFailures: number;
+    consecutiveTimeouts: number;
+    p50LatencyMs: number | null;
+    p95LatencyMs: number | null;
+    timeoutRate: number | null;
+    rateLimitRate: number | null;
+    serverErrorRate: number | null;
+    lastSuccessAt: string | null;
+    cooldownUntil: string | null;
+    availability: "healthy" | "degraded" | "cooldown" | "unknown";
+    priorityPenalty: number;
 };
 declare function hashSession(value: string | undefined): string | undefined;
 declare class AcuRoutingStore {
@@ -1152,10 +1179,21 @@ declare class AcuRoutingStore {
     recordAttempts(requestId: string, attempts: RoutingAttemptInput[]): void;
     recordFeedback(input: FeedbackInput): void;
     recordOutcome(input: OutcomeInput): void;
+    private refreshExecutionProfileHealth;
+    getExecutionProfileHealth(executionProfileId: string): ExecutionProfileHealth;
+    private executionProfileSummaries;
     summary(): Record<string, unknown>;
     close(): void;
 }
 declare function openAcuRoutingStore(path: string): AcuRoutingStore | null;
+
+type ThinkingMode = "disabled" | "enabled" | "default";
+type ExecutionProfile = {
+    executionProfileId: string;
+    thinkingMode: ThinkingMode;
+    requestParameterApplied: boolean;
+};
+declare function executionProfileFor(modelId: string, enableThinking: unknown): ExecutionProfile;
 
 type ProxyOptions = {
     apiKey?: string;
@@ -1286,4 +1324,4 @@ declare const VERSION: string;
 
 declare const plugin: OpenClawPluginDefinition;
 
-export { ACU_TIERS, type AcuBenchmarkEvidence, type AcuCurvePoint, AcuDemoStrategy, type AcuEvaluateInput, type AcuEvaluation, AcuJudgeClient, type AcuJudgeResult, type AcuJudgeResultSource, type AcuJudgeStatus, type AcuModelCatalogEntry, type AcuModelEstimate, type AcuRecommendation, AcuRoutingStore, type AcuRuntimeConfig, type AcuTier, type AcuTierProbabilities, type AcuVisibleMessage, BLOCKRUN_MODELS, type CachedResponse, DEFAULT_ROUTING_CONFIG, type FeedbackInput, MODEL_ALIASES, OPENCLAW_MODELS, type OutcomeInput, RequestDeduplicator, ResponseCache, type RoutingConfig, type RoutingDecision, type RoutingRecordMetadata, type SessionConfig, type SessionEntry, SessionStore, type Tier, type UsageEntry, VERSION, blockrunProvider, buildModelCurve, buildProviderModels, calculateModelCost, continuousTierProbabilities, plugin as default, difficultyScore, estimateCallCost, estimatedQuality, getAcuCatalog, getAcuModel, getFallbackChain, getModelContextWindow, getProxyPort, getSessionId, hashRequestContent, hashSession, interpolateModelCurve, isParetoEfficient, isReasoningModel, logUsage, normalizeProbabilities, normalizedEntropy, openAcuRoutingStore, parseJudgeResult, publicCatalogPayload, readAcuRuntimeConfig, recommendModel, resolveApiKey, resolveModelAlias, route, rulesFallbackJudge, saveApiKey, selectValueRoute, serializeVisibleContext, solveAbilityParameter, startProxy, supportsToolCalling, supportsVision, tierSufficiency };
+export { ACU_TIERS, type AcuBenchmarkEvidence, type AcuCurvePoint, AcuDemoStrategy, type AcuEvaluateInput, type AcuEvaluation, AcuJudgeClient, type AcuJudgeResult, type AcuJudgeResultSource, type AcuJudgeStatus, type AcuModelCatalogEntry, type AcuModelEstimate, type AcuRecommendation, AcuRoutingStore, type AcuRuntimeConfig, type AcuTier, type AcuTierProbabilities, type AcuVisibleMessage, BLOCKRUN_MODELS, type CachedResponse, DEFAULT_ROUTING_CONFIG, type ExecutionProfile, type ExecutionProfileHealth, type FeedbackInput, MODEL_ALIASES, OPENCLAW_MODELS, type OutcomeInput, RequestDeduplicator, ResponseCache, type RoutingConfig, type RoutingDecision, type RoutingRecordMetadata, type SessionConfig, type SessionEntry, SessionStore, type ThinkingMode, type Tier, type UsageEntry, VERSION, blockrunProvider, buildModelCurve, buildProviderModels, calculateModelCost, continuousTierProbabilities, plugin as default, difficultyScore, estimateCallCost, estimatedQuality, executionProfileFor, getAcuCatalog, getAcuModel, getFallbackChain, getModelContextWindow, getProxyPort, getSessionId, hashRequestContent, hashSession, interpolateModelCurve, isParetoEfficient, isReasoningModel, logUsage, normalizeProbabilities, normalizedEntropy, openAcuRoutingStore, parseJudgeResult, publicCatalogPayload, readAcuRuntimeConfig, recommendModel, resolveApiKey, resolveModelAlias, route, rulesFallbackJudge, saveApiKey, selectValueRoute, serializeVisibleContext, solveAbilityParameter, startProxy, supportsToolCalling, supportsVision, tierSufficiency };

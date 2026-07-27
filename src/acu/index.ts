@@ -13,6 +13,8 @@ export {
 } from "./math.js";
 export { readAcuRuntimeConfig } from "./config.js";
 export { AcuRoutingStore, openAcuRoutingStore, hashSession } from "./storage.js";
-export type { RoutingRecordMetadata, FeedbackInput, OutcomeInput } from "./storage.js";
+export { executionProfileFor } from "./execution-profile.js";
+export type { ExecutionProfile, ThinkingMode } from "./execution-profile.js";
+export type { RoutingRecordMetadata, FeedbackInput, OutcomeInput, ExecutionProfileHealth } from "./storage.js";
 export type { AcuRuntimeConfig } from "./config.js";
 export type * from "./types.js";

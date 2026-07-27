@@ -70,11 +70,14 @@ import {
   hashSession,
   openAcuRoutingStore,
   publicCatalogPayload,
+  getAcuModel,
   readAcuRuntimeConfig,
+  executionProfileFor,
   type AcuEvaluation,
   type AcuRuntimeConfig,
   type AcuVisibleMessage,
   type AcuRoutingStore,
+  type ExecutionProfileHealth,
 } from "./acu/index.js";
 
 export const DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
@@ -187,6 +190,12 @@ type AcuAttemptTrace = {
   latency_ms: number;
   billed_cost?: number;
   usage_source?: "upstream_usage" | "upstream_cost" | "response_text_estimate" | "max_token_estimate";
+  attempt_type: "initial" | "fallback" | "format_repair" | "quality_upgrade";
+  execution_profile_id: string;
+  thinking_mode: "disabled" | "enabled" | "default";
+  request_parameter_applied: boolean;
+  upstream_model?: string;
+  reasoning_tokens?: number;
 };
 
 type UsageSource = "upstream_usage" | "upstream_cost" | "response_text_estimate" | "max_token_estimate";
@@ -213,6 +222,25 @@ type LatencyBreakdown = {
   total_router_latency_ms: number;
 };
 
+function attemptProfileFields(
+  modelId: string,
+  requestBody: Buffer,
+  attemptType: AcuAttemptTrace["attempt_type"],
+): Pick<AcuAttemptTrace, "attempt_type" | "execution_profile_id" | "thinking_mode" | "request_parameter_applied" | "upstream_model"> {
+  let enableThinking: unknown;
+  try {
+    enableThinking = (JSON.parse(requestBody.toString()) as Record<string, unknown>).enable_thinking;
+  } catch { /* malformed requests are handled by the upstream path */ }
+  const profile = executionProfileFor(modelId, enableThinking);
+  return {
+    attempt_type: attemptType,
+    execution_profile_id: profile.executionProfileId,
+    thinking_mode: profile.thinkingMode,
+    request_parameter_applied: profile.requestParameterApplied,
+    upstream_model: modelId,
+  };
+}
+
 type AcuTrace = {
   request_id: string;
   profile: string;
@@ -230,6 +258,13 @@ type AcuTrace = {
   attempt_count: number;
   fallback_used: boolean;
   quality_fallback_used: boolean;
+  quality_review_required?: boolean;
+  format_repair_used?: boolean;
+  format_repair_succeeded?: boolean;
+  execution_profile_id?: string;
+  thinking_mode?: "disabled" | "enabled" | "default";
+  request_parameter_applied?: boolean;
+  upstream_model?: string;
   streaming?: boolean;
   estimated_input_tokens: number;
   estimated_output_tokens: number;
@@ -502,7 +537,8 @@ function parseUsage(
 }
 
 function getFallbackUsed(attempts: AcuAttemptTrace[], actualModelUsed: string, selectedModel?: string): boolean {
-  return attempts.length > 1 || Boolean(selectedModel && selectedModel !== actualModelUsed);
+  return attempts.some((attempt) => attempt.attempt_type === "fallback" || attempt.attempt_type === "quality_upgrade")
+    || Boolean(selectedModel && selectedModel !== actualModelUsed);
 }
 
 function setAcuExecutionResult(
@@ -532,6 +568,7 @@ function buildStreamingTrace(args: {
   costs: { costEstimate: number; baselineCost: number; savings: number };
 }): AcuTrace {
   const fallbackUsed = getFallbackUsed(args.attempts, args.actualModelUsed, args.routingDecision?.model);
+  const finalAttempt = [...args.attempts].reverse().find((attempt) => attempt.model === args.actualModelUsed && attempt.status === "success");
   return {
     ...buildRuleTraceSignals(args.parsedMessages, args.maxTokens, args.config),
     request_id: args.requestId,
@@ -548,6 +585,10 @@ function buildStreamingTrace(args: {
     attempt_count: args.attempts.length,
     fallback_used: fallbackUsed,
     quality_fallback_used: false,
+    execution_profile_id: finalAttempt?.execution_profile_id,
+    thinking_mode: finalAttempt?.thinking_mode,
+    request_parameter_applied: finalAttempt?.request_parameter_applied,
+    upstream_model: finalAttempt?.upstream_model ?? args.actualModelUsed,
     streaming: true,
     estimated_input_tokens: args.estimatedInputTokens,
     estimated_output_tokens: args.estimatedOutputTokens,
@@ -629,16 +670,79 @@ function injectTraceIntoJsonResponse(responseBody: string, trace: AcuTrace): str
   }
 }
 
-function selectQualityFallbackModel(
-  routingDecision: RoutingDecision | undefined,
-  routingConfig: RoutingConfig,
-  actualModelUsed: string,
-  modelsTried: string[],
-): string | undefined {
-  if (!routingDecision) return undefined;
-  const premiumTiers = routingConfig.premiumTiers ?? routingConfig.tiers;
-  const premiumChain = getFallbackChain(routingDecision.tier, premiumTiers);
-  return premiumChain.find((model) => model !== actualModelUsed && !modelsTried.includes(model));
+const QUALITY_FALLBACK_CONSERVATIVE_TOLERANCE_POINTS = 1;
+
+function executionHealthForModel(store: AcuRoutingStore | null | undefined, modelId: string): ExecutionProfileHealth | undefined {
+  if (!store) return undefined;
+  const profile = executionProfileFor(modelId, modelId === "qwen3.6-plus" ? false : undefined);
+  return store.getExecutionProfileHealth(profile.executionProfileId);
+}
+
+function applyPassiveHealthAvailability(modelIds: string[], store: AcuRoutingStore | null | undefined): string[] {
+  if (!store) return modelIds;
+  const assessed = modelIds.map((modelId) => ({ modelId, health: executionHealthForModel(store, modelId) }));
+  const healthy = assessed.filter(({ health }) => health?.availability === "healthy" || health?.availability === "unknown");
+  if (healthy.length > 0) return healthy.map(({ modelId }) => modelId);
+  const degraded = assessed.filter(({ health }) => health?.availability === "degraded");
+  if (degraded.length > 0) return degraded.map(({ modelId }) => modelId);
+  return modelIds;
+}
+
+function selectQualityFallbackModel(args: {
+  evaluation: AcuEvaluation | undefined;
+  currentModel: string;
+  modelsTried: string[];
+  store?: AcuRoutingStore | null;
+  hasTools: boolean;
+  hasVision: boolean;
+  requiredContextTokens: number;
+}): string | undefined {
+  if (!args.evaluation) return undefined;
+  const current = args.evaluation.recommendation.estimates.find((estimate) => estimate.modelId === args.currentModel);
+  if (!current) return undefined;
+  const compatible = args.evaluation.recommendation.estimates.filter((estimate) => {
+    const model = getAcuModel(estimate.modelId);
+    return Boolean(model?.routingEligible)
+      && !args.modelsTried.includes(estimate.modelId)
+      && (!args.hasTools || model?.toolCallSupport)
+      && (!args.hasVision || model?.visionSupport)
+      && (model?.contextWindow === null || (model?.contextWindow ?? 0) >= args.requiredContextTokens)
+      && estimate.predictedScore >= current.predictedScore
+      && estimate.conservativeScore >= current.conservativeScore - QUALITY_FALLBACK_CONSERVATIVE_TOLERANCE_POINTS;
+  }).map((estimate) => ({ estimate, health: executionHealthForModel(args.store, estimate.modelId) }));
+  if (compatible.length === 0) return undefined;
+  const available = compatible.filter(({ health }) => health?.availability !== "cooldown");
+  const pool = available.length > 0 ? available : compatible;
+  return pool.sort((left, right) => (
+    right.estimate.predictedScore - left.estimate.predictedScore
+    || (left.health?.priorityPenalty ?? 0) - (right.health?.priorityPenalty ?? 0)
+    || left.estimate.estimatedCallCost - right.estimate.estimatedCallCost
+    || (left.health?.p50LatencyMs ?? Number.POSITIVE_INFINITY) - (right.health?.p50LatencyMs ?? Number.POSITIVE_INFINITY)
+  ))[0]?.estimate.modelId;
+}
+
+function buildFormatRepairBody(body: Buffer, validator: ValidatorResult, maxTokens: number): Buffer {
+  const parsed = JSON.parse(body.toString()) as Record<string, unknown>;
+  const messages = Array.isArray(parsed.messages) ? [...parsed.messages] : [];
+  messages.push({
+    role: "user",
+    content: `上一条响应未通过${validator.validator === "schema_validator" ? "Schema" : "JSON"}格式校验（${validator.reason ?? "格式无效"}）。只修复格式，不重新扩写内容；只返回目标格式，不要附加说明。`,
+  });
+  parsed.messages = messages;
+  parsed.stream = false;
+  parsed.enable_thinking = false;
+  parsed.max_tokens = Math.min(384, Math.max(64, maxTokens));
+  delete parsed.max_completion_tokens;
+  return Buffer.from(JSON.stringify(parsed));
+}
+
+function upstreamModelFromBody(responseBody: string, fallback: string): string {
+  try {
+    const model = (JSON.parse(responseBody) as { model?: unknown }).model;
+    return typeof model === "string" && model ? model : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 async function fetchUpstreamChatCompletion(args: {
@@ -1224,11 +1328,11 @@ async function handleRequest(
         Number.isFinite(expectedOutputTokens) ? expectedOutputTokens : 800,
         { ...ctx.routerOpts, routingProfile: "auto", hasTools: requireTools },
       );
-      const eligibleModelIds = BLOCKRUN_MODELS.filter((model) => (
+      const eligibleModelIds = applyPassiveHealthAvailability(BLOCKRUN_MODELS.filter((model) => (
         !ctx.excludeList.has(model.id)
         && (!requireTools || modelSupportsToolCalling(model.id))
         && (!requireVision || modelSupportsVision(model.id))
-      )).map((model) => model.id);
+      )).map((model) => model.id), ctx.acuStore);
       const evaluation = await ctx.acuStrategy.evaluate({
         messages,
         tools,
@@ -1417,11 +1521,11 @@ async function handleRequest(
       routingDecision = rulesDecision;
       if (ctx.acuStrategy.enabled) {
         const acuRouteStart = Date.now();
-        const eligibleModelIds = BLOCKRUN_MODELS.filter((model) => (
+        const eligibleModelIds = applyPassiveHealthAvailability(BLOCKRUN_MODELS.filter((model) => (
           !ctx.excludeList.has(model.id)
           && (!hasTools || modelSupportsToolCalling(model.id))
           && (!hasVision || modelSupportsVision(model.id))
-        )).map((model) => model.id);
+        )).map((model) => model.id), ctx.acuStore);
         acuEvaluation = await ctx.acuStrategy.evaluate({
           messages: messages as AcuVisibleMessage[],
           tools: Array.isArray(parsed.tools) ? parsed.tools as unknown[] : [],
@@ -1707,6 +1811,7 @@ async function handleRequest(
         actualModelUsed = tryModel;
         upstreamProviderUsed = upstreamProvider;
         attempts.push({
+          ...attemptProfileFields(tryModel, body, i === 0 ? "initial" : "fallback"),
           model: tryModel,
           upstream: upstreamProvider,
           status: "success",
@@ -1721,6 +1826,7 @@ async function handleRequest(
       lastErrorCategory = category ?? "upstream_error";
       lastError = { body: errorBody, status: response.status };
       attempts.push({
+        ...attemptProfileFields(tryModel, body, i === 0 ? "initial" : "fallback"),
         model: tryModel,
         upstream: upstreamProvider,
         status: "error",
@@ -1748,6 +1854,7 @@ async function handleRequest(
         lastError = { body: err.message, status: 500 };
         lastErrorCategory = "unknown_model";
         attempts.push({
+          ...attemptProfileFields(tryModel, body, i === 0 ? "initial" : "fallback"),
           model: tryModel,
           upstream: "unknown",
           status: "skipped",
@@ -1760,6 +1867,7 @@ async function handleRequest(
       if (modelController.signal.aborted && i < modelsToTry.length - 1) {
         lastErrorCategory = "timeout";
         attempts.push({
+          ...attemptProfileFields(tryModel, body, i === 0 ? "initial" : "fallback"),
           model: tryModel,
           upstream: "unknown",
           status: "timeout",
@@ -1772,6 +1880,7 @@ async function handleRequest(
       lastError = { body: String(err), status: 500 };
       lastErrorCategory = "server_error";
       attempts.push({
+        ...attemptProfileFields(tryModel, body, i === 0 ? "initial" : "fallback"),
         model: tryModel,
         upstream: "unknown",
         status: "error",
@@ -1911,85 +2020,153 @@ async function handleRequest(
       });
       let validatorLatencyMs = Date.now() - initialValidatorStart;
       let qualityFallbackUsed = false;
+      let qualityReviewRequired = false;
+      let formatRepairUsed = false;
+      let formatRepairSucceeded = false;
+      const originalResponseBody = responseBody;
+      const originalModel = actualModelUsed;
+      const originalProvider = upstreamProviderUsed;
+      const originalAttempt = [...attempts].reverse().find((attempt) => attempt.model === originalModel && attempt.status === "success");
+      const billAttempt = (attempt: AcuAttemptTrace | undefined, payload: string, model: string): void => {
+        if (!attempt) return;
+        const attemptUsage = parseUsage(payload, Math.ceil(body.length / 4), maxTokens, ctx.routerOpts.modelPricing.get(model));
+        attempt.billed_cost = attemptUsage.modelCallCost;
+        attempt.usage_source = attemptUsage.usageSource;
+        attempt.reasoning_tokens = attemptUsage.reasoningTokens;
+        attempt.upstream_model = upstreamModelFromBody(payload, model);
+      };
 
-      if (validator.result === "fail" && routingDecision) {
-        const qualityFallbackModel = selectQualityFallbackModel(
-          routingDecision,
-          ctx.routerOpts.config,
-          actualModelUsed,
-          attempts.map((attempt) => attempt.model),
-        );
-        if (qualityFallbackModel) {
-          const qualityStart = Date.now();
-          const qualityController = new AbortController();
-          const qualityTimeout = setTimeout(() => qualityController.abort(), timeoutForModel(qualityFallbackModel));
-          try {
-            const { response, upstreamProvider } = await fetchUpstreamChatCompletion({
-              body,
-              model: qualityFallbackModel,
-              apiKey: ctx.apiKey,
-              proxyApiKey: ctx.proxyApiKey,
-              proxyBaseUrl: ctx.proxyBaseUrl,
-              signal: AbortSignal.any([globalController.signal, qualityController.signal]),
+      if (validator.result === "fail" && (validator.validator === "json_validator" || validator.validator === "schema_validator")) {
+        formatRepairUsed = true;
+        const repairBody = buildFormatRepairBody(body, validator, maxTokens);
+        const repairStart = Date.now();
+        const repairController = new AbortController();
+        const repairTimeout = setTimeout(() => repairController.abort(), timeoutForModel(originalModel));
+        try {
+          const { response, upstreamProvider } = await fetchUpstreamChatCompletion({
+            body: repairBody, model: originalModel, apiKey: ctx.apiKey,
+            proxyApiKey: ctx.proxyApiKey, proxyBaseUrl: ctx.proxyBaseUrl,
+            signal: AbortSignal.any([globalController.signal, repairController.signal]),
+          });
+          if (response.status === 200) {
+            const repairedBody = await readResponseText(response);
+            const repairAttempt: AcuAttemptTrace = {
+              ...attemptProfileFields(originalModel, repairBody, "format_repair"),
+              model: originalModel, upstream: upstreamProvider, status: "success", latency_ms: Date.now() - repairStart,
+            };
+            attempts.push(repairAttempt);
+            const checkStart = Date.now();
+            const repairedValidator = validateAssistantOutput({
+              messages: parsedMessages, assistantText: extractAssistantText(repairedBody), responseFormat, expectedSchema,
             });
-            if (response.status === 200) {
-              const replacedModel = actualModelUsed;
-              const replacedUsage = parseUsage(
-                responseBody, Math.ceil(body.length / 4), maxTokens,
-                ctx.routerOpts.modelPricing.get(replacedModel),
-              );
-              const replacedAttempt = [...attempts].reverse().find((attempt) => (
-                attempt.model === replacedModel && attempt.status === "success"
-              ));
-              if (replacedAttempt) {
-                replacedAttempt.billed_cost = replacedUsage.modelCallCost;
-                replacedAttempt.usage_source = replacedUsage.usageSource;
-              }
-              responseBody = await readResponseText(response);
-              actualModelUsed = qualityFallbackModel;
+            validatorLatencyMs += Date.now() - checkStart;
+            if (repairedValidator.result === "pass") {
+              billAttempt(originalAttempt, originalResponseBody, originalModel);
+              responseBody = repairedBody;
+              validator = repairedValidator;
               upstreamProviderUsed = upstreamProvider;
-              qualityFallbackUsed = true;
-              attempts.push({
-                model: qualityFallbackModel,
-                upstream: upstreamProvider,
-                status: "success",
-                latency_ms: Date.now() - qualityStart,
-              });
-              const fallbackValidatorStart = Date.now();
-              validator = validateAssistantOutput({
-                messages: parsedMessages,
-                assistantText: extractAssistantText(responseBody),
-                responseFormat,
-                expectedSchema,
-              });
-              validatorLatencyMs += Date.now() - fallbackValidatorStart;
+              formatRepairSucceeded = true;
             } else {
-              const errorBody = await response.text().catch(() => "");
-              const category = categorizeError(response.status, errorBody) ?? "validation_fallback_error";
-              lastErrorCategory = category;
-              attempts.push({
-                model: qualityFallbackModel,
-                upstream: upstreamProvider,
-                status: "error",
-                error_category: category,
-                latency_ms: Date.now() - qualityStart,
-                ...(extractExplicitUpstreamCost(errorBody) !== undefined && {
-                  billed_cost: extractExplicitUpstreamCost(errorBody), usage_source: "upstream_cost" as const,
-                }),
-              });
+              repairAttempt.status = "error";
+              repairAttempt.error_category = "format_repair_validation_failed";
+              billAttempt(repairAttempt, repairedBody, originalModel);
+              validator = repairedValidator;
             }
-          } catch (err) {
-            const category = qualityController.signal.aborted ? "timeout" : "validation_fallback_error";
-            lastErrorCategory = category;
+          } else {
+            const errorBody = await response.text().catch(() => "");
+            const category = categorizeError(response.status, errorBody) ?? "format_repair_error";
             attempts.push({
-              model: qualityFallbackModel,
-              upstream: "unknown",
-              status: qualityController.signal.aborted ? "timeout" : "error",
-              error_category: category,
-              latency_ms: Date.now() - qualityStart,
+              ...attemptProfileFields(originalModel, repairBody, "format_repair"),
+              model: originalModel, upstream: upstreamProvider, status: "error", error_category: category,
+              latency_ms: Date.now() - repairStart,
+              ...(extractExplicitUpstreamCost(errorBody) !== undefined && {
+                billed_cost: extractExplicitUpstreamCost(errorBody), usage_source: "upstream_cost" as const,
+              }),
             });
-          } finally {
-            clearTimeout(qualityTimeout);
+          }
+        } catch {
+          const category = repairController.signal.aborted ? "timeout" : "format_repair_error";
+          attempts.push({
+            ...attemptProfileFields(originalModel, repairBody, "format_repair"),
+            model: originalModel, upstream: "unknown", status: repairController.signal.aborted ? "timeout" : "error",
+            error_category: category, latency_ms: Date.now() - repairStart,
+          });
+        } finally {
+          clearTimeout(repairTimeout);
+        }
+
+        if (!formatRepairSucceeded) {
+          const qualityFallbackModel = selectQualityFallbackModel({
+            evaluation: acuEvaluation, currentModel: originalModel,
+            modelsTried: attempts.map((attempt) => attempt.model), store: ctx.acuStore,
+            hasTools, hasVision, requiredContextTokens: Math.ceil(body.length / 4) + maxTokens,
+          });
+          if (qualityFallbackModel) {
+            const qualityStart = Date.now();
+            const qualityController = new AbortController();
+            const qualityTimeout = setTimeout(() => qualityController.abort(), timeoutForModel(qualityFallbackModel));
+            try {
+              const { response, upstreamProvider } = await fetchUpstreamChatCompletion({
+                body: repairBody, model: qualityFallbackModel, apiKey: ctx.apiKey,
+                proxyApiKey: ctx.proxyApiKey, proxyBaseUrl: ctx.proxyBaseUrl,
+                signal: AbortSignal.any([globalController.signal, qualityController.signal]),
+              });
+              if (response.status === 200) {
+                const replacementBody = await readResponseText(response);
+                const replacementAttempt: AcuAttemptTrace = {
+                  ...attemptProfileFields(qualityFallbackModel, repairBody, "quality_upgrade"),
+                  model: qualityFallbackModel, upstream: upstreamProvider, status: "success", latency_ms: Date.now() - qualityStart,
+                };
+                attempts.push(replacementAttempt);
+                const checkStart = Date.now();
+                const replacementValidator = validateAssistantOutput({
+                  messages: parsedMessages, assistantText: extractAssistantText(replacementBody), responseFormat, expectedSchema,
+                });
+                validatorLatencyMs += Date.now() - checkStart;
+                if (replacementValidator.result === "pass") {
+                  billAttempt(originalAttempt, originalResponseBody, originalModel);
+                  responseBody = replacementBody;
+                  actualModelUsed = qualityFallbackModel;
+                  upstreamProviderUsed = upstreamProvider;
+                  validator = replacementValidator;
+                  qualityFallbackUsed = true;
+                } else {
+                  replacementAttempt.status = "error";
+                  replacementAttempt.error_category = "quality_upgrade_validation_failed";
+                  billAttempt(replacementAttempt, replacementBody, qualityFallbackModel);
+                  qualityReviewRequired = true;
+                }
+              } else {
+                const errorBody = await response.text().catch(() => "");
+                const category = categorizeError(response.status, errorBody) ?? "quality_upgrade_error";
+                attempts.push({
+                  ...attemptProfileFields(qualityFallbackModel, repairBody, "quality_upgrade"),
+                  model: qualityFallbackModel, upstream: upstreamProvider, status: "error", error_category: category,
+                  latency_ms: Date.now() - qualityStart,
+                  ...(extractExplicitUpstreamCost(errorBody) !== undefined && {
+                    billed_cost: extractExplicitUpstreamCost(errorBody), usage_source: "upstream_cost" as const,
+                  }),
+                });
+                qualityReviewRequired = true;
+              }
+            } catch {
+              const category = qualityController.signal.aborted ? "timeout" : "quality_upgrade_error";
+              attempts.push({
+                ...attemptProfileFields(qualityFallbackModel, repairBody, "quality_upgrade"),
+                model: qualityFallbackModel, upstream: "unknown", status: qualityController.signal.aborted ? "timeout" : "error",
+                error_category: category, latency_ms: Date.now() - qualityStart,
+              });
+              qualityReviewRequired = true;
+            } finally {
+              clearTimeout(qualityTimeout);
+            }
+          } else {
+            qualityReviewRequired = true;
+          }
+          if (!qualityFallbackUsed) {
+            responseBody = originalResponseBody;
+            actualModelUsed = originalModel;
+            upstreamProviderUsed = originalProvider;
           }
         }
       }
@@ -1997,6 +2174,18 @@ async function handleRequest(
       const latencyMs = Date.now() - startTime;
       const estimatedInputTokens = Math.ceil(body.length / 4);
       const usage = parseUsage(responseBody, estimatedInputTokens, maxTokens, ctx.routerOpts.modelPricing.get(actualModelUsed));
+      const finalAttempt = [...attempts].reverse().find((attempt) => attempt.model === actualModelUsed && attempt.status === "success");
+      if (finalAttempt) {
+        finalAttempt.reasoning_tokens = usage.reasoningTokens;
+        finalAttempt.upstream_model = upstreamModelFromBody(responseBody, actualModelUsed);
+      }
+      const finalExecutionProfile = finalAttempt
+        ? {
+            executionProfileId: finalAttempt.execution_profile_id,
+            thinkingMode: finalAttempt.thinking_mode,
+            requestParameterApplied: finalAttempt.request_parameter_applied,
+          }
+        : executionProfileFor(actualModelUsed, undefined);
       let costEstimate = 0;
       let baselineCost = 0;
       let savings = 0;
@@ -2045,6 +2234,13 @@ async function handleRequest(
 	        attempt_count: attempts.length,
 	        fallback_used: fallbackUsed,
 	        quality_fallback_used: qualityFallbackUsed,
+	        quality_review_required: qualityReviewRequired,
+	        format_repair_used: formatRepairUsed,
+	        format_repair_succeeded: formatRepairSucceeded,
+	        execution_profile_id: finalExecutionProfile.executionProfileId,
+	        thinking_mode: finalExecutionProfile.thinkingMode,
+	        request_parameter_applied: finalExecutionProfile.requestParameterApplied,
+	        upstream_model: upstreamModelFromBody(responseBody, actualModelUsed),
 	        estimated_input_tokens: usage.inputTokens,
         estimated_output_tokens: usage.completionTokens,
         estimated_cost: costEstimate,
@@ -2115,18 +2311,23 @@ async function handleRequest(
             usageSource: usage.usageSource, usageRawKeys: usage.usageRawKeys,
             inputPricePerMillion: usage.inputPricePerMillion, outputPricePerMillion: usage.outputPricePerMillion,
             modelCallCost: usage.modelCallCost, totalAcuCost,
+            executionProfileId: finalExecutionProfile.executionProfileId,
+            thinkingMode: finalExecutionProfile.thinkingMode,
+            requestParameterApplied: finalExecutionProfile.requestParameterApplied,
+            upstreamModel: upstreamModelFromBody(responseBody, actualModelUsed),
           });
           if (validator.result !== "not_applicable") {
             ctx.acuStore?.recordOutcome({
               requestId, validatorResult: validator.result, outcomeSource: "validator",
               outcomeScore: validator.result === "pass" ? 1 : 0,
+              executionProfileId: finalExecutionProfile.executionProfileId,
             });
           }
           if (attempts.length > 1) {
-            ctx.acuStore?.recordOutcome({ requestId, retryCount: attempts.length - 1, outcomeSource: "retry_signal" });
+            ctx.acuStore?.recordOutcome({ requestId, retryCount: attempts.length - 1, outcomeSource: "retry_signal", executionProfileId: finalExecutionProfile.executionProfileId });
           }
           if (actualModelUsed !== routingDecision?.model) {
-            ctx.acuStore?.recordOutcome({ requestId, modelSwitched: true, outcomeSource: "model_upgrade_signal" });
+            ctx.acuStore?.recordOutcome({ requestId, modelSwitched: true, outcomeSource: "model_upgrade_signal", executionProfileId: finalExecutionProfile.executionProfileId });
           }
         } catch { /* telemetry must not affect the response */ }
       }
@@ -2235,6 +2436,12 @@ async function handleRequest(
     try {
       const streamingUsage = parseUsage(responseBody, estimatedInputTokens, maxTokens, ctx.routerOpts.modelPricing.get(actualModelUsed));
       const streamingTotalAcuCost = streamingUsage.modelCallCost + acuEvaluation.judgeCost;
+      const finalAttempt = [...attempts].reverse().find((attempt) => attempt.model === actualModelUsed && attempt.status === "success");
+      if (finalAttempt) {
+        finalAttempt.reasoning_tokens = streamingUsage.reasoningTokens;
+        finalAttempt.upstream_model = upstreamModelFromBody(responseBody, actualModelUsed);
+      }
+      const finalProfile = finalAttempt ?? attemptProfileFields(actualModelUsed, body, "initial");
       ctx.acuStore?.recordAttempts(requestId, attempts);
       ctx.acuStore?.finalizeRequest(requestId, {
         actualModel: actualModelUsed, inputTokens: streamingUsage.inputTokens, outputTokens: streamingUsage.completionTokens,
@@ -2245,6 +2452,10 @@ async function handleRequest(
         inputPricePerMillion: streamingUsage.inputPricePerMillion,
         outputPricePerMillion: streamingUsage.outputPricePerMillion,
         modelCallCost: streamingUsage.modelCallCost, totalAcuCost: streamingTotalAcuCost,
+        executionProfileId: finalProfile.execution_profile_id,
+        thinkingMode: finalProfile.thinking_mode,
+        requestParameterApplied: finalProfile.request_parameter_applied,
+        upstreamModel: upstreamModelFromBody(responseBody, actualModelUsed),
       });
     } catch { /* telemetry must not affect the response */ }
   }

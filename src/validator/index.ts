@@ -32,10 +32,16 @@ export function promptNeedsJsonValidation(
   responseFormat?: unknown,
   expectedSchema?: unknown,
 ): boolean {
-  if (responseFormat || expectedSchema) return true;
-  const prompt = messages.map((message) => textFromContent(message.content)).join("\n").toLowerCase();
+  const format = responseFormat && typeof responseFormat === "object"
+    ? responseFormat as { type?: unknown } : undefined;
+  if (format?.type === "json_object" || format?.type === "json_schema" || expectedSchema) return true;
+  const prompt = messages
+    .filter((message) => message.role === "user")
+    .map((message) => textFromContent(message.content)).join("\n").toLowerCase();
   if (/不要\s*(输出|返回)?\s*json|do\s+not\s+(output|return)\s+json|no\s+json/.test(prompt)) return false;
-  return /\bjson\b|schema|structured|fields?|字段|结构化|提取/.test(prompt);
+  const explicitJson = /(?:只|请)?\s*(?:返回|输出|生成|提供|响应(?:为|成)?)\s*(?:严格|合法|有效)?\s*json\b|\bjson\s*(?:格式|对象|数组|输出|响应)|(?:return|output|respond\s+with|produce|generate)\s+(?:only\s+|valid\s+)?json\b/i.test(prompt);
+  const structuredFieldExtraction = /(?:提取|抽取)[\s\S]{0,120}(?:字段(?:包括|包含|为|：|:)|字段列表)[\s\S]{0,120}(?:结构化(?:输出|结果)|按结构输出)|(?:字段(?:包括|包含|为|：|:)|字段列表)[\s\S]{0,120}(?:提取|抽取)[\s\S]{0,120}(?:结构化(?:输出|结果)|按结构输出)|(?:extract|parse)[\s\S]{0,120}(?:fields?\s*(?:include|:)|field list)[\s\S]{0,120}structured\s+output/i.test(prompt);
+  return explicitJson || structuredFieldExtraction;
 }
 
 function extractJsonCandidate(text: string): string | undefined {
@@ -71,7 +77,11 @@ export function validateAssistantOutput(args: {
 
   const candidate = extractJsonCandidate(args.assistantText);
   if (!candidate) {
-    return { result: "fail", validator: "json_validator", reason: "No JSON object or array found" };
+    return {
+      result: "fail",
+      validator: requiredFields.length > 0 ? "schema_validator" : "json_validator",
+      reason: "未找到JSON对象或数组",
+    };
   }
 
   let parsed: unknown;

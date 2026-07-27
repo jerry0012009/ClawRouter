@@ -97,6 +97,12 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
     const catalog = await response.json() as { models: unknown[]; curves: Record<string, unknown[]> };
     expect(catalog.models.length).toBeGreaterThanOrEqual(8);
     expect(Object.values(catalog.curves).every((curve) => curve.length === 101)).toBe(true);
+
+    const gallery = await fetch(`${proxy.baseUrl}/acu/curves`, {
+      headers: { Authorization: AUTHORIZATION },
+    });
+    expect(gallery.status).toBe(200);
+    expect(await gallery.text()).toContain("模型难度—估算达标率图集");
   });
 
   it("evaluates the full API context and returns a cost-aware recommendation", async () => {

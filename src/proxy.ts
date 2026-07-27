@@ -237,7 +237,7 @@ function isProtectedDemoPath(pathname: string): boolean {
     || pathname === "/index.html"
     || pathname === "/acu"
     || pathname === "/acu/"
-    || pathname.startsWith("/acu/api/")
+    || pathname.startsWith("/acu/")
     || pathname.startsWith("/public/")
     || pathname === "/cache"
     || pathname === "/stats"
@@ -1054,6 +1054,11 @@ async function handleRequest(
     }
     return;
   }
+  if (pathname === "/acu/curves" && req.method === "GET") {
+    res.writeHead(308, { Location: "curves/" });
+    res.end();
+    return;
+  }
 
   // ── Share routes ──
   if (pathname.startsWith("/share/") && req.method === "GET") {
@@ -1081,7 +1086,7 @@ async function handleRequest(
   // ── Only handle chat completions from here ──
 
   // ── Static file serving (frontend) ──
-  if (req.method === "GET" && (pathname === "/" || pathname === "/index.html" || pathname === "/acu" || pathname === "/acu/" || pathname.startsWith("/public/"))) {
+  if (req.method === "GET" && (pathname === "/" || pathname === "/index.html" || pathname === "/acu" || pathname === "/acu/" || pathname === "/acu/curves" || pathname === "/acu/curves/" || pathname.startsWith("/public/"))) {
     const { readFileSync, existsSync } = await import("node:fs");
     const { join, dirname } = await import("node:path");
     const { fileURLToPath } = await import("node:url");
@@ -1091,6 +1096,8 @@ async function handleRequest(
       ? join(publicDir, "index.html")
       : pathname === "/acu" || pathname === "/acu/"
         ? join(publicDir, "acu.html")
+      : pathname === "/acu/curves" || pathname === "/acu/curves/"
+        ? join(publicDir, "acu-curves.html")
       : join(publicDir, pathname.replace("/public/", ""));
     if (existsSync(filePath)) {
       const ext = filePath.split(".").pop() || "html";

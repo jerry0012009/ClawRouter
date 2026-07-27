@@ -5646,7 +5646,7 @@ function normalizeRequestHeaders(req) {
   return headers;
 }
 function isProtectedDemoPath(pathname) {
-  return pathname === "/" || pathname === "/index.html" || pathname === "/acu" || pathname === "/acu/" || pathname.startsWith("/acu/api/") || pathname.startsWith("/public/") || pathname === "/cache" || pathname === "/stats" || pathname === "/ledger" || pathname === "/ledger/summary" || pathname.includes("/chat/completions");
+  return pathname === "/" || pathname === "/index.html" || pathname === "/acu" || pathname === "/acu/" || pathname.startsWith("/acu/") || pathname.startsWith("/public/") || pathname === "/cache" || pathname === "/stats" || pathname === "/ledger" || pathname === "/ledger/summary" || pathname.includes("/chat/completions");
 }
 function getEnvDemoAccessToken() {
   return process.env.DEMO_ACCESS_TOKEN?.trim() || process.env.ACU_DEMO_KEY?.trim() || process.env.PROXY_API_KEY?.trim() || "";
@@ -6230,6 +6230,11 @@ async function handleRequest(req, res, ctx) {
     }
     return;
   }
+  if (pathname === "/acu/curves" && req.method === "GET") {
+    res.writeHead(308, { Location: "curves/" });
+    res.end();
+    return;
+  }
   if (pathname.startsWith("/share/") && req.method === "GET") {
     try {
       const url = new URL(req.url, "http://localhost");
@@ -6257,13 +6262,13 @@ async function handleRequest(req, res, ctx) {
     }
     return;
   }
-  if (req.method === "GET" && (pathname === "/" || pathname === "/index.html" || pathname === "/acu" || pathname === "/acu/" || pathname.startsWith("/public/"))) {
+  if (req.method === "GET" && (pathname === "/" || pathname === "/index.html" || pathname === "/acu" || pathname === "/acu/" || pathname === "/acu/curves" || pathname === "/acu/curves/" || pathname.startsWith("/public/"))) {
     const { readFileSync: readFileSync3, existsSync: existsSync4 } = await import("fs");
     const { join: join8, dirname: dirname4 } = await import("path");
     const { fileURLToPath: fileURLToPath3 } = await import("url");
     const __dirname2 = dirname4(fileURLToPath3(import.meta.url));
     const publicDir = join8(__dirname2, "..", "public");
-    const filePath = pathname === "/" || pathname === "/index.html" ? join8(publicDir, "index.html") : pathname === "/acu" || pathname === "/acu/" ? join8(publicDir, "acu.html") : join8(publicDir, pathname.replace("/public/", ""));
+    const filePath = pathname === "/" || pathname === "/index.html" ? join8(publicDir, "index.html") : pathname === "/acu" || pathname === "/acu/" ? join8(publicDir, "acu.html") : pathname === "/acu/curves" || pathname === "/acu/curves/" ? join8(publicDir, "acu-curves.html") : join8(publicDir, pathname.replace("/public/", ""));
     if (existsSync4(filePath)) {
       const ext = filePath.split(".").pop() || "html";
       const mime = { html: "text/html", css: "text/css", js: "application/javascript", json: "application/json", png: "image/png", svg: "image/svg+xml" };

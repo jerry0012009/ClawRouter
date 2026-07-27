@@ -28,6 +28,14 @@ npm run build
 - 目录：`GET /acu/api/catalog`
 - 评估：`POST /acu/api/evaluate`
 
+当前隔离的公网 dev 部署：
+
+- 交互式页面：`https://eu.jerrypsy.top/acu-router-dev/`
+- 静态曲线图集：`https://eu.jerrypsy.top/acu-router-dev/acu/curves/`
+- 三张原始 PNG 位于 `/acu-router-dev/public/acu-curves/`
+
+公网 dev 实例使用独立端口和发布目录，不会重启或替换原 `/acu-router/` 实例。访问控制与原 Demo 一致。
+
 评估请求示例：
 
 ```json
@@ -66,4 +74,3 @@ research/quality-curves/twinrouterbench/phase1d-foundation/.cache/venv/bin/pytho
 ```
 
 它读取 Phase 1D Parquet、已有 OpenHands 官方数据审计输出及 `src/models.ts`，重建运行时目录、固定 few-shot 和 Phase 2A 研究表。MiniMax M3 只有 Benchmark 证据，仓库没有可调用文本模型 ID，因此不会进入路由候选。
-

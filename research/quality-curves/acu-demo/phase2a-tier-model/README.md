@@ -49,6 +49,7 @@ Prompt 见 [judge_prompt_v1.md](judge_prompt_v1.md)，样本来源与哈希见 [
 - `fitted_model_curves.csv`：13 × 101 个连续曲线点。
 - `representative_decisions.csv`：四个确定性接口场景的计算链条。
 - `screenshots/acu-demo.png`：本地 UI 截图；若 Judge 未配置，页面明确显示 Rules fallback。
+- `public/acu-curves/*.png`：由冻结曲线 CSV 生成的代表模型、性价比模型和厂商分面图集。
 
 ## 复现与验证
 
@@ -63,4 +64,3 @@ git diff --check
 ```
 
 生成器不修改 Phase 1D 或 OpenHands 研究目录。估算边界与证据限制详见 [assumptions.md](assumptions.md)。
-

@@ -1,4 +1,6 @@
-const PREFIX=location.pathname.startsWith('/acu-router')?'/acu-router':'';
+const prefixMatch=location.pathname.match(/^\/(acu-router(?:-dev)?)(?:\/|$)/);
+const PREFIX=prefixMatch?`/${prefixMatch[1]}`:'';
+document.getElementById('curve-gallery-link').href=`${PREFIX}/acu/curves/`;
 const API=`${PREFIX}/acu/api`;
 const colors=['#5aa7ff','#f0b44d','#58d5cf','#ef7f45','#dd79b5','#8fb86b','#a88beb','#8ec8ff','#f3cc7a','#78e0be','#ee9a6c','#b6a3ff','#d2dce6'];
 const presets={

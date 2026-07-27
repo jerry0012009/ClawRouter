@@ -267,29 +267,29 @@ describe("ACU Router demo reliability", () => {
 
   it("integrated frontend consumes the ACU trace without embedding credentials", async () => {
     const html = await readFrontend();
+    const main = await readFile(join(process.cwd(), "public", "acu-main.js"), "utf8");
     const integrated = await readFile(join(process.cwd(), "public", "acu-integrated.js"), "utf8");
-    expect(html).toContain("const BASELINE_MODEL='claude-opus-4-7'");
     expect(html).toContain("acu-decision-module");
-    expect(html).toContain("window.dispatchEvent(new CustomEvent('acu:evaluation'");
-    expect(html).toContain("t?.cost_audit?.total_acu_cost");
-    expect(html).toContain("trace?.fallback_used");
-    expect(html).toContain("chatComplete(BASELINE_MODEL,messages,undefined,maxTokens)");
-    expect(html).toContain("chatComplete(ROUTER_MODEL,messages,spec.threshold/100,maxTokens)");
-    expect(html).toContain("cache:false");
-    expect(html).toContain("structured_extraction:256");
-    expect(html).toContain("reasoning:1200");
-    expect(html).toContain("max_tokens:maxTokens");
-    expect(html).toContain("Promise.allSettled");
-    expect(html).not.toContain("await Promise.all([chatComplete");
+    expect(html).toContain("当前任务最高预计得分模型");
+    expect(html).toContain("全部备选");
+    expect(html).not.toContain("真实数据闭环");
+    expect(html.match(/id="feedback-row"/g)).toHaveLength(1);
+    expect(main).toContain("/acu/api/plan");
+    expect(main).toContain("acu_plan_id: plan.planId");
+    expect(main).toContain("window.dispatchEvent(new CustomEvent('acu:evaluation'");
+    expect(main).toContain("Promise.allSettled");
+    expect(main).not.toContain("BASELINE_MODEL");
+    expect(main).not.toContain("localStorage");
     expect(html).not.toContain("acu_demo_key");
     expect(html).not.toContain("demo_key");
     expect(html).not.toContain("X-ACU-Demo-Key");
-    expect(integrated).toContain("function displayModelIds(evaluation, trace)");
+    expect(integrated).toContain("function visibleModelIds()");
     expect(integrated).toContain("ACU推荐");
     expect(integrated).toContain("实际执行");
-    expect(integrated).toContain("推荐模型调用失败");
+    expect(integrated).toContain("质量上界");
+    expect(integrated).toContain("推荐模型${reason}，已切换");
     expect(integrated).toContain("质量复核后升级");
-    expect(integrated).toContain("slice(0, 8)");
+    expect(integrated).toContain("state.locked.size >= 3");
   });
 
   it("resolves production and Dev API prefixes without allowing Dev to call production", async () => {

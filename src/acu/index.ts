@@ -1,5 +1,5 @@
 export { AcuDemoStrategy, rulesFallbackJudge } from "./strategy.js";
-export { AcuJudgeClient, parseJudgeResult, serializeVisibleContext } from "./judge.js";
+export { AcuJudgeClient, parseJudgeResult, serializeVisibleContext, estimateVisibleTokens } from "./judge.js";
 export { getAcuCatalog, getAcuModel, buildModelCurve, interpolateModelCurve, publicCatalogPayload } from "./catalog.js";
 export { recommendModel, estimateCallCost, isParetoEfficient, selectValueRoute } from "./decision.js";
 export {

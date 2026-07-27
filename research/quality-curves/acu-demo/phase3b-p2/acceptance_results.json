@@ -1,0 +1,184 @@
+{
+  "generatedAt": "2026-07-27T15:15:39.704Z",
+  "baseUrl": "https://eu.jerrypsy.top/acu-router-dev/",
+  "cases": [
+    {
+      "id": "avg-code-fix",
+      "preset": 1,
+      "requestId": "a197ed8e-e594-41f6-9632-7c86deda6b2e",
+      "difficultyScore": 25,
+      "judgeStatus": "cache_hit",
+      "qualityCeilingModel": "gpt-5.6-luna",
+      "qualityCeilingScore": 95.29495616835193,
+      "recommendedModel": "qwen3.6-plus",
+      "recommendedScore": 82.72637519142147,
+      "actualModel": "qwen3.6-plus",
+      "featuredModels": [
+        "gpt-5.6-luna",
+        "qwen3.6-plus",
+        "glm-5.1",
+        "kimi-k2.6"
+      ],
+      "featuredView": {
+        "x": [
+          0,
+          100
+        ],
+        "global": true
+      },
+      "baselineMeta": "GPT-5.6 Luna预计 95.3分Default模型调用 2621ms本次实际成本 US$0.00183upstream_usage",
+      "routerMeta": "实际 qwen3.6-plus任务评估 0ms模型调用 6693ms总耗时 6716ms本次实际成本 US$0.00053upstream_usage",
+      "comparison": "ACU 预计以 12.6分的模型得分差距，换取成本降低 71.1%。质量上界实际成本 US$0.00183；ACU 本次实际成本 US$0.00053。",
+      "executionStatus": "推荐已执行",
+      "allModels": [
+        "qwen3.6-plus",
+        "glm-5.1",
+        "kimi-k2.6",
+        "kimi-k2.7-code",
+        "gpt-5.6-luna",
+        "deepseek-v4-pro",
+        "glm-5.2",
+        "qwen3.7-max",
+        "gemini-2.5-flash",
+        "qwen/qwen3-235b-a22b",
+        "deepseek-v4-flash",
+        "gemini-3.5-flash",
+        "meta-llama/llama-4-maverick",
+        "qwen3.5-flash",
+        "meta-llama/llama-3.3-70b-instruct",
+        "deepseek/deepseek-chat-v3-0324",
+        "gpt-5.4-mini",
+        "gpt-5.6-terra",
+        "claude-sonnet-5",
+        "claude-opus-4-8",
+        "gpt-5.5",
+        "gpt-5.6-sol"
+      ],
+      "allView": {
+        "x": [
+          7,
+          43
+        ],
+        "global": false
+      },
+      "calls": [
+        {
+          "method": "GET",
+          "url": "https://eu.jerrypsy.top/acu-router-dev/acu/api/catalog"
+        },
+        {
+          "method": "POST",
+          "url": "https://eu.jerrypsy.top/acu-router-dev/acu/api/plan"
+        },
+        {
+          "method": "POST",
+          "url": "https://eu.jerrypsy.top/acu-router-dev/v1/chat/completions"
+        },
+        {
+          "method": "POST",
+          "url": "https://eu.jerrypsy.top/acu-router-dev/v1/chat/completions"
+        }
+      ],
+      "interactionApiCalls": 0,
+      "pageErrors": []
+    },
+    {
+      "id": "low-json",
+      "preset": 0,
+      "requestId": "d0c19a72-f611-4f4b-bb7f-7b6299aee347",
+      "difficultyScore": 15,
+      "judgeStatus": "live",
+      "qualityCeilingModel": "gpt-5.6-luna",
+      "qualityCeilingScore": 98.27008675018939,
+      "recommendedModel": "qwen3.6-plus",
+      "recommendedScore": 89.04114758796867,
+      "actualModel": "qwen3.6-plus",
+      "featuredModels": [
+        "gpt-5.6-luna",
+        "qwen3.6-plus",
+        "glm-5.1",
+        "kimi-k2.6"
+      ],
+      "featuredView": {
+        "x": [
+          0,
+          100
+        ],
+        "global": true
+      },
+      "baselineMeta": "GPT-5.6 Luna预计 98.3分Default模型调用 1933ms本次实际成本 US$0.00067upstream_usage",
+      "routerMeta": "实际 qwen3.6-plus任务评估 2159ms模型调用 2908ms总耗时 2915ms本次实际成本 US$0.00051upstream_usage",
+      "comparison": "ACU 预计以 9.2分的模型得分差距，换取成本降低 24.1%。质量上界实际成本 US$0.00067；ACU 本次实际成本 US$0.00051。",
+      "executionStatus": "推荐已执行",
+      "calls": [
+        {
+          "method": "GET",
+          "url": "https://eu.jerrypsy.top/acu-router-dev/acu/api/catalog"
+        },
+        {
+          "method": "POST",
+          "url": "https://eu.jerrypsy.top/acu-router-dev/acu/api/plan"
+        },
+        {
+          "method": "POST",
+          "url": "https://eu.jerrypsy.top/acu-router-dev/v1/chat/completions"
+        },
+        {
+          "method": "POST",
+          "url": "https://eu.jerrypsy.top/acu-router-dev/v1/chat/completions"
+        }
+      ],
+      "interactionApiCalls": 0,
+      "pageErrors": []
+    },
+    {
+      "id": "high-reasoning",
+      "preset": 3,
+      "requestId": "57c2af0e-38d8-48ed-868b-697a2f6f66a4",
+      "difficultyScore": 88.5,
+      "judgeStatus": "live",
+      "qualityCeilingModel": "gpt-5.6-sol",
+      "qualityCeilingScore": 44.885404814481824,
+      "recommendedModel": "claude-opus-4-8",
+      "recommendedScore": 43.65790989961111,
+      "actualModel": "claude-opus-4-8",
+      "featuredModels": [
+        "gpt-5.6-sol",
+        "claude-opus-4-8",
+        "gpt-5.6-terra",
+        "qwen3.6-plus"
+      ],
+      "featuredView": {
+        "x": [
+          0,
+          100
+        ],
+        "global": true
+      },
+      "baselineMeta": "GPT-5.6 Sol预计 44.9分Default模型调用 17563ms本次实际成本 US$0.03680upstream_usage",
+      "routerMeta": "实际 claude-opus-4-8任务评估 2435ms模型调用 20992ms总耗时 20997ms本次实际成本 US$0.03155upstream_usage",
+      "comparison": "ACU 预计以 1.2分的模型得分差距，换取成本降低 14.3%。质量上界实际成本 US$0.03680；ACU 本次实际成本 US$0.03155。",
+      "executionStatus": "推荐已执行",
+      "calls": [
+        {
+          "method": "GET",
+          "url": "https://eu.jerrypsy.top/acu-router-dev/acu/api/catalog"
+        },
+        {
+          "method": "POST",
+          "url": "https://eu.jerrypsy.top/acu-router-dev/acu/api/plan"
+        },
+        {
+          "method": "POST",
+          "url": "https://eu.jerrypsy.top/acu-router-dev/v1/chat/completions"
+        },
+        {
+          "method": "POST",
+          "url": "https://eu.jerrypsy.top/acu-router-dev/v1/chat/completions"
+        }
+      ],
+      "interactionApiCalls": 0,
+      "pageErrors": []
+    }
+  ]
+}

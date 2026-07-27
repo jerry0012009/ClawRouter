@@ -2,139 +2,372 @@
   const prefix = location.pathname.match(/^\/(acu-router(?:-dev)?)(?:\/|$)/)?.[1];
   const api = prefix ? `${location.origin}/${prefix}/acu/api` : `${location.origin}/acu/api`;
   const safeFetch = (target, options) => window.AcuApiPrefix.fetchFrom(location.pathname, target, options);
-  const colors = ['#90e8a0','#ffd76a','#9fc7ff','#ff8fa3','#b7a1ff','#67d8c2','#f6a96b','#85d7ff'];
-  let catalog;
-  let latestEvaluation;
-  let latestMessages;
-
+  const core = window.AcuChartCore;
+  const colors = ['#90e8a0', '#ffd76a', '#9fc7ff', '#ff8fa3', '#b7a1ff', '#67d8c2', '#f6a96b', '#85d7ff', '#d3e47d', '#d7a4ff', '#80c4aa', '#ffadbf'];
+  const state = {
+    catalog: null, plan: null, evaluation: null, trace: null, mode: 'featured',
+    views: { featured: { x: [0, 100], global: true }, all: null },
+    locked: new Set(), hovered: null, selected: null, geometry: null,
+    dragging: null, touches: new Map(), pinchDistance: null,
+  };
   const $ = (id) => document.getElementById(id);
-  const money = (value) => `US$${Number(value || 0).toFixed(value < .01 ? 5 : 3)}`;
+  const money = (value) => `US$${Number(value || 0).toFixed(value < 0.01 ? 5 : 3)}`;
   const score = (value) => `${Number(value).toFixed(1)}分`;
-
-  function currentMessages() {
-    const prompt = $('prompt-input')?.value.trim() || '';
-    const spec = typeof window.getQualitySpec === 'function' ? window.getQualitySpec() : null;
-    const system = spec && typeof window.qualitySpecPrompt === 'function' ? window.qualitySpecPrompt(spec) : '请准确完成用户请求。';
-    return [{ role: 'system', content: system }, { role: 'user', content: prompt }];
-  }
+  const healthLabel = (status) => ({ healthy: '正常', degraded: '当前性能波动', cooldown: '冷却中', unknown: '样本不足' })[status] || '样本不足';
+  const evidenceLabel = (confidence) => ({ high: '高可信公开证据', medium: '公开Benchmark锚定估算', low: '相对估算' })[confidence] || '相对估算';
+  const modeLabel = (candidate) => candidate?.thinkingMode === 'disabled' ? 'Non-thinking' : candidate?.thinkingMode === 'enabled' ? 'Thinking' : 'Default';
 
   function sourceLabel(evaluation) {
-    if (evaluation.judgeStatus === 'live') return ['实时Judge','live'];
-    if (evaluation.judgeStatus === 'cache_hit') return ['Judge缓存','cache'];
-    return ['规则估算','rules'];
+    if (evaluation.judgeStatus === 'live') return ['实时任务评估', 'live'];
+    if (evaluation.judgeStatus === 'cache_hit') return ['任务评估缓存', 'cache'];
+    return ['规则估算', 'rules'];
   }
 
-  function interpolateCurve(curve, difficulty) {
-    if (!Array.isArray(curve) || !curve.length) return null;
-    const leftIndex = Math.max(0, Math.min(curve.length - 1, Math.floor(difficulty)));
-    const rightIndex = Math.max(0, Math.min(curve.length - 1, Math.ceil(difficulty)));
-    const left = curve[leftIndex], right = curve[rightIndex];
-    if (!left || !right) return null;
-    const fraction = difficulty - Math.floor(difficulty);
-    return (left.estimatedQuality + (right.estimatedQuality - left.estimatedQuality) * fraction) * 100;
+  function difficultyLevel(value) { return value < 30 ? '简单' : value < 55 ? '标准' : value < 80 ? '复杂' : '高难度'; }
+  function inputScale(tokens) { return tokens < 500 ? '短上下文' : tokens <= 4000 ? '中等上下文' : '长上下文'; }
+  function qualityMode(value) { return value < 75 ? '成本优先' : value < 88 ? '质量成本均衡' : '质量优先'; }
+
+  function candidates() {
+    if (!state.plan || !state.catalog) return [];
+    return core.visibleCandidates(state.plan.displayCandidates || [], Object.keys(state.catalog.curves || {}));
   }
 
-  function displayModelIds(evaluation, trace) {
-    const recommended = evaluation.recommendation.recommended.modelId;
-    const actual = evaluation.actualModel || trace?.actual_model_used;
-    const attempts = (trace?.attempts || []).map((attempt) => attempt.model);
-    const defaults = catalog.models.filter((model) => model.defaultDisplay && model.routingEligible).map((model) => model.modelId);
-    const roleReferences = [
-      defaults.find((id) => /opus|sol/i.test(id)),
-      defaults.find((id) => /terra|glm|kimi/i.test(id)),
-      defaults.find((id) => /flash|luna/i.test(id)),
-      ...defaults,
-    ];
-    return [...new Set([recommended, actual, ...attempts, ...roleReferences].filter(Boolean))]
-      .filter((id) => catalog.curves[id] && catalog.models.some((model) => model.modelId === id))
-      .slice(0, 8);
-  }
+  function candidate(modelId) { return candidates().find((item) => item.modelId === modelId); }
 
-  function roleLabels(modelId, evaluation, trace) {
+  function roleLabels(modelId) {
     const labels = [];
-    if (modelId === evaluation.recommendation.recommended.modelId) labels.push('ACU推荐');
-    if (modelId === (evaluation.actualModel || trace?.actual_model_used)) labels.push('实际执行');
-    (trace?.attempts || []).forEach((attempt, index) => {
-      if (attempt.model === modelId) labels.push(`第${index + 1}次尝试`);
-    });
+    if (modelId === state.plan?.qualityCeilingModel?.modelId) labels.push('质量上界');
+    if (modelId === state.plan?.recommendation?.recommended?.modelId) labels.push('ACU推荐');
+    if (modelId === (state.evaluation?.actualModel || state.trace?.actual_model_used)) labels.push('实际执行');
+    (state.trace?.attempts || []).forEach((attempt, index) => { if (attempt.model === modelId) labels.push(`第${index + 1}次尝试`); });
+    if (candidate(modelId)?.evidenceConfidence === 'low') labels.push('相对估算');
+    if (candidate(modelId)?.healthStatus === 'degraded') labels.push('当前性能波动');
     return [...new Set(labels)];
   }
 
-  function executionStatus(evaluation, trace) {
+  function visibleModelIds() {
+    const all = candidates();
+    if (state.mode === 'all') return all.map((item) => item.modelId);
+    return core.featuredModelIds({
+      candidates: all,
+      ceilingId: state.plan?.qualityCeilingModel?.modelId,
+      recommendedId: state.plan?.recommendation?.recommended?.modelId,
+      actualId: state.evaluation?.actualModel || state.trace?.actual_model_used,
+      attemptIds: (state.trace?.attempts || []).map((attempt) => attempt.model),
+    });
+  }
+
+  function autoFit(mode = state.mode) {
+    if (!state.evaluation) return;
+    state.views[mode] = mode === 'all'
+      ? { x: core.autoDifficultyDomain(state.evaluation.difficultyScore), global: false }
+      : { x: [0, 100], global: true };
+    drawChart();
+  }
+
+  function currentView() {
+    if (!state.views[state.mode]) autoFit(state.mode);
+    return state.views[state.mode] || { x: [0, 100], global: true };
+  }
+
+  function interpolateCurve(curve, difficulty) {
+    if (!curve?.length) return null;
+    const bounded = Math.max(0, Math.min(100, difficulty));
+    const lower = curve[Math.floor(bounded)], upper = curve[Math.ceil(bounded)];
+    if (!lower || !upper) return null;
+    const fraction = bounded - Math.floor(bounded);
+    return (lower.estimatedQuality + (upper.estimatedQuality - lower.estimatedQuality) * fraction) * 100;
+  }
+
+  function executionStatus() {
+    const evaluation = state.evaluation, trace = state.trace;
+    if (!evaluation) return '等待路由结果';
     if (trace?.format_repair_succeeded === true) return '同模型格式修复成功';
     if (trace?.quality_review_required === true) return '当前结果需要复核';
     if (trace?.quality_fallback_used === true) return '质量复核后升级';
     const attempts = trace?.attempts || [];
-    if (attempts.length > 1 && ['error','timeout'].includes(attempts[0]?.status) && attempts.some((item) => item.status === 'success')) {
-      const reason = attempts[0].status === 'timeout' ? '超时' : (attempts[0].error_category || '调用错误');
-      return `推荐模型调用失败（${reason}），已切换`;
+    if (attempts.length > 1 && ['error', 'timeout'].includes(attempts[0]?.status) && attempts.some((attempt) => attempt.status === 'success')) {
+      const reason = attempts[0].status === 'timeout' ? '超时' : attempts[0].error_category === 'rate_limited' ? '上游限流' : (attempts[0].error_category || '调用错误');
+      return `推荐模型${reason}，已切换`;
     }
     if ((evaluation.actualModel || trace?.actual_model_used) !== evaluation.recommendation.recommended.modelId) return '执行模型发生切换';
-    if (evaluation.recommendationApplied === true) return '推荐已执行';
-    return evaluation.shadowMode ? 'Shadow模式未执行推荐' : '推荐未执行';
+    return evaluation.recommendationApplied === true ? '推荐已执行' : evaluation.shadowMode ? 'Shadow模式未执行推荐' : '推荐未执行';
   }
 
-  function drawChart(evaluation) {
-    if (!catalog) return;
-    const canvas = $('acu-integrated-chart');
-    const ratio = devicePixelRatio || 1;
-    const width = Math.max(620, canvas.clientWidth || 760), height = 385;
-    canvas.width = width * ratio; canvas.height = height * ratio;
-    const ctx = canvas.getContext('2d'); ctx.scale(ratio, ratio);
-    const margin = { left: 46, right: 18, top: 18, bottom: 35 };
-    const plotW = width - margin.left - margin.right, plotH = height - margin.top - margin.bottom;
-    const x = (value) => margin.left + plotW * value / 100;
-    const y = (value) => margin.top + plotH * (1 - value / 100);
-    ctx.clearRect(0, 0, width, height); ctx.font = '10px ui-monospace,monospace';
-    for (let tick=0; tick<=100; tick+=20) {
-      ctx.strokeStyle='rgba(255,255,255,.10)';ctx.beginPath();ctx.moveTo(margin.left,y(tick));ctx.lineTo(width-margin.right,y(tick));ctx.stroke();
-      ctx.fillStyle='#888';ctx.textAlign='right';ctx.fillText(String(tick),margin.left-7,y(tick)+3);ctx.textAlign='center';ctx.fillText(String(tick),x(tick),height-14);
+  function updateOverview() {
+    const evaluation = state.evaluation || state.plan;
+    if (!evaluation) return;
+    const context = window.__acuPageContext || {};
+    $('acu-task-type').textContent = context.taskType || '通用任务';
+    $('acu-live-difficulty').textContent = `${evaluation.difficultyScore.toFixed(1)} / 100`;
+    $('acu-difficulty-level').textContent = difficultyLevel(evaluation.difficultyScore);
+    const preference = context.qualityTarget ?? evaluation.qualityTarget * 100;
+    $('acu-quality-preference').textContent = `${Number(preference).toFixed(0)}分`;
+    $('acu-quality-mode').textContent = qualityMode(preference);
+    $('acu-input-tokens').textContent = `${evaluation.contextTokenEstimate} tokens`;
+    $('acu-input-scale').textContent = inputScale(evaluation.contextTokenEstimate);
+  }
+
+  function updateSummary() {
+    const evaluation = state.evaluation || state.plan;
+    if (!evaluation) return;
+    const [label, cls] = sourceLabel(evaluation);
+    const badge = $('acu-source-badge');
+    badge.textContent = label;
+    badge.className = `acu-source-badge ${cls}`;
+    $('acu-routing-mode').textContent = evaluation.shadowMode ? '路由模式：Shadow观察' : '路由模式：ACU实际执行';
+    const recommended = state.plan?.recommendation?.recommended || evaluation.recommendation.recommended;
+    const actualId = state.evaluation?.actualModel || state.trace?.actual_model_used;
+    const actual = candidate(actualId);
+    $('acu-live-recommendation').textContent = `${recommended.displayName} · ${score(recommended.predictedScore)} · ${money(recommended.expectedTotalCost)}`;
+    $('acu-live-actual').textContent = actualId ? `${actual?.displayName || actualId} · ${modeLabel(actual)}` : '等待模型执行';
+    $('acu-live-application').textContent = executionStatus();
+    const ceiling = state.plan?.qualityCeilingModel;
+    $('acu-live-reason').textContent = ceiling?.modelId === recommended.modelId
+      ? '该任务已接近质量上界，当前没有可靠的降配空间。'
+      : evaluation.recommendation.reason;
+    updateOverview();
+  }
+
+  function chartDomain(modelIds) {
+    const view = currentView();
+    const y = view.global ? [0, 100] : core.autoScoreDomain(state.catalog.curves, modelIds, view.x);
+    return { x: view.x, y };
+  }
+
+  function drawAxes(ctx, bounds, domain, xScale, yScale) {
+    ctx.font = '10px ui-monospace, monospace';
+    ctx.lineWidth = 1;
+    for (let index = 0; index <= 5; index += 1) {
+      const yValue = domain.y[0] + (domain.y[1] - domain.y[0]) * index / 5;
+      const py = yScale(yValue);
+      ctx.strokeStyle = 'rgba(255,255,255,.09)'; ctx.beginPath(); ctx.moveTo(bounds.left, py); ctx.lineTo(bounds.right, py); ctx.stroke();
+      ctx.fillStyle = '#898990'; ctx.textAlign = 'right'; ctx.fillText(yValue.toFixed(0), bounds.left - 7, py + 3);
+      const xValue = domain.x[0] + (domain.x[1] - domain.x[0]) * index / 5;
+      ctx.textAlign = 'center'; ctx.fillText(xValue.toFixed(0), xScale(xValue), bounds.bottom + 18);
     }
-    const modelIds = displayModelIds(evaluation, window.__latestAcuTrace);
-    const defaults = modelIds.map((id) => catalog.models.find((model) => model.modelId === id)).filter(Boolean);
-    const estimates = new Map(evaluation.recommendation.estimates.map((item) => [item.modelId,item]));
-    const points=[];
-    defaults.forEach((model,index) => {
-      const curve=catalog.curves[model.modelId], color=colors[index%colors.length];ctx.strokeStyle=color;ctx.lineWidth=model.modelId===evaluation.recommendation.recommended.modelId?2.8:1.5;ctx.beginPath();
-      curve.forEach((point,i)=>{const px=x(point.difficultyScore),py=y(point.estimatedQuality*100);if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py)});ctx.stroke();
-      const originalEstimate=estimates.get(model.modelId);const predictedScore=interpolateCurve(curve,evaluation.difficultyScore);if(predictedScore===null)return;const actual=model.modelId===(evaluation.actualModel||window.__latestAcuTrace?.actual_model_used);const actualCost=window.__latestAcuTrace?.cost_audit?.total_acu_cost;const estimate={...(originalEstimate||{}),predictedScore,expectedTotalCost:actual&&Number.isFinite(actualCost)?actualCost:(originalEstimate?.expectedTotalCost||0)};const px=x(evaluation.difficultyScore),py=y(predictedScore);ctx.fillStyle=color;ctx.beginPath();ctx.arc(px,py,model.modelId===evaluation.recommendation.recommended.modelId||actual?5:3.5,0,Math.PI*2);ctx.fill();points.push({model,estimate,px,py,color});
+  }
+
+  function labelModels(modelIds) {
+    if (state.mode === 'featured') return modelIds;
+    const permanent = [state.plan?.qualityCeilingModel?.modelId, state.plan?.recommendation?.recommended?.modelId, state.evaluation?.actualModel || state.trace?.actual_model_used];
+    return [...new Set([...permanent, ...state.locked].filter((id) => modelIds.includes(id)))];
+  }
+
+  function drawLabels(ctx, points, bounds) {
+    const selected = new Set(labelModels(points.map((point) => point.modelId)));
+    const labels = points.filter((point) => selected.has(point.modelId)).sort((left, right) => left.py - right.py);
+    const gap = 40;
+    labels.forEach((item, index) => {
+      item.labelY = Math.max(bounds.top + 18, item.py);
+      if (index && item.labelY < labels[index - 1].labelY + gap) item.labelY = labels[index - 1].labelY + gap;
     });
-    const lineX=x(evaluation.difficultyScore);ctx.strokeStyle='rgba(255,255,255,.65)';ctx.setLineDash([3,4]);ctx.beginPath();ctx.moveTo(lineX,margin.top);ctx.lineTo(lineX,height-margin.bottom);ctx.stroke();ctx.setLineDash([]);
-    const labels=points.sort((a,b)=>a.py-b.py);const gap=36;labels.forEach((item,i)=>{item.ly=Math.max(27,item.py);if(i&&item.ly<labels[i-1].ly+gap)item.ly=labels[i-1].ly+gap});const overflow=labels.at(-1)?.ly-(height-52)||0;if(overflow>0)labels.forEach(item=>item.ly-=overflow);
-    const right=lineX<width*.68, boxW=170, boxH=31, boxX=right?Math.min(width-boxW-9,lineX+12):Math.max(margin.left,lineX-boxW-12);
-    labels.forEach((item)=>{const selected=item.model.modelId===evaluation.recommendation.recommended.modelId;ctx.strokeStyle=item.color;ctx.lineWidth=selected?2:1;ctx.beginPath();ctx.moveTo(item.px,item.py);ctx.lineTo(right?boxX:boxX+boxW,item.ly);ctx.stroke();ctx.fillStyle=selected?'rgba(70,65,28,.97)':'rgba(15,15,17,.96)';ctx.strokeStyle=item.color;ctx.fillRect(boxX,item.ly-boxH/2,boxW,boxH);ctx.strokeRect(boxX,item.ly-boxH/2,boxW,boxH);ctx.textAlign='left';ctx.fillStyle=selected?'#ffd76a':'#f3f3f4';ctx.font='600 10px sans-serif';ctx.fillText(item.model.displayName,boxX+7,item.ly-2);ctx.fillStyle='#aaa';ctx.font='9px ui-monospace,monospace';ctx.fillText(`${score(item.estimate.predictedScore)} · ${money(item.estimate.expectedTotalCost)}`,boxX+7,item.ly+10)});
-    $('acu-integrated-legend').innerHTML=points.map((item)=>{const roles=roleLabels(item.model.modelId,evaluation,window.__latestAcuTrace);const evidence=item.model.evidenceConfidence==='low'?' · 相对估算':'';return `<div class="acu-legend-row"><strong><b style="color:${item.color}">${item.model.displayName}</b><em>${score(item.estimate.predictedScore)}</em></strong><span>${roles.map((role)=>`<small>${role}</small>`).join(' ')}${evidence}<br>${money(item.estimate.expectedTotalCost)}</span></div>`}).join('');
+    const overflow = (labels.at(-1)?.labelY || 0) - (bounds.bottom - 18);
+    if (overflow > 0) labels.forEach((item) => { item.labelY -= overflow; });
+    for (const item of labels) {
+      const width = 176, height = 34;
+      const placeRight = item.px < (bounds.left + bounds.right) / 2;
+      const boxX = placeRight ? Math.min(bounds.right - width, item.px + 13) : Math.max(bounds.left, item.px - width - 13);
+      ctx.strokeStyle = item.color; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(item.px, item.py); ctx.lineTo(placeRight ? boxX : boxX + width, item.labelY); ctx.stroke();
+      ctx.fillStyle = item.modelId === state.plan?.recommendation?.recommended?.modelId ? 'rgba(70,65,28,.97)' : 'rgba(15,15,17,.97)';
+      ctx.fillRect(boxX, item.labelY - height / 2, width, height); ctx.strokeStyle = item.color; ctx.strokeRect(boxX, item.labelY - height / 2, width, height);
+      ctx.textAlign = 'left'; ctx.fillStyle = '#f3f3f4'; ctx.font = '600 10px sans-serif'; ctx.fillText(item.candidate.displayName, boxX + 7, item.labelY - 3);
+      ctx.font = '600 9px ui-monospace, monospace'; ctx.fillText(`${score(item.candidate.predictedScore)}    ${money(item.candidate.expectedTotalCost)}`, boxX + 7, item.labelY + 11);
+    }
   }
 
-  function render(evaluation, messages, trace) {
-    latestEvaluation=evaluation;latestMessages=messages||latestMessages||currentMessages();window.__latestAcuTrace=trace||window.__latestAcuTrace;
-    const [label,cls]=sourceLabel(evaluation), badge=$('acu-source-badge');badge.textContent=label;badge.className=`acu-source-badge ${cls}`;
-    $('acu-routing-mode').textContent=evaluation.shadowMode?'路由模式：Shadow观察':'路由模式：ACU实际执行';
-    $('acu-live-difficulty').textContent=score(evaluation.difficultyScore);
-    $('acu-tier-probabilities').innerHTML=[['Low',evaluation.judge.pLow],['Mid',evaluation.judge.pMid],['Mid-high',evaluation.judge.pMidHigh],['High',evaluation.judge.pHigh]].map(([name,value])=>`<div><span>${name}</span><b>${(value*100).toFixed(1)}%</b></div>`).join('');
-    const rec=evaluation.recommendation.recommended, actual=evaluation.actualModel||trace?.actual_model_used||'—', fallback=trace?.fallback_used===true;
-    $('acu-live-recommendation').textContent=`ACU推荐：${rec.displayName} · ${score(rec.predictedScore)} · ${money(rec.expectedTotalCost)}`;
-    const modeLabel=trace?.thinking_mode==='disabled'?' · Non-thinking':trace?.thinking_mode==='enabled'?' · Thinking':'';
-    $('acu-live-actual').textContent=`实际执行：${actual}${modeLabel}`;
-    $('acu-live-application').textContent=executionStatus(evaluation,trace);
-    $('acu-live-reason').textContent=`质量偏好 ${(evaluation.qualityTarget*100).toFixed(0)}分 · ${evaluation.recommendation.reason}`;
-    $('acu-server-feedback').hidden=false;
-    const latency=trace?.latency_breakdown||{},usage=trace?.usage_audit||{},costs=trace?.cost_audit||{};
-    const attempts=(trace?.attempts||[]).map((item,index)=>`#${index+1} ${item.model}: ${item.status}${item.error_category?`/${item.error_category}`:''} · ${item.attempt_type||'initial'} · ${item.execution_profile_id||'default'} · ${item.latency_ms}ms`).join('<br>')||'—';
-    $('acu-technical-details').innerHTML=[['状态',label],['执行状态',executionStatus(evaluation,trace)],['路由模式',evaluation.shadowMode?'Shadow观察':'ACU实际执行'],['ACU推荐',rec.modelId],['实际执行',actual],['Attempts',attempts],['recommendationApplied',String(evaluation.recommendationApplied===true)],['validator_result',trace?.validator_result??'—'],['validator',trace?.validator??'—'],['validator_reason',trace?.validator_reason??'—'],['quality_fallback_used',String(trace?.quality_fallback_used===true)],['format_repair_used',String(trace?.format_repair_used===true)],['format_repair_succeeded',String(trace?.format_repair_succeeded===true)],['executionProfileId',trace?.execution_profile_id??'—'],['运行模式',trace?.thinking_mode??'—'],['requestParameterApplied',String(trace?.request_parameter_applied===true)],['实际上游模型',trace?.upstream_model??'—'],['当前质量偏好',`${(evaluation.qualityTarget*100).toFixed(0)}分`],['Judge延迟',`${latency.judge_latency_ms??evaluation.judgeLatencyMs} ms`],['推荐模型调用',`${trace?.attempts?.[0]?.latency_ms??0} ms`],['切换耗时',`${latency.fallback_latency_ms??0} ms`],['Router总耗时',`${latency.total_router_latency_ms??0} ms`],['输入 / 可见输出Token',`${usage.inputTokens??'—'} / ${usage.visibleOutputTokens??'—'}`],['Completion / Reasoning Token',`${usage.completionTokens??'—'} / ${usage.reasoningTokens??'—'}`],['Usage来源',usage.usageSource??'—'],['Usage字段',(usage.usageRawKeys||[]).join(', ')||'—'],['Judge成本',money(costs.judge_cost)],['模型成本',money(costs.model_call_cost)],['切换成本',money(costs.failed_attempt_cost)],['ACU总成本',money(costs.total_acu_cost)],['上游模型',evaluation.judgeModel],['Provider',evaluation.judgeProvider],['Endpoint Host',evaluation.judgeEndpointHost],['Context hash',`…${evaluation.contextSha256.slice(-8)}`],['评估时间',evaluation.cacheCreatedAt],['Request ID',evaluation.requestId],['曲线版本',evaluation.routingModelVersion]].map(([key,value])=>`<div><dt>${key}</dt><dd>${value??'—'}</dd></div>`).join('');
-    drawChart(evaluation);
+  function drawChart() {
+    if (!state.catalog || !(state.evaluation || state.plan)) return;
+    const canvas = $('acu-integrated-chart');
+    const ratio = window.devicePixelRatio || 1;
+    const width = Math.max(540, canvas.clientWidth || 760), height = Math.max(410, canvas.clientHeight || 460);
+    canvas.width = width * ratio; canvas.height = height * ratio;
+    const ctx = canvas.getContext('2d'); ctx.scale(ratio, ratio); ctx.clearRect(0, 0, width, height);
+    const bounds = { left: 48, right: width - 18, top: 22, bottom: height - 38 };
+    const modelIds = visibleModelIds();
+    const domain = chartDomain(modelIds);
+    const xScale = (value) => bounds.left + (value - domain.x[0]) / (domain.x[1] - domain.x[0]) * (bounds.right - bounds.left);
+    const yScale = (value) => bounds.bottom - (value - domain.y[0]) / (domain.y[1] - domain.y[0]) * (bounds.bottom - bounds.top);
+    drawAxes(ctx, bounds, domain, xScale, yScale);
+    const points = [], paths = [];
+    modelIds.forEach((modelId, index) => {
+      const curve = state.catalog.curves[modelId], item = candidate(modelId);
+      if (!curve || !item) return;
+      const color = colors[index % colors.length];
+      const highlighted = state.hovered === modelId || state.selected === modelId || state.locked.has(modelId);
+      ctx.strokeStyle = color; ctx.globalAlpha = state.hovered && !highlighted ? 0.24 : 1; ctx.lineWidth = highlighted ? 3.2 : roleLabels(modelId).length ? 2.4 : 1.25; ctx.beginPath();
+      const visiblePoints = curve.filter((point) => point.difficultyScore >= domain.x[0] - 1 && point.difficultyScore <= domain.x[1] + 1);
+      visiblePoints.forEach((point, pointIndex) => { const px = xScale(point.difficultyScore), py = yScale(point.estimatedQuality * 100); if (!pointIndex) ctx.moveTo(px, py); else ctx.lineTo(px, py); });
+      ctx.stroke(); ctx.globalAlpha = 1;
+      paths.push({ modelId, curve, color });
+      const pointScore = interpolateCurve(curve, (state.evaluation || state.plan).difficultyScore);
+      if (pointScore === null) return;
+      const px = xScale((state.evaluation || state.plan).difficultyScore), py = yScale(pointScore);
+      ctx.fillStyle = color; ctx.beginPath(); ctx.arc(px, py, roleLabels(modelId).length ? 5 : 3.2, 0, Math.PI * 2); ctx.fill();
+      points.push({ modelId, candidate: item, px, py, color, pointScore });
+    });
+    const difficulty = (state.evaluation || state.plan).difficultyScore;
+    if (difficulty >= domain.x[0] && difficulty <= domain.x[1]) {
+      const lineX = xScale(difficulty); ctx.strokeStyle = 'rgba(255,255,255,.60)'; ctx.setLineDash([3, 4]); ctx.beginPath(); ctx.moveTo(lineX, bounds.top); ctx.lineTo(lineX, bounds.bottom); ctx.stroke(); ctx.setLineDash([]);
+    }
+    drawLabels(ctx, points, bounds);
+    state.geometry = { width, height, bounds, domain, xScale, yScale, points, paths };
+    $('acu-local-view-note').hidden = currentView().global;
+    renderModelList();
   }
 
-  async function evaluate(force) {
-    const response=await safeFetch(`${api}/evaluate`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'auto',messages:latestMessages||currentMessages(),quality_target:Number($('quality-threshold')?.value||80)/100,expected_output_tokens:800,force_judge_refresh:force})});
-    const payload=await response.json();if(!response.ok)throw new Error(payload.error?.message||'评估失败');render(payload,latestMessages||currentMessages());return payload;
+  function tooltipHtml(item) {
+    const roles = roleLabels(item.modelId);
+    return `<strong>${item.displayName} · ${modeLabel(item)}</strong><div class="acu-tooltip-roles">${roles.map((role) => `<span>${role}</span>`).join('')}</div><dl><dt>预计模型得分</dt><dd>${score(item.predictedScore)}</dd><dt>保守预计得分</dt><dd>${score(item.conservativeScore)}</dd><dt>预计综合成本</dt><dd>${money(item.expectedTotalCost)}</dd><dt>预计模型调用成本</dt><dd>${money(item.estimatedCallCost)}</dd><dt>预计P50延迟</dt><dd>${item.p50LatencyMs === null ? '样本不足' : `${(item.p50LatencyMs / 1000).toFixed(1)}秒`}</dd><dt>当前健康状态</dt><dd>${healthLabel(item.healthStatus)}</dd><dt>执行模式</dt><dd>${modeLabel(item)}</dd><dt>证据等级</dt><dd>${evidenceLabel(item.evidenceConfidence)}</dd><dt>Pareto有效前沿</dt><dd>${item.paretoEfficient ? '是' : '否'}</dd></dl>`;
   }
 
-  async function loadSummary(){try{const response=await safeFetch(`${api}/data-summary`);const data=await response.json();$('acu-real-requests').textContent=`${data.realRequestCount||0} 请求 · ${data.labeledRequestCount||0} 标签`;$('acu-data-notice').textContent=data.sampleNotice||`实时Judge ${data.realJudgeRequestCount} 次，缓存命中率 ${((data.cacheHitRate||0)*100).toFixed(1)}%。`;}catch{$('acu-data-notice').textContent='SQLite汇总暂不可用。'}}
+  function showTooltip(modelId, clientX, clientY, lock = false) {
+    const item = candidate(modelId), tooltip = $('acu-chart-tooltip'), wrap = tooltip.parentElement;
+    if (!item) return;
+    tooltip.innerHTML = tooltipHtml(item); tooltip.hidden = false;
+    if (window.innerWidth > 700) {
+      const rect = wrap.getBoundingClientRect();
+      let left = clientX - rect.left + 14, top = clientY - rect.top + 14;
+      if (left + 280 > rect.width) left = Math.max(8, left - 300);
+      if (top + 260 > rect.height) top = Math.max(8, top - 270);
+      tooltip.style.left = `${left}px`; tooltip.style.top = `${top}px`;
+    }
+    state.selected = lock ? modelId : state.selected;
+  }
 
-  window.addEventListener('acu:evaluation',(event)=>{const trace=event.detail?.trace;const evaluation=trace?.acu_demo;if(evaluation)render(evaluation,currentMessages(),trace)});
-  $('acu-force-refresh')?.addEventListener('click',async(event)=>{event.currentTarget.disabled=true;try{await evaluate(true)}catch(error){alert(error.message)}finally{event.currentTarget.disabled=false}});
-  document.querySelectorAll('#acu-server-feedback button[data-accepted]').forEach((button)=>button.addEventListener('click',async()=>{if(!latestEvaluation)return;const body={request_id:latestEvaluation.requestId,accepted:button.dataset.accepted==='true',rating:Number($('acu-feedback-rating').value),required_upgrade:$('acu-feedback-upgrade').checked,final_model:latestEvaluation.actualModel||latestEvaluation.recommendation.recommended.modelId};const response=await safeFetch(`${api}/feedback`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});$('acu-feedback-status').textContent=response.ok?'已写入 SQLite':'写入失败';if(response.ok)loadSummary()}));
-  Promise.all([safeFetch(`${api}/catalog`).then(r=>r.json()),loadSummary()]).then(([data])=>{catalog=data;if(latestEvaluation)drawChart(latestEvaluation)}).catch(()=>{$('acu-data-notice').textContent='ACU目录加载失败。'});
-  window.addEventListener('resize',()=>{if(latestEvaluation)drawChart(latestEvaluation)});
+  function hideTooltip() { if (!state.selected) $('acu-chart-tooltip').hidden = true; }
+
+  function renderModelList() {
+    const sortKey = $('acu-model-sort').value;
+    const selectedIds = new Set(visibleModelIds());
+    const items = core.sortCandidates(candidates().filter((item) => selectedIds.has(item.modelId)), sortKey);
+    $('acu-integrated-legend').innerHTML = items.map((item) => {
+      const roles = roleLabels(item.modelId);
+      return `<button type="button" class="acu-model-row${state.selected === item.modelId || state.locked.has(item.modelId) ? ' selected' : ''}" data-model-id="${item.modelId}"><span class="acu-model-title"><b>${item.displayName}</b><em>${roles.map((role) => `<i>${role}</i>`).join('')}</em></span><span class="acu-model-metrics"><strong>${score(item.predictedScore)}<small>预计得分</small></strong><strong>${money(item.expectedTotalCost)}<small>预计综合成本</small></strong></span><span class="acu-model-detail">${item.p50LatencyMs === null ? 'P50 样本不足' : `P50 ${(item.p50LatencyMs / 1000).toFixed(1)}s`} · ${healthLabel(item.healthStatus)} · ${evidenceLabel(item.evidenceConfidence)}</span></button>`;
+    }).join('');
+  }
+
+  function technicalDetails() {
+    if (!state.evaluation || !state.trace) return;
+    const evaluation = state.evaluation, trace = state.trace, latency = trace.latency_breakdown || {}, usage = trace.usage_audit || {}, costs = trace.cost_audit || {};
+    const attempts = (trace.attempts || []).map((item, index) => `#${index + 1} ${item.model}: ${item.status}${item.error_category ? `/${item.error_category}` : ''} · ${item.attempt_type || 'initial'} · ${item.execution_profile_id || 'default'} · ${item.latency_ms}ms`).join('<br>') || '—';
+    const fields = [
+      ['任务评估来源', sourceLabel(evaluation)[0]], ['执行状态', executionStatus()], ['路由模式', evaluation.shadowMode ? 'Shadow观察' : 'ACU实际执行'],
+      ['Judge模型', evaluation.judgeModel], ['Prompt版本', evaluation.promptVersion], ['缓存状态', evaluation.judgeStatus], ['Context Hash', `…${evaluation.contextSha256.slice(-8)}`],
+      ['曲线计算', '冻结曲线线性插值'], ['Routing Model Version', evaluation.routingModelVersion], ['Request ID', evaluation.requestId],
+      ['executionProfileId', trace.execution_profile_id], ['完整Attempts', attempts], ['validator_result', trace.validator_result], ['validator', trace.validator],
+      ['validator_reason', trace.validator_reason], ['quality_fallback_used', String(trace.quality_fallback_used === true)], ['任务评估耗时', `${latency.judge_latency_ms ?? evaluation.judgeLatencyMs} ms`],
+      ['Router总耗时', `${latency.total_router_latency_ms ?? 0} ms`], ['Completion / Reasoning Token', `${usage.completionTokens ?? '—'} / ${usage.reasoningTokens ?? '—'}`],
+      ['Usage来源', usage.usageSource], ['Judge成本', money(costs.judge_cost)], ['模型成本', money(costs.model_call_cost)], ['本次实际总成本', money(costs.total_acu_cost)],
+    ];
+    $('acu-technical-details').innerHTML = fields.map(([key, value]) => `<div><dt>${key}</dt><dd>${value ?? '—'}</dd></div>`).join('');
+  }
+
+  function render() { updateSummary(); drawChart(); technicalDetails(); }
+
+  function setMode(mode) {
+    if (!['featured', 'all'].includes(mode) || state.mode === mode) return;
+    state.mode = mode; state.hovered = null; state.selected = null; $('acu-chart-tooltip').hidden = true;
+    document.querySelectorAll('[data-chart-mode]').forEach((button) => button.classList.toggle('active', button.dataset.chartMode === mode));
+    if (!state.views[mode]) autoFit(mode); else drawChart();
+  }
+
+  function zoom(factor, center) {
+    const view = currentView(), [minimum, maximum] = view.x, span = maximum - minimum;
+    const newSpan = Math.max(8, Math.min(100, span * factor));
+    const focus = center ?? (minimum + maximum) / 2;
+    const ratio = span ? (focus - minimum) / span : 0.5;
+    view.x = core.normalizeDomain([focus - newSpan * ratio, focus + newSpan * (1 - ratio)], Math.min(8, newSpan));
+    view.global = view.x[0] === 0 && view.x[1] === 100;
+    drawChart();
+  }
+
+  function pan(delta) {
+    const view = currentView(), span = view.x[1] - view.x[0];
+    view.x = core.normalizeDomain([view.x[0] + delta, view.x[1] + delta], span);
+    view.global = view.x[0] === 0 && view.x[1] === 100;
+    drawChart();
+  }
+
+  function nearestModel(event) {
+    const geometry = state.geometry;
+    if (!geometry) return null;
+    const rect = $('acu-integrated-chart').getBoundingClientRect();
+    const px = event.clientX - rect.left, py = event.clientY - rect.top;
+    const xValue = geometry.domain.x[0] + (px - geometry.bounds.left) / (geometry.bounds.right - geometry.bounds.left) * (geometry.domain.x[1] - geometry.domain.x[0]);
+    let nearest = null, distance = 12;
+    for (const path of geometry.paths) {
+      const value = interpolateCurve(path.curve, xValue);
+      if (value === null) continue;
+      const candidateDistance = Math.abs(geometry.yScale(value) - py);
+      if (candidateDistance < distance) { distance = candidateDistance; nearest = path.modelId; }
+    }
+    for (const point of geometry.points) {
+      const pointDistance = Math.hypot(point.px - px, point.py - py);
+      if (pointDistance < distance + 5) { distance = pointDistance; nearest = point.modelId; }
+    }
+    return { modelId: nearest, px, py, xValue };
+  }
+
+  function lockModel(modelId) {
+    if (!modelId) return;
+    const permanent = new Set([state.plan?.qualityCeilingModel?.modelId, state.plan?.recommendation?.recommended?.modelId, state.evaluation?.actualModel]);
+    if (!permanent.has(modelId)) {
+      if (state.locked.has(modelId)) state.locked.delete(modelId);
+      else { while (state.locked.size >= 3) state.locked.delete(state.locked.values().next().value); state.locked.add(modelId); }
+    }
+    state.selected = modelId; drawChart();
+  }
+
+  function bindInteractions() {
+    const canvas = $('acu-integrated-chart');
+    canvas.addEventListener('wheel', (event) => {
+      if (!state.geometry) return; event.preventDefault();
+      const nearest = nearestModel(event); zoom(event.deltaY < 0 ? 0.82 : 1.22, nearest?.xValue);
+    }, { passive: false });
+    canvas.addEventListener('mousedown', (event) => { state.dragging = { x: event.clientX, domain: [...currentView().x] }; });
+    window.addEventListener('mousemove', (event) => {
+      if (state.dragging && state.geometry) {
+        const span = state.dragging.domain[1] - state.dragging.domain[0];
+        const delta = -(event.clientX - state.dragging.x) / (state.geometry.bounds.right - state.geometry.bounds.left) * span;
+        currentView().x = core.normalizeDomain([state.dragging.domain[0] + delta, state.dragging.domain[1] + delta], span); currentView().global = false; drawChart(); return;
+      }
+    });
+    canvas.addEventListener('mousemove', (event) => {
+      if (state.dragging) return;
+      const nearest = nearestModel(event); state.hovered = nearest?.modelId || null; drawChart();
+      if (nearest?.modelId) showTooltip(nearest.modelId, event.clientX, event.clientY); else hideTooltip();
+    });
+    window.addEventListener('mouseup', () => { state.dragging = null; });
+    canvas.addEventListener('mouseleave', () => { if (!state.dragging) { state.hovered = null; hideTooltip(); drawChart(); } });
+    canvas.addEventListener('dblclick', () => autoFit());
+    canvas.addEventListener('click', (event) => { const nearest = nearestModel(event); if (nearest?.modelId) { lockModel(nearest.modelId); showTooltip(nearest.modelId, event.clientX, event.clientY, true); } else { state.selected = null; $('acu-chart-tooltip').hidden = true; drawChart(); } });
+    canvas.addEventListener('pointerdown', (event) => { if (event.pointerType === 'touch') { canvas.setPointerCapture(event.pointerId); state.touches.set(event.pointerId, { x: event.clientX, y: event.clientY }); } });
+    canvas.addEventListener('pointermove', (event) => {
+      if (event.pointerType !== 'touch' || !state.touches.has(event.pointerId)) return;
+      const previous = state.touches.get(event.pointerId); state.touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      const touches = [...state.touches.values()];
+      if (touches.length === 1 && state.geometry) pan(-(event.clientX - previous.x) / (state.geometry.bounds.right - state.geometry.bounds.left) * (currentView().x[1] - currentView().x[0]));
+      if (touches.length === 2) { const distance = Math.hypot(touches[0].x - touches[1].x, touches[0].y - touches[1].y); if (state.pinchDistance) zoom(state.pinchDistance / distance); state.pinchDistance = distance; }
+    });
+    const endTouch = (event) => { state.touches.delete(event.pointerId); if (state.touches.size < 2) state.pinchDistance = null; };
+    canvas.addEventListener('pointerup', endTouch); canvas.addEventListener('pointercancel', endTouch);
+    document.querySelectorAll('[data-chart-mode]').forEach((button) => button.addEventListener('click', () => setMode(button.dataset.chartMode)));
+    document.querySelectorAll('[data-chart-action]').forEach((button) => button.addEventListener('click', () => {
+      const action = button.dataset.chartAction;
+      if (action === 'zoom-in') zoom(0.8); else if (action === 'zoom-out') zoom(1.25); else if (action === 'fit') autoFit();
+      else if (action === 'global') { state.views[state.mode] = { x: [0, 100], global: true }; drawChart(); }
+    }));
+    $('acu-model-sort').addEventListener('change', renderModelList);
+    $('acu-integrated-legend').addEventListener('click', (event) => { const row = event.target.closest('[data-model-id]'); if (row) { lockModel(row.dataset.modelId); const point = state.geometry?.points.find((item) => item.modelId === row.dataset.modelId); if (point) { const rect = $('acu-integrated-chart').getBoundingClientRect(); showTooltip(row.dataset.modelId, rect.left + point.px, rect.top + point.py, true); } } });
+  }
+
+  window.addEventListener('acu:plan', (event) => {
+    state.plan = event.detail.plan; state.evaluation = null; state.trace = null; state.views = { featured: { x: [0, 100], global: true }, all: null }; state.locked.clear(); updateSummary(); drawChart();
+  });
+  window.addEventListener('acu:evaluation', (event) => { state.trace = event.detail.trace; state.evaluation = state.trace.acu_demo; if (!state.plan) state.plan = state.evaluation; render(); });
+  window.addEventListener('resize', drawChart);
+  safeFetch(`${api}/catalog`).then((response) => response.json()).then((catalog) => { state.catalog = catalog; drawChart(); }).catch(() => {});
+  bindInteractions();
+  window.AcuInteractiveChart = { setMode, autoFit, zoom, getState: () => ({ mode: state.mode, view: currentView(), visibleModelIds: visibleModelIds(), locked: [...state.locked], recommendedModel: state.plan?.recommendation?.recommended?.modelId, qualityCeilingModel: state.plan?.qualityCeilingModel?.modelId, actualModel: state.evaluation?.actualModel }) };
 })();

@@ -1,0 +1,107 @@
+{
+  "generatedAt": "2026-07-27T15:18:41.949Z",
+  "baseUrl": "https://eu.jerrypsy.top/acu-router-dev/",
+  "cases": [
+    {
+      "id": "avg-code-fix",
+      "preset": 1,
+      "requestId": "b2e4ea7b-7bb6-4b72-b705-bb2f54bb8037",
+      "difficultyScore": 25,
+      "judgeStatus": "cache_hit",
+      "qualityCeilingModel": "gpt-5.6-luna",
+      "qualityCeilingScore": 95.29495616835193,
+      "recommendedModel": "qwen3.6-plus",
+      "recommendedScore": 82.72637519142147,
+      "actualModel": "qwen3.6-plus",
+      "featuredModels": [
+        "gpt-5.6-luna",
+        "qwen3.6-plus",
+        "glm-5.1",
+        "kimi-k2.6"
+      ],
+      "featuredView": {
+        "x": [
+          0,
+          100
+        ],
+        "global": true
+      },
+      "baselineMeta": "GPT-5.6 Luna预计 95.3分Default模型调用 3149ms本次实际成本 US$0.00170upstream_usage",
+      "routerMeta": "实际 qwen3.6-plus任务评估 0ms模型调用 8268ms总耗时 8293ms本次实际成本 US$0.00065upstream_usage",
+      "comparison": "ACU 预计以 12.6分的模型得分差距，换取成本降低 61.6%。质量上界实际成本 US$0.00170；ACU 本次实际成本 US$0.00065。",
+      "executionStatus": "推荐已执行",
+      "wheelZoomView": {
+        "x": [
+          10.097894736842104,
+          39.6178947368421
+        ],
+        "global": false
+      },
+      "dragPanView": {
+        "x": [
+          13.334736842105261,
+          42.85473684210526
+        ],
+        "global": false
+      },
+      "doubleClickView": {
+        "x": [
+          7,
+          43
+        ],
+        "global": false
+      },
+      "allModels": [
+        "qwen3.6-plus",
+        "glm-5.1",
+        "kimi-k2.6",
+        "kimi-k2.7-code",
+        "gpt-5.6-luna",
+        "deepseek-v4-pro",
+        "glm-5.2",
+        "qwen3.7-max",
+        "gemini-2.5-flash",
+        "qwen/qwen3-235b-a22b",
+        "deepseek-v4-flash",
+        "gemini-3.5-flash",
+        "meta-llama/llama-4-maverick",
+        "qwen3.5-flash",
+        "meta-llama/llama-3.3-70b-instruct",
+        "deepseek/deepseek-chat-v3-0324",
+        "gpt-5.4-mini",
+        "gpt-5.6-terra",
+        "claude-sonnet-5",
+        "claude-opus-4-8",
+        "gpt-5.5",
+        "gpt-5.6-sol"
+      ],
+      "allView": {
+        "x": [
+          7,
+          43
+        ],
+        "global": false
+      },
+      "calls": [
+        {
+          "method": "GET",
+          "url": "https://eu.jerrypsy.top/acu-router-dev/acu/api/catalog"
+        },
+        {
+          "method": "POST",
+          "url": "https://eu.jerrypsy.top/acu-router-dev/acu/api/plan"
+        },
+        {
+          "method": "POST",
+          "url": "https://eu.jerrypsy.top/acu-router-dev/v1/chat/completions"
+        },
+        {
+          "method": "POST",
+          "url": "https://eu.jerrypsy.top/acu-router-dev/v1/chat/completions"
+        }
+      ],
+      "interactionApiCalls": 0,
+      "pageErrors": []
+    }
+  ]
+}

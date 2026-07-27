@@ -71,6 +71,9 @@ import {
   openAcuRoutingStore,
   publicCatalogPayload,
   getAcuModel,
+  recommendModel,
+  serializeVisibleContext,
+  estimateVisibleTokens,
   readAcuRuntimeConfig,
   executionProfileFor,
   type AcuEvaluation,
@@ -287,6 +290,31 @@ type AcuTrace = {
   validator_reason?: string;
   acu_demo?: AcuEvaluation;
 };
+
+type AcuPlanCandidate = AcuEvaluation["recommendation"]["estimates"][number] & {
+  routingEligible: true;
+  healthStatus: ExecutionProfileHealth["availability"];
+  healthPriorityPenalty: number;
+  p50LatencyMs: number | null;
+  evidenceConfidence: "low" | "medium" | "high";
+  executionProfileId: string;
+  thinkingMode: "disabled" | "enabled" | "default";
+  requestParameterApplied: boolean;
+};
+
+type AcuPlanRecord = {
+  evaluation: AcuEvaluation;
+  createdAt: number;
+  expiresAt: number;
+  contextSha256: string;
+  qualityTarget: number;
+  expectedOutputTokens: number;
+  qualityCeilingModel: AcuPlanCandidate;
+  displayCandidates: AcuPlanCandidate[];
+};
+
+const ACU_PLAN_TTL_MS = 5 * 60_000;
+const ACU_PLAN_MAX_ENTRIES = 100;
 
 function stripAcuPrefix(url: string | undefined): string {
   if (!url) return "/";
@@ -688,6 +716,107 @@ function applyPassiveHealthAvailability(modelIds: string[], store: AcuRoutingSto
   return modelIds;
 }
 
+function executionProfileForDifficulty(modelId: string, difficultyScore: number) {
+  return executionProfileFor(modelId, modelId === "qwen3.6-plus" && difficultyScore < 55 ? false : undefined);
+}
+
+function compatibleAcuModelIds(args: {
+  store: AcuRoutingStore | null;
+  excludeList: Set<string>;
+  hasTools: boolean;
+  hasVision: boolean;
+  requiredContextTokens: number;
+  includeCooldown?: boolean;
+}): string[] {
+  return BLOCKRUN_MODELS.filter((model) => {
+    const catalogModel = getAcuModel(model.id);
+    if (!catalogModel?.routingEligible || args.excludeList.has(model.id)) return false;
+    if (args.hasTools && !modelSupportsToolCalling(model.id)) return false;
+    if (args.hasVision && !modelSupportsVision(model.id)) return false;
+    const contextWindow = getModelContextWindow(model.id);
+    if (contextWindow === undefined || contextWindow < args.requiredContextTokens) return false;
+    const health = executionHealthForModel(args.store, model.id);
+    return args.includeCooldown || health?.availability !== "cooldown";
+  }).map((model) => model.id);
+}
+
+function healthRank(status: ExecutionProfileHealth["availability"]): number {
+  return ({ healthy: 0, unknown: 1, degraded: 2, cooldown: 3 } as const)[status];
+}
+
+function evidenceRank(confidence: "low" | "medium" | "high"): number {
+  return ({ high: 0, medium: 1, low: 2 } as const)[confidence];
+}
+
+function decoratePlanCandidate(
+  estimate: AcuEvaluation["recommendation"]["estimates"][number],
+  difficultyScore: number,
+  store: AcuRoutingStore | null,
+): AcuPlanCandidate {
+  const model = getAcuModel(estimate.modelId)!;
+  const health = executionHealthForModel(store, estimate.modelId);
+  const profile = executionProfileForDifficulty(estimate.modelId, difficultyScore);
+  return {
+    ...estimate,
+    routingEligible: true,
+    healthStatus: health?.availability ?? "unknown",
+    healthPriorityPenalty: health?.priorityPenalty ?? 0,
+    p50LatencyMs: health?.p50LatencyMs ?? null,
+    evidenceConfidence: model.evidenceConfidence,
+    ...profile,
+  };
+}
+
+function qualityCeilingCandidate(candidates: AcuPlanCandidate[]): AcuPlanCandidate {
+  if (candidates.length === 0) throw new Error("No compatible ACU quality-ceiling candidate");
+  return [...candidates].sort((left, right) => {
+    const displayedScoreDifference = Number(right.predictedScore.toFixed(1)) - Number(left.predictedScore.toFixed(1));
+    return displayedScoreDifference
+      || right.conservativeScore - left.conservativeScore
+      || healthRank(left.healthStatus) - healthRank(right.healthStatus)
+      || (left.p50LatencyMs ?? Number.POSITIVE_INFINITY) - (right.p50LatencyMs ?? Number.POSITIVE_INFINITY)
+      || evidenceRank(left.evidenceConfidence) - evidenceRank(right.evidenceConfidence)
+      || left.modelId.localeCompare(right.modelId);
+  })[0];
+}
+
+function buildPlanRecord(args: {
+  evaluation: AcuEvaluation;
+  allCompatibleModelIds: string[];
+  expectedOutputTokens: number;
+  store: AcuRoutingStore | null;
+}): AcuPlanRecord {
+  const displayRecommendation = recommendModel({
+    probabilities: args.evaluation.judge,
+    difficultyScore: args.evaluation.difficultyScore,
+    inputTokens: args.evaluation.contextTokenEstimate,
+    expectedOutputTokens: args.expectedOutputTokens,
+    judgeCost: args.evaluation.judgeCost,
+    qualityTarget: args.evaluation.qualityTarget,
+    eligibleModelIds: args.allCompatibleModelIds,
+  });
+  const displayCandidates = displayRecommendation.estimates.map((estimate) => (
+    decoratePlanCandidate(estimate, args.evaluation.difficultyScore, args.store)
+  ));
+  const now = Date.now();
+  return {
+    evaluation: args.evaluation,
+    createdAt: now,
+    expiresAt: now + ACU_PLAN_TTL_MS,
+    contextSha256: args.evaluation.contextSha256,
+    qualityTarget: args.evaluation.qualityTarget,
+    expectedOutputTokens: args.expectedOutputTokens,
+    qualityCeilingModel: qualityCeilingCandidate(displayCandidates),
+    displayCandidates,
+  };
+}
+
+function pruneAcuPlans(plans: Map<string, AcuPlanRecord>): void {
+  const now = Date.now();
+  for (const [planId, plan] of plans) if (plan.expiresAt <= now) plans.delete(planId);
+  while (plans.size >= ACU_PLAN_MAX_ENTRIES) plans.delete(plans.keys().next().value as string);
+}
+
 function selectQualityFallbackModel(args: {
   evaluation: AcuEvaluation | undefined;
   currentModel: string;
@@ -848,7 +977,7 @@ function normalizeMessagesForThinking(messages: ChatMessage[]): ChatMessage[] {
 
 function stripDemoOnlyRequestFields(parsed: Record<string, unknown>): boolean {
   let changed = false;
-  for (const key of ["baseline_model", "cache", "expected_schema", "acu_quality_target", "acu_execute_recommended"]) {
+  for (const key of ["baseline_model", "cache", "expected_schema", "acu_quality_target", "acu_execute_recommended", "acu_plan_id"]) {
     if (key in parsed) {
       delete parsed[key];
       changed = true;
@@ -1069,6 +1198,7 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
   const demoAccessToken = options.demoAccessToken?.trim() ?? getEnvDemoAccessToken();
   const acuStrategy = new AcuDemoStrategy(readAcuRuntimeConfig(options.acuRuntimeConfig));
   const acuStore = acuStrategy.enabled ? openAcuRoutingStore(acuStrategy.databasePath) : null;
+  const acuPlans = new Map<string, AcuPlanRecord>();
 
   const deduplicator = new RequestDeduplicator();
   const responseCache = new ResponseCache(options.cacheConfig);
@@ -1084,7 +1214,7 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
       await handleRequest(req, res, {
         apiKey, proxyApiKey: options.proxyApiKey, proxyBaseUrl, routerOpts, deduplicator, responseCache, sessionStore,
         sessionJournal, excludeList, onRouted: options.onRouted, walletAddress, demoAccessToken,
-        acuStrategy, acuStore,
+        acuStrategy, acuStore, acuPlans,
       });
     } catch (err) {
       console.error(`[ClawRouter] Unhandled error: ${err instanceof Error ? err.message : err}`);
@@ -1149,6 +1279,7 @@ async function handleRequest(
     demoAccessToken: string;
     acuStrategy: AcuDemoStrategy;
     acuStore: AcuRoutingStore | null;
+    acuPlans: Map<string, AcuPlanRecord>;
   },
 ): Promise<void> {
   req.url = stripAcuPrefix(req.url);
@@ -1304,6 +1435,57 @@ async function handleRequest(
     } catch (error) {
       res.writeHead(400, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: { message: error instanceof Error ? error.message : "outcome rejected" } }));
+    }
+    return;
+  }
+  if (pathname === "/acu/api/plan" && req.method === "POST") {
+    try {
+      const parsed = await readJsonRequest(req);
+      const messages = Array.isArray(parsed.messages) ? parsed.messages as AcuVisibleMessage[] : [];
+      if (messages.length === 0) throw new Error("messages must contain at least one visible API message");
+      const tools = Array.isArray(parsed.tools) ? parsed.tools : [];
+      const expectedOutputTokens = Number(parsed.expected_output_tokens ?? 800);
+      const qualityTarget = Number(parsed.quality_target ?? 0.8);
+      if (!Number.isFinite(expectedOutputTokens) || expectedOutputTokens <= 0) throw new Error("expected_output_tokens must be positive");
+      if (!Number.isFinite(qualityTarget) || qualityTarget < 0 || qualityTarget > 1) throw new Error("quality_target must be between 0 and 1");
+      const requireTools = tools.length > 0;
+      const requireVision = messages.some((message) => Array.isArray(message.content)
+        && message.content.some((part) => Boolean(part && typeof part === "object" && (part as { type?: string }).type === "image_url")));
+      const visible = serializeVisibleContext(messages, tools);
+      const requiredContextTokens = estimateVisibleTokens(visible) + expectedOutputTokens;
+      const allCompatibleModelIds = compatibleAcuModelIds({
+        store: ctx.acuStore, excludeList: ctx.excludeList, hasTools: requireTools,
+        hasVision: requireVision, requiredContextTokens,
+      });
+      const eligibleModelIds = applyPassiveHealthAvailability(allCompatibleModelIds, ctx.acuStore);
+      const lastUser = [...messages].reverse().find((message) => message.role === "user");
+      const system = messages.find((message) => message.role === "system");
+      const rulesDecision = route(
+        messageContentAsText(lastUser?.content), messageContentAsText(system?.content) || undefined,
+        expectedOutputTokens, { ...ctx.routerOpts, routingProfile: "auto", hasTools: requireTools },
+      );
+      const evaluation = await ctx.acuStrategy.evaluate({
+        messages, tools, qualityTarget, expectedOutputTokens, eligibleModelIds,
+        requireToolCallSupport: requireTools, requireVisionSupport: requireVision,
+        requestId: randomUUID(), requestedModel: "planning_only",
+      }, rulesDecision);
+      const plan = buildPlanRecord({ evaluation, allCompatibleModelIds, expectedOutputTokens, store: ctx.acuStore });
+      pruneAcuPlans(ctx.acuPlans);
+      const planId = randomUUID();
+      ctx.acuPlans.set(planId, plan);
+      res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+      res.end(JSON.stringify({
+        ...evaluation,
+        planId,
+        planExpiresAt: new Date(plan.expiresAt).toISOString(),
+        qualityCeilingModel: plan.qualityCeilingModel,
+        displayCandidates: plan.displayCandidates,
+        planningOnly: true,
+        databaseWrites: 0,
+      }));
+    } catch (error) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: { type: "acu_plan_error", message: error instanceof Error ? error.message : "Invalid ACU plan request" } }));
     }
     return;
   }
@@ -1467,6 +1649,7 @@ async function handleRequest(
   let responseFormat: unknown;
   let expectedSchema: unknown;
   let acuQualityTarget = 0.8;
+  let acuPlanId: string | undefined;
   let executeAcuRecommended: boolean;
   let routeComputeLatencyMs = 0;
 
@@ -1479,6 +1662,7 @@ async function handleRequest(
     expectedSchema = parsed.expected_schema;
     const requestedQualityTarget = Number(parsed.acu_quality_target);
     if (Number.isFinite(requestedQualityTarget)) acuQualityTarget = requestedQualityTarget;
+    acuPlanId = typeof parsed.acu_plan_id === "string" ? parsed.acu_plan_id : undefined;
     executeAcuRecommended = parsed.acu_execute_recommended === true;
     if (stripDemoOnlyRequestFields(parsed)) bodyModified = true;
 
@@ -1521,23 +1705,32 @@ async function handleRequest(
       routingDecision = rulesDecision;
       if (ctx.acuStrategy.enabled) {
         const acuRouteStart = Date.now();
-        const eligibleModelIds = applyPassiveHealthAvailability(BLOCKRUN_MODELS.filter((model) => (
-          !ctx.excludeList.has(model.id)
-          && (!hasTools || modelSupportsToolCalling(model.id))
-          && (!hasVision || modelSupportsVision(model.id))
-        )).map((model) => model.id), ctx.acuStore);
-        acuEvaluation = await ctx.acuStrategy.evaluate({
-          messages: messages as AcuVisibleMessage[],
-          tools: Array.isArray(parsed.tools) ? parsed.tools as unknown[] : [],
-          qualityTarget: acuQualityTarget,
-          expectedOutputTokens: maxTokens,
-          eligibleModelIds,
-          requireToolCallSupport: hasTools,
-          requireVisionSupport: hasVision,
-          requestId,
-          requestedModel: modelId,
-          sessionHash: hashSession(effectiveSessionId),
-        }, rulesDecision);
+        const tools = Array.isArray(parsed.tools) ? parsed.tools as unknown[] : [];
+        const planned = acuPlanId ? ctx.acuPlans.get(acuPlanId) : undefined;
+        const contextSha256 = createHash("sha256")
+          .update(serializeVisibleContext(messages as AcuVisibleMessage[], tools)).digest("hex");
+        if (planned
+          && planned.expiresAt > Date.now()
+          && planned.contextSha256 === contextSha256
+          && Math.abs(planned.qualityTarget - acuQualityTarget) < 1e-9
+          && planned.expectedOutputTokens === maxTokens) {
+          acuEvaluation = structuredClone(planned.evaluation);
+          acuEvaluation.requestId = requestId;
+          ctx.acuPlans.delete(acuPlanId!);
+        } else {
+          if (acuPlanId) ctx.acuPlans.delete(acuPlanId);
+          const requiredContextTokens = estimateVisibleTokens(serializeVisibleContext(messages as AcuVisibleMessage[], tools)) + maxTokens;
+          const compatibleModelIds = compatibleAcuModelIds({
+            store: ctx.acuStore, excludeList: ctx.excludeList, hasTools, hasVision, requiredContextTokens,
+          });
+          const eligibleModelIds = applyPassiveHealthAvailability(compatibleModelIds, ctx.acuStore);
+          acuEvaluation = await ctx.acuStrategy.evaluate({
+            messages: messages as AcuVisibleMessage[], tools, qualityTarget: acuQualityTarget,
+            expectedOutputTokens: maxTokens, eligibleModelIds,
+            requireToolCallSupport: hasTools, requireVisionSupport: hasVision,
+            requestId, requestedModel: modelId, sessionHash: hashSession(effectiveSessionId),
+          }, rulesDecision);
+        }
         routeComputeLatencyMs = Math.max(0, Date.now() - acuRouteStart - acuEvaluation.judgeLatencyMs);
         try {
           ctx.acuStore?.recordEvaluation(acuEvaluation, {

@@ -253,6 +253,45 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
     );
   });
 
+  it("reuses one planning evaluation for the quality ceiling and ACU route without duplicate database writes", async () => {
+    const summary = () => fetch(`${proxy.baseUrl}/acu/api/data-summary`, { headers: { Authorization: AUTHORIZATION } })
+      .then((response) => response.json()) as Promise<{ realRequestCount: number }>;
+    const before = await summary();
+    receivedModels.length = 0;
+    const messages = [{ role: "user", content: "Plan once for this unique investor demo request." }];
+    const planResponse = await fetch(`${proxy.baseUrl}/acu/api/plan`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: AUTHORIZATION },
+      body: JSON.stringify({ messages, quality_target: 0.9, expected_output_tokens: 300 }),
+    });
+    expect(planResponse.status).toBe(200);
+    const plan = await planResponse.json() as {
+      planId: string;
+      planningOnly: boolean;
+      databaseWrites: number;
+      qualityCeilingModel: { modelId: string; predictedScore: number };
+      displayCandidates: Array<{ modelId: string; predictedScore: number; routingEligible: boolean }>;
+    };
+    expect(plan.planningOnly).toBe(true);
+    expect(plan.databaseWrites).toBe(0);
+    expect((await summary()).realRequestCount).toBe(before.realRequestCount);
+    expect(receivedModels).toEqual(["deepseek-v4-flash"]);
+    const compatibleScores = plan.displayCandidates.filter((item) => item.routingEligible).map((item) => Number(item.predictedScore.toFixed(1)));
+    expect(Number(plan.qualityCeilingModel.predictedScore.toFixed(1))).toBe(Math.max(...compatibleScores));
+
+    const routedResponse = await fetch(`${proxy.baseUrl}/v1/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: AUTHORIZATION },
+      body: JSON.stringify({ model: "auto", messages, acu_quality_target: 0.9, max_tokens: 300, acu_plan_id: plan.planId, cache: false }),
+    });
+    expect(routedResponse.status).toBe(200);
+    const routed = await routedResponse.json() as { acu_trace?: { acu_demo?: { judgeStatus: string } } };
+    expect(routed.acu_trace?.acu_demo?.judgeStatus).toBe("live");
+    expect(receivedModels.filter((model) => model === "deepseek-v4-flash")).toHaveLength(1);
+    expect(receivedModels).toHaveLength(2);
+    expect((await summary()).realRequestCount).toBe(before.realRequestCount + 1);
+  });
+
   it("does not write explicit baseline requests into ACU routing records", async () => {
     const summary = () => fetch(`${proxy.baseUrl}/acu/api/data-summary`, { headers: { Authorization: AUTHORIZATION } })
       .then((response) => response.json()) as Promise<{ realRequestCount: number }>;

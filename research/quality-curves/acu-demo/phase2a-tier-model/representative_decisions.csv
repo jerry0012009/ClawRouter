@@ -1,0 +1,5 @@
+fixture,p_low,p_mid,p_mid_high,p_high,difficulty_score,quality_target,recommended_model,estimated_quality,conservative_quality,estimated_call_cost,judge_cost,expected_total_cost,fallback_model,input_tokens,output_tokens,probability_source
+single_explicit_action,0.82,0.13,0.04,0.01,8.0,0.9,claude-opus-4-8,0.9578041415296814,0.8778041415296814,0.021,0.00099,0.024580552199570754,claude-opus-4-8,1200,600,deterministic interface fixture; not a live Judge result
+multi_constraint_tool_call,0.12,0.6,0.23,0.05,40.33333333333333,0.9,claude-opus-4-8,0.8501193383533195,0.7701193383533196,0.021,0.00099,0.026863470026909628,claude-opus-4-8,1200,600,deterministic interface fixture; not a live Judge result
+long_context_execution_state,0.04,0.16,0.58,0.22,66.0,0.9,claude-opus-4-8,0.6422570844776152,0.5622570844776152,0.021,0.00099,0.03127014980907456,claude-opus-4-8,1200,600,deterministic interface fixture; not a live Judge result
+high_risk_multi_step_reasoning,0.01,0.04,0.2,0.75,89.66666666666667,0.9,claude-opus-4-8,0.37794940642686403,0.297949406426864,0.021,0.00099,0.03687347258375048,claude-opus-4-8,1200,600,deterministic interface fixture; not a live Judge result

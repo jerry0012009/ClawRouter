@@ -754,6 +754,261 @@ declare function getSessionId(headers: Record<string, string | string[] | undefi
  */
 declare function hashRequestContent(lastUserContent: string, toolCallNames?: string[]): string;
 
+type AcuRuntimeConfig = {
+    enabled: boolean;
+    judgeModel: string;
+    judgeBaseUrl: string;
+    judgeMode: "non-thinking";
+    promptVersion: string;
+    timeoutMs: number;
+    maxContextTokens: number;
+    maxOutputTokens: number;
+    apiKey?: string;
+    cachePath?: string;
+};
+declare function readAcuRuntimeConfig(overrides?: Partial<AcuRuntimeConfig>): AcuRuntimeConfig;
+
+declare const ACU_TIERS: readonly ["low", "mid", "mid_high", "high"];
+type AcuTier = (typeof ACU_TIERS)[number];
+type AcuTierProbabilities = {
+    pLow: number;
+    pMid: number;
+    pMidHigh: number;
+    pHigh: number;
+    confidence: number;
+};
+type AcuJudgeResult = AcuTierProbabilities & {
+    signals: string[];
+    explanation: string;
+};
+type AcuBenchmarkEvidence = {
+    benchmarkName: string;
+    normalizedScore: number;
+    scoreScale: string;
+    sampleSize: number;
+    sourceModelName: string;
+    evaluationMode: string;
+    sourceUrl: string;
+    resultsUrl: string;
+    sourceVersion: string;
+    benchmarkDate: string;
+    directForModel: boolean;
+    configuredRelativeDelta: number;
+};
+type AcuModelCatalogEntry = {
+    modelId: string;
+    displayName: string;
+    provider: string;
+    upstream: string;
+    availability: string;
+    routingEligible: boolean;
+    defaultDisplay: boolean;
+    abilityAnchor: number;
+    solvedAbilityParameter: number;
+    fittingError: number;
+    sufficientLow: number;
+    sufficientMid: number;
+    sufficientMidHigh: number;
+    sufficientHigh: number;
+    inputPricePerMillion: number | null;
+    outputPricePerMillion: number | null;
+    cachedInputPricePerMillion: number | null;
+    cacheWritePricePerMillion: number | null;
+    contextWindow: number | null;
+    maxOutputTokens: number | null;
+    toolCallSupport: boolean;
+    visionSupport: boolean;
+    benchmarkEvidence: AcuBenchmarkEvidence[];
+    evidenceConfidence: "low" | "medium" | "high";
+    uncertaintyWidth: number;
+    curveMethod: string;
+    sourceNames: string[];
+    sourceRetrievedAt: string;
+    notes: string;
+};
+type AcuModelEstimate = {
+    modelId: string;
+    displayName: string;
+    provider: string;
+    estimatedQuality: number;
+    conservativeQuality: number;
+    qualityLower: number;
+    qualityUpper: number;
+    estimatedCallCost: number;
+    expectedFallbackCost: number;
+    expectedTotalCost: number;
+    savingsVsFlagship: number;
+    savingsPercentVsFlagship: number;
+    meetsQualityTarget: boolean;
+};
+type AcuRecommendation = {
+    recommended: AcuModelEstimate;
+    valueAlternative: AcuModelEstimate | null;
+    flagshipAlternative: AcuModelEstimate;
+    fallbackModel: AcuModelEstimate;
+    estimates: AcuModelEstimate[];
+    reason: string;
+};
+type AcuVisibleMessage = {
+    role: string;
+    content?: unknown;
+    name?: string;
+    tool_call_id?: string;
+    [key: string]: unknown;
+};
+type AcuEvaluateInput = {
+    messages: AcuVisibleMessage[];
+    tools?: unknown[];
+    qualityTarget?: number;
+    expectedOutputTokens?: number;
+    eligibleModelIds?: string[];
+    requireToolCallSupport?: boolean;
+    requireVisionSupport?: boolean;
+};
+type AcuEvaluation = {
+    estimateLabel: "public-benchmark constrained estimate";
+    promptVersion: string;
+    judgeModel: string;
+    judgeMode: "non-thinking";
+    judge: AcuJudgeResult;
+    judgeStatus: "success" | "cache_hit" | "rules_fallback";
+    judgeLatencyMs: number;
+    judgeCost: number;
+    contextSha256: string;
+    contextTokenEstimate: number;
+    contextTruncated: boolean;
+    difficultyScore: number;
+    qualityTarget: number;
+    recommendation: AcuRecommendation;
+    disclaimer: string;
+};
+type AcuCurvePoint = {
+    difficultyScore: number;
+    pLow: number;
+    pMid: number;
+    pMidHigh: number;
+    pHigh: number;
+    estimatedQuality: number;
+    qualityLower: number;
+    qualityUpper: number;
+};
+
+type JudgeRequestResult = {
+    result: AcuJudgeResult;
+    status: "success" | "cache_hit";
+    latencyMs: number;
+    cost: number;
+    contextSha256: string;
+    contextTokenEstimate: number;
+    contextTruncated: boolean;
+};
+declare function serializeVisibleContext(messages: AcuVisibleMessage[], tools?: unknown[]): string;
+declare function parseJudgeResult(text: string): AcuJudgeResult;
+declare class AcuJudgeClient {
+    private readonly config;
+    private readonly fetchImplementation;
+    constructor(config: AcuRuntimeConfig, fetchImplementation?: typeof fetch);
+    judge(messages: AcuVisibleMessage[], tools?: unknown[]): Promise<JudgeRequestResult>;
+}
+
+declare function rulesFallbackJudge(decision: RoutingDecision): AcuJudgeResult;
+declare class AcuDemoStrategy {
+    private readonly config;
+    private readonly judgeClient;
+    readonly name = "acu-demo";
+    constructor(config: AcuRuntimeConfig, judgeClient?: AcuJudgeClient);
+    get enabled(): boolean;
+    evaluate(input: AcuEvaluateInput, rulesDecision: RoutingDecision): Promise<AcuEvaluation>;
+}
+
+type AcuCatalogConfig = {
+    tierDifficulty: {
+        low: number;
+        mid: number;
+        mid_high: number;
+        high: number;
+    };
+    sharedTemperature: number;
+    commonFloor: number;
+    commonCeiling: number;
+    curveThresholds: {
+        above_low: number;
+        above_mid: number;
+        above_mid_high: number;
+    };
+    curveTemperature: number;
+    distributionWeights: {
+        low: number;
+        mid: number;
+        mid_high: number;
+        high: number;
+    };
+    distributionCounts: {
+        low: number;
+        mid: number;
+        mid_high: number;
+        high: number;
+    };
+    judge: {
+        model: string;
+        baseUrl: string;
+        mode: string;
+        promptVersion: string;
+        timeoutMs: number;
+        maxContextTokens: number;
+        maxOutputTokens: number;
+    };
+    cost: {
+        judgeInputTokens: number;
+        judgeOutputTokens: number;
+        switchCostUsd: number;
+    };
+};
+type AcuModelCatalog = {
+    schemaVersion: string;
+    generatedAt: string;
+    estimateLabel: string;
+    disclaimer: string;
+    config: AcuCatalogConfig;
+    provenance: Record<string, unknown>;
+    models: AcuModelCatalogEntry[];
+};
+declare function getAcuCatalog(): AcuModelCatalog;
+declare function getAcuModel(modelId: string): AcuModelCatalogEntry | undefined;
+declare function buildModelCurve(model: AcuModelCatalogEntry): AcuCurvePoint[];
+declare function publicCatalogPayload(): Record<string, unknown>;
+
+type AcuDecisionInput = {
+    probabilities: AcuTierProbabilities;
+    inputTokens: number;
+    expectedOutputTokens: number;
+    judgeCost: number;
+    qualityTarget?: number;
+    eligibleModelIds?: string[];
+    requireToolCallSupport?: boolean;
+    requireVisionSupport?: boolean;
+    switchCost?: number;
+};
+declare function estimateCallCost(model: Pick<AcuModelCatalogEntry, "inputPricePerMillion" | "outputPricePerMillion">, inputTokens: number, outputTokens: number): number;
+declare function recommendModel(input: AcuDecisionInput): AcuRecommendation;
+
+declare function normalizeProbabilities(value: Omit<AcuTierProbabilities, "confidence"> & {
+    confidence?: number;
+}): AcuTierProbabilities;
+declare function difficultyScore(probabilities: AcuTierProbabilities): number;
+declare function tierSufficiency(abilityParameter: number): {
+    sufficientLow: number;
+    sufficientMid: number;
+    sufficientMidHigh: number;
+    sufficientHigh: number;
+};
+declare function solveAbilityParameter(abilityAnchor: number, distribution: AcuTierProbabilities): {
+    abilityParameter: number;
+    fittingError: number;
+};
+declare function estimatedQuality(probabilities: AcuTierProbabilities, model: Pick<AcuModelCatalogEntry, "sufficientLow" | "sufficientMid" | "sufficientMidHigh" | "sufficientHigh">): number;
+declare function continuousTierProbabilities(difficulty: number): AcuTierProbabilities;
+
 type ProxyOptions = {
     apiKey?: string;
     port?: number;
@@ -768,6 +1023,7 @@ type ProxyOptions = {
     demoAccessToken?: string;
     skipBalanceCheck?: boolean;
     onRouted?: (decision: RoutingDecision) => void;
+    acuRuntimeConfig?: Partial<AcuRuntimeConfig>;
 };
 type ProxyHandle = {
     port: number;
@@ -882,4 +1138,4 @@ declare const VERSION: string;
 
 declare const plugin: OpenClawPluginDefinition;
 
-export { BLOCKRUN_MODELS, type CachedResponse, DEFAULT_ROUTING_CONFIG, MODEL_ALIASES, OPENCLAW_MODELS, RequestDeduplicator, ResponseCache, type RoutingConfig, type RoutingDecision, type SessionConfig, type SessionEntry, SessionStore, type Tier, type UsageEntry, VERSION, blockrunProvider, buildProviderModels, calculateModelCost, plugin as default, getFallbackChain, getModelContextWindow, getProxyPort, getSessionId, hashRequestContent, isReasoningModel, logUsage, resolveApiKey, resolveModelAlias, route, saveApiKey, startProxy, supportsToolCalling, supportsVision };
+export { ACU_TIERS, type AcuBenchmarkEvidence, type AcuCurvePoint, AcuDemoStrategy, type AcuEvaluateInput, type AcuEvaluation, AcuJudgeClient, type AcuJudgeResult, type AcuModelCatalogEntry, type AcuModelEstimate, type AcuRecommendation, type AcuRuntimeConfig, type AcuTier, type AcuTierProbabilities, type AcuVisibleMessage, BLOCKRUN_MODELS, type CachedResponse, DEFAULT_ROUTING_CONFIG, MODEL_ALIASES, OPENCLAW_MODELS, RequestDeduplicator, ResponseCache, type RoutingConfig, type RoutingDecision, type SessionConfig, type SessionEntry, SessionStore, type Tier, type UsageEntry, VERSION, blockrunProvider, buildModelCurve, buildProviderModels, calculateModelCost, continuousTierProbabilities, plugin as default, difficultyScore, estimateCallCost, estimatedQuality, getAcuCatalog, getAcuModel, getFallbackChain, getModelContextWindow, getProxyPort, getSessionId, hashRequestContent, isReasoningModel, logUsage, normalizeProbabilities, parseJudgeResult, publicCatalogPayload, readAcuRuntimeConfig, recommendModel, resolveApiKey, resolveModelAlias, route, rulesFallbackJudge, saveApiKey, serializeVisibleContext, solveAbilityParameter, startProxy, supportsToolCalling, supportsVision, tierSufficiency };

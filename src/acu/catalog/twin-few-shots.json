@@ -1,0 +1,53 @@
+{
+  "promptVersion": "acu-tier-requirement-v1",
+  "examples": [
+    {
+      "exampleId": "low-1",
+      "context": "[SYSTEM]\nYou are a helpful assistant that can use tools.\n\n[USER]\nguide me",
+      "minimumSufficientTier": "low",
+      "explanation": "单一明确动作，约束少，低档能力即可稳定完成。"
+    },
+    {
+      "exampleId": "low-2",
+      "context": "[SYSTEM]\nYou are a helpful assistant that can use tools.\n\n[USER]\ndelete all txt files",
+      "minimumSufficientTier": "low",
+      "explanation": "单一明确动作，约束少，低档能力即可稳定完成。"
+    },
+    {
+      "exampleId": "mid-1",
+      "context": "[SYSTEM]\nYou are a helpful assistant that can use tools.\n\n[USER]\nI'd like to know how to retrieve a weather forecast for New York City on the 4th of July this year.",
+      "minimumSufficientTier": "mid",
+      "explanation": "存在多个约束或工具参数，需要中档能力保持一致性。"
+    },
+    {
+      "exampleId": "mid-2",
+      "context": "[SYSTEM]\nYou are a helpful assistant that can use tools.\n\n[USER]\nCould you kindly show me the list of files in tmp directory in my file system including the hidden one?",
+      "minimumSufficientTier": "mid",
+      "explanation": "存在多个约束或工具参数，需要中档能力保持一致性。"
+    },
+    {
+      "exampleId": "mid_high-1",
+      "context": "[SYSTEM]\nYou are a helpful assistant that can use tools.\n\n[USER]\nDelete all the files in the 'Drafts' directory including the directory.",
+      "minimumSufficientTier": "mid_high",
+      "explanation": "上下文依赖和执行状态较多，需要中高档能力综合处理。"
+    },
+    {
+      "exampleId": "mid_high-2",
+      "context": "[SYSTEM]\nYou are a helpful assistant for query-based meeting summarization ([TASK]). Answer the user's query using the meeting transcript below. Be accurate, concise, and faithful to what was discussed in the transcript.\n\n[USER]\n## Meeting transcript\nIndustrial Designer: {vocalsound} Okay . Okay , so that's basically the the voice recognition item we were searching for . Okay . This sample sensor uh requires an regular chip , I thought . Um no op I'm not very sure . No , it's not in here . If we want to use the L_C_D_ display , we really need the advanced version , which is a bit l little bit more costly . If we want to use the scroll-wheels we need the regular version . And if we don't want to use uh any of these uh more advanced functions we can keep with the simple uh chip , which is a bit cheaper .\nProject Manager: Okay . Uh well {disfmarker} uh\nIndustrial Designer: Okay .\nProject Manager: d did we already decide on the display ? To {disfmarker}\nIndustrial Designer: Um no , but I think that's something for uh Roo here to think about .\nUser Interface: Yeah . Well , I don't have um {disfmarker} I haven't looked for uh for information about it , but I don't think information {disfmarker} uh y I don't think you need it on a display .\nProject Manager: No .\nUser Interface: Especially when when we have to look at a cost , I don't think uh {disfmarker}\nIndustrial Designer: I I don't think either .\nUser Interface: 'cause uh {gap} uh all {disfmarker} any T_V_ can uh can uh view a digit on uh on screen ,\nIndustrial Designer: No . I don't think you need it .\nProject Manager: On screen display . Yeah .\nUser Interface: yeah .\nProject Manager: Okay\nIndustrial Designer: Okay . Okay ,\n[...deterministic middle truncation...]\nIndustrial Designer: Mm-hmm .\nProject Manager: because it it adds a little ext extra high-tech feeling to it .\nIndustrial Designer: Yes .\nUser Interface: But we already have the scroll-wheels , the sp uh the speaker uh the speak recognition , the rubber , the fancy colours .\nProject Manager: Mm yeah .\nIndustrial Designer: Uh I think our customers will go insane .\nProject Manager: Okay , okay .\nIndustrial Designer: {vocalsound} It's it's too much .\n\n## Query\nWhy did the team decide not to use LCD displays when discussing interface controls?\n\nAnswer this query based only on the transcript above.",
+      "minimumSufficientTier": "mid_high",
+      "explanation": "上下文依赖和执行状态较多，需要中高档能力综合处理。"
+    },
+    {
+      "exampleId": "high-1",
+      "context": "[SYSTEM]\nYou are a helpful, accurate assistant. You are given a multi-turn conversation and reference passages retrieved from a knowledge base. Answer the user's latest question based on the reference passages and conversation history. Be concise and factual. If the passages do not contain enough information, say so honestly.\n\n[USER]\nHere are reference passages from the knowledge base:\n\n[Passage 1]\n\nThis command returns either cc, cd, ci, or pr, depending on which pipeline is running. This way, you can reuse the setup script between pipelines if necessary.\n\n Static code scan\n\nThe static code scan stage runs a static code analyzer tool on the specified app repo codebases.\n\nCC pipeline provides the repos that are found in the inventory for the scanner.\n\nYou can use any of the following methods to add static code to your pipeline:\n\n* Provide an already running SonarQube instance name, URL, and credentials by adding the SonarQube tool to your toolchain. The static-scan task runs a scan on the specified repos.\n* Add your code to the static-scan custom stage in your .pipeline-config.yaml file for a custom implementation.\n\n Dynamic scan\n\nThe Dynamic scan stage runs a dynamic application security testing tool to find vulnerabilities in the deployed application.\n\n* Add your own dynamic scan code to the dynamic-scan custom stage in your .pipeline-config.yaml file for a custom implementation.\n\nTo learn more about configuring dynamic scan by using OWASP-ZAP, see [Configuring ZAP scan for CC pipeline]([URL]\n\n Scans and checks in compliance checks\n\nTable 3. Compliance scans and checks\n\n Scan or check Description\n\n Detect secrets The [IBM Detect Secrets]([URL] tool identifies where secr\n[...deterministic middle truncation...]\nUSER]\nIs Dynamic secret better than Static secret?\n\n[ASSISTANT]\nYou can not compare dynamic and static secrets in terms of one being \"better\" than another. There are differences between them. Dynamic secrets have their expiration date and time enforced when their secret data is read or accessed, while static secrets have their expiration date and time enforced at secret creation or rotation time. With a Secrets Manager, you can create, lease, and centrally manage secrets that are used in IBM Cloud services or your custom-built applications.\n\n[USER]\nWhich one protects more from vulnerabilities?",
+      "minimumSufficientTier": "high",
+      "explanation": "需要跨多步状态、长上下文或高风险推理，高档能力才较充分。"
+    },
+    {
+      "exampleId": "high-2",
+      "context": "[SYSTEM]\nYou are a personal assistant running inside OpenClaw.\n## Tooling\nTool availability (filtered by policy):\nTool names are case-sensitive. Call tools exactly as listed.\n- read: Read file contents\n- write: Create or overwrite files\n- edit: Make precise edits to files\n- exec: Run shell commands (pty available for TTY-required CLIs)\n- process: Manage background exec sessions\n- web_search: Search the web (Brave API)\n- web_fetch: Fetch and extract readable content from a URL\n- browser: Control web browser\n- canvas: Present/eval/snapshot the Canvas\n- nodes: List/describe/notify/camera/screen on paired nodes\n- cron: Manage cron jobs and wake events (use for reminders; when scheduling a reminder, write the systemEvent text as something that will read like a reminder when it fires, and mention that it is a reminder depending on the time gap between setting and firing; include recent context in reminder text if appropriate)\n- message: Send messages and channel actions\n- gateway: Restart, apply config, or run updates on the running OpenClaw process\n- agents_list: List OpenClaw agent ids allowed for sessions_spawn when runtime=\"subagent\" (not ACP harness ids)\n- sessions_list: List other sessions (incl. sub-agents) with filters/last\n- sessions_history: Fetch history for another session/sub-agent\n- sessions_send: Send a message to another session/sub-agent\n- subagents: List, steer, or kill sub-agent runs for this requester session\n- session_status: Show a /status-equivalent status card (usage + time + Reasoning/Verbose/Elevated); use for model-use questions (📊 session_status); optional per-session model override\n- memory_get: Safe snippet read from MEMORY.md or memory/*.md with o\n[...deterministic middle truncation...]\nhe empathy, ethical judgment, and contextual understanding that human healthcare providers bring to patient care. This collaborative approach promises to improve outcomes, reduce costs, and make quality healthcare more accessible to populations around the world.\n\n[ASSISTANT]\n[TOOL_CALL name=write]\n{\"path\":\"/tmp/[TASK]/smartroute-task_05_summary/agent_workspace/summary_output.txt\"}\n\n[TOOL name=write]\nValidation failed for tool \"write\":\n  - content: must have required property 'content'\n\nReceived arguments:\n{\n  \"path\": \"/tmp/[TASK]/smartroute-task_05_summary/agent_workspace/summary_output.txt\"\n}",
+      "minimumSufficientTier": "high",
+      "explanation": "需要跨多步状态、长上下文或高风险推理，高档能力才较充分。"
+    }
+  ]
+}

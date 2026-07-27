@@ -65,6 +65,14 @@ import {
   type AcuLedgerEntry,
 } from "./ledger.js";
 import { validateAssistantOutput, type ValidatorResult } from "./validator/index.js";
+import {
+  AcuDemoStrategy,
+  publicCatalogPayload,
+  readAcuRuntimeConfig,
+  type AcuEvaluation,
+  type AcuRuntimeConfig,
+  type AcuVisibleMessage,
+} from "./acu/index.js";
 
 export const DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 export const DEFAULT_PROXY_BASE_URL = "https://api.openai-proxy.org/v1";
@@ -196,6 +204,7 @@ type AcuTrace = {
   validator: ValidatorResult["validator"];
   validator_pass?: boolean;
   validator_reason?: string;
+  acu_demo?: AcuEvaluation;
 };
 
 function stripAcuPrefix(url: string | undefined): string {
@@ -226,6 +235,9 @@ function normalizeRequestHeaders(req: IncomingMessage): Record<string, string> {
 function isProtectedDemoPath(pathname: string): boolean {
   return pathname === "/"
     || pathname === "/index.html"
+    || pathname === "/acu"
+    || pathname === "/acu/"
+    || pathname.startsWith("/acu/api/")
     || pathname.startsWith("/public/")
     || pathname === "/cache"
     || pathname === "/stats"
@@ -271,6 +283,36 @@ function isDemoAuthorized(req: IncomingMessage, demoAccessToken: string): boolea
 function hashPrompt(messages: ChatMessage[]): string {
   const text = messages.map((message) => JSON.stringify(message.content ?? "")).join("\n");
   return createHash("sha256").update(text).digest("hex").slice(0, 24);
+}
+
+async function readJsonRequest(req: IncomingMessage): Promise<Record<string, unknown>> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  const body = Buffer.concat(chunks).toString("utf8");
+  const parsed = JSON.parse(body) as unknown;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Request body must be a JSON object");
+  }
+  return parsed as Record<string, unknown>;
+}
+
+function messageContentAsText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return (content as Array<{ type?: string; text?: string }>)
+    .filter((part) => part.type === "text" && typeof part.text === "string")
+    .map((part) => part.text)
+    .join(" ");
+}
+
+function routingTierFromAcu(evaluation: AcuEvaluation): Tier {
+  const values: Array<[number, Tier]> = [
+    [evaluation.judge.pLow, "SIMPLE"],
+    [evaluation.judge.pMid, "MEDIUM"],
+    [evaluation.judge.pMidHigh, "COMPLEX"],
+    [evaluation.judge.pHigh, "REASONING"],
+  ];
+  return values.reduce((best, current) => current[0] > best[0] ? current : best)[1];
 }
 
 function detectTaskType(messages: ChatMessage[]): string {
@@ -546,6 +588,7 @@ export type ProxyOptions = {
   demoAccessToken?: string;
   skipBalanceCheck?: boolean; // unused, kept for API compat
   onRouted?: (decision: RoutingDecision) => void;
+  acuRuntimeConfig?: Partial<AcuRuntimeConfig>;
 };
 
 export type ProxyHandle = {
@@ -572,7 +615,7 @@ function normalizeMessagesForThinking(messages: ChatMessage[]): ChatMessage[] {
 
 function stripDemoOnlyRequestFields(parsed: Record<string, unknown>): boolean {
   let changed = false;
-  for (const key of ["baseline_model", "cache", "expected_schema"]) {
+  for (const key of ["baseline_model", "cache", "expected_schema", "acu_quality_target"]) {
     if (key in parsed) {
       delete parsed[key];
       changed = true;
@@ -791,6 +834,7 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
   const modelPricing = buildModelPricing();
   const routerOpts: RouterOptions = { config: routingConfig, modelPricing };
   const demoAccessToken = options.demoAccessToken?.trim() ?? getEnvDemoAccessToken();
+  const acuStrategy = new AcuDemoStrategy(readAcuRuntimeConfig(options.acuRuntimeConfig));
 
   const deduplicator = new RequestDeduplicator();
   const responseCache = new ResponseCache(options.cacheConfig);
@@ -806,6 +850,7 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
       await handleRequest(req, res, {
         apiKey, proxyApiKey: options.proxyApiKey, proxyBaseUrl, routerOpts, deduplicator, responseCache, sessionStore,
         sessionJournal, excludeList, onRouted: options.onRouted, walletAddress, demoAccessToken,
+        acuStrategy,
       });
     } catch (err) {
       console.error(`[ClawRouter] Unhandled error: ${err instanceof Error ? err.message : err}`);
@@ -868,6 +913,7 @@ async function handleRequest(
     onRouted?: (decision: RoutingDecision) => void;
     walletAddress?: string;
     demoAccessToken: string;
+    acuStrategy: AcuDemoStrategy;
   },
 ): Promise<void> {
   req.url = stripAcuPrefix(req.url);
@@ -961,6 +1007,54 @@ async function handleRequest(
     return;
   }
 
+  // ── Phase 2A ACU catalog and request evaluation ──
+  if (pathname === "/acu/api/catalog" && req.method === "GET") {
+    res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+    res.end(JSON.stringify(publicCatalogPayload()));
+    return;
+  }
+  if (pathname === "/acu/api/evaluate" && req.method === "POST") {
+    try {
+      const parsed = await readJsonRequest(req);
+      const messages = Array.isArray(parsed.messages) ? parsed.messages as AcuVisibleMessage[] : [];
+      if (messages.length === 0) throw new Error("messages must contain at least one visible API message");
+      const tools = Array.isArray(parsed.tools) ? parsed.tools : [];
+      const lastUser = [...messages].reverse().find((message) => message.role === "user");
+      const system = messages.find((message) => message.role === "system");
+      const expectedOutputTokens = Number(parsed.expected_output_tokens ?? 800);
+      const qualityTarget = Number(parsed.quality_target ?? 0.9);
+      const requireTools = tools.length > 0;
+      const requireVision = messages.some((message) => Array.isArray(message.content)
+        && message.content.some((part) => Boolean(part && typeof part === "object" && (part as { type?: string }).type === "image_url")));
+      const rulesDecision = route(
+        messageContentAsText(lastUser?.content),
+        messageContentAsText(system?.content) || undefined,
+        Number.isFinite(expectedOutputTokens) ? expectedOutputTokens : 800,
+        { ...ctx.routerOpts, routingProfile: "auto", hasTools: requireTools },
+      );
+      const eligibleModelIds = BLOCKRUN_MODELS.filter((model) => (
+        !ctx.excludeList.has(model.id)
+        && (!requireTools || modelSupportsToolCalling(model.id))
+        && (!requireVision || modelSupportsVision(model.id))
+      )).map((model) => model.id);
+      const evaluation = await ctx.acuStrategy.evaluate({
+        messages,
+        tools,
+        qualityTarget: Number.isFinite(qualityTarget) ? qualityTarget : 0.9,
+        expectedOutputTokens: Number.isFinite(expectedOutputTokens) ? expectedOutputTokens : 800,
+        eligibleModelIds,
+        requireToolCallSupport: requireTools,
+        requireVisionSupport: requireVision,
+      }, rulesDecision);
+      res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+      res.end(JSON.stringify(evaluation));
+    } catch (error) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: { type: "acu_evaluation_error", message: error instanceof Error ? error.message : "Invalid ACU request" } }));
+    }
+    return;
+  }
+
   // ── Share routes ──
   if (pathname.startsWith("/share/") && req.method === "GET") {
     try {
@@ -987,7 +1081,7 @@ async function handleRequest(
   // ── Only handle chat completions from here ──
 
   // ── Static file serving (frontend) ──
-  if (req.method === "GET" && (pathname === "/" || pathname === "/index.html" || pathname.startsWith("/public/"))) {
+  if (req.method === "GET" && (pathname === "/" || pathname === "/index.html" || pathname === "/acu" || pathname === "/acu/" || pathname.startsWith("/public/"))) {
     const { readFileSync, existsSync } = await import("node:fs");
     const { join, dirname } = await import("node:path");
     const { fileURLToPath } = await import("node:url");
@@ -995,6 +1089,8 @@ async function handleRequest(
     const publicDir = join(__dirname, "..", "public");
     const filePath = pathname === "/" || pathname === "/index.html"
       ? join(publicDir, "index.html")
+      : pathname === "/acu" || pathname === "/acu/"
+        ? join(publicDir, "acu.html")
       : join(publicDir, pathname.replace("/public/", ""));
     if (existsSync(filePath)) {
       const ext = filePath.split(".").pop() || "html";
@@ -1045,6 +1141,7 @@ async function handleRequest(
   let maxTokens = 4096;
   let routingProfile: "eco" | "auto" | "premium" | null = null;
   let routingDecision: RoutingDecision | undefined;
+  let acuEvaluation: AcuEvaluation | undefined;
   let hasTools = false;
   let hasVision = false;
   let bodyModified = false;
@@ -1053,6 +1150,7 @@ async function handleRequest(
   const parsedMessages: ChatMessage[] = [];
   let responseFormat: unknown;
   let expectedSchema: unknown;
+  let acuQualityTarget = 0.9;
 
   try {
     const parsed = JSON.parse(body.toString()) as Record<string, unknown>;
@@ -1061,6 +1159,8 @@ async function handleRequest(
     maxTokens = (parsed.max_tokens as number) || 4096;
     responseFormat = parsed.response_format;
     expectedSchema = parsed.expected_schema;
+    const requestedQualityTarget = Number(parsed.acu_quality_target);
+    if (Number.isFinite(requestedQualityTarget)) acuQualityTarget = requestedQualityTarget;
     if (stripDemoOnlyRequestFields(parsed)) bodyModified = true;
 
     const messages = Array.isArray(parsed.messages) ? (parsed.messages as ChatMessage[]) : [];
@@ -1086,10 +1186,7 @@ async function handleRequest(
 
       // Smart routing
       const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
-      const rawPrompt = lastUserMsg?.content;
-      const prompt = typeof rawPrompt === "string" ? rawPrompt : Array.isArray(rawPrompt)
-        ? (rawPrompt as Array<{ type: string; text?: string }>).filter((b) => b.type === "text").map((b) => b.text ?? "").join(" ")
-        : "";
+      const prompt = messageContentAsText(lastUserMsg?.content);
       const systemMsg = messages.find((m) => m.role === "system");
       const systemPrompt = typeof systemMsg?.content === "string" ? systemMsg.content : undefined;
 
@@ -1097,11 +1194,54 @@ async function handleRequest(
       effectiveSessionId = sessionId ?? deriveSessionId(messages);
       const existingSession = effectiveSessionId ? ctx.sessionStore.getSession(effectiveSessionId) : undefined;
 
-      routingDecision = route(prompt, systemPrompt, maxTokens, {
+      const rulesDecision = route(prompt, systemPrompt, maxTokens, {
         ...ctx.routerOpts,
         routingProfile: routingProfile ?? undefined,
         hasTools,
       });
+      routingDecision = rulesDecision;
+      if (ctx.acuStrategy.enabled) {
+        const eligibleModelIds = BLOCKRUN_MODELS.filter((model) => (
+          !ctx.excludeList.has(model.id)
+          && (!hasTools || modelSupportsToolCalling(model.id))
+          && (!hasVision || modelSupportsVision(model.id))
+        )).map((model) => model.id);
+        acuEvaluation = await ctx.acuStrategy.evaluate({
+          messages: messages as AcuVisibleMessage[],
+          tools: Array.isArray(parsed.tools) ? parsed.tools as unknown[] : [],
+          qualityTarget: acuQualityTarget,
+          expectedOutputTokens: maxTokens,
+          eligibleModelIds,
+          requireToolCallSupport: hasTools,
+          requireVisionSupport: hasVision,
+        }, rulesDecision);
+        if (acuEvaluation.judgeStatus !== "rules_fallback") {
+          const selected = acuEvaluation.recommendation.recommended;
+          const fallback = acuEvaluation.recommendation.fallbackModel.modelId;
+          const tier = routingTierFromAcu(acuEvaluation);
+          const baseTiers = routingDecision.tierConfigs ?? ctx.routerOpts.config.tiers;
+          const existingFallbacks = baseTiers[tier].fallback;
+          routingDecision = {
+            ...rulesDecision,
+            model: selected.modelId,
+            tier,
+            confidence: acuEvaluation.judge.confidence,
+            method: "llm",
+            reasoning: `${acuEvaluation.judge.explanation} | ${acuEvaluation.recommendation.reason}`,
+            costEstimate: selected.expectedTotalCost,
+            baselineCost: acuEvaluation.recommendation.flagshipAlternative.estimatedCallCost,
+            savings: selected.savingsPercentVsFlagship,
+            tierConfigs: {
+              ...baseTiers,
+              [tier]: {
+                primary: selected.modelId,
+                fallback: [...new Set([fallback, ...existingFallbacks])]
+                  .filter((modelId) => modelId !== selected.modelId),
+              },
+            },
+          };
+        }
+      }
 
       if (existingSession?.userExplicit) {
         modelId = existingSession.model;
@@ -1472,6 +1612,7 @@ async function handleRequest(
         estimatedOutputTokens: maxTokens,
         costs,
       });
+      if (acuEvaluation) trace.acu_demo = acuEvaluation;
       safeWrite(res, `event: acu_trace\ndata: ${JSON.stringify(trace)}\n\n`);
     }
 
@@ -1622,6 +1763,7 @@ async function handleRequest(
 	        validator: validator.validator,
         ...(validator.result !== "not_applicable" && { validator_pass: validator.result === "pass" }),
         validator_reason: validator.reason ?? "not_applicable",
+        ...(acuEvaluation && { acu_demo: acuEvaluation }),
       };
 
       if (debugMode) responseBody = injectTraceIntoJsonResponse(responseBody, trace);

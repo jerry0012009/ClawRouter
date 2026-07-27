@@ -140,4 +140,5 @@ export type { CachedResponse } from "./dedup.js";
 export { SessionStore, getSessionId, hashRequestContent } from "./session.js";
 export type { SessionEntry, SessionConfig } from "./session.js";
 export { ResponseCache } from "./response-cache.js";
+export * from "./acu/index.js";
 export { VERSION } from "./version.js";

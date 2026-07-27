@@ -1,0 +1,18 @@
+{
+  "analysis_name": "TwinRouterBench published-label product distribution",
+  "total": 970,
+  "counts": {
+    "low": 689,
+    "mid": 62,
+    "mid_high": 49,
+    "high": 170
+  },
+  "weights": {
+    "low": 0.7103092783505155,
+    "mid": 0.06391752577319587,
+    "mid_high": 0.050515463917525774,
+    "high": 0.17525773195876287
+  },
+  "source": "research/quality-curves/twinrouterbench/phase1d-foundation/outputs/acu_step_contexts.parquet",
+  "source_sha256": "287ae2e5087bbd731c1513a81a94ccf936ad356c25ca3a78f652dcb91129b6e4"
+}

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ACU Model Curve Demo</title>
+  <link rel="stylesheet" href="./public/acu.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">CLAWROUTER · PHASE 2A</p>
+      <h1>请求难度与模型估算达标率</h1>
+    </div>
+    <div class="status"><span class="status-dot"></span><span id="runtime-status">加载目录…</span></div>
+  </header>
+
+  <main>
+    <section class="hero-grid">
+      <article class="panel input-panel">
+        <div class="panel-heading">
+          <div><p class="section-kicker">01 · REQUEST</p><h2>完整可见 API 上下文</h2></div>
+          <select id="preset" aria-label="示例上下文">
+            <option value="tool">工具调用</option>
+            <option value="analysis">多约束分析</option>
+            <option value="simple">简单改写</option>
+            <option value="agent">Agent 执行反馈</option>
+          </select>
+        </div>
+        <textarea id="context-input" spellcheck="false" aria-label="OpenAI-compatible request JSON"></textarea>
+        <div class="input-actions">
+          <label>质量目标 <strong id="quality-target-label">90%</strong>
+            <input id="quality-target" type="range" min="70" max="99" step="1" value="90">
+          </label>
+          <button id="evaluate-button" type="button">评估并推荐</button>
+        </div>
+        <p class="privacy-note">仅发送到本机 ACU 接口；缓存保存上下文 SHA-256，不保存完整请求正文。</p>
+      </article>
+
+      <article class="panel difficulty-panel">
+        <div class="panel-heading"><div><p class="section-kicker">02 · REQUIREMENT</p><h2>请求档位需求</h2></div><span id="judge-badge" class="badge">等待评估</span></div>
+        <div class="difficulty-score"><strong id="difficulty-score">—</strong><span>/ 100</span></div>
+        <div class="probability-bars" id="probability-bars"></div>
+        <div class="judge-copy">
+          <p id="judge-explanation">Judge 将判断完成下一次响应所需的最低充分能力档位。</p>
+          <div id="judge-signals" class="signal-list"></div>
+        </div>
+        <dl class="mini-metrics">
+          <div><dt>Confidence</dt><dd id="judge-confidence">—</dd></div>
+          <div><dt>Judge latency</dt><dd id="judge-latency">—</dd></div>
+          <div><dt>Context</dt><dd id="context-tokens">—</dd></div>
+        </dl>
+      </article>
+    </section>
+
+    <section class="panel chart-panel">
+      <div class="panel-heading chart-heading">
+        <div><p class="section-kicker">03 · CURVES</p><h2>模型难度—估算达标率曲线</h2></div>
+        <div class="chart-controls">
+          <select id="provider-filter" aria-label="厂商筛选"><option value="all">全部厂商</option></select>
+          <button id="expand-models" type="button" class="secondary">展开全部</button>
+        </div>
+      </div>
+      <div class="chart-layout">
+        <div class="canvas-wrap">
+          <canvas id="curve-chart" aria-label="模型估算达标率曲线"></canvas>
+          <div id="chart-tooltip" class="chart-tooltip" hidden></div>
+        </div>
+        <aside id="model-legend" class="model-legend"></aside>
+      </div>
+      <p class="chart-note">横轴连续难度只用于展示；当前请求交点直接使用 Judge 四档概率计算，不由标量难度反推。</p>
+    </section>
+
+    <section class="recommendation-grid">
+      <article class="panel recommendation-card featured">
+        <p class="section-kicker">04 · RECOMMENDATION</p>
+        <h2 id="recommended-model">等待评估</h2>
+        <p id="recommendation-reason" class="recommendation-reason">设置质量目标后选择预计总成本最低的合格模型。</p>
+        <div class="quality-pair">
+          <div><span>估算达标率</span><strong id="estimated-quality">—</strong></div>
+          <div><span>保守达标率</span><strong id="conservative-quality">—</strong></div>
+        </div>
+        <dl class="cost-list">
+          <div><dt>首次调用</dt><dd id="call-cost">—</dd></div>
+          <div><dt>含 Fallback 预计总成本</dt><dd id="total-cost">—</dd></div>
+          <div><dt>相比旗舰</dt><dd id="flagship-savings">—</dd></div>
+          <div><dt>Fallback</dt><dd id="fallback-model">—</dd></div>
+        </dl>
+      </article>
+      <article class="panel alternatives-card">
+        <p class="section-kicker">ALTERNATIVES</p>
+        <div id="alternatives"></div>
+      </article>
+    </section>
+
+    <section class="disclaimer" id="disclaimer">
+      请求难度基于TwinRouterBench最低充分档位体系；模型曲线由公开Benchmark能力锚点和受约束能力模型生成，用于产品演示，不代表具体模型对当前请求的逐题实测成功率。
+    </section>
+  </main>
+  <script type="module" src="./public/acu.js"></script>
+</body>
+</html>

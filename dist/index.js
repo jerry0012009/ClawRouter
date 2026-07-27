@@ -8,7 +8,7 @@ var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require
 
 // src/proxy.ts
 import { createServer } from "http";
-import { createHash as createHash4, randomUUID } from "crypto";
+import { createHash as createHash6, randomUUID } from "crypto";
 
 // src/router/rules.ts
 function scoreTokenCount(estimatedTokens, thresholds) {
@@ -4138,6 +4138,1422 @@ function validateAssistantOutput(args) {
   return { result: "pass", validator: "json_validator", reason: "Valid JSON" };
 }
 
+// src/acu/strategy.ts
+import { createHash as createHash5 } from "crypto";
+
+// src/acu/config.ts
+var ACU_PROMPT_VERSION = "acu-tier-requirement-v1";
+var ACU_DEFAULT_JUDGE_MODEL = "deepseek-v4-flash";
+var ACU_DEFAULT_JUDGE_BASE_URL = "https://api.deepseek.com";
+var ACU_DEFAULT_JUDGE_MODE = "non-thinking";
+var ACU_DEFAULT_JUDGE_TIMEOUT_MS = 8e3;
+var ACU_DEFAULT_MAX_CONTEXT_TOKENS = 6e3;
+var ACU_DEFAULT_MAX_OUTPUT_TOKENS = 300;
+var ACU_DEFAULT_QUALITY_TARGET = 0.9;
+var ACU_DEFAULT_SWITCH_COST_USD = 2e-4;
+var ACU_TIER_DIFFICULTY = {
+  low: 0.15,
+  mid: 0.4,
+  midHigh: 0.65,
+  high: 0.88
+};
+var ACU_SHARED_TEMPERATURE = 0.12;
+var ACU_COMMON_FLOOR = 0.03;
+var ACU_COMMON_CEILING = 0.99;
+var ACU_CURVE_THRESHOLDS = {
+  aboveLow: 0.275,
+  aboveMid: 0.525,
+  aboveMidHigh: 0.765
+};
+var ACU_CURVE_TEMPERATURE = 0.08;
+var ACU_DEMO_DISCLAIMER = "\u8BF7\u6C42\u96BE\u5EA6\u57FA\u4E8ETwinRouterBench\u6700\u4F4E\u5145\u5206\u6863\u4F4D\u4F53\u7CFB\uFF1B\u6A21\u578B\u66F2\u7EBF\u7531\u516C\u5F00Benchmark\u80FD\u529B\u951A\u70B9\u548C\u53D7\u7EA6\u675F\u80FD\u529B\u6A21\u578B\u751F\u6210\uFF0C\u7528\u4E8E\u4EA7\u54C1\u6F14\u793A\uFF0C\u4E0D\u4EE3\u8868\u5177\u4F53\u6A21\u578B\u5BF9\u5F53\u524D\u8BF7\u6C42\u7684\u9010\u9898\u5B9E\u6D4B\u6210\u529F\u7387\u3002";
+function positiveInteger(value, fallback) {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+function readAcuRuntimeConfig(overrides = {}) {
+  const enabled = process.env.ACU_DEMO_ROUTER_ENABLED?.trim().toLowerCase() === "true";
+  return {
+    enabled,
+    judgeModel: process.env.ACU_JUDGE_MODEL?.trim() || ACU_DEFAULT_JUDGE_MODEL,
+    judgeBaseUrl: process.env.ACU_JUDGE_BASE_URL?.trim() || ACU_DEFAULT_JUDGE_BASE_URL,
+    judgeMode: ACU_DEFAULT_JUDGE_MODE,
+    promptVersion: process.env.ACU_JUDGE_PROMPT_VERSION?.trim() || ACU_PROMPT_VERSION,
+    timeoutMs: positiveInteger(process.env.ACU_JUDGE_TIMEOUT_MS, ACU_DEFAULT_JUDGE_TIMEOUT_MS),
+    maxContextTokens: positiveInteger(
+      process.env.ACU_JUDGE_MAX_CONTEXT_TOKENS,
+      ACU_DEFAULT_MAX_CONTEXT_TOKENS
+    ),
+    maxOutputTokens: ACU_DEFAULT_MAX_OUTPUT_TOKENS,
+    apiKey: process.env.ACU_JUDGE_API_KEY?.trim() || process.env.DEEPSEEK_API_KEY?.trim(),
+    cachePath: process.env.ACU_JUDGE_CACHE_PATH?.trim(),
+    ...overrides
+  };
+}
+
+// src/acu/math.ts
+function clamp(value, minimum = 0, maximum = 1) {
+  return Math.min(maximum, Math.max(minimum, value));
+}
+function sigmoid(value) {
+  if (value >= 0) {
+    const z2 = Math.exp(-value);
+    return 1 / (1 + z2);
+  }
+  const z = Math.exp(value);
+  return z / (1 + z);
+}
+function normalizeProbabilities(value) {
+  const raw = [value.pLow, value.pMid, value.pMidHigh, value.pHigh];
+  if (raw.some((item) => !Number.isFinite(item) || item < 0 || item > 1)) {
+    throw new Error("ACU tier probabilities must be finite values in [0, 1]");
+  }
+  const total = raw.reduce((sum, item) => sum + item, 0);
+  if (!Number.isFinite(total) || total <= 0) {
+    throw new Error("ACU tier probabilities must have a positive sum");
+  }
+  const confidence = value.confidence ?? 0.5;
+  if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1) {
+    throw new Error("ACU confidence must be in [0, 1]");
+  }
+  return {
+    pLow: raw[0] / total,
+    pMid: raw[1] / total,
+    pMidHigh: raw[2] / total,
+    pHigh: raw[3] / total,
+    confidence
+  };
+}
+function difficultyScore(probabilities) {
+  const normalized = normalizeProbabilities(probabilities);
+  return 100 * (normalized.pMid / 3 + 2 * normalized.pMidHigh / 3 + normalized.pHigh);
+}
+function tierSufficiency(abilityParameter) {
+  const calculate = (difficulty) => ACU_COMMON_FLOOR + (ACU_COMMON_CEILING - ACU_COMMON_FLOOR) * sigmoid((abilityParameter - difficulty) / ACU_SHARED_TEMPERATURE);
+  const values = {
+    sufficientLow: calculate(ACU_TIER_DIFFICULTY.low),
+    sufficientMid: calculate(ACU_TIER_DIFFICULTY.mid),
+    sufficientMidHigh: calculate(ACU_TIER_DIFFICULTY.midHigh),
+    sufficientHigh: calculate(ACU_TIER_DIFFICULTY.high)
+  };
+  if (!(values.sufficientLow >= values.sufficientMid && values.sufficientMid >= values.sufficientMidHigh && values.sufficientMidHigh >= values.sufficientHigh)) {
+    throw new Error("ACU tier sufficiency must be monotone decreasing");
+  }
+  return values;
+}
+function solveAbilityParameter(abilityAnchor, distribution) {
+  const anchor = clamp(abilityAnchor);
+  const weights = normalizeProbabilities(distribution);
+  const aggregate = (ability) => {
+    const values = tierSufficiency(ability);
+    return weights.pLow * values.sufficientLow + weights.pMid * values.sufficientMid + weights.pMidHigh * values.sufficientMidHigh + weights.pHigh * values.sufficientHigh;
+  };
+  let lower = -1;
+  let upper = 2;
+  for (let index = 0; index < 100; index += 1) {
+    const middle = (lower + upper) / 2;
+    if (aggregate(middle) < anchor) lower = middle;
+    else upper = middle;
+  }
+  const abilityParameter = (lower + upper) / 2;
+  return { abilityParameter, fittingError: aggregate(abilityParameter) - anchor };
+}
+function estimatedQuality(probabilities, model) {
+  const normalized = normalizeProbabilities(probabilities);
+  return normalized.pLow * model.sufficientLow + normalized.pMid * model.sufficientMid + normalized.pMidHigh * model.sufficientMidHigh + normalized.pHigh * model.sufficientHigh;
+}
+function continuousTierProbabilities(difficulty) {
+  const d = clamp(difficulty);
+  const aboveLow = sigmoid((d - ACU_CURVE_THRESHOLDS.aboveLow) / ACU_CURVE_TEMPERATURE);
+  const aboveMid = sigmoid((d - ACU_CURVE_THRESHOLDS.aboveMid) / ACU_CURVE_TEMPERATURE);
+  const aboveMidHigh = sigmoid(
+    (d - ACU_CURVE_THRESHOLDS.aboveMidHigh) / ACU_CURVE_TEMPERATURE
+  );
+  return normalizeProbabilities({
+    pLow: 1 - aboveLow,
+    pMid: aboveLow - aboveMid,
+    pMidHigh: aboveMid - aboveMidHigh,
+    pHigh: aboveMidHigh,
+    confidence: 1
+  });
+}
+
+// src/acu/catalog/model-catalog.json
+var model_catalog_default = {
+  schemaVersion: "acu-model-catalog-v1",
+  generatedAt: "2026-07-27",
+  estimateLabel: "public-benchmark constrained estimate",
+  disclaimer: "\u7528\u4E8E\u4EA7\u54C1\u6F14\u793A\uFF0C\u4E0D\u4EE3\u8868\u5177\u4F53\u6A21\u578B\u5BF9\u5F53\u524D\u8BF7\u6C42\u7684\u9010\u9898\u5B9E\u6D4B\u6210\u529F\u7387\u3002",
+  config: {
+    tierDifficulty: {
+      low: 0.15,
+      mid: 0.4,
+      mid_high: 0.65,
+      high: 0.88
+    },
+    sharedTemperature: 0.12,
+    commonFloor: 0.03,
+    commonCeiling: 0.99,
+    curveThresholds: {
+      above_low: 0.275,
+      above_mid: 0.525,
+      above_mid_high: 0.765
+    },
+    curveTemperature: 0.08,
+    distributionWeights: {
+      low: 0.7103092783505155,
+      mid: 0.06391752577319587,
+      mid_high: 0.050515463917525774,
+      high: 0.17525773195876287
+    },
+    distributionCounts: {
+      low: 689,
+      mid: 62,
+      mid_high: 49,
+      high: 170
+    },
+    judge: {
+      model: "deepseek-v4-flash",
+      baseUrl: "https://api.deepseek.com",
+      mode: "non-thinking",
+      promptVersion: "acu-tier-requirement-v1",
+      timeoutMs: 8e3,
+      maxContextTokens: 6e3,
+      maxOutputTokens: 300
+    },
+    cost: {
+      judgeInputTokens: 6e3,
+      judgeOutputTokens: 300,
+      switchCostUsd: 2e-4
+    }
+  },
+  provenance: {
+    twinInput: "research/quality-curves/twinrouterbench/phase1d-foundation/outputs/acu_step_contexts.parquet",
+    twinInputSha256: "287ae2e5087bbd731c1513a81a94ccf936ad356c25ca3a78f652dcb91129b6e4",
+    openhands: {
+      name: "OpenHands Index SWE-bench aggregate",
+      url: "https://huggingface.co/datasets/OpenHands/openhands-index",
+      version: "v2026.06.30-3015ac6",
+      revision: "94ac78ad8ec547875a0a4ec56e15a644aa5653f6",
+      results_url: "https://github.com/OpenHands/openhands-index-results/tree/3015ac612e7196f428e6e8a3948965d32d9a3331",
+      benchmark_date: "2026-06-30"
+    },
+    priceAndAvailabilitySource: "src/models.ts at build-time",
+    priceAndAvailabilitySourceSha256: "105e2ceb8c9795faf9cd226bef5d703164dfc3824bfa2fc9caaf2d0c45fbfd32",
+    crossBenchmarkCaveat: "Product-demo constrained connection; not strict statistical equivalence across benchmarks."
+  },
+  models: [
+    {
+      modelId: "gpt-5.5",
+      displayName: "GPT-5.5",
+      upstream: "proxy",
+      inputPricePerMillion: 5,
+      outputPricePerMillion: 30,
+      cachedInputPricePerMillion: 2.5,
+      cacheWritePricePerMillion: 5,
+      contextWindow: 1048576,
+      maxOutputTokens: 65536,
+      toolCallSupport: true,
+      visionSupport: true,
+      provider: "OpenAI",
+      availability: "callable_in_repository",
+      routingEligible: true,
+      defaultDisplay: true,
+      abilityAnchor: 0.782,
+      solvedAbilityParameter: 0.6000445560690806,
+      fittingError: 0,
+      sufficientLow: 0.9679497255290579,
+      sufficientMid: 0.8375332853989281,
+      sufficientMidHigh: 0.41150743243938315,
+      sufficientHigh: 0.11489241897773944,
+      benchmarkEvidence: [
+        {
+          benchmarkName: "SWE-bench Verified via OpenHands Index",
+          normalizedScore: 0.782,
+          scoreScale: "0-1 resolved fraction",
+          sampleSize: 500,
+          sourceModelName: "GPT-5.5",
+          evaluationMode: "OpenHands agent harness",
+          sourceUrl: "https://huggingface.co/datasets/OpenHands/openhands-index",
+          resultsUrl: "https://github.com/OpenHands/openhands-index-results/tree/3015ac612e7196f428e6e8a3948965d32d9a3331",
+          sourceVersion: "v2026.06.30-3015ac6",
+          benchmarkDate: "2026-06-30",
+          directForModel: true,
+          configuredRelativeDelta: 0
+        }
+      ],
+      evidenceConfidence: "medium",
+      uncertaintyWidth: 0.08,
+      curveMethod: "shared-slope constrained logistic calibrated to Twin published-label distribution",
+      sourceNames: [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      sourceRetrievedAt: "2026-07-27",
+      notes: "Direct aggregate anchor from the pinned OpenHands Index SWE-bench evaluation; agent-harness dependent."
+    },
+    {
+      modelId: "gpt-5.4-mini",
+      displayName: "GPT-5.4 Mini",
+      upstream: "proxy",
+      inputPricePerMillion: 0.75,
+      outputPricePerMillion: 4.5,
+      cachedInputPricePerMillion: 0.375,
+      cacheWritePricePerMillion: 0.75,
+      contextWindow: 1048576,
+      maxOutputTokens: 32768,
+      toolCallSupport: true,
+      visionSupport: true,
+      provider: "OpenAI",
+      availability: "callable_in_repository",
+      routingEligible: true,
+      defaultDisplay: false,
+      abilityAnchor: 0.6559999999999999,
+      solvedAbilityParameter: 0.37542767996868553,
+      fittingError: -33306690738754696e-32,
+      sufficientLow: 0.8627482535246016,
+      sufficientMid: 0.46102636447178436,
+      sufficientMidHigh: 0.1184285739606725,
+      sufficientHigh: 0.044116580001326816,
+      benchmarkEvidence: [
+        {
+          benchmarkName: "SWE-bench Verified via OpenHands Index",
+          normalizedScore: 0.7559999999999999,
+          scoreScale: "0-1 resolved fraction",
+          sampleSize: 500,
+          sourceModelName: "GPT-5.4",
+          evaluationMode: "OpenHands agent harness",
+          sourceUrl: "https://huggingface.co/datasets/OpenHands/openhands-index",
+          resultsUrl: "https://github.com/OpenHands/openhands-index-results/tree/3015ac612e7196f428e6e8a3948965d32d9a3331",
+          sourceVersion: "v2026.06.30-3015ac6",
+          benchmarkDate: "2026-06-30",
+          directForModel: false,
+          configuredRelativeDelta: -0.1
+        }
+      ],
+      evidenceConfidence: "low",
+      uncertaintyWidth: 0.14,
+      curveMethod: "shared-slope constrained logistic calibrated to Twin published-label distribution",
+      sourceNames: [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      sourceRetrievedAt: "2026-07-27",
+      notes: "Series-relative estimate: GPT-5.4 0.756 plus configured delta -0.100; not a direct benchmark result."
+    },
+    {
+      modelId: "claude-opus-4-8",
+      displayName: "Claude Opus 4.8",
+      upstream: "proxy",
+      inputPricePerMillion: 5,
+      outputPricePerMillion: 25,
+      cachedInputPricePerMillion: 0.5,
+      cacheWritePricePerMillion: 6.25,
+      contextWindow: 2e5,
+      maxOutputTokens: 32e3,
+      toolCallSupport: true,
+      visionSupport: true,
+      provider: "Anthropic",
+      availability: "callable_in_repository",
+      routingEligible: true,
+      defaultDisplay: true,
+      abilityAnchor: 0.838,
+      solvedAbilityParameter: 0.7405368154801621,
+      fittingError: -2220446049250313e-31,
+      sufficientLow: 0.9830514792769127,
+      sufficientMid: 0.9368975687252181,
+      sufficientMidHigh: 0.6829465554428616,
+      sufficientHigh: 0.2587382370620185,
+      benchmarkEvidence: [
+        {
+          benchmarkName: "SWE-bench Verified via OpenHands Index",
+          normalizedScore: 0.838,
+          scoreScale: "0-1 resolved fraction",
+          sampleSize: 500,
+          sourceModelName: "claude-opus-4-8",
+          evaluationMode: "OpenHands agent harness",
+          sourceUrl: "https://huggingface.co/datasets/OpenHands/openhands-index",
+          resultsUrl: "https://github.com/OpenHands/openhands-index-results/tree/3015ac612e7196f428e6e8a3948965d32d9a3331",
+          sourceVersion: "v2026.06.30-3015ac6",
+          benchmarkDate: "2026-06-30",
+          directForModel: true,
+          configuredRelativeDelta: 0
+        }
+      ],
+      evidenceConfidence: "medium",
+      uncertaintyWidth: 0.08,
+      curveMethod: "shared-slope constrained logistic calibrated to Twin published-label distribution",
+      sourceNames: [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      sourceRetrievedAt: "2026-07-27",
+      notes: "Direct aggregate anchor from the pinned OpenHands Index SWE-bench evaluation; agent-harness dependent."
+    },
+    {
+      modelId: "claude-sonnet-5",
+      displayName: "Claude Sonnet 5",
+      upstream: "proxy",
+      inputPricePerMillion: 3,
+      outputPricePerMillion: 15,
+      cachedInputPricePerMillion: 0.3,
+      cacheWritePricePerMillion: 3.75,
+      contextWindow: 2e5,
+      maxOutputTokens: 16384,
+      toolCallSupport: true,
+      visionSupport: true,
+      provider: "Anthropic",
+      availability: "callable_in_repository",
+      routingEligible: true,
+      defaultDisplay: true,
+      abilityAnchor: 0.778,
+      solvedAbilityParameter: 0.5902419125429264,
+      fittingError: 0,
+      sufficientLow: 0.9661195393909839,
+      sufficientMid: 0.826762340786717,
+      sufficientMidHigh: 0.3928939569621095,
+      sufficientHigh: 0.10877981376289587,
+      benchmarkEvidence: [
+        {
+          benchmarkName: "SWE-bench Verified via OpenHands Index",
+          normalizedScore: 0.838,
+          scoreScale: "0-1 resolved fraction",
+          sampleSize: 500,
+          sourceModelName: "claude-opus-4-8",
+          evaluationMode: "OpenHands agent harness",
+          sourceUrl: "https://huggingface.co/datasets/OpenHands/openhands-index",
+          resultsUrl: "https://github.com/OpenHands/openhands-index-results/tree/3015ac612e7196f428e6e8a3948965d32d9a3331",
+          sourceVersion: "v2026.06.30-3015ac6",
+          benchmarkDate: "2026-06-30",
+          directForModel: false,
+          configuredRelativeDelta: -0.06
+        }
+      ],
+      evidenceConfidence: "low",
+      uncertaintyWidth: 0.14,
+      curveMethod: "shared-slope constrained logistic calibrated to Twin published-label distribution",
+      sourceNames: [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      sourceRetrievedAt: "2026-07-27",
+      notes: "Series-relative estimate: claude-opus-4-8 0.838 plus configured delta -0.060; not a direct benchmark result."
+    },
+    {
+      modelId: "gemini-3.5-flash",
+      displayName: "Gemini 3.5 Flash",
+      upstream: "proxy",
+      inputPricePerMillion: 1.5,
+      outputPricePerMillion: 9,
+      cachedInputPricePerMillion: 0.75,
+      cacheWritePricePerMillion: 1.5,
+      contextWindow: 1048576,
+      maxOutputTokens: 65536,
+      toolCallSupport: true,
+      visionSupport: true,
+      provider: "Google",
+      availability: "callable_in_repository",
+      routingEligible: true,
+      defaultDisplay: true,
+      abilityAnchor: 0.7859999999999999,
+      solvedAbilityParameter: 0.6099577631117494,
+      fittingError: 11102230246251565e-32,
+      sufficientLow: 0.9696610480291519,
+      sufficientMid: 0.8478320661619502,
+      sufficientMidHigh: 0.4306504341229589,
+      sufficientHigh: 0.1215063443167558,
+      benchmarkEvidence: [
+        {
+          benchmarkName: "SWE-bench Verified via OpenHands Index",
+          normalizedScore: 0.7859999999999999,
+          scoreScale: "0-1 resolved fraction",
+          sampleSize: 500,
+          sourceModelName: "Gemini-3.5-Flash",
+          evaluationMode: "OpenHands agent harness",
+          sourceUrl: "https://huggingface.co/datasets/OpenHands/openhands-index",
+          resultsUrl: "https://github.com/OpenHands/openhands-index-results/tree/3015ac612e7196f428e6e8a3948965d32d9a3331",
+          sourceVersion: "v2026.06.30-3015ac6",
+          benchmarkDate: "2026-06-30",
+          directForModel: true,
+          configuredRelativeDelta: 0
+        }
+      ],
+      evidenceConfidence: "medium",
+      uncertaintyWidth: 0.08,
+      curveMethod: "shared-slope constrained logistic calibrated to Twin published-label distribution",
+      sourceNames: [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      sourceRetrievedAt: "2026-07-27",
+      notes: "Direct aggregate anchor from the pinned OpenHands Index SWE-bench evaluation; agent-harness dependent."
+    },
+    {
+      modelId: "deepseek-v4-flash",
+      displayName: "DeepSeek V4 Flash",
+      upstream: "proxy",
+      inputPricePerMillion: 0.15,
+      outputPricePerMillion: 0.3,
+      cachedInputPricePerMillion: 0.07,
+      cacheWritePricePerMillion: 0.15,
+      contextWindow: 163840,
+      maxOutputTokens: 163840,
+      toolCallSupport: true,
+      visionSupport: false,
+      provider: "DeepSeek",
+      availability: "callable_in_repository",
+      routingEligible: true,
+      defaultDisplay: true,
+      abilityAnchor: 0.6719999999999999,
+      solvedAbilityParameter: 0.395431465104481,
+      fittingError: -11102230246251565e-32,
+      sufficientLow: 0.8800492946367835,
+      sufficientMid: 0.5008640336627619,
+      sufficientMidHigh: 0.132752411327875,
+      sufficientHigh: 0.04663292795940523,
+      benchmarkEvidence: [
+        {
+          benchmarkName: "SWE-bench Verified via OpenHands Index",
+          normalizedScore: 0.732,
+          scoreScale: "0-1 resolved fraction",
+          sampleSize: 500,
+          sourceModelName: "DeepSeek-V4-Pro",
+          evaluationMode: "OpenHands agent harness",
+          sourceUrl: "https://huggingface.co/datasets/OpenHands/openhands-index",
+          resultsUrl: "https://github.com/OpenHands/openhands-index-results/tree/3015ac612e7196f428e6e8a3948965d32d9a3331",
+          sourceVersion: "v2026.06.30-3015ac6",
+          benchmarkDate: "2026-06-30",
+          directForModel: false,
+          configuredRelativeDelta: -0.06
+        }
+      ],
+      evidenceConfidence: "low",
+      uncertaintyWidth: 0.14,
+      curveMethod: "shared-slope constrained logistic calibrated to Twin published-label distribution",
+      sourceNames: [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      sourceRetrievedAt: "2026-07-27",
+      notes: "Series-relative estimate: DeepSeek-V4-Pro 0.732 plus configured delta -0.060; not a direct benchmark result."
+    },
+    {
+      modelId: "deepseek-v4-pro",
+      displayName: "DeepSeek V4 Pro",
+      upstream: "proxy",
+      inputPricePerMillion: 1.8,
+      outputPricePerMillion: 3.6,
+      cachedInputPricePerMillion: 0.9,
+      cacheWritePricePerMillion: 1.8,
+      contextWindow: 163840,
+      maxOutputTokens: 163840,
+      toolCallSupport: true,
+      visionSupport: false,
+      provider: "DeepSeek",
+      availability: "callable_in_repository",
+      routingEligible: true,
+      defaultDisplay: true,
+      abilityAnchor: 0.732,
+      solvedAbilityParameter: 0.4898299253001487,
+      fittingError: -2220446049250313e-31,
+      sufficientLow: 0.936601283501504,
+      sufficientMid: 0.6817150085462865,
+      sufficientMidHigh: 0.23003965656687225,
+      sufficientHigh: 0.06578495274009998,
+      benchmarkEvidence: [
+        {
+          benchmarkName: "SWE-bench Verified via OpenHands Index",
+          normalizedScore: 0.732,
+          scoreScale: "0-1 resolved fraction",
+          sampleSize: 500,
+          sourceModelName: "DeepSeek-V4-Pro",
+          evaluationMode: "OpenHands agent harness",
+          sourceUrl: "https://huggingface.co/datasets/OpenHands/openhands-index",
+          resultsUrl: "https://github.com/OpenHands/openhands-index-results/tree/3015ac612e7196f428e6e8a3948965d32d9a3331",
+          sourceVersion: "v2026.06.30-3015ac6",
+          benchmarkDate: "2026-06-30",
+          directForModel: true,
+          configuredRelativeDelta: 0
+        }
+      ],
+      evidenceConfidence: "medium",
+      uncertaintyWidth: 0.08,
+      curveMethod: "shared-slope constrained logistic calibrated to Twin published-label distribution",
+      sourceNames: [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      sourceRetrievedAt: "2026-07-27",
+      notes: "Direct aggregate anchor from the pinned OpenHands Index SWE-bench evaluation; agent-harness dependent."
+    },
+    {
+      modelId: "glm-5.1",
+      displayName: "GLM 5.1",
+      upstream: "proxy",
+      inputPricePerMillion: 0.9,
+      outputPricePerMillion: 3.5,
+      cachedInputPricePerMillion: 0.45,
+      cacheWritePricePerMillion: 0.9,
+      contextWindow: 128e3,
+      maxOutputTokens: 16384,
+      toolCallSupport: true,
+      visionSupport: false,
+      provider: "Zhipu AI",
+      availability: "callable_in_repository",
+      routingEligible: true,
+      defaultDisplay: true,
+      abilityAnchor: 0.75,
+      solvedAbilityParameter: 0.5260528779602989,
+      fittingError: -11102230246251565e-32,
+      sufficientLow: 0.9499340057215506,
+      sufficientMid: 0.7412251267540898,
+      sufficientMidHigh: 0.282022734300432,
+      sufficientHigh: 0.07776704834339279,
+      benchmarkEvidence: [
+        {
+          benchmarkName: "SWE-bench Verified via OpenHands Index",
+          normalizedScore: 0.75,
+          scoreScale: "0-1 resolved fraction",
+          sampleSize: 500,
+          sourceModelName: "GLM-5.1",
+          evaluationMode: "OpenHands agent harness",
+          sourceUrl: "https://huggingface.co/datasets/OpenHands/openhands-index",
+          resultsUrl: "https://github.com/OpenHands/openhands-index-results/tree/3015ac612e7196f428e6e8a3948965d32d9a3331",
+          sourceVersion: "v2026.06.30-3015ac6",
+          benchmarkDate: "2026-06-30",
+          directForModel: true,
+          configuredRelativeDelta: 0
+        }
+      ],
+      evidenceConfidence: "medium",
+      uncertaintyWidth: 0.08,
+      curveMethod: "shared-slope constrained logistic calibrated to Twin published-label distribution",
+      sourceNames: [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      sourceRetrievedAt: "2026-07-27",
+      notes: "Direct aggregate anchor from the pinned OpenHands Index SWE-bench evaluation; agent-harness dependent."
+    },
+    {
+      modelId: "kimi-k2.6",
+      displayName: "Kimi K2.6",
+      upstream: "proxy",
+      inputPricePerMillion: 0.95,
+      outputPricePerMillion: 4,
+      cachedInputPricePerMillion: 0.475,
+      cacheWritePricePerMillion: 0.95,
+      contextWindow: 256e3,
+      maxOutputTokens: 32768,
+      toolCallSupport: true,
+      visionSupport: false,
+      provider: "Moonshot AI",
+      availability: "callable_in_repository",
+      routingEligible: true,
+      defaultDisplay: true,
+      abilityAnchor: 0.746,
+      solvedAbilityParameter: 0.5176439518588729,
+      fittingError: -11102230246251565e-32,
+      sufficientLow: 0.9471554937915162,
+      sufficientMid: 0.7280936499597717,
+      sufficientMidHigh: 0.2692169934411507,
+      sufficientHigh: 0.07468485765601768,
+      benchmarkEvidence: [
+        {
+          benchmarkName: "SWE-bench Verified via OpenHands Index",
+          normalizedScore: 0.746,
+          scoreScale: "0-1 resolved fraction",
+          sampleSize: 500,
+          sourceModelName: "Kimi-K2.6",
+          evaluationMode: "OpenHands agent harness",
+          sourceUrl: "https://huggingface.co/datasets/OpenHands/openhands-index",
+          resultsUrl: "https://github.com/OpenHands/openhands-index-results/tree/3015ac612e7196f428e6e8a3948965d32d9a3331",
+          sourceVersion: "v2026.06.30-3015ac6",
+          benchmarkDate: "2026-06-30",
+          directForModel: true,
+          configuredRelativeDelta: 0
+        }
+      ],
+      evidenceConfidence: "medium",
+      uncertaintyWidth: 0.08,
+      curveMethod: "shared-slope constrained logistic calibrated to Twin published-label distribution",
+      sourceNames: [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      sourceRetrievedAt: "2026-07-27",
+      notes: "Direct aggregate anchor from the pinned OpenHands Index SWE-bench evaluation; agent-harness dependent."
+    },
+    {
+      modelId: "qwen3.5-flash",
+      displayName: "Qwen 3.5 Flash",
+      upstream: "proxy",
+      inputPricePerMillion: 0.04,
+      outputPricePerMillion: 0.3,
+      cachedInputPricePerMillion: 0.02,
+      cacheWritePricePerMillion: 0.04,
+      contextWindow: 131072,
+      maxOutputTokens: 32768,
+      toolCallSupport: true,
+      visionSupport: false,
+      provider: "Alibaba Cloud",
+      availability: "callable_in_repository",
+      routingEligible: true,
+      defaultDisplay: true,
+      abilityAnchor: 0.62,
+      solvedAbilityParameter: 0.33571102109254747,
+      fittingError: -11102230246251565e-32,
+      sufficientLow: 0.8215830210062496,
+      sufficientMid: 0.3844116239029469,
+      sufficientMidHigh: 0.09520400719339295,
+      sufficientHigh: 0.04018106760138174,
+      benchmarkEvidence: [
+        {
+          benchmarkName: "SWE-bench Verified via OpenHands Index",
+          normalizedScore: 0.62,
+          scoreScale: "0-1 resolved fraction",
+          sampleSize: 500,
+          sourceModelName: "Qwen3.5-Flash",
+          evaluationMode: "OpenHands agent harness",
+          sourceUrl: "https://huggingface.co/datasets/OpenHands/openhands-index",
+          resultsUrl: "https://github.com/OpenHands/openhands-index-results/tree/3015ac612e7196f428e6e8a3948965d32d9a3331",
+          sourceVersion: "v2026.06.30-3015ac6",
+          benchmarkDate: "2026-06-30",
+          directForModel: true,
+          configuredRelativeDelta: 0
+        }
+      ],
+      evidenceConfidence: "medium",
+      uncertaintyWidth: 0.08,
+      curveMethod: "shared-slope constrained logistic calibrated to Twin published-label distribution",
+      sourceNames: [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      sourceRetrievedAt: "2026-07-27",
+      notes: "Direct aggregate anchor from the pinned OpenHands Index SWE-bench evaluation; agent-harness dependent."
+    },
+    {
+      modelId: "qwen3.6-plus",
+      displayName: "Qwen 3.6 Plus",
+      upstream: "proxy",
+      inputPricePerMillion: 0.3,
+      outputPricePerMillion: 1.75,
+      cachedInputPricePerMillion: 0.15,
+      cacheWritePricePerMillion: 0.3,
+      contextWindow: 131072,
+      maxOutputTokens: 32768,
+      toolCallSupport: true,
+      visionSupport: false,
+      provider: "Alibaba Cloud",
+      availability: "callable_in_repository",
+      routingEligible: true,
+      defaultDisplay: true,
+      abilityAnchor: 0.742,
+      solvedAbilityParameter: 0.5094407048215279,
+      fittingError: -11102230246251565e-32,
+      sufficientLow: 0.9442685981340386,
+      sufficientMid: 0.7148740330388823,
+      sufficientMidHigh: 0.25715051855293314,
+      sufficientHigh: 0.07186100251848729,
+      benchmarkEvidence: [
+        {
+          benchmarkName: "SWE-bench Verified via OpenHands Index",
+          normalizedScore: 0.742,
+          scoreScale: "0-1 resolved fraction",
+          sampleSize: 500,
+          sourceModelName: "Qwen3.6-Plus",
+          evaluationMode: "OpenHands agent harness",
+          sourceUrl: "https://huggingface.co/datasets/OpenHands/openhands-index",
+          resultsUrl: "https://github.com/OpenHands/openhands-index-results/tree/3015ac612e7196f428e6e8a3948965d32d9a3331",
+          sourceVersion: "v2026.06.30-3015ac6",
+          benchmarkDate: "2026-06-30",
+          directForModel: true,
+          configuredRelativeDelta: 0
+        }
+      ],
+      evidenceConfidence: "medium",
+      uncertaintyWidth: 0.08,
+      curveMethod: "shared-slope constrained logistic calibrated to Twin published-label distribution",
+      sourceNames: [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      sourceRetrievedAt: "2026-07-27",
+      notes: "Direct aggregate anchor from the pinned OpenHands Index SWE-bench evaluation; agent-harness dependent."
+    },
+    {
+      modelId: "qwen3.7-max",
+      displayName: "Qwen 3.7 Max",
+      upstream: "proxy",
+      inputPricePerMillion: 1.8,
+      outputPricePerMillion: 5.4,
+      cachedInputPricePerMillion: 0.9,
+      cacheWritePricePerMillion: 1.8,
+      contextWindow: 131072,
+      maxOutputTokens: 32768,
+      toolCallSupport: true,
+      visionSupport: false,
+      provider: "Alibaba Cloud",
+      availability: "callable_in_repository",
+      routingEligible: true,
+      defaultDisplay: true,
+      abilityAnchor: 0.762,
+      solvedAbilityParameter: 0.5524840411863314,
+      fittingError: 0,
+      sufficientLow: 0.9575872086698267,
+      sufficientMid: 0.7796281070882295,
+      sufficientMidHigh: 0.32503651723147053,
+      sufficientHigh: 0.08881577201574785,
+      benchmarkEvidence: [
+        {
+          benchmarkName: "SWE-bench Verified via OpenHands Index",
+          normalizedScore: 0.742,
+          scoreScale: "0-1 resolved fraction",
+          sampleSize: 500,
+          sourceModelName: "Qwen3.6-Plus",
+          evaluationMode: "OpenHands agent harness",
+          sourceUrl: "https://huggingface.co/datasets/OpenHands/openhands-index",
+          resultsUrl: "https://github.com/OpenHands/openhands-index-results/tree/3015ac612e7196f428e6e8a3948965d32d9a3331",
+          sourceVersion: "v2026.06.30-3015ac6",
+          benchmarkDate: "2026-06-30",
+          directForModel: false,
+          configuredRelativeDelta: 0.02
+        }
+      ],
+      evidenceConfidence: "low",
+      uncertaintyWidth: 0.14,
+      curveMethod: "shared-slope constrained logistic calibrated to Twin published-label distribution",
+      sourceNames: [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      sourceRetrievedAt: "2026-07-27",
+      notes: "Series-relative estimate: Qwen3.6-Plus 0.742 plus configured delta +0.020; not a direct benchmark result."
+    },
+    {
+      modelId: "minimax-m3",
+      displayName: "MiniMax M3",
+      upstream: "not_configured",
+      inputPricePerMillion: null,
+      outputPricePerMillion: null,
+      cachedInputPricePerMillion: null,
+      cacheWritePricePerMillion: null,
+      contextWindow: null,
+      maxOutputTokens: null,
+      toolCallSupport: false,
+      visionSupport: false,
+      provider: "MiniMax",
+      availability: "benchmark_only_not_configured",
+      routingEligible: false,
+      defaultDisplay: false,
+      abilityAnchor: 0.764,
+      solvedAbilityParameter: 0.5570571678943699,
+      fittingError: 0,
+      sufficientLow: 0.9587597590467984,
+      sufficientMid: 0.7858213563704296,
+      sufficientMidHigh: 0.33288131895246353,
+      sufficientHigh: 0.09095539584187315,
+      benchmarkEvidence: [
+        {
+          benchmarkName: "SWE-bench Verified via OpenHands Index",
+          normalizedScore: 0.764,
+          scoreScale: "0-1 resolved fraction",
+          sampleSize: 500,
+          sourceModelName: "MiniMax-M3",
+          evaluationMode: "OpenHands agent harness",
+          sourceUrl: "https://huggingface.co/datasets/OpenHands/openhands-index",
+          resultsUrl: "https://github.com/OpenHands/openhands-index-results/tree/3015ac612e7196f428e6e8a3948965d32d9a3331",
+          sourceVersion: "v2026.06.30-3015ac6",
+          benchmarkDate: "2026-06-30",
+          directForModel: true,
+          configuredRelativeDelta: 0
+        }
+      ],
+      evidenceConfidence: "medium",
+      uncertaintyWidth: 0.08,
+      curveMethod: "shared-slope constrained logistic calibrated to Twin published-label distribution",
+      sourceNames: [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      sourceRetrievedAt: "2026-07-27",
+      notes: "Direct aggregate anchor from the pinned OpenHands Index SWE-bench evaluation; agent-harness dependent. Benchmark-only entry: no matching callable text model exists in BLOCKRUN_MODELS, so routing eligibility is false."
+    }
+  ]
+};
+
+// src/acu/catalog.ts
+var catalog = model_catalog_default;
+function getAcuCatalog() {
+  return catalog;
+}
+function getAcuModel(modelId) {
+  return catalog.models.find((model) => model.modelId === modelId);
+}
+function getRoutingEligibleModels(eligibleModelIds) {
+  const allowed = eligibleModelIds ? new Set(eligibleModelIds) : null;
+  return catalog.models.filter((model) => model.routingEligible && (!allowed || allowed.has(model.modelId)));
+}
+function buildModelCurve(model) {
+  const points = [];
+  for (let difficultyScore2 = 0; difficultyScore2 <= 100; difficultyScore2 += 1) {
+    const probabilities = continuousTierProbabilities(difficultyScore2 / 100);
+    const quality = estimatedQuality(probabilities, model);
+    points.push({
+      difficultyScore: difficultyScore2,
+      ...probabilities,
+      estimatedQuality: quality,
+      qualityLower: Math.max(0, quality - model.uncertaintyWidth),
+      qualityUpper: Math.min(1, quality + model.uncertaintyWidth)
+    });
+  }
+  return points;
+}
+function publicCatalogPayload() {
+  return {
+    schemaVersion: catalog.schemaVersion,
+    generatedAt: catalog.generatedAt,
+    estimateLabel: catalog.estimateLabel,
+    disclaimer: catalog.disclaimer,
+    config: catalog.config,
+    provenance: catalog.provenance,
+    models: catalog.models,
+    curves: Object.fromEntries(catalog.models.map((model) => [model.modelId, buildModelCurve(model)]))
+  };
+}
+
+// src/acu/decision.ts
+function estimateCallCost(model, inputTokens, outputTokens) {
+  if (model.inputPricePerMillion === null || model.outputPricePerMillion === null) {
+    return Number.POSITIVE_INFINITY;
+  }
+  return (Math.max(0, inputTokens) * model.inputPricePerMillion + Math.max(0, outputTokens) * model.outputPricePerMillion) / 1e6;
+}
+function estimateOne(model, probabilities, inputTokens, outputTokens, judgeCost, fallbackCallCost, qualityTarget, switchCost) {
+  const quality = estimatedQuality(probabilities, model);
+  const lower = clamp(quality - model.uncertaintyWidth);
+  const upper = clamp(quality + model.uncertaintyWidth);
+  const callCost = estimateCallCost(model, inputTokens, outputTokens);
+  const expectedFallbackCost = (1 - lower) * (fallbackCallCost + switchCost);
+  const total = judgeCost + callCost + expectedFallbackCost;
+  return {
+    modelId: model.modelId,
+    displayName: model.displayName,
+    provider: model.provider,
+    estimatedQuality: quality,
+    conservativeQuality: lower,
+    qualityLower: lower,
+    qualityUpper: upper,
+    estimatedCallCost: callCost,
+    expectedFallbackCost,
+    expectedTotalCost: total,
+    savingsVsFlagship: 0,
+    savingsPercentVsFlagship: 0,
+    meetsQualityTarget: lower >= qualityTarget
+  };
+}
+function recommendModel(input) {
+  const probabilities = normalizeProbabilities(input.probabilities);
+  const qualityTarget = clamp(input.qualityTarget ?? ACU_DEFAULT_QUALITY_TARGET);
+  const inputTokens = Math.max(1, Math.round(input.inputTokens));
+  const outputTokens = Math.max(1, Math.round(input.expectedOutputTokens));
+  const switchCost = Math.max(0, input.switchCost ?? ACU_DEFAULT_SWITCH_COST_USD);
+  let models = getRoutingEligibleModels(input.eligibleModelIds);
+  if (input.requireToolCallSupport) models = models.filter((model) => model.toolCallSupport);
+  if (input.requireVisionSupport) models = models.filter((model) => model.visionSupport);
+  if (models.length === 0) throw new Error("No ACU catalog model is eligible for this request");
+  const flagship = models.reduce((best, model) => model.abilityAnchor > best.abilityAnchor ? model : best);
+  const fallback = flagship;
+  const fallbackCallCost = estimateCallCost(fallback, inputTokens, outputTokens);
+  const estimates = models.map((model) => estimateOne(
+    model,
+    probabilities,
+    inputTokens,
+    outputTokens,
+    Math.max(0, input.judgeCost),
+    fallbackCallCost,
+    qualityTarget,
+    switchCost
+  ));
+  const flagshipEstimate = estimates.find((estimate) => estimate.modelId === flagship.modelId);
+  if (!flagshipEstimate) throw new Error("ACU flagship model estimate is missing");
+  for (const estimate of estimates) {
+    estimate.savingsVsFlagship = flagshipEstimate.expectedTotalCost - estimate.expectedTotalCost;
+    estimate.savingsPercentVsFlagship = flagshipEstimate.expectedTotalCost > 0 ? estimate.savingsVsFlagship / flagshipEstimate.expectedTotalCost : 0;
+  }
+  const qualified = estimates.filter((estimate) => estimate.meetsQualityTarget);
+  const recommended = qualified.length > 0 ? qualified.reduce((best, estimate) => estimate.expectedTotalCost < best.expectedTotalCost ? estimate : best) : estimates.reduce((best, estimate) => estimate.estimatedQuality > best.estimatedQuality ? estimate : best);
+  const valuePool = estimates.filter((estimate) => estimate.modelId !== recommended.modelId);
+  const valueAlternative = valuePool.length > 0 ? valuePool.reduce((best, estimate) => estimate.expectedTotalCost < best.expectedTotalCost ? estimate : best) : null;
+  const flagshipAlternative = flagshipEstimate;
+  return {
+    recommended,
+    valueAlternative,
+    flagshipAlternative,
+    fallbackModel: flagshipAlternative,
+    estimates: estimates.sort((left, right) => left.expectedTotalCost - right.expectedTotalCost),
+    reason: qualified.length > 0 ? `\u4FDD\u5B88\u4F30\u7B97\u8FBE\u5230 ${(qualityTarget * 100).toFixed(0)}% \u76EE\u6807\u7684\u5019\u9009\u4E2D\uFF0C\u9884\u8BA1\u603B\u6210\u672C\u6700\u4F4E\u3002` : `\u6CA1\u6709\u5019\u9009\u7684\u4FDD\u5B88\u4F30\u7B97\u8FBE\u5230 ${(qualityTarget * 100).toFixed(0)}% \u76EE\u6807\uFF0C\u9009\u62E9\u4F30\u7B97\u8FBE\u6807\u7387\u6700\u9AD8\u8005\u3002`
+  };
+}
+function judgeModelPrice() {
+  const modelId = getAcuCatalog().config.judge.model;
+  const model = getAcuCatalog().models.find((entry) => entry.modelId === modelId);
+  if (!model) throw new Error(`Judge model ${modelId} is absent from the ACU catalog`);
+  return model;
+}
+
+// src/acu/judge.ts
+import { createHash as createHash4 } from "crypto";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
+import { homedir as homedir4 } from "os";
+import { dirname as dirname2, join as join5 } from "path";
+
+// src/acu/catalog/twin-few-shots.json
+var twin_few_shots_default = {
+  promptVersion: "acu-tier-requirement-v1",
+  examples: [
+    {
+      exampleId: "low-1",
+      context: "[SYSTEM]\nYou are a helpful assistant that can use tools.\n\n[USER]\nguide me",
+      minimumSufficientTier: "low",
+      explanation: "\u5355\u4E00\u660E\u786E\u52A8\u4F5C\uFF0C\u7EA6\u675F\u5C11\uFF0C\u4F4E\u6863\u80FD\u529B\u5373\u53EF\u7A33\u5B9A\u5B8C\u6210\u3002"
+    },
+    {
+      exampleId: "low-2",
+      context: "[SYSTEM]\nYou are a helpful assistant that can use tools.\n\n[USER]\ndelete all txt files",
+      minimumSufficientTier: "low",
+      explanation: "\u5355\u4E00\u660E\u786E\u52A8\u4F5C\uFF0C\u7EA6\u675F\u5C11\uFF0C\u4F4E\u6863\u80FD\u529B\u5373\u53EF\u7A33\u5B9A\u5B8C\u6210\u3002"
+    },
+    {
+      exampleId: "mid-1",
+      context: "[SYSTEM]\nYou are a helpful assistant that can use tools.\n\n[USER]\nI'd like to know how to retrieve a weather forecast for New York City on the 4th of July this year.",
+      minimumSufficientTier: "mid",
+      explanation: "\u5B58\u5728\u591A\u4E2A\u7EA6\u675F\u6216\u5DE5\u5177\u53C2\u6570\uFF0C\u9700\u8981\u4E2D\u6863\u80FD\u529B\u4FDD\u6301\u4E00\u81F4\u6027\u3002"
+    },
+    {
+      exampleId: "mid-2",
+      context: "[SYSTEM]\nYou are a helpful assistant that can use tools.\n\n[USER]\nCould you kindly show me the list of files in tmp directory in my file system including the hidden one?",
+      minimumSufficientTier: "mid",
+      explanation: "\u5B58\u5728\u591A\u4E2A\u7EA6\u675F\u6216\u5DE5\u5177\u53C2\u6570\uFF0C\u9700\u8981\u4E2D\u6863\u80FD\u529B\u4FDD\u6301\u4E00\u81F4\u6027\u3002"
+    },
+    {
+      exampleId: "mid_high-1",
+      context: "[SYSTEM]\nYou are a helpful assistant that can use tools.\n\n[USER]\nDelete all the files in the 'Drafts' directory including the directory.",
+      minimumSufficientTier: "mid_high",
+      explanation: "\u4E0A\u4E0B\u6587\u4F9D\u8D56\u548C\u6267\u884C\u72B6\u6001\u8F83\u591A\uFF0C\u9700\u8981\u4E2D\u9AD8\u6863\u80FD\u529B\u7EFC\u5408\u5904\u7406\u3002"
+    },
+    {
+      exampleId: "mid_high-2",
+      context: "[SYSTEM]\nYou are a helpful assistant for query-based meeting summarization ([TASK]). Answer the user's query using the meeting transcript below. Be accurate, concise, and faithful to what was discussed in the transcript.\n\n[USER]\n## Meeting transcript\nIndustrial Designer: {vocalsound} Okay . Okay , so that's basically the the voice recognition item we were searching for . Okay . This sample sensor uh requires an regular chip , I thought . Um no op I'm not very sure . No , it's not in here . If we want to use the L_C_D_ display , we really need the advanced version , which is a bit l little bit more costly . If we want to use the scroll-wheels we need the regular version . And if we don't want to use uh any of these uh more advanced functions we can keep with the simple uh chip , which is a bit cheaper .\nProject Manager: Okay . Uh well {disfmarker} uh\nIndustrial Designer: Okay .\nProject Manager: d did we already decide on the display ? To {disfmarker}\nIndustrial Designer: Um no , but I think that's something for uh Roo here to think about .\nUser Interface: Yeah . Well , I don't have um {disfmarker} I haven't looked for uh for information about it , but I don't think information {disfmarker} uh y I don't think you need it on a display .\nProject Manager: No .\nUser Interface: Especially when when we have to look at a cost , I don't think uh {disfmarker}\nIndustrial Designer: I I don't think either .\nUser Interface: 'cause uh {gap} uh all {disfmarker} any T_V_ can uh can uh view a digit on uh on screen ,\nIndustrial Designer: No . I don't think you need it .\nProject Manager: On screen display . Yeah .\nUser Interface: yeah .\nProject Manager: Okay\nIndustrial Designer: Okay . Okay ,\n[...deterministic middle truncation...]\nIndustrial Designer: Mm-hmm .\nProject Manager: because it it adds a little ext extra high-tech feeling to it .\nIndustrial Designer: Yes .\nUser Interface: But we already have the scroll-wheels , the sp uh the speaker uh the speak recognition , the rubber , the fancy colours .\nProject Manager: Mm yeah .\nIndustrial Designer: Uh I think our customers will go insane .\nProject Manager: Okay , okay .\nIndustrial Designer: {vocalsound} It's it's too much .\n\n## Query\nWhy did the team decide not to use LCD displays when discussing interface controls?\n\nAnswer this query based only on the transcript above.",
+      minimumSufficientTier: "mid_high",
+      explanation: "\u4E0A\u4E0B\u6587\u4F9D\u8D56\u548C\u6267\u884C\u72B6\u6001\u8F83\u591A\uFF0C\u9700\u8981\u4E2D\u9AD8\u6863\u80FD\u529B\u7EFC\u5408\u5904\u7406\u3002"
+    },
+    {
+      exampleId: "high-1",
+      context: `[SYSTEM]
+You are a helpful, accurate assistant. You are given a multi-turn conversation and reference passages retrieved from a knowledge base. Answer the user's latest question based on the reference passages and conversation history. Be concise and factual. If the passages do not contain enough information, say so honestly.
+
+[USER]
+Here are reference passages from the knowledge base:
+
+[Passage 1]
+
+This command returns either cc, cd, ci, or pr, depending on which pipeline is running. This way, you can reuse the setup script between pipelines if necessary.
+
+ Static code scan
+
+The static code scan stage runs a static code analyzer tool on the specified app repo codebases.
+
+CC pipeline provides the repos that are found in the inventory for the scanner.
+
+You can use any of the following methods to add static code to your pipeline:
+
+* Provide an already running SonarQube instance name, URL, and credentials by adding the SonarQube tool to your toolchain. The static-scan task runs a scan on the specified repos.
+* Add your code to the static-scan custom stage in your .pipeline-config.yaml file for a custom implementation.
+
+ Dynamic scan
+
+The Dynamic scan stage runs a dynamic application security testing tool to find vulnerabilities in the deployed application.
+
+* Add your own dynamic scan code to the dynamic-scan custom stage in your .pipeline-config.yaml file for a custom implementation.
+
+To learn more about configuring dynamic scan by using OWASP-ZAP, see [Configuring ZAP scan for CC pipeline]([URL]
+
+ Scans and checks in compliance checks
+
+Table 3. Compliance scans and checks
+
+ Scan or check Description
+
+ Detect secrets The [IBM Detect Secrets]([URL] tool identifies where secr
+[...deterministic middle truncation...]
+USER]
+Is Dynamic secret better than Static secret?
+
+[ASSISTANT]
+You can not compare dynamic and static secrets in terms of one being "better" than another. There are differences between them. Dynamic secrets have their expiration date and time enforced when their secret data is read or accessed, while static secrets have their expiration date and time enforced at secret creation or rotation time. With a Secrets Manager, you can create, lease, and centrally manage secrets that are used in IBM Cloud services or your custom-built applications.
+
+[USER]
+Which one protects more from vulnerabilities?`,
+      minimumSufficientTier: "high",
+      explanation: "\u9700\u8981\u8DE8\u591A\u6B65\u72B6\u6001\u3001\u957F\u4E0A\u4E0B\u6587\u6216\u9AD8\u98CE\u9669\u63A8\u7406\uFF0C\u9AD8\u6863\u80FD\u529B\u624D\u8F83\u5145\u5206\u3002"
+    },
+    {
+      exampleId: "high-2",
+      context: `[SYSTEM]
+You are a personal assistant running inside OpenClaw.
+## Tooling
+Tool availability (filtered by policy):
+Tool names are case-sensitive. Call tools exactly as listed.
+- read: Read file contents
+- write: Create or overwrite files
+- edit: Make precise edits to files
+- exec: Run shell commands (pty available for TTY-required CLIs)
+- process: Manage background exec sessions
+- web_search: Search the web (Brave API)
+- web_fetch: Fetch and extract readable content from a URL
+- browser: Control web browser
+- canvas: Present/eval/snapshot the Canvas
+- nodes: List/describe/notify/camera/screen on paired nodes
+- cron: Manage cron jobs and wake events (use for reminders; when scheduling a reminder, write the systemEvent text as something that will read like a reminder when it fires, and mention that it is a reminder depending on the time gap between setting and firing; include recent context in reminder text if appropriate)
+- message: Send messages and channel actions
+- gateway: Restart, apply config, or run updates on the running OpenClaw process
+- agents_list: List OpenClaw agent ids allowed for sessions_spawn when runtime="subagent" (not ACP harness ids)
+- sessions_list: List other sessions (incl. sub-agents) with filters/last
+- sessions_history: Fetch history for another session/sub-agent
+- sessions_send: Send a message to another session/sub-agent
+- subagents: List, steer, or kill sub-agent runs for this requester session
+- session_status: Show a /status-equivalent status card (usage + time + Reasoning/Verbose/Elevated); use for model-use questions (\u{1F4CA} session_status); optional per-session model override
+- memory_get: Safe snippet read from MEMORY.md or memory/*.md with o
+[...deterministic middle truncation...]
+he empathy, ethical judgment, and contextual understanding that human healthcare providers bring to patient care. This collaborative approach promises to improve outcomes, reduce costs, and make quality healthcare more accessible to populations around the world.
+
+[ASSISTANT]
+[TOOL_CALL name=write]
+{"path":"/tmp/[TASK]/smartroute-task_05_summary/agent_workspace/summary_output.txt"}
+
+[TOOL name=write]
+Validation failed for tool "write":
+  - content: must have required property 'content'
+
+Received arguments:
+{
+  "path": "/tmp/[TASK]/smartroute-task_05_summary/agent_workspace/summary_output.txt"
+}`,
+      minimumSufficientTier: "high",
+      explanation: "\u9700\u8981\u8DE8\u591A\u6B65\u72B6\u6001\u3001\u957F\u4E0A\u4E0B\u6587\u6216\u9AD8\u98CE\u9669\u63A8\u7406\uFF0C\u9AD8\u6863\u80FD\u529B\u624D\u8F83\u5145\u5206\u3002"
+    }
+  ]
+};
+
+// src/acu/judge.ts
+function contentText(content) {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content.map((part) => {
+      if (typeof part === "string") return part;
+      if (!part || typeof part !== "object") return String(part ?? "");
+      const value = part;
+      if (typeof value.text === "string") return value.text;
+      if (typeof value.content === "string") return value.content;
+      if (value.type === "image_url") return "[IMAGE]";
+      return JSON.stringify(value);
+    }).join("\n");
+  }
+  return content === void 0 ? "" : JSON.stringify(content);
+}
+function serializeVisibleContext(messages, tools = []) {
+  const sections = messages.map((message) => {
+    const role = message.role.toUpperCase();
+    const name = message.name ? ` name=${message.name}` : "";
+    return `[${role}${name}]
+${contentText(message.content)}`;
+  });
+  if (tools.length > 0) sections.push(`[AVAILABLE_TOOLS]
+${JSON.stringify(tools)}`);
+  return sections.join("\n\n").trim();
+}
+function estimateVisibleTokens(text) {
+  let ascii = 0;
+  let nonAscii = 0;
+  for (const character of text) {
+    if (character.codePointAt(0) <= 127) ascii += 1;
+    else nonAscii += 1;
+  }
+  return Math.ceil(ascii / 4) + nonAscii;
+}
+function truncateVisibleContext(text, maxTokens) {
+  const originalTokens = estimateVisibleTokens(text);
+  if (originalTokens <= maxTokens) return { text, tokenEstimate: originalTokens, truncated: false };
+  const characters = Array.from(text);
+  let lower = 0;
+  let upper = characters.length;
+  const marker = "\n[...deterministic head-tail truncation...]\n";
+  while (lower < upper) {
+    const keep = Math.ceil((lower + upper) / 2);
+    const head2 = Math.ceil(keep * 0.58);
+    const candidate = `${characters.slice(0, head2).join("")}${marker}${characters.slice(-(keep - head2)).join("")}`;
+    if (estimateVisibleTokens(candidate) <= maxTokens) lower = keep;
+    else upper = keep - 1;
+  }
+  const head = Math.ceil(lower * 0.58);
+  const truncatedText = `${characters.slice(0, head).join("")}${marker}${characters.slice(-(lower - head)).join("")}`;
+  return { text: truncatedText, tokenEstimate: estimateVisibleTokens(truncatedText), truncated: true };
+}
+function buildJudgeSystemPrompt() {
+  const examples = twin_few_shots_default.examples.map((example) => [
+    `\u793A\u4F8B ${example.exampleId}`,
+    "\u4E0A\u4E0B\u6587\uFF1A",
+    example.context,
+    `\u6700\u4F4E\u5145\u5206\u6863\u4F4D\uFF1A${example.minimumSufficientTier}`,
+    `\u89E3\u91CA\uFF1A${example.explanation}`
+  ].join("\n")).join("\n\n---\n\n");
+  return [
+    "\u4F60\u662F ACU \u4EFB\u52A1\u80FD\u529B\u9700\u6C42\u5206\u7C7B\u5668\u3002\u5224\u65AD\u5F53\u524D\u5B8C\u6574\u3001\u53EF\u89C1 API \u4E0A\u4E0B\u6587\u4E2D\uFF0C\u5B8C\u6210\u4E0B\u4E00\u6B21\u6A21\u578B\u54CD\u5E94\u6240\u9700\u7684\u6700\u4F4E\u5145\u5206\u80FD\u529B\u6863\u4F4D\u3002",
+    "\u4E0D\u5F97\u56DE\u7B54\u539F\u4EFB\u52A1\uFF0C\u4E0D\u5F97\u63A8\u8350\u5177\u4F53\u6A21\u578B\uFF0C\u4E0D\u5F97\u8F93\u51FA\u4EE3\u7801\uFF0C\u4E0D\u5F97\u8F93\u51FA\u601D\u7EF4\u8FC7\u7A0B\u3002",
+    '\u53EA\u8F93\u51FA\u4E25\u683C JSON\uFF1A{"p_low":0,"p_mid":0,"p_mid_high":0,"p_high":0,"confidence":0,"signals":[],"explanation":""}',
+    "\u56DB\u6863\u6982\u7387\u5FC5\u987B\u57280\u52301\u4E14\u603B\u548C\u4E3A1\uFF1Bsignals\u6700\u591A5\u4E2A\uFF1Bexplanation\u4E0D\u8D85\u8FC780\u4E2A\u4E2D\u6587\u5B57\u7B26\u3002",
+    "low=\u5355\u4E00\u660E\u786E\u6267\u884C\uFF1Bmid=\u4E2D\u7B49\u7EA6\u675F\u6574\u5408\uFF1Bmid_high=\u590D\u6742\u4E0A\u4E0B\u6587\u4E0E\u5DE5\u5177\u72B6\u6001\u6574\u5408\uFF1Bhigh=\u9AD8\u98CE\u9669\u6216\u6DF1\u5C42\u591A\u6B65\u63A8\u7406\u3002",
+    "\u4EE5\u4E0B\u793A\u4F8B\u53EA\u5305\u542B\u5F53\u65F6\u53EF\u89C1\u4E0A\u4E0B\u6587\uFF0C\u4E0D\u542B\u672A\u6765\u6D88\u606F\uFF1A",
+    examples
+  ].join("\n\n");
+}
+function extractJson(text) {
+  const cleaned = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+  const start = cleaned.indexOf("{");
+  const end = cleaned.lastIndexOf("}");
+  if (start < 0 || end <= start) throw new Error("Judge response does not contain a JSON object");
+  const parsed = JSON.parse(cleaned.slice(start, end + 1));
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Judge response JSON must be an object");
+  }
+  return parsed;
+}
+function parseJudgeResult(text) {
+  const parsed = extractJson(text);
+  const probabilities = normalizeProbabilities({
+    pLow: Number(parsed.p_low),
+    pMid: Number(parsed.p_mid),
+    pMidHigh: Number(parsed.p_mid_high),
+    pHigh: Number(parsed.p_high),
+    confidence: Number(parsed.confidence)
+  });
+  if (!Array.isArray(parsed.signals) || parsed.signals.length > 5 || parsed.signals.some((signal) => typeof signal !== "string")) {
+    throw new Error("Judge signals must contain at most five strings");
+  }
+  if (typeof parsed.explanation !== "string" || Array.from(parsed.explanation).length > 80) {
+    throw new Error("Judge explanation must be a string no longer than 80 characters");
+  }
+  return {
+    ...probabilities,
+    signals: parsed.signals,
+    explanation: parsed.explanation
+  };
+}
+function cachePath(config) {
+  return config.cachePath || join5(homedir4(), ".claw-router", "acu-judge-cache-v1.json");
+}
+function readCache(path) {
+  if (!existsSync(path)) return { schemaVersion: "acu-judge-cache-v1", entries: {} };
+  try {
+    const parsed = JSON.parse(readFileSync(path, "utf8"));
+    if (parsed.schemaVersion !== "acu-judge-cache-v1" || !parsed.entries) throw new Error("wrong schema");
+    return parsed;
+  } catch {
+    return { schemaVersion: "acu-judge-cache-v1", entries: {} };
+  }
+}
+function writeCache(path, cache) {
+  try {
+    mkdirSync(dirname2(path), { recursive: true });
+    const entries = Object.entries(cache.entries).slice(-2e3);
+    const temporary = `${path}.${process.pid}.tmp`;
+    writeFileSync(temporary, `${JSON.stringify({ ...cache, entries: Object.fromEntries(entries) }, null, 2)}
+`, { mode: 384 });
+    renameSync(temporary, path);
+  } catch {
+  }
+}
+var AcuJudgeClient = class {
+  constructor(config, fetchImplementation = fetch) {
+    this.config = config;
+    this.fetchImplementation = fetchImplementation;
+  }
+  config;
+  fetchImplementation;
+  async judge(messages, tools = []) {
+    if (!this.config.apiKey) throw new Error("ACU Judge API key is not configured");
+    if (this.config.promptVersion !== twin_few_shots_default.promptVersion) {
+      throw new Error("ACU Judge prompt version does not match frozen few-shot data");
+    }
+    const visible = serializeVisibleContext(messages, tools);
+    const contextSha256 = createHash4("sha256").update(visible).digest("hex");
+    const truncated = truncateVisibleContext(visible, this.config.maxContextTokens);
+    const key = createHash4("sha256").update(`${this.config.promptVersion}
+${this.config.judgeModel}
+${contextSha256}`).digest("hex");
+    const path = cachePath(this.config);
+    const cache = readCache(path);
+    const cached = cache.entries[key];
+    if (cached) {
+      return {
+        result: cached.result,
+        status: "cache_hit",
+        latencyMs: 0,
+        cost: 0,
+        contextSha256,
+        contextTokenEstimate: truncated.tokenEstimate,
+        contextTruncated: truncated.truncated
+      };
+    }
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.config.timeoutMs);
+    const started = Date.now();
+    let response;
+    try {
+      response = await this.fetchImplementation(
+        `${this.config.judgeBaseUrl.replace(/\/$/, "")}/chat/completions`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${this.config.apiKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: this.config.judgeModel,
+            messages: [
+              { role: "system", content: buildJudgeSystemPrompt() },
+              { role: "user", content: `\u5F53\u524DAPI\u4E0A\u4E0B\u6587\uFF1A
+${truncated.text}` }
+            ],
+            temperature: 0,
+            max_tokens: Math.min(300, this.config.maxOutputTokens),
+            response_format: { type: "json_object" },
+            thinking: { type: "disabled" },
+            stream: false
+          }),
+          signal: controller.signal
+        }
+      );
+    } finally {
+      clearTimeout(timeout);
+    }
+    const latencyMs = Date.now() - started;
+    if (!response.ok) throw new Error(`ACU Judge HTTP ${response.status}`);
+    const payload = await response.json();
+    const content = payload.choices?.[0]?.message?.content;
+    if (!content) throw new Error("ACU Judge returned no content");
+    const result = parseJudgeResult(content);
+    const price = judgeModelPrice();
+    const promptTokens = payload.usage?.prompt_tokens ?? truncated.tokenEstimate;
+    const completionTokens = payload.usage?.completion_tokens ?? this.config.maxOutputTokens;
+    const cost = estimateCallCost(price, promptTokens, completionTokens);
+    cache.entries[key] = {
+      result,
+      createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+      promptVersion: this.config.promptVersion,
+      model: this.config.judgeModel
+    };
+    writeCache(path, cache);
+    return {
+      result,
+      status: "success",
+      latencyMs,
+      cost,
+      contextSha256,
+      contextTokenEstimate: truncated.tokenEstimate,
+      contextTruncated: truncated.truncated
+    };
+  }
+};
+
+// src/acu/strategy.ts
+function acuTierForRuleTier(tier) {
+  return { SIMPLE: "low", MEDIUM: "mid", COMPLEX: "mid_high", REASONING: "high" }[tier];
+}
+function rulesFallbackJudge(decision) {
+  const selected = acuTierForRuleTier(decision.tier);
+  const confidence = Math.max(0.55, Math.min(0.97, decision.confidence));
+  const remainder = (1 - confidence) / 3;
+  const probabilities = normalizeProbabilities({
+    pLow: selected === "low" ? confidence : remainder,
+    pMid: selected === "mid" ? confidence : remainder,
+    pMidHigh: selected === "mid_high" ? confidence : remainder,
+    pHigh: selected === "high" ? confidence : remainder,
+    confidence: decision.confidence
+  });
+  return {
+    ...probabilities,
+    signals: ["rules_strategy_fallback", decision.tier.toLowerCase()],
+    explanation: "Difficulty Judge\u4E0D\u53EF\u7528\uFF0C\u5DF2\u4F7F\u7528\u73B0\u6709RulesStrategy\u5B89\u5168\u56DE\u9000\u3002"
+  };
+}
+var AcuDemoStrategy = class {
+  constructor(config, judgeClient = new AcuJudgeClient(config)) {
+    this.config = config;
+    this.judgeClient = judgeClient;
+  }
+  config;
+  judgeClient;
+  name = "acu-demo";
+  get enabled() {
+    return this.config.enabled;
+  }
+  async evaluate(input, rulesDecision) {
+    const visible = serializeVisibleContext(input.messages, input.tools);
+    const fallbackContext = truncateVisibleContext(visible, this.config.maxContextTokens);
+    let judge;
+    let judgeStatus;
+    let judgeLatencyMs = 0;
+    let judgeCost = 0;
+    let contextSha256 = createHash5("sha256").update(visible).digest("hex");
+    let contextTokenEstimate = estimateVisibleTokens(fallbackContext.text);
+    let contextTruncated = fallbackContext.truncated;
+    try {
+      if (!this.config.enabled) throw new Error("ACU Demo Router feature flag is disabled");
+      const response = await this.judgeClient.judge(input.messages, input.tools);
+      judge = response.result;
+      judgeStatus = response.status;
+      judgeLatencyMs = response.latencyMs;
+      judgeCost = response.cost;
+      contextSha256 = response.contextSha256;
+      contextTokenEstimate = response.contextTokenEstimate;
+      contextTruncated = response.contextTruncated;
+    } catch {
+      judge = rulesFallbackJudge(rulesDecision);
+      judgeStatus = "rules_fallback";
+    }
+    const recommendation = recommendModel({
+      probabilities: judge,
+      inputTokens: contextTokenEstimate,
+      expectedOutputTokens: input.expectedOutputTokens ?? 800,
+      judgeCost,
+      qualityTarget: input.qualityTarget,
+      eligibleModelIds: input.eligibleModelIds,
+      requireToolCallSupport: input.requireToolCallSupport,
+      requireVisionSupport: input.requireVisionSupport
+    });
+    return {
+      estimateLabel: "public-benchmark constrained estimate",
+      promptVersion: this.config.promptVersion,
+      judgeModel: this.config.judgeModel,
+      judgeMode: "non-thinking",
+      judge,
+      judgeStatus,
+      judgeLatencyMs,
+      judgeCost,
+      contextSha256,
+      contextTokenEstimate,
+      contextTruncated,
+      difficultyScore: difficultyScore(judge),
+      qualityTarget: input.qualityTarget ?? 0.9,
+      recommendation,
+      disclaimer: ACU_DEMO_DISCLAIMER
+    };
+  }
+};
+
 // src/proxy.ts
 var DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 var DEFAULT_PROXY_BASE_URL = "https://api.openai-proxy.org/v1";
@@ -4230,7 +5646,7 @@ function normalizeRequestHeaders(req) {
   return headers;
 }
 function isProtectedDemoPath(pathname) {
-  return pathname === "/" || pathname === "/index.html" || pathname.startsWith("/public/") || pathname === "/cache" || pathname === "/stats" || pathname === "/ledger" || pathname === "/ledger/summary" || pathname.includes("/chat/completions");
+  return pathname === "/" || pathname === "/index.html" || pathname === "/acu" || pathname === "/acu/" || pathname.startsWith("/acu/api/") || pathname.startsWith("/public/") || pathname === "/cache" || pathname === "/stats" || pathname === "/ledger" || pathname === "/ledger/summary" || pathname.includes("/chat/completions");
 }
 function getEnvDemoAccessToken() {
   return process.env.DEMO_ACCESS_TOKEN?.trim() || process.env.ACU_DEMO_KEY?.trim() || process.env.PROXY_API_KEY?.trim() || "";
@@ -4259,7 +5675,31 @@ function isDemoAuthorized(req, demoAccessToken) {
 }
 function hashPrompt(messages) {
   const text = messages.map((message) => JSON.stringify(message.content ?? "")).join("\n");
-  return createHash4("sha256").update(text).digest("hex").slice(0, 24);
+  return createHash6("sha256").update(text).digest("hex").slice(0, 24);
+}
+async function readJsonRequest(req) {
+  const chunks = [];
+  for await (const chunk of req) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  const body = Buffer.concat(chunks).toString("utf8");
+  const parsed = JSON.parse(body);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Request body must be a JSON object");
+  }
+  return parsed;
+}
+function messageContentAsText(content) {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content.filter((part) => part.type === "text" && typeof part.text === "string").map((part) => part.text).join(" ");
+}
+function routingTierFromAcu(evaluation) {
+  const values = [
+    [evaluation.judge.pLow, "SIMPLE"],
+    [evaluation.judge.pMid, "MEDIUM"],
+    [evaluation.judge.pMidHigh, "COMPLEX"],
+    [evaluation.judge.pHigh, "REASONING"]
+  ];
+  return values.reduce((best, current) => current[0] > best[0] ? current : best)[1];
 }
 function detectTaskType(messages) {
   const text = messages.map((message) => {
@@ -4420,7 +5860,7 @@ function normalizeMessagesForThinking(messages) {
 }
 function stripDemoOnlyRequestFields(parsed) {
   let changed = false;
-  for (const key of ["baseline_model", "cache", "expected_schema"]) {
+  for (const key of ["baseline_model", "cache", "expected_schema", "acu_quality_target"]) {
     if (key in parsed) {
       delete parsed[key];
       changed = true;
@@ -4605,6 +6045,7 @@ async function startProxy(options) {
   const modelPricing = buildModelPricing();
   const routerOpts = { config: routingConfig, modelPricing };
   const demoAccessToken = options.demoAccessToken?.trim() ?? getEnvDemoAccessToken();
+  const acuStrategy = new AcuDemoStrategy(readAcuRuntimeConfig(options.acuRuntimeConfig));
   const deduplicator = new RequestDeduplicator();
   const responseCache = new ResponseCache(options.cacheConfig);
   const sessionStore = new SessionStore(options.sessionConfig);
@@ -4627,7 +6068,8 @@ async function startProxy(options) {
         excludeList,
         onRouted: options.onRouted,
         walletAddress,
-        demoAccessToken
+        demoAccessToken,
+        acuStrategy
       });
     } catch (err) {
       console.error(`[ClawRouter] Unhandled error: ${err instanceof Error ? err.message : err}`);
@@ -4747,6 +6189,47 @@ async function handleRequest(req, res, ctx) {
     res.end(JSON.stringify({ object: "list", data: buildProxyModelList() }));
     return;
   }
+  if (pathname === "/acu/api/catalog" && req.method === "GET") {
+    res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+    res.end(JSON.stringify(publicCatalogPayload()));
+    return;
+  }
+  if (pathname === "/acu/api/evaluate" && req.method === "POST") {
+    try {
+      const parsed = await readJsonRequest(req);
+      const messages = Array.isArray(parsed.messages) ? parsed.messages : [];
+      if (messages.length === 0) throw new Error("messages must contain at least one visible API message");
+      const tools = Array.isArray(parsed.tools) ? parsed.tools : [];
+      const lastUser = [...messages].reverse().find((message) => message.role === "user");
+      const system = messages.find((message) => message.role === "system");
+      const expectedOutputTokens = Number(parsed.expected_output_tokens ?? 800);
+      const qualityTarget = Number(parsed.quality_target ?? 0.9);
+      const requireTools = tools.length > 0;
+      const requireVision = messages.some((message) => Array.isArray(message.content) && message.content.some((part) => Boolean(part && typeof part === "object" && part.type === "image_url")));
+      const rulesDecision = route(
+        messageContentAsText(lastUser?.content),
+        messageContentAsText(system?.content) || void 0,
+        Number.isFinite(expectedOutputTokens) ? expectedOutputTokens : 800,
+        { ...ctx.routerOpts, routingProfile: "auto", hasTools: requireTools }
+      );
+      const eligibleModelIds = BLOCKRUN_MODELS.filter((model) => !ctx.excludeList.has(model.id) && (!requireTools || supportsToolCalling(model.id)) && (!requireVision || supportsVision(model.id))).map((model) => model.id);
+      const evaluation = await ctx.acuStrategy.evaluate({
+        messages,
+        tools,
+        qualityTarget: Number.isFinite(qualityTarget) ? qualityTarget : 0.9,
+        expectedOutputTokens: Number.isFinite(expectedOutputTokens) ? expectedOutputTokens : 800,
+        eligibleModelIds,
+        requireToolCallSupport: requireTools,
+        requireVisionSupport: requireVision
+      }, rulesDecision);
+      res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+      res.end(JSON.stringify(evaluation));
+    } catch (error) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: { type: "acu_evaluation_error", message: error instanceof Error ? error.message : "Invalid ACU request" } }));
+    }
+    return;
+  }
   if (pathname.startsWith("/share/") && req.method === "GET") {
     try {
       const url = new URL(req.url, "http://localhost");
@@ -4774,18 +6257,18 @@ async function handleRequest(req, res, ctx) {
     }
     return;
   }
-  if (req.method === "GET" && (pathname === "/" || pathname === "/index.html" || pathname.startsWith("/public/"))) {
-    const { readFileSync: readFileSync2, existsSync: existsSync3 } = await import("fs");
-    const { join: join7, dirname: dirname3 } = await import("path");
+  if (req.method === "GET" && (pathname === "/" || pathname === "/index.html" || pathname === "/acu" || pathname === "/acu/" || pathname.startsWith("/public/"))) {
+    const { readFileSync: readFileSync3, existsSync: existsSync4 } = await import("fs");
+    const { join: join8, dirname: dirname4 } = await import("path");
     const { fileURLToPath: fileURLToPath3 } = await import("url");
-    const __dirname2 = dirname3(fileURLToPath3(import.meta.url));
-    const publicDir = join7(__dirname2, "..", "public");
-    const filePath = pathname === "/" || pathname === "/index.html" ? join7(publicDir, "index.html") : join7(publicDir, pathname.replace("/public/", ""));
-    if (existsSync3(filePath)) {
+    const __dirname2 = dirname4(fileURLToPath3(import.meta.url));
+    const publicDir = join8(__dirname2, "..", "public");
+    const filePath = pathname === "/" || pathname === "/index.html" ? join8(publicDir, "index.html") : pathname === "/acu" || pathname === "/acu/" ? join8(publicDir, "acu.html") : join8(publicDir, pathname.replace("/public/", ""));
+    if (existsSync4(filePath)) {
       const ext = filePath.split(".").pop() || "html";
       const mime = { html: "text/html", css: "text/css", js: "application/javascript", json: "application/json", png: "image/png", svg: "image/svg+xml" };
       res.writeHead(200, { "Content-Type": mime[ext] || "text/plain" });
-      res.end(readFileSync2(filePath));
+      res.end(readFileSync3(filePath));
       return;
     }
   }
@@ -4823,6 +6306,7 @@ async function handleRequest(req, res, ctx) {
   let maxTokens = 4096;
   let routingProfile = null;
   let routingDecision;
+  let acuEvaluation;
   let hasTools = false;
   let hasVision = false;
   let bodyModified = false;
@@ -4831,6 +6315,7 @@ async function handleRequest(req, res, ctx) {
   const parsedMessages = [];
   let responseFormat;
   let expectedSchema;
+  let acuQualityTarget = 0.9;
   try {
     const parsed = JSON.parse(body.toString());
     isStreaming = parsed.stream === true;
@@ -4838,6 +6323,8 @@ async function handleRequest(req, res, ctx) {
     maxTokens = parsed.max_tokens || 4096;
     responseFormat = parsed.response_format;
     expectedSchema = parsed.expected_schema;
+    const requestedQualityTarget = Number(parsed.acu_quality_target);
+    if (Number.isFinite(requestedQualityTarget)) acuQualityTarget = requestedQualityTarget;
     if (stripDemoOnlyRequestFields(parsed)) bodyModified = true;
     const messages = Array.isArray(parsed.messages) ? parsed.messages : [];
     parsedMessages.push(...messages);
@@ -4854,17 +6341,54 @@ async function handleRequest(req, res, ctx) {
       const profileName = resolvedModel.replace("blockrun/", "");
       routingProfile = profileName;
       const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
-      const rawPrompt = lastUserMsg?.content;
-      const prompt = typeof rawPrompt === "string" ? rawPrompt : Array.isArray(rawPrompt) ? rawPrompt.filter((b) => b.type === "text").map((b) => b.text ?? "").join(" ") : "";
+      const prompt = messageContentAsText(lastUserMsg?.content);
       const systemMsg = messages.find((m) => m.role === "system");
       const systemPrompt = typeof systemMsg?.content === "string" ? systemMsg.content : void 0;
       effectiveSessionId = sessionId ?? deriveSessionId(messages);
       const existingSession = effectiveSessionId ? ctx.sessionStore.getSession(effectiveSessionId) : void 0;
-      routingDecision = route(prompt, systemPrompt, maxTokens, {
+      const rulesDecision = route(prompt, systemPrompt, maxTokens, {
         ...ctx.routerOpts,
         routingProfile: routingProfile ?? void 0,
         hasTools
       });
+      routingDecision = rulesDecision;
+      if (ctx.acuStrategy.enabled) {
+        const eligibleModelIds = BLOCKRUN_MODELS.filter((model) => !ctx.excludeList.has(model.id) && (!hasTools || supportsToolCalling(model.id)) && (!hasVision || supportsVision(model.id))).map((model) => model.id);
+        acuEvaluation = await ctx.acuStrategy.evaluate({
+          messages,
+          tools: Array.isArray(parsed.tools) ? parsed.tools : [],
+          qualityTarget: acuQualityTarget,
+          expectedOutputTokens: maxTokens,
+          eligibleModelIds,
+          requireToolCallSupport: hasTools,
+          requireVisionSupport: hasVision
+        }, rulesDecision);
+        if (acuEvaluation.judgeStatus !== "rules_fallback") {
+          const selected = acuEvaluation.recommendation.recommended;
+          const fallback = acuEvaluation.recommendation.fallbackModel.modelId;
+          const tier = routingTierFromAcu(acuEvaluation);
+          const baseTiers = routingDecision.tierConfigs ?? ctx.routerOpts.config.tiers;
+          const existingFallbacks = baseTiers[tier].fallback;
+          routingDecision = {
+            ...rulesDecision,
+            model: selected.modelId,
+            tier,
+            confidence: acuEvaluation.judge.confidence,
+            method: "llm",
+            reasoning: `${acuEvaluation.judge.explanation} | ${acuEvaluation.recommendation.reason}`,
+            costEstimate: selected.expectedTotalCost,
+            baselineCost: acuEvaluation.recommendation.flagshipAlternative.estimatedCallCost,
+            savings: selected.savingsPercentVsFlagship,
+            tierConfigs: {
+              ...baseTiers,
+              [tier]: {
+                primary: selected.modelId,
+                fallback: [.../* @__PURE__ */ new Set([fallback, ...existingFallbacks])].filter((modelId2) => modelId2 !== selected.modelId)
+              }
+            }
+          };
+        }
+      }
       if (existingSession?.userExplicit) {
         modelId = existingSession.model;
         parsed.model = modelId;
@@ -5194,6 +6718,7 @@ data: [DONE]
         estimatedOutputTokens: maxTokens,
         costs
       });
+      if (acuEvaluation) trace.acu_demo = acuEvaluation;
       safeWrite(res, `event: acu_trace
 data: ${JSON.stringify(trace)}
 
@@ -5339,7 +6864,8 @@ data: ${JSON.stringify(trace)}
         validator_result: validator.result,
         validator: validator.validator,
         ...validator.result !== "not_applicable" && { validator_pass: validator.result === "pass" },
-        validator_reason: validator.reason ?? "not_applicable"
+        validator_reason: validator.reason ?? "not_applicable",
+        ...acuEvaluation && { acu_demo: acuEvaluation }
       };
       if (debugMode) responseBody = injectTraceIntoJsonResponse(responseBody, trace);
       const ledgerEntry = {
@@ -5504,17 +7030,17 @@ var blockrunProvider = {
 };
 
 // src/auth.ts
-import { readFileSync, existsSync, writeFileSync, mkdirSync } from "fs";
-import { join as join5 } from "path";
-import { homedir as homedir4 } from "os";
+import { readFileSync as readFileSync2, existsSync as existsSync2, writeFileSync as writeFileSync2, mkdirSync as mkdirSync2 } from "fs";
+import { join as join6 } from "path";
+import { homedir as homedir5 } from "os";
 import { randomBytes } from "crypto";
-var CONFIG_DIR = join5(homedir4(), ".claw-router");
+var CONFIG_DIR = join6(homedir5(), ".claw-router");
 function resolveApiKey() {
   const envKey = process.env.OPENROUTER_API_KEY;
   if (envKey?.trim()) return envKey.trim();
-  const keyFile = join5(CONFIG_DIR, "api-key");
-  if (existsSync(keyFile)) {
-    const key = readFileSync(keyFile, "utf-8").trim();
+  const keyFile = join6(CONFIG_DIR, "api-key");
+  if (existsSync2(keyFile)) {
+    const key = readFileSync2(keyFile, "utf-8").trim();
     if (key) return key;
   }
   throw new Error("OPENROUTER_API_KEY not set. Set env var or save to ~/.claw-router/api-key");
@@ -5526,41 +7052,41 @@ function resolveProxyBaseUrl() {
   return process.env.PROXY_BASE_URL?.trim() || void 0;
 }
 function saveApiKey(key) {
-  mkdirSync(CONFIG_DIR, { recursive: true });
-  writeFileSync(join5(CONFIG_DIR, "api-key"), key.trim() + "\n", { mode: 384 });
-  console.log(`[ClawRouter] API key saved to ${join5(CONFIG_DIR, "api-key")}`);
+  mkdirSync2(CONFIG_DIR, { recursive: true });
+  writeFileSync2(join6(CONFIG_DIR, "api-key"), key.trim() + "\n", { mode: 384 });
+  console.log(`[ClawRouter] API key saved to ${join6(CONFIG_DIR, "api-key")}`);
 }
 
 // src/index.ts
-import { existsSync as existsSync2, readdirSync, mkdirSync as mkdirSync2, copyFileSync } from "fs";
-import { homedir as homedir5 } from "os";
-import { join as join6, dirname as dirname2 } from "path";
+import { existsSync as existsSync3, readdirSync, mkdirSync as mkdirSync3, copyFileSync } from "fs";
+import { homedir as homedir6 } from "os";
+import { join as join7, dirname as dirname3 } from "path";
 import { fileURLToPath as fileURLToPath2 } from "url";
 function getPackageRoot() {
-  return join6(dirname2(fileURLToPath2(import.meta.url)), "..");
+  return join7(dirname3(fileURLToPath2(import.meta.url)), "..");
 }
 function installSkillsToWorkspace(logger) {
   try {
     const packageRoot = getPackageRoot();
-    const bundledSkillsDir = join6(packageRoot, "skills");
-    if (!existsSync2(bundledSkillsDir)) return;
+    const bundledSkillsDir = join7(packageRoot, "skills");
+    if (!existsSync3(bundledSkillsDir)) return;
     const profile = (process["env"].OPENCLAW_PROFILE ?? "").trim().toLowerCase();
     const workspaceDirName = profile && profile !== "default" ? `workspace-${profile}` : "workspace";
-    const workspaceSkillsDir = join6(homedir5(), ".openclaw", workspaceDirName, "skills");
-    mkdirSync2(workspaceSkillsDir, { recursive: true });
+    const workspaceSkillsDir = join7(homedir6(), ".openclaw", workspaceDirName, "skills");
+    mkdirSync3(workspaceSkillsDir, { recursive: true });
     const entries = readdirSync(bundledSkillsDir, { withFileTypes: true });
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
-      const srcSkillFile = join6(bundledSkillsDir, entry.name, "SKILL.md");
-      const dstSkillDir = join6(workspaceSkillsDir, entry.name);
-      const dstSkillFile = join6(dstSkillDir, "SKILL.md");
-      if (!existsSync2(srcSkillFile)) continue;
-      if (existsSync2(dstSkillFile)) {
+      const srcSkillFile = join7(bundledSkillsDir, entry.name, "SKILL.md");
+      const dstSkillDir = join7(workspaceSkillsDir, entry.name);
+      const dstSkillFile = join7(dstSkillDir, "SKILL.md");
+      if (!existsSync3(srcSkillFile)) continue;
+      if (existsSync3(dstSkillFile)) {
         const src = __require("fs").readFileSync(srcSkillFile, "utf-8");
         const dst = __require("fs").readFileSync(dstSkillFile, "utf-8");
         if (src === dst) continue;
       }
-      mkdirSync2(dstSkillDir, { recursive: true });
+      mkdirSync3(dstSkillDir, { recursive: true });
       copyFileSync(srcSkillFile, dstSkillFile);
       logger.info(`Installed skill: ${entry.name}`);
     }
@@ -5600,6 +7126,8 @@ var plugin = {
 };
 var index_default = plugin;
 export {
+  AcuDemoStrategy,
+  AcuJudgeClient,
   BLOCKRUN_MODELS,
   DEFAULT_ROUTING_CONFIG,
   MODEL_ALIASES,
@@ -5609,9 +7137,16 @@ export {
   SessionStore,
   VERSION,
   blockrunProvider,
+  buildModelCurve,
   buildProviderModels,
   calculateModelCost,
+  continuousTierProbabilities,
   index_default as default,
+  difficultyScore,
+  estimateCallCost,
+  estimatedQuality,
+  getAcuCatalog,
+  getAcuModel,
   getFallbackChain,
   getModelContextWindow,
   getProxyPort,
@@ -5619,12 +7154,21 @@ export {
   hashRequestContent,
   isReasoningModel,
   logUsage,
+  normalizeProbabilities,
+  parseJudgeResult,
+  publicCatalogPayload,
+  readAcuRuntimeConfig,
+  recommendModel,
   resolveApiKey,
   resolveModelAlias,
   route,
+  rulesFallbackJudge,
   saveApiKey,
+  serializeVisibleContext,
+  solveAbilityParameter,
   startProxy,
   supportsToolCalling,
-  supportsVision
+  supportsVision,
+  tierSufficiency
 };
 //# sourceMappingURL=index.js.map

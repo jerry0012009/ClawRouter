@@ -1,0 +1,109 @@
+{
+  "prompt_version": "acu-tier-requirement-v1",
+  "examples": [
+    {
+      "example_id": "low-1",
+      "source_context_id": "bfcl_live_irrelevance_254-53-2_step_1",
+      "source_context_sha256": "ddfb37c91e867cc1fe26ef73497b3c771666cb65e834101fba6834771383c940",
+      "prompt_context_sha256": "ddfb37c91e867cc1fe26ef73497b3c771666cb65e834101fba6834771383c940",
+      "minimum_sufficient_tier": "low",
+      "label_confidence": "strong_ground_truth_ready",
+      "pipeline_stage": "ground_truth_ready",
+      "selection": "short strong-label prefix; stable prompt-version hash; up to two scenario-diverse rows",
+      "future_messages_included": false,
+      "model_brand_redaction": true,
+      "benchmark_name_redaction": true
+    },
+    {
+      "example_id": "low-2",
+      "source_context_id": "bfcl_live_irrelevance_253-53-1_step_1",
+      "source_context_sha256": "4ebb4648a065b9d91e7d889d8390de365f9e12275c6aacb6afefd6a234695aa7",
+      "prompt_context_sha256": "4ebb4648a065b9d91e7d889d8390de365f9e12275c6aacb6afefd6a234695aa7",
+      "minimum_sufficient_tier": "low",
+      "label_confidence": "strong_ground_truth_ready",
+      "pipeline_stage": "ground_truth_ready",
+      "selection": "short strong-label prefix; stable prompt-version hash; up to two scenario-diverse rows",
+      "future_messages_included": false,
+      "model_brand_redaction": true,
+      "benchmark_name_redaction": true
+    },
+    {
+      "example_id": "mid-1",
+      "source_context_id": "bfcl_live_multiple_181-76-1_step_1",
+      "source_context_sha256": "55d2a9467dcb2a671d3e160d05519789bb41abb3a51121dbfa9fb0ff0e7b698d",
+      "prompt_context_sha256": "55d2a9467dcb2a671d3e160d05519789bb41abb3a51121dbfa9fb0ff0e7b698d",
+      "minimum_sufficient_tier": "mid",
+      "label_confidence": "strong_ground_truth_ready",
+      "pipeline_stage": "ground_truth_ready",
+      "selection": "short strong-label prefix; stable prompt-version hash; up to two scenario-diverse rows",
+      "future_messages_included": false,
+      "model_brand_redaction": true,
+      "benchmark_name_redaction": true
+    },
+    {
+      "example_id": "mid-2",
+      "source_context_id": "bfcl_multi_turn_long_context_4_step_1",
+      "source_context_sha256": "18d4ff15ab407047b4e0c8e653b821be280de3ad2ea41f944a38dab85c26cf31",
+      "prompt_context_sha256": "18d4ff15ab407047b4e0c8e653b821be280de3ad2ea41f944a38dab85c26cf31",
+      "minimum_sufficient_tier": "mid",
+      "label_confidence": "strong_ground_truth_ready",
+      "pipeline_stage": "ground_truth_ready",
+      "selection": "short strong-label prefix; stable prompt-version hash; up to two scenario-diverse rows",
+      "future_messages_included": false,
+      "model_brand_redaction": true,
+      "benchmark_name_redaction": true
+    },
+    {
+      "example_id": "mid_high-1",
+      "source_context_id": "bfcl_multi_turn_long_context_46_step_1",
+      "source_context_sha256": "428c4598e01048eef0573155e2fd6fc2f7c29d1d769c024b9dd8035098a48f6d",
+      "prompt_context_sha256": "428c4598e01048eef0573155e2fd6fc2f7c29d1d769c024b9dd8035098a48f6d",
+      "minimum_sufficient_tier": "mid_high",
+      "label_confidence": "strong_ground_truth_ready",
+      "pipeline_stage": "ground_truth_ready",
+      "selection": "short strong-label prefix; stable prompt-version hash; up to two scenario-diverse rows",
+      "future_messages_included": false,
+      "model_brand_redaction": true,
+      "benchmark_name_redaction": true
+    },
+    {
+      "example_id": "mid_high-2",
+      "source_context_id": "qmsum_TS3011c_spec_5_step_1",
+      "source_context_sha256": "38bd3d87801218e7d954f5a14b085ba5cffc6bc1b122938259151301f067af4c",
+      "prompt_context_sha256": "857080fc9bc8353b3b85d50f244677ecf9ec0753a41d131b24710e3c86fceeca",
+      "minimum_sufficient_tier": "mid_high",
+      "label_confidence": "strong_ground_truth_ready",
+      "pipeline_stage": "ground_truth_ready",
+      "selection": "short strong-label prefix; stable prompt-version hash; up to two scenario-diverse rows",
+      "future_messages_included": false,
+      "model_brand_redaction": true,
+      "benchmark_name_redaction": true
+    },
+    {
+      "example_id": "high-1",
+      "source_context_id": "mtrag_5815bb4a99e2a0d8a986348da4c49083_turn_2_step_1",
+      "source_context_sha256": "124408af7931a8f006297475cc60ebc292458383c5b60863e2c2eb70e10a24db",
+      "prompt_context_sha256": "8c004590d1c001c8122b5d26d726d3ed4b15ce7e8366e4aebaacc9e679b90cc6",
+      "minimum_sufficient_tier": "high",
+      "label_confidence": "strong_ground_truth_ready",
+      "pipeline_stage": "ground_truth_ready",
+      "selection": "short strong-label prefix; stable prompt-version hash; up to two scenario-diverse rows",
+      "future_messages_included": false,
+      "model_brand_redaction": true,
+      "benchmark_name_redaction": true
+    },
+    {
+      "example_id": "high-2",
+      "source_context_id": "pinchbench_task_05_summary_step_3",
+      "source_context_sha256": "5e7f8eb0375988bf9ccb0b389885b36ae97df279f4922546da3194bec69ceeb9",
+      "prompt_context_sha256": "f6319b9435085559faa14e58e0f72283eadcc3bfe703831bd931c6ff59415ccc",
+      "minimum_sufficient_tier": "high",
+      "label_confidence": "strong_mixed_model_validated",
+      "pipeline_stage": "mixed_model_validated",
+      "selection": "short strong-label prefix; stable prompt-version hash; up to two scenario-diverse rows",
+      "future_messages_included": false,
+      "model_brand_redaction": true,
+      "benchmark_name_redaction": true
+    }
+  ]
+}

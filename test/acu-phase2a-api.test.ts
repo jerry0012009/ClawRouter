@@ -90,6 +90,11 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
     expect(page.status).toBe(200);
     expect(await page.text()).toContain("请求难度与模型价值路由");
 
+    for (const assetPath of ["/public/acu.css", "/public/acu.js", "/acu/public/acu.css", "/acu/public/acu.js"]) {
+      const asset = await fetch(`${proxy.baseUrl}${assetPath}`, { headers: { Authorization: AUTHORIZATION } });
+      expect(asset.status, assetPath).toBe(200);
+    }
+
     const response = await fetch(`${proxy.baseUrl}/acu/api/catalog`, {
       headers: { Authorization: AUTHORIZATION },
     });

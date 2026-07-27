@@ -7076,13 +7076,13 @@ async function handleRequest(req, res, ctx) {
     }
     return;
   }
-  if (req.method === "GET" && (pathname === "/" || pathname === "/index.html" || pathname === "/acu" || pathname === "/acu/" || pathname === "/acu/curves" || pathname === "/acu/curves/" || pathname.startsWith("/public/"))) {
+  if (req.method === "GET" && (pathname === "/" || pathname === "/index.html" || pathname === "/acu" || pathname === "/acu/" || pathname === "/acu/curves" || pathname === "/acu/curves/" || pathname.startsWith("/public/") || pathname.startsWith("/acu/public/"))) {
     const { readFileSync: readFileSync3, existsSync: existsSync3 } = await import("fs");
     const { join: join7, dirname: dirname3 } = await import("path");
     const { fileURLToPath: fileURLToPath2 } = await import("url");
     const __dirname2 = dirname3(fileURLToPath2(import.meta.url));
     const publicDir = join7(__dirname2, "..", "public");
-    const filePath = pathname === "/" || pathname === "/index.html" ? join7(publicDir, "index.html") : pathname === "/acu" || pathname === "/acu/" ? join7(publicDir, "acu.html") : pathname === "/acu/curves" || pathname === "/acu/curves/" ? join7(publicDir, "acu-curves.html") : join7(publicDir, pathname.replace("/public/", ""));
+    const filePath = pathname === "/" || pathname === "/index.html" ? join7(publicDir, "index.html") : pathname === "/acu" || pathname === "/acu/" ? join7(publicDir, "acu.html") : pathname === "/acu/curves" || pathname === "/acu/curves/" ? join7(publicDir, "acu-curves.html") : join7(publicDir, pathname.replace(/^\/acu\/public\//, "").replace(/^\/public\//, ""));
     if (existsSync3(filePath)) {
       const ext = filePath.split(".").pop() || "html";
       const mime = { html: "text/html", css: "text/css", js: "application/javascript", json: "application/json", png: "image/png", svg: "image/svg+xml" };

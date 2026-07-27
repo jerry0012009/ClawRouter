@@ -1086,7 +1086,7 @@ async function handleRequest(
   // ── Only handle chat completions from here ──
 
   // ── Static file serving (frontend) ──
-  if (req.method === "GET" && (pathname === "/" || pathname === "/index.html" || pathname === "/acu" || pathname === "/acu/" || pathname === "/acu/curves" || pathname === "/acu/curves/" || pathname.startsWith("/public/"))) {
+  if (req.method === "GET" && (pathname === "/" || pathname === "/index.html" || pathname === "/acu" || pathname === "/acu/" || pathname === "/acu/curves" || pathname === "/acu/curves/" || pathname.startsWith("/public/") || pathname.startsWith("/acu/public/"))) {
     const { readFileSync, existsSync } = await import("node:fs");
     const { join, dirname } = await import("node:path");
     const { fileURLToPath } = await import("node:url");
@@ -1098,7 +1098,7 @@ async function handleRequest(
         ? join(publicDir, "acu.html")
       : pathname === "/acu/curves" || pathname === "/acu/curves/"
         ? join(publicDir, "acu-curves.html")
-      : join(publicDir, pathname.replace("/public/", ""));
+      : join(publicDir, pathname.replace(/^\/acu\/public\//, "").replace(/^\/public\//, ""));
     if (existsSync(filePath)) {
       const ext = filePath.split(".").pop() || "html";
       const mime: Record<string, string> = { html: "text/html", css: "text/css", js: "application/javascript", json: "application/json", png: "image/png", svg: "image/svg+xml" };

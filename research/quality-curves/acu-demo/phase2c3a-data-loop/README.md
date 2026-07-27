@@ -23,6 +23,8 @@ Dev 使用 `/var/lib/clawrouter-dev/acu-routing.db`，WAL 模式。数据库只�
 
 最终 Dev 运行时 Mock 扫描见 `runtime_mock_audit.json`，统计接口的脱敏快照见 `data_summary_example.json`，整合页面截图见 `integrated_dev_page.png`。
 
+P0 主页面接线修复后的四个公网案例、质量偏好切换、Network URL 和 SQLite 增量见 `p0_e2e_validation.json`；最终主页面截图见 `p0_integrated_dev_page.png`。Dev 使用 `ACU_SHADOW_MODE=false`，生产配置未修改。
+
 ## 数据质量边界
 
 `routing_requests` 的粒度是一行一次评估/路由请求；`model_candidate_scores` 是请求×候选模型；反馈和自动弱标签各自保留来源，不能混作同置信度标签。`GET /acu/api/data-summary` 在少于 20 个请求时固定返回“小样本仅用于产品验证”提示。当前真实样本仍不足以重新拟合曲线。

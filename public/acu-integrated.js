@@ -1,7 +1,7 @@
 (() => {
   const prefix = location.pathname.match(/^\/(acu-router(?:-dev)?)(?:\/|$)/)?.[1];
   const api = prefix ? `${location.origin}/${prefix}/acu/api` : `${location.origin}/acu/api`;
-  const chatApi = prefix ? `${location.origin}/${prefix}/v1/chat/completions` : `${location.origin}/v1/chat/completions`;
+  const safeFetch = (target, options) => window.AcuApiPrefix.fetchFrom(location.pathname, target, options);
   const colors = ['#90e8a0','#ffd76a','#9fc7ff','#ff8fa3','#b7a1ff','#67d8c2'];
   let catalog;
   let latestEvaluation;
@@ -55,28 +55,32 @@
     $('acu-integrated-legend').innerHTML=defaults.map((model,index)=>{const item=estimates.get(model.modelId);return `<div class="acu-legend-row"><strong><b style="color:${colors[index]}">${model.displayName}</b><em>${item?score(item.predictedScore):'—'}</em></strong><span>${item?money(item.expectedTotalCost):'—'}</span></div>`}).join('');
   }
 
-  function render(evaluation, messages) {
+  function render(evaluation, messages, trace) {
     latestEvaluation=evaluation;latestMessages=messages||latestMessages||currentMessages();
     const [label,cls]=sourceLabel(evaluation), badge=$('acu-source-badge');badge.textContent=label;badge.className=`acu-source-badge ${cls}`;
+    $('acu-routing-mode').textContent=evaluation.shadowMode?'路由模式：Shadow观察':'路由模式：ACU实际执行';
     $('acu-live-difficulty').textContent=score(evaluation.difficultyScore);
     $('acu-tier-probabilities').innerHTML=[['Low',evaluation.judge.pLow],['Mid',evaluation.judge.pMid],['Mid-high',evaluation.judge.pMidHigh],['High',evaluation.judge.pHigh]].map(([name,value])=>`<div><span>${name}</span><b>${(value*100).toFixed(1)}%</b></div>`).join('');
-    const rec=evaluation.recommendation.recommended;$('acu-live-recommendation').textContent=`${rec.displayName} · ${score(rec.predictedScore)} · ${money(rec.expectedTotalCost)}`;$('acu-live-reason').textContent=evaluation.recommendation.reason;
+    const rec=evaluation.recommendation.recommended, actual=evaluation.actualModel||trace?.actual_model_used||'—', fallback=trace?.fallback_used===true;
+    $('acu-live-recommendation').textContent=`ACU推荐：${rec.displayName} · ${score(rec.predictedScore)} · ${money(rec.expectedTotalCost)}`;
+    $('acu-live-actual').textContent=`实际执行：${actual}`;
+    $('acu-live-application').textContent=evaluation.recommendationApplied?'推荐已执行':fallback?'执行中发生升级':evaluation.shadowMode?'Shadow模式未执行推荐':'推荐未执行';
+    $('acu-live-reason').textContent=`质量偏好 ${(evaluation.qualityTarget*100).toFixed(0)}分 · ${evaluation.recommendation.reason}`;
     $('acu-server-feedback').hidden=false;
-    $('acu-technical-details').innerHTML=[['状态',label],['上游模型',evaluation.judgeModel],['Provider',evaluation.judgeProvider],['Endpoint Host',evaluation.judgeEndpointHost],['延迟',`${evaluation.judgeLatencyMs} ms`],['Token',`${evaluation.judgePromptTokens}+${evaluation.judgeCompletionTokens} · ${evaluation.usageStatus}`],['Context hash',`…${evaluation.contextSha256.slice(-8)}`],['缓存键',`…${evaluation.cacheKeySha256.slice(-8)}`],['评估时间',evaluation.cacheCreatedAt],['Request ID',evaluation.requestId],['Shadow',String(evaluation.shadowMode)],['曲线版本',evaluation.routingModelVersion]].map(([key,value])=>`<div><dt>${key}</dt><dd>${value??'—'}</dd></div>`).join('');
+    $('acu-technical-details').innerHTML=[['状态',label],['路由模式',evaluation.shadowMode?'Shadow观察':'ACU实际执行'],['ACU推荐',rec.modelId],['实际执行',actual],['recommendationApplied',String(evaluation.recommendationApplied===true)],['当前质量偏好',`${(evaluation.qualityTarget*100).toFixed(0)}分`],['上游模型',evaluation.judgeModel],['Provider',evaluation.judgeProvider],['Endpoint Host',evaluation.judgeEndpointHost],['延迟',`${evaluation.judgeLatencyMs} ms`],['Token',`${evaluation.judgePromptTokens}+${evaluation.judgeCompletionTokens} · ${evaluation.usageStatus}`],['Context hash',`…${evaluation.contextSha256.slice(-8)}`],['缓存键',`…${evaluation.cacheKeySha256.slice(-8)}`],['评估时间',evaluation.cacheCreatedAt],['Request ID',evaluation.requestId],['曲线版本',evaluation.routingModelVersion]].map(([key,value])=>`<div><dt>${key}</dt><dd>${value??'—'}</dd></div>`).join('');
     drawChart(evaluation);
   }
 
   async function evaluate(force) {
-    const response=await fetch(`${api}/evaluate`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'auto',messages:latestMessages||currentMessages(),quality_target:Number($('quality-threshold')?.value||80)/100,expected_output_tokens:800,force_judge_refresh:force})});
+    const response=await safeFetch(`${api}/evaluate`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'auto',messages:latestMessages||currentMessages(),quality_target:Number($('quality-threshold')?.value||80)/100,expected_output_tokens:800,force_judge_refresh:force})});
     const payload=await response.json();if(!response.ok)throw new Error(payload.error?.message||'评估失败');render(payload,latestMessages||currentMessages());return payload;
   }
 
-  async function loadSummary(){try{const response=await fetch(`${api}/data-summary`);const data=await response.json();$('acu-real-requests').textContent=`${data.realRequestCount||0} 请求 · ${data.labeledRequestCount||0} 标签`;$('acu-data-notice').textContent=data.sampleNotice||`实时Judge ${data.realJudgeRequestCount} 次，缓存命中率 ${((data.cacheHitRate||0)*100).toFixed(1)}%。`;}catch{$('acu-data-notice').textContent='SQLite汇总暂不可用。'}}
+  async function loadSummary(){try{const response=await safeFetch(`${api}/data-summary`);const data=await response.json();$('acu-real-requests').textContent=`${data.realRequestCount||0} 请求 · ${data.labeledRequestCount||0} 标签`;$('acu-data-notice').textContent=data.sampleNotice||`实时Judge ${data.realJudgeRequestCount} 次，缓存命中率 ${((data.cacheHitRate||0)*100).toFixed(1)}%。`;}catch{$('acu-data-notice').textContent='SQLite汇总暂不可用。'}}
 
-  window.addEventListener('acu:evaluation',(event)=>{const trace=event.detail?.trace;const evaluation=trace?.acu_demo;if(evaluation)render(evaluation,currentMessages())});
+  window.addEventListener('acu:evaluation',(event)=>{const trace=event.detail?.trace;const evaluation=trace?.acu_demo;if(evaluation)render(evaluation,currentMessages(),trace)});
   $('acu-force-refresh')?.addEventListener('click',async(event)=>{event.currentTarget.disabled=true;try{await evaluate(true)}catch(error){alert(error.message)}finally{event.currentTarget.disabled=false}});
-  $('acu-execute-recommended')?.addEventListener('click',async(event)=>{if(!latestEvaluation)return;event.currentTarget.disabled=true;try{const response=await fetch(chatApi,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'auto',messages:latestMessages||currentMessages(),max_tokens:800,cache:false,acu_quality_target:Number($('quality-threshold')?.value||80)/100,acu_execute_recommended:true})});if(!response.ok)throw new Error('推荐模型执行失败');$('acu-live-reason').textContent=`已按 ${latestEvaluation.recommendation.recommended.displayName} 执行；响应保留在主路由链路。`;}catch(error){alert(error.message)}finally{event.currentTarget.disabled=false}});
-  document.querySelectorAll('#acu-server-feedback button[data-accepted]').forEach((button)=>button.addEventListener('click',async()=>{if(!latestEvaluation)return;const body={request_id:latestEvaluation.requestId,accepted:button.dataset.accepted==='true',rating:Number($('acu-feedback-rating').value),required_upgrade:$('acu-feedback-upgrade').checked,final_model:latestEvaluation.recommendation.recommended.modelId};const response=await fetch(`${api}/feedback`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});$('acu-feedback-status').textContent=response.ok?'已写入 SQLite':'写入失败';if(response.ok)loadSummary()}));
-  Promise.all([fetch(`${api}/catalog`).then(r=>r.json()),loadSummary()]).then(([data])=>{catalog=data;if(latestEvaluation)drawChart(latestEvaluation)}).catch(()=>{$('acu-data-notice').textContent='ACU目录加载失败。'});
+  document.querySelectorAll('#acu-server-feedback button[data-accepted]').forEach((button)=>button.addEventListener('click',async()=>{if(!latestEvaluation)return;const body={request_id:latestEvaluation.requestId,accepted:button.dataset.accepted==='true',rating:Number($('acu-feedback-rating').value),required_upgrade:$('acu-feedback-upgrade').checked,final_model:latestEvaluation.actualModel||latestEvaluation.recommendation.recommended.modelId};const response=await safeFetch(`${api}/feedback`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});$('acu-feedback-status').textContent=response.ok?'已写入 SQLite':'写入失败';if(response.ok)loadSummary()}));
+  Promise.all([safeFetch(`${api}/catalog`).then(r=>r.json()),loadSummary()]).then(([data])=>{catalog=data;if(latestEvaluation)drawChart(latestEvaluation)}).catch(()=>{$('acu-data-notice').textContent='ACU目录加载失败。'});
   window.addEventListener('resize',()=>{if(latestEvaluation)drawChart(latestEvaluation)});
 })();

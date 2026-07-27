@@ -1,0 +1,104 @@
+{
+  "captured_at": "2026-07-27T11:58:40Z",
+  "public_dev_url": "https://eu.jerrypsy.top/acu-router-dev/",
+  "network_request_url": "https://eu.jerrypsy.top/acu-router-dev/v1/chat/completions",
+  "production_request_url_observed": false,
+  "official_cases": [
+    {
+      "case_id": "structured_extraction",
+      "request_id": "9f7271ce-1f45-4e63-bd69-3e70854157fa",
+      "judge_status": "live",
+      "difficulty_score": 5.0,
+      "recommended_model": "qwen3.6-plus",
+      "actual_model": "qwen3.6-plus",
+      "recommendation_applied": true,
+      "fallback_used": false,
+      "predicted_score": 91.8379773952435,
+      "expected_total_cost": 0.000882216522686772,
+      "actual_cost": 0.00081085,
+      "sqlite_final_status": "completed"
+    },
+    {
+      "case_id": "ordinary_writing",
+      "request_id": "e79aa30e-5b9b-4dbe-9ceb-05e8af653e74",
+      "judge_status": "live",
+      "difficulty_score": 5.0,
+      "recommended_model": "qwen3.6-plus",
+      "actual_model": "qwen3.6-plus",
+      "recommendation_applied": true,
+      "fallback_used": false,
+      "predicted_score": 91.8379773952435,
+      "expected_total_cost": 0.00087475686788823,
+      "actual_cost": 0.0016059,
+      "sqlite_final_status": "completed"
+    },
+    {
+      "case_id": "multi_step_code_fix",
+      "request_id": "3d912d9a-f3ba-42f8-84ab-eaed43860719",
+      "judge_status": "live",
+      "difficulty_score": 85.0,
+      "recommended_model": "claude-opus-4-8",
+      "actual_model": "claude-opus-4-8",
+      "recommendation_applied": true,
+      "fallback_used": false,
+      "predicted_score": 45.9768252478519,
+      "expected_total_cost": 0.00368211303475663,
+      "actual_cost": 0.00189,
+      "sqlite_final_status": "completed"
+    },
+    {
+      "case_id": "complex_reasoning",
+      "request_id": "ad2fe057-ef61-4a20-89f5-4256a94c8bb5",
+      "judge_status": "live",
+      "difficulty_score": 85.0,
+      "recommended_model": "claude-opus-4-8",
+      "actual_model": "claude-opus-4-8",
+      "recommendation_applied": true,
+      "fallback_used": false,
+      "predicted_score": 45.9768252478519,
+      "expected_total_cost": 0.0036878383741772,
+      "actual_cost": 0.001895,
+      "sqlite_final_status": "completed"
+    }
+  ],
+  "quality_preference_check": {
+    "difficulty_score": 55.0,
+    "low_preference": {
+      "quality_target": 0.60,
+      "request_id": "cf4940ec-abaf-4cb0-abbc-ac3f977ef4e3",
+      "judge_status": "cache_hit",
+      "recommended_model": "kimi-k2.7-code",
+      "actual_model": "kimi-k2.7-code",
+      "recommendation_applied": true
+    },
+    "high_preference": {
+      "quality_target": 0.95,
+      "request_id": "255ddd6f-76dd-411a-bf81-7b7c3f1aebb5",
+      "judge_status": "cache_hit",
+      "recommended_model": "claude-opus-4-8",
+      "actual_model": "claude-opus-4-8",
+      "recommendation_applied": true
+    },
+    "recommendation_changed": true
+  },
+  "browser_page_check": {
+    "request_id": "959ab5c9-9e0b-4c45-aa65-2ea09bc31885",
+    "judge_status": "live",
+    "difficulty_score": 10.0,
+    "recommended_model": "qwen3.6-plus",
+    "actual_model": "gemini-2.5-flash",
+    "recommendation_applied": false,
+    "fallback_used": true,
+    "displayed_execution_status": "执行中发生升级",
+    "observed_network_urls": [
+      "https://eu.jerrypsy.top/acu-router-dev/acu/api/catalog",
+      "https://eu.jerrypsy.top/acu-router-dev/acu/api/data-summary",
+      "https://eu.jerrypsy.top/acu-router-dev/v1/chat/completions"
+    ]
+  },
+  "sqlite_count_before_p0": 18,
+  "sqlite_count_after_p0": 31,
+  "sqlite_total_increment": 13,
+  "official_case_increment": 4,
+  "notes": "Total increment also includes preference checks, browser smoke testing, one long-tail retry/fallback probe, and evaluate-only diagnostics. No rows were deleted."
+}

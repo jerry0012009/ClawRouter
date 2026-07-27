@@ -6899,7 +6899,7 @@ var MAX_FALLBACK_ATTEMPTS = 5;
 var RATE_LIMIT_COOLDOWN_MS = 6e4;
 var OVERLOAD_COOLDOWN_MS = 15e3;
 var MAX_MESSAGES = 200;
-var ACU_PREFIX = "/acu-router";
+var ACU_PREFIX_PATTERN = /^\/acu-router(?:-dev)?(?=\/|\?|$)/;
 var DEFAULT_BASELINE_MODEL = "claude-opus-4-7";
 var ROUTING_PROFILES = /* @__PURE__ */ new Set(["auto", "eco", "premium"]);
 var rateLimitedModels = /* @__PURE__ */ new Map();
@@ -6959,8 +6959,10 @@ function categorizeError(status, body) {
   return null;
 }
 function stripAcuPrefix(url) {
-  if (!url?.startsWith(ACU_PREFIX)) return url || "/";
-  const stripped = url.slice(ACU_PREFIX.length);
+  if (!url) return "/";
+  const match = url.match(ACU_PREFIX_PATTERN);
+  if (!match) return url;
+  const stripped = url.slice(match[0].length);
   if (!stripped) return "/";
   if (stripped.startsWith("?")) return `/${stripped}`;
   return stripped;
@@ -7088,6 +7090,10 @@ function parseUsage(responseBody, estimatedInputTokens, estimatedOutputTokens) {
 }
 function getFallbackUsed(attempts, actualModelUsed, selectedModel) {
   return attempts.length > 1 || Boolean(selectedModel && selectedModel !== actualModelUsed);
+}
+function setAcuExecutionResult(evaluation, recommendationSelected, actualModel) {
+  evaluation.actualModel = actualModel;
+  evaluation.recommendationApplied = recommendationSelected && actualModel === evaluation.recommendation.recommended.modelId;
 }
 function buildStreamingTrace(args) {
   const fallbackUsed = getFallbackUsed(args.attempts, args.actualModelUsed, args.routingDecision?.model);
@@ -7724,6 +7730,7 @@ async function handleRequest(req, res, ctx) {
   let routingProfile = null;
   let routingDecision;
   let acuEvaluation;
+  let acuRecommendationSelected = false;
   let hasTools = false;
   let hasVision = false;
   let bodyModified = false;
@@ -7819,9 +7826,17 @@ async function handleRequest(req, res, ctx) {
               }
             }
           };
+          acuRecommendationSelected = true;
         }
       }
-      if (existingSession?.userExplicit) {
+      if (acuRecommendationSelected) {
+        modelId = routingDecision.model;
+        parsed.model = modelId;
+        bodyModified = true;
+        if (effectiveSessionId) {
+          ctx.sessionStore.setSession(effectiveSessionId, routingDecision.model, routingDecision.tier);
+        }
+      } else if (existingSession?.userExplicit) {
         modelId = existingSession.model;
         parsed.model = modelId;
         bodyModified = true;
@@ -7896,7 +7911,7 @@ async function handleRequest(req, res, ctx) {
     }
   }
   const requestHeaders = normalizeRequestHeaders(req);
-  const allowResponseCache = ctx.responseCache.shouldCache(body, requestHeaders);
+  const allowResponseCache = routingProfile === null && ctx.responseCache.shouldCache(body, requestHeaders);
   const respCached = allowResponseCache ? ctx.responseCache.get(dedupKey) : void 0;
   if (respCached) {
     const headers = { "Content-Type": "application/json", "X-Cache-Hit": "true" };
@@ -8169,7 +8184,10 @@ data: [DONE]
         estimatedOutputTokens: maxTokens,
         costs
       });
-      if (acuEvaluation) trace.acu_demo = acuEvaluation;
+      if (acuEvaluation) {
+        setAcuExecutionResult(acuEvaluation, acuRecommendationSelected, actualModelUsed);
+        trace.acu_demo = acuEvaluation;
+      }
       safeWrite(res, `event: acu_trace
 data: ${JSON.stringify(trace)}
 
@@ -8289,6 +8307,7 @@ data: ${JSON.stringify(trace)}
         savings2 = costs.savings;
       }
       const fallbackUsed = getFallbackUsed(attempts, actualModelUsed, routingDecision?.model);
+      if (acuEvaluation) setAcuExecutionResult(acuEvaluation, acuRecommendationSelected, actualModelUsed);
       const trace = {
         ...buildRuleTraceSignals(parsedMessages, maxTokens, ctx.routerOpts.config),
         request_id: requestId,
@@ -8433,6 +8452,10 @@ data: [DONE]
           estimatedOutputTokens: maxTokens,
           costs
         });
+        if (acuEvaluation) {
+          setAcuExecutionResult(acuEvaluation, acuRecommendationSelected, actualModelUsed);
+          trace.acu_demo = acuEvaluation;
+        }
         safeWrite(res, `event: acu_trace
 data: ${JSON.stringify(trace)}
 

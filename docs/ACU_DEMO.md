@@ -1,4 +1,4 @@
-# ACU Phase 2C / 3A Shadow 价值路由
+# ACU Phase 2C / 3A 价值路由
 
 ACU Demo 把一次 OpenAI-compatible API 请求的完整可见上下文转换为四档最低充分能力需求概率，再将概率与公开 Benchmark 约束生成的模型档位充分率结合，给出预计模型得分、预计综合成本与价值路由建议。
 
@@ -17,7 +17,7 @@ export ACU_JUDGE_MODE=non-thinking
 export ACU_JUDGE_PROMPT_VERSION=acu-tier-requirement-v2
 export ACU_JUDGE_TIMEOUT_MS=8000
 export ACU_JUDGE_MAX_CONTEXT_TOKENS=6000
-export ACU_SHADOW_MODE=true
+export ACU_SHADOW_MODE=false # isolated Dev actual-routing deployment only
 export ACU_ALLOW_MOCK=false
 export ACU_DATABASE_PATH=/var/lib/clawrouter-dev/acu-routing.db
 npm run build
@@ -57,7 +57,9 @@ npm run build
 }
 ```
 
-自动聊天路由继续使用 `model: "auto"`，可额外传 `acu_quality_target`。Dev 默认 Shadow：原路由模型正常执行，ACU 建议写入 trace 和 SQLite；只有显式传 `acu_execute_recommended: true` 才执行建议模型。这些字段转发前都会删除。
+自动聊天路由继续使用 `model: "auto"`，并用 `acu_quality_target` 传入页面质量偏好。隔离 Dev 实例使用 `ACU_SHADOW_MODE=false`，因此正常请求直接采用 ACU 推荐；生产实例仍保持原配置和 `RulesStrategy`。如需观察模式，可在独立环境设置 `ACU_SHADOW_MODE=true`。这些控制字段转发上游前都会删除。
+
+页面 API 前缀通过完整路径段识别 `/acu-router/` 与 `/acu-router-dev/`。Dev 页面若尝试请求不带 `-dev` 的生产前缀，会在发出网络请求前抛出 `Dev page attempted to call production API.`。
 
 ## 计算边界
 

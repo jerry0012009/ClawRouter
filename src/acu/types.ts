@@ -157,6 +157,8 @@ export type AcuEvaluation = {
   judgeEntropy: number;
   routingModelVersion: string;
   shadowMode: boolean;
+  actualModel?: string;
+  recommendationApplied?: boolean;
   requestId: string;
   qualityTarget: number;
   recommendation: AcuRecommendation;

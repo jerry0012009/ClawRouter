@@ -88,7 +88,7 @@ const MAX_FALLBACK_ATTEMPTS = 5;
 const RATE_LIMIT_COOLDOWN_MS = 60_000;
 const OVERLOAD_COOLDOWN_MS = 15_000;
 const MAX_MESSAGES = 200;
-const ACU_PREFIX = "/acu-router";
+const ACU_PREFIX_PATTERN = /^\/acu-router(?:-dev)?(?=\/|\?|$)/;
 const DEFAULT_BASELINE_MODEL = "claude-opus-4-7";
 
 // ── Routing profile virtual models ──
@@ -211,8 +211,10 @@ type AcuTrace = {
 };
 
 function stripAcuPrefix(url: string | undefined): string {
-  if (!url?.startsWith(ACU_PREFIX)) return url || "/";
-  const stripped = url.slice(ACU_PREFIX.length);
+  if (!url) return "/";
+  const match = url.match(ACU_PREFIX_PATTERN);
+  if (!match) return url;
+  const stripped = url.slice(match[0].length);
   if (!stripped) return "/";
   if (stripped.startsWith("?")) return `/${stripped}`;
   return stripped;
@@ -387,6 +389,16 @@ function parseUsage(responseBody: string, estimatedInputTokens: number, estimate
 
 function getFallbackUsed(attempts: AcuAttemptTrace[], actualModelUsed: string, selectedModel?: string): boolean {
   return attempts.length > 1 || Boolean(selectedModel && selectedModel !== actualModelUsed);
+}
+
+function setAcuExecutionResult(
+  evaluation: AcuEvaluation,
+  recommendationSelected: boolean,
+  actualModel: string,
+): void {
+  evaluation.actualModel = actualModel;
+  evaluation.recommendationApplied = recommendationSelected
+    && actualModel === evaluation.recommendation.recommended.modelId;
 }
 
 function buildStreamingTrace(args: {
@@ -1227,6 +1239,7 @@ async function handleRequest(
   let routingProfile: "eco" | "auto" | "premium" | null = null;
   let routingDecision: RoutingDecision | undefined;
   let acuEvaluation: AcuEvaluation | undefined;
+  let acuRecommendationSelected = false;
   let hasTools = false;
   let hasVision = false;
   let bodyModified = false;
@@ -1340,10 +1353,18 @@ async function handleRequest(
               },
             },
           };
+          acuRecommendationSelected = true;
         }
       }
 
-      if (existingSession?.userExplicit) {
+      if (acuRecommendationSelected) {
+        modelId = routingDecision.model;
+        parsed.model = modelId;
+        bodyModified = true;
+        if (effectiveSessionId) {
+          ctx.sessionStore.setSession(effectiveSessionId, routingDecision.model, routingDecision.tier);
+        }
+      } else if (existingSession?.userExplicit) {
         modelId = existingSession.model;
         parsed.model = modelId;
         bodyModified = true;
@@ -1433,7 +1454,10 @@ async function handleRequest(
 
   // ── Response cache check ──
   const requestHeaders = normalizeRequestHeaders(req);
-  const allowResponseCache = ctx.responseCache.shouldCache(body, requestHeaders);
+  // Routed requests must produce a fresh trace/request_id and a distinct SQLite row.
+  // The Judge has its own content-addressed cache, so disabling response caching here
+  // does not add Judge cost for repeated contexts.
+  const allowResponseCache = routingProfile === null && ctx.responseCache.shouldCache(body, requestHeaders);
   const respCached = allowResponseCache ? ctx.responseCache.get(dedupKey) : undefined;
   if (respCached) {
     const headers = { "Content-Type": "application/json", "X-Cache-Hit": "true" };
@@ -1724,7 +1748,10 @@ async function handleRequest(
         estimatedOutputTokens: maxTokens,
         costs,
       });
-      if (acuEvaluation) trace.acu_demo = acuEvaluation;
+      if (acuEvaluation) {
+        setAcuExecutionResult(acuEvaluation, acuRecommendationSelected, actualModelUsed);
+        trace.acu_demo = acuEvaluation;
+      }
       safeWrite(res, `event: acu_trace\ndata: ${JSON.stringify(trace)}\n\n`);
     }
 
@@ -1848,6 +1875,7 @@ async function handleRequest(
       }
 
 	      const fallbackUsed = getFallbackUsed(attempts, actualModelUsed, routingDecision?.model);
+	      if (acuEvaluation) setAcuExecutionResult(acuEvaluation, acuRecommendationSelected, actualModelUsed);
 	      const trace: AcuTrace = {
         ...buildRuleTraceSignals(parsedMessages, maxTokens, ctx.routerOpts.config),
         request_id: requestId,
@@ -1982,6 +2010,10 @@ async function handleRequest(
           estimatedOutputTokens: maxTokens,
           costs,
         });
+        if (acuEvaluation) {
+          setAcuExecutionResult(acuEvaluation, acuRecommendationSelected, actualModelUsed);
+          trace.acu_demo = acuEvaluation;
+        }
         safeWrite(res, `event: acu_trace\ndata: ${JSON.stringify(trace)}\n\n`);
       }
       safeWrite(res, "data: [DONE]\n\n");

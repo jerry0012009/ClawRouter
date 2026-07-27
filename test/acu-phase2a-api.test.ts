@@ -78,6 +78,7 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
         cachePath: join(temporaryDirectory, "judge-cache.json"),
         databasePath: join(temporaryDirectory, "acu-routing.db"),
         allowForceRefresh: true,
+        shadowMode: false,
       },
     });
   });
@@ -97,7 +98,7 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
     expect(debugPage.status).toBe(200);
     expect(await debugPage.text()).toContain("请求难度与模型价值路由");
 
-    for (const assetPath of ["/public/acu.css", "/public/acu.js", "/acu/public/acu.css", "/acu/public/acu.js", "/acu-debug/public/acu.css", "/acu-debug/public/acu.js"]) {
+    for (const assetPath of ["/public/acu.css", "/public/acu.js", "/public/acu-api-prefix.js", "/acu/public/acu.css", "/acu/public/acu.js", "/acu-debug/public/acu.css", "/acu-debug/public/acu.js"]) {
       const asset = await fetch(`${proxy.baseUrl}${assetPath}`, { headers: { Authorization: AUTHORIZATION } });
       expect(asset.status, assetPath).toBe(200);
     }
@@ -186,12 +187,40 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
     });
     expect(response.status).toBe(200);
     const payload = await response.json() as {
-      acu_trace?: { acu_demo?: { judgeStatus: string }; selected_model?: string };
+      model?: string;
+      acu_trace?: {
+        acu_demo?: {
+          judgeStatus: string;
+          actualModel?: string;
+          recommendationApplied?: boolean;
+          recommendation: { recommended: { modelId: string } };
+        };
+        selected_model?: string;
+        actual_model_used?: string;
+      };
     };
     expect(payload.acu_trace?.acu_demo?.judgeStatus).toBe("live");
     expect(receivedModels[0]).toBe("deepseek-v4-flash");
     expect(receivedModels).toHaveLength(2);
     expect(receivedModels[1]).toBe(payload.acu_trace?.selected_model);
+    expect(payload.acu_trace?.selected_model).toBe(payload.acu_trace?.acu_demo?.recommendation.recommended.modelId);
+    expect(payload.acu_trace?.actual_model_used).toBe(payload.acu_trace?.selected_model);
+    expect(payload.acu_trace?.acu_demo?.actualModel).toBe(payload.acu_trace?.actual_model_used);
+    expect(payload.acu_trace?.acu_demo?.recommendationApplied).toBe(true);
+    expect(payload.model).toBe(payload.acu_trace?.actual_model_used);
+  });
+
+  it("does not write explicit baseline requests into ACU routing records", async () => {
+    const summary = () => fetch(`${proxy.baseUrl}/acu/api/data-summary`, { headers: { Authorization: AUTHORIZATION } })
+      .then((response) => response.json()) as Promise<{ realRequestCount: number }>;
+    const before = await summary();
+    const response = await fetch(`${proxy.baseUrl}/v1/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: AUTHORIZATION },
+      body: JSON.stringify({ model: "gemini-2.5-flash", messages: [{ role: "user", content: "Baseline only." }] }),
+    });
+    expect(response.status).toBe(200);
+    expect((await summary()).realRequestCount).toBe(before.realRequestCount);
   });
 
   it("keeps the request alive and reports RulesStrategy fallback on Judge errors", async () => {

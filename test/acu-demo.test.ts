@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
+import { runInNewContext } from "node:vm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { startProxy, type ProxyHandle } from "../src/proxy.js";
 
@@ -76,6 +77,19 @@ async function readFrontend(): Promise<string> {
 
 async function readProxySource(): Promise<string> {
   return readFile(join(process.cwd(), "src", "proxy.ts"), "utf8");
+}
+
+async function loadApiPrefixHelper(): Promise<{
+  resolve: (pathname: string, origin: string) => string;
+  assertSafeTarget: (pathname: string, target: string) => void;
+}> {
+  const source = await readFile(join(process.cwd(), "public", "acu-api-prefix.js"), "utf8");
+  const sandbox: Record<string, unknown> = {};
+  runInNewContext(source, sandbox);
+  return sandbox.AcuApiPrefix as {
+    resolve: (pathname: string, origin: string) => string;
+    assertSafeTarget: (pathname: string, target: string) => void;
+  };
 }
 
 describe("ACU Router demo reliability", () => {
@@ -200,12 +214,13 @@ describe("ACU Router demo reliability", () => {
     expect(body.acu_trace?.validator_result).toBe("not_applicable");
   });
 
-  it("supports /acu-router prefix for health, models, chat, and ledger", async () => {
-    const health = await fetch(`${proxy.baseUrl}/acu-router/health`);
-    expect(health.status).toBe(200);
-
-    const models = await fetch(`${proxy.baseUrl}/acu-router/v1/models`);
-    expect(models.status).toBe(200);
+  it("supports /acu-router and /acu-router-dev prefixes", async () => {
+    for (const prefix of ["/acu-router", "/acu-router-dev"]) {
+      const health = await fetch(`${proxy.baseUrl}${prefix}/health`);
+      expect(health.status, prefix).toBe(200);
+      const models = await fetch(`${proxy.baseUrl}${prefix}/v1/models`);
+      expect(models.status, prefix).toBe(200);
+    }
 
     const chat = await fetch(`${proxy.baseUrl}/acu-router/v1/chat/completions`, {
       method: "POST",
@@ -256,13 +271,27 @@ describe("ACU Router demo reliability", () => {
     expect(html).toContain("t?.estimated_cost");
     expect(html).toContain("trace?.fallback_used");
     expect(html).toContain("chatComplete(BASELINE_MODEL,messages)");
-    expect(html).toContain("chatComplete(ROUTER_MODEL,messages)");
+    expect(html).toContain("chatComplete(ROUTER_MODEL,messages,spec.threshold/100)");
     expect(html).toContain("cache:false");
     expect(html).not.toContain("max_tokens: maxTokens || 600");
     expect(html).not.toContain("payload.max_tokens");
     expect(html).not.toContain("acu_demo_key");
     expect(html).not.toContain("demo_key");
     expect(html).not.toContain("X-ACU-Demo-Key");
+  });
+
+  it("resolves production and Dev API prefixes without allowing Dev to call production", async () => {
+    const helper = await loadApiPrefixHelper();
+    expect(helper.resolve("/acu-router-dev/", "https://example.test")).toBe("https://example.test/acu-router-dev");
+    expect(helper.resolve("/acu-router/", "https://example.test")).toBe("https://example.test/acu-router");
+    expect(() => helper.assertSafeTarget(
+      "/acu-router-dev/acu",
+      "https://example.test/acu-router/v1/chat/completions",
+    )).toThrow("Dev page attempted to call production API.");
+    expect(() => helper.assertSafeTarget(
+      "/acu-router-dev/acu",
+      "https://example.test/acu-router-dev/v1/chat/completions",
+    )).not.toThrow();
   });
 
   it("does not add demo-only rate limiting on top of auth", async () => {

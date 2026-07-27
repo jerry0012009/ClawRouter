@@ -3,6 +3,7 @@ import type { AddressInfo } from "node:net";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createRequire } from "node:module";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { startProxy, type ProxyHandle } from "../src/proxy.js";
 
@@ -40,7 +41,11 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
         const content = visible.includes("JUDGE_FAILURE")
           ? "not valid judge json"
           : JSON.stringify({
-            difficulty_score: 14,
+            difficulty_score_raw: 14,
+            factors: {
+              reasoning_depth: 1.4, task_scope: 1.4, constraint_density: 1.4,
+              tool_dependency: 1.4, verification_burden: 1.4, context_burden: 1.4,
+            },
             p_low: 0.7,
             p_mid: 0.2,
             p_mid_high: 0.08,
@@ -150,10 +155,18 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
       requestId: string;
       judgeStatus: string;
       difficultyScore: number;
+      difficultyScoreRaw: number;
+      difficultyIndex: number;
+      difficultyMethodVersion: string;
+      difficultyFactors: Record<string, number>;
       recommendation: { recommended: { modelId: string; expectedTotalCost: number } };
     };
     expect(evaluation.judgeStatus).toBe("live");
     expect(evaluation.difficultyScore).toBeCloseTo(14, 10);
+    expect(evaluation.difficultyIndex).toBe(evaluation.difficultyScore);
+    expect(evaluation.difficultyScoreRaw).toBe(14);
+    expect(evaluation.difficultyMethodVersion).toBe("acu-difficulty-index-v1");
+    expect(Object.keys(evaluation.difficultyFactors)).toHaveLength(6);
     expect(evaluation.recommendation.recommended.modelId).toBeTruthy();
     expect(evaluation.recommendation.recommended.expectedTotalCost).toBeGreaterThan(0);
 
@@ -345,5 +358,24 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
     };
     expect(payload.judgeStatus).toBe("rules_fallback");
     expect(payload.judge.signals).toContain("rules_strategy_fallback");
+  });
+
+  it("persists v3 difficulty provenance without backfilling legacy semantics", () => {
+    const require = createRequire(import.meta.url);
+    const { DatabaseSync } = require("node:sqlite") as { DatabaseSync: new (path: string) => {
+      prepare: (sql: string) => { all: () => Array<Record<string, unknown>>; get: () => Record<string, unknown> };
+      close: () => void;
+    } };
+    const database = new DatabaseSync(join(temporaryDirectory, "acu-routing.db"));
+    try {
+      const columns = database.prepare("PRAGMA table_info(routing_requests)").all().map((row) => row.name);
+      expect(columns).toEqual(expect.arrayContaining([
+        "difficulty_score_raw", "difficulty_index", "reasoning_depth", "task_scope", "constraint_density",
+        "tool_dependency", "verification_burden", "context_burden", "difficulty_method_version",
+      ]));
+      const row = database.prepare("SELECT * FROM routing_requests WHERE prompt_version='acu-tier-requirement-v3' LIMIT 1").get();
+      expect(row.difficulty_index).toBe(row.difficulty_score);
+      expect(row.difficulty_method_version).toBe("acu-difficulty-index-v1");
+    } finally { database.close(); }
   });
 });

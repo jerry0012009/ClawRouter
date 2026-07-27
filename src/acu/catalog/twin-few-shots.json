@@ -1,53 +1,77 @@
 {
-  "promptVersion": "acu-tier-requirement-v2",
+  "promptVersion": "acu-tier-requirement-v3",
   "examples": [
     {
-      "exampleId": "low-1",
-      "context": "[SYSTEM]\nYou are a helpful assistant that can use tools.\n\n[USER]\nguide me",
+      "exampleId": "simple-rewrite-1",
+      "context": "[USER]\n把这句话改得更礼貌：今天把文件给我。",
       "minimumSufficientTier": "low",
-      "explanation": "单一明确动作，约束少，低档能力即可稳定完成。"
+      "explanation": "单句局部改写，范围和验证负担很低。",
+      "expected": {
+        "difficulty_score_raw": 8.7,
+        "factors": { "reasoning_depth": 0.8, "task_scope": 0.7, "constraint_density": 1.5, "tool_dependency": 0.0, "verification_burden": 1.0, "context_burden": 0.4 },
+        "p_low": 0.94, "p_mid": 0.05, "p_mid_high": 0.01, "p_high": 0.0, "confidence": 0.93,
+        "signals": ["single_rewrite", "no_tools"], "explanation": "单句礼貌改写，约束明确且容易核验。"
+      }
     },
     {
-      "exampleId": "low-2",
-      "context": "[SYSTEM]\nYou are a helpful assistant that can use tools.\n\n[USER]\ndelete all txt files",
+      "exampleId": "json-extraction-1",
+      "context": "[USER]\n从订单说明中提取order_id、amount和currency，只返回合法JSON，缺失值为null。",
       "minimumSufficientTier": "low",
-      "explanation": "单一明确动作，约束少，低档能力即可稳定完成。"
+      "explanation": "提取范围有限，但格式与字段约束提高了约束密度。",
+      "expected": {
+        "difficulty_score_raw": 22.6,
+        "factors": { "reasoning_depth": 1.3, "task_scope": 1.2, "constraint_density": 4.7, "tool_dependency": 0.0, "verification_burden": 1.1, "context_burden": 0.9 },
+        "p_low": 0.78, "p_mid": 0.20, "p_mid_high": 0.02, "p_high": 0.0, "confidence": 0.89,
+        "signals": ["strict_json", "field_constraints"], "explanation": "结构简单，但需严格满足JSON字段约束。"
+      }
     },
     {
-      "exampleId": "mid-1",
-      "context": "[SYSTEM]\nYou are a helpful assistant that can use tools.\n\n[USER]\nI'd like to know how to retrieve a weather forecast for New York City on the 4th of July this year.",
+      "exampleId": "code-fix-1",
+      "context": "[USER]\n修复这个Python函数在空列表时除零的问题，给出修改后的函数并解释原因。",
       "minimumSufficientTier": "mid",
-      "explanation": "存在多个约束或工具参数，需要中档能力保持一致性。"
+      "explanation": "需要定位边界条件、修改实现并解释，但范围局部。",
+      "expected": {
+        "difficulty_score_raw": 38.2,
+        "factors": { "reasoning_depth": 3.4, "task_scope": 3.2, "constraint_density": 2.8, "tool_dependency": 2.5, "verification_burden": 3.6, "context_burden": 1.4 },
+        "p_low": 0.24, "p_mid": 0.66, "p_mid_high": 0.09, "p_high": 0.01, "confidence": 0.84,
+        "signals": ["edge_case", "code_change"], "explanation": "局部代码修复，需要正确处理边界并保持行为。"
+      }
     },
     {
-      "exampleId": "mid-2",
-      "context": "[SYSTEM]\nYou are a helpful assistant that can use tools.\n\n[USER]\nCould you kindly show me the list of files in tmp directory in my file system including the hidden one?",
-      "minimumSufficientTier": "mid",
-      "explanation": "存在多个约束或工具参数，需要中档能力保持一致性。"
-    },
-    {
-      "exampleId": "mid_high-1",
-      "context": "[SYSTEM]\nYou are a helpful assistant that can use tools.\n\n[USER]\nDelete all the files in the 'Drafts' directory including the directory.",
+      "exampleId": "multi-file-fix-1",
+      "context": "[SYSTEM]\nYou can inspect and edit repository files and run tests.\n\n[USER]\n定位认证重试导致的重复写入，修改API层和存储层，补回归测试并说明兼容风险。",
       "minimumSufficientTier": "mid_high",
-      "explanation": "上下文依赖和执行状态较多，需要中高档能力综合处理。"
+      "explanation": "跨模块修改、测试与兼容风险共同提高范围和验证负担。",
+      "expected": {
+        "difficulty_score_raw": 63.7,
+        "factors": { "reasoning_depth": 6.2, "task_scope": 6.8, "constraint_density": 5.4, "tool_dependency": 6.1, "verification_burden": 5.9, "context_burden": 4.2 },
+        "p_low": 0.03, "p_mid": 0.24, "p_mid_high": 0.65, "p_high": 0.08, "confidence": 0.82,
+        "signals": ["multi_module", "regression_tests", "compatibility_risk"], "explanation": "跨层修复并验证回归，需要整合多处状态。"
+      }
     },
     {
-      "exampleId": "mid_high-2",
-      "context": "[SYSTEM]\nYou are a helpful assistant for query-based meeting summarization ([TASK]). Answer the user's query using the meeting transcript below. Be accurate, concise, and faithful to what was discussed in the transcript.\n\n[USER]\n## Meeting transcript\nIndustrial Designer: {vocalsound} Okay . Okay , so that's basically the the voice recognition item we were searching for . Okay . This sample sensor uh requires an regular chip , I thought . Um no op I'm not very sure . No , it's not in here . If we want to use the L_C_D_ display , we really need the advanced version , which is a bit l little bit more costly . If we want to use the scroll-wheels we need the regular version . And if we don't want to use uh any of these uh more advanced functions we can keep with the simple uh chip , which is a bit cheaper .\nProject Manager: Okay . Uh well {disfmarker} uh\nIndustrial Designer: Okay .\nProject Manager: d did we already decide on the display ? To {disfmarker}\nIndustrial Designer: Um no , but I think that's something for uh Roo here to think about .\nUser Interface: Yeah . Well , I don't have um {disfmarker} I haven't looked for uh for information about it , but I don't think information {disfmarker} uh y I don't think you need it on a display .\nProject Manager: No .\nUser Interface: Especially when when we have to look at a cost , I don't think uh {disfmarker}\nIndustrial Designer: I I don't think either .\nUser Interface: 'cause uh {gap} uh all {disfmarker} any T_V_ can uh can uh view a digit on uh on screen ,\nIndustrial Designer: No . I don't think you need it .\nProject Manager: On screen display . Yeah .\nUser Interface: yeah .\nProject Manager: Okay\nIndustrial Designer: Okay . Okay ,\n[...deterministic middle truncation...]\nIndustrial Designer: Mm-hmm .\nProject Manager: because it it adds a little ext extra high-tech feeling to it .\nIndustrial Designer: Yes .\nUser Interface: But we already have the scroll-wheels , the sp uh the speaker uh the speak recognition , the rubber , the fancy colours .\nProject Manager: Mm yeah .\nIndustrial Designer: Uh I think our customers will go insane .\nProject Manager: Okay , okay .\nIndustrial Designer: {vocalsound} It's it's too much .\n\n## Query\nWhy did the team decide not to use LCD displays when discussing interface controls?\n\nAnswer this query based only on the transcript above.",
+      "exampleId": "multi-tool-agent-1",
+      "context": "[SYSTEM]\nUse shell, repository search and browser tools when necessary.\n\n[USER]\n调查部署后支付回调重复执行：检查日志和配置、定位提交、修复幂等逻辑、运行测试并验证灰度环境。",
       "minimumSufficientTier": "mid_high",
-      "explanation": "上下文依赖和执行状态较多，需要中高档能力综合处理。"
+      "explanation": "依赖多工具、环境状态和有序验证，执行链较长。",
+      "expected": {
+        "difficulty_score_raw": 76.3,
+        "factors": { "reasoning_depth": 7.0, "task_scope": 7.6, "constraint_density": 6.1, "tool_dependency": 8.8, "verification_burden": 7.2, "context_burden": 6.4 },
+        "p_low": 0.01, "p_mid": 0.08, "p_mid_high": 0.70, "p_high": 0.21, "confidence": 0.80,
+        "signals": ["multi_tool", "environment_state", "ordered_validation"], "explanation": "多工具长链执行，需要持续跟踪环境与验证状态。"
+      }
     },
     {
-      "exampleId": "high-1",
-      "context": "[SYSTEM]\nYou are a helpful, accurate assistant. You are given a multi-turn conversation and reference passages retrieved from a knowledge base. Answer the user's latest question based on the reference passages and conversation history. Be concise and factual. If the passages do not contain enough information, say so honestly.\n\n[USER]\nHere are reference passages from the knowledge base:\n\n[Passage 1]\n\nThis command returns either cc, cd, ci, or pr, depending on which pipeline is running. This way, you can reuse the setup script between pipelines if necessary.\n\n Static code scan\n\nThe static code scan stage runs a static code analyzer tool on the specified app repo codebases.\n\nCC pipeline provides the repos that are found in the inventory for the scanner.\n\nYou can use any of the following methods to add static code to your pipeline:\n\n* Provide an already running SonarQube instance name, URL, and credentials by adding the SonarQube tool to your toolchain. The static-scan task runs a scan on the specified repos.\n* Add your code to the static-scan custom stage in your .pipeline-config.yaml file for a custom implementation.\n\n Dynamic scan\n\nThe Dynamic scan stage runs a dynamic application security testing tool to find vulnerabilities in the deployed application.\n\n* Add your own dynamic scan code to the dynamic-scan custom stage in your .pipeline-config.yaml file for a custom implementation.\n\nTo learn more about configuring dynamic scan by using OWASP-ZAP, see [Configuring ZAP scan for CC pipeline]([URL]\n\n Scans and checks in compliance checks\n\nTable 3. Compliance scans and checks\n\n Scan or check Description\n\n Detect secrets The [IBM Detect Secrets]([URL] tool identifies where secr\n[...deterministic middle truncation...]\nUSER]\nIs Dynamic secret better than Static secret?\n\n[ASSISTANT]\nYou can not compare dynamic and static secrets in terms of one being \"better\" than another. There are differences between them. Dynamic secrets have their expiration date and time enforced when their secret data is read or accessed, while static secrets have their expiration date and time enforced at secret creation or rotation time. With a Secrets Manager, you can create, lease, and centrally manage secrets that are used in IBM Cloud services or your custom-built applications.\n\n[USER]\nWhich one protects more from vulnerabilities?",
+      "exampleId": "long-horizon-reasoning-1",
+      "context": "[USER]\n为跨地区订单系统制定不停机迁移方案，覆盖支付幂等、消息重放、数据一致性、灰度回滚、监管约束、验证指标和故障演练，并给出依赖顺序。",
       "minimumSufficientTier": "high",
-      "explanation": "需要跨多步状态、长上下文或高风险推理，高档能力才较充分。"
-    },
-    {
-      "exampleId": "high-2",
-      "context": "[SYSTEM]\nYou are a personal assistant running inside OpenClaw.\n## Tooling\nTool availability (filtered by policy):\nTool names are case-sensitive. Call tools exactly as listed.\n- read: Read file contents\n- write: Create or overwrite files\n- edit: Make precise edits to files\n- exec: Run shell commands (pty available for TTY-required CLIs)\n- process: Manage background exec sessions\n- web_search: Search the web (Brave API)\n- web_fetch: Fetch and extract readable content from a URL\n- browser: Control web browser\n- canvas: Present/eval/snapshot the Canvas\n- nodes: List/describe/notify/camera/screen on paired nodes\n- cron: Manage cron jobs and wake events (use for reminders; when scheduling a reminder, write the systemEvent text as something that will read like a reminder when it fires, and mention that it is a reminder depending on the time gap between setting and firing; include recent context in reminder text if appropriate)\n- message: Send messages and channel actions\n- gateway: Restart, apply config, or run updates on the running OpenClaw process\n- agents_list: List OpenClaw agent ids allowed for sessions_spawn when runtime=\"subagent\" (not ACP harness ids)\n- sessions_list: List other sessions (incl. sub-agents) with filters/last\n- sessions_history: Fetch history for another session/sub-agent\n- sessions_send: Send a message to another session/sub-agent\n- subagents: List, steer, or kill sub-agent runs for this requester session\n- session_status: Show a /status-equivalent status card (usage + time + Reasoning/Verbose/Elevated); use for model-use questions (📊 session_status); optional per-session model override\n- memory_get: Safe snippet read from MEMORY.md or memory/*.md with o\n[...deterministic middle truncation...]\nhe empathy, ethical judgment, and contextual understanding that human healthcare providers bring to patient care. This collaborative approach promises to improve outcomes, reduce costs, and make quality healthcare more accessible to populations around the world.\n\n[ASSISTANT]\n[TOOL_CALL name=write]\n{\"path\":\"/tmp/[TASK]/smartroute-task_05_summary/agent_workspace/summary_output.txt\"}\n\n[TOOL name=write]\nValidation failed for tool \"write\":\n  - content: must have required property 'content'\n\nReceived arguments:\n{\n  \"path\": \"/tmp/[TASK]/smartroute-task_05_summary/agent_workspace/summary_output.txt\"\n}",
-      "minimumSufficientTier": "high",
-      "explanation": "需要跨多步状态、长上下文或高风险推理，高档能力才较充分。"
+      "explanation": "高抽象、多系统、多约束且难以一次性验证，属于长程高风险推理。",
+      "expected": {
+        "difficulty_score_raw": 91.4,
+        "factors": { "reasoning_depth": 9.1, "task_scope": 9.0, "constraint_density": 8.4, "tool_dependency": 8.8, "verification_burden": 9.2, "context_burden": 8.6 },
+        "p_low": 0.0, "p_mid": 0.01, "p_mid_high": 0.12, "p_high": 0.87, "confidence": 0.91,
+        "signals": ["long_horizon", "cross_system", "high_risk"], "explanation": "跨系统高风险迁移，推理、验证与状态依赖都很高。"
+      }
     }
   ]
 }

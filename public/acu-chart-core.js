@@ -71,7 +71,8 @@
     const remaining = candidates.filter((candidate) => !fixed.includes(candidate.modelId));
     const valueModel = sortCandidates(remaining, 'value')[0]?.modelId;
     const lowCostModel = sortCandidates(remaining.filter((candidate) => candidate.modelId !== valueModel), 'cost')[0]?.modelId;
-    return [...new Set([...fixed, valueModel, lowCostModel].filter(Boolean))].slice(0, 6);
+    const scoreFill = sortCandidates(remaining, 'score').map((candidate) => candidate.modelId);
+    return [...new Set([...fixed, valueModel, lowCostModel, ...scoreFill].filter(Boolean))].slice(0, 6);
   }
 
   root.AcuChartCore = {

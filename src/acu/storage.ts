@@ -138,6 +138,15 @@ export class AcuRoutingStore {
         judge_model TEXT NOT NULL,
         judge_provider TEXT NOT NULL,
         difficulty_score REAL NOT NULL CHECK(difficulty_score BETWEEN 0 AND 100),
+        difficulty_score_raw REAL,
+        difficulty_index REAL,
+        reasoning_depth REAL,
+        task_scope REAL,
+        constraint_density REAL,
+        tool_dependency REAL,
+        verification_burden REAL,
+        context_burden REAL,
+        difficulty_method_version TEXT,
         p_low REAL NOT NULL, p_mid REAL NOT NULL, p_mid_high REAL NOT NULL, p_high REAL NOT NULL,
         judge_confidence REAL NOT NULL,
         judge_latency_ms INTEGER NOT NULL,
@@ -246,6 +255,15 @@ export class AcuRoutingStore {
     this.ensureColumn("routing_requests", "thinking_mode", "TEXT");
     this.ensureColumn("routing_requests", "request_parameter_applied", "INTEGER");
     this.ensureColumn("routing_requests", "upstream_model", "TEXT");
+    this.ensureColumn("routing_requests", "difficulty_score_raw", "REAL");
+    this.ensureColumn("routing_requests", "difficulty_index", "REAL");
+    this.ensureColumn("routing_requests", "reasoning_depth", "REAL");
+    this.ensureColumn("routing_requests", "task_scope", "REAL");
+    this.ensureColumn("routing_requests", "constraint_density", "REAL");
+    this.ensureColumn("routing_requests", "tool_dependency", "REAL");
+    this.ensureColumn("routing_requests", "verification_burden", "REAL");
+    this.ensureColumn("routing_requests", "context_burden", "REAL");
+    this.ensureColumn("routing_requests", "difficulty_method_version", "TEXT");
     this.ensureColumn("routing_attempts", "attempt_type", "TEXT");
     this.ensureColumn("routing_attempts", "execution_profile_id", "TEXT");
     this.ensureColumn("routing_attempts", "thinking_mode", "TEXT");
@@ -269,10 +287,12 @@ export class AcuRoutingStore {
     this.database.prepare(`
       INSERT INTO routing_requests (
         request_id,created_at,session_hash,context_sha256,prompt_version,routing_model_version,
-        judge_status,judge_model,judge_provider,difficulty_score,p_low,p_mid,p_mid_high,p_high,
+        judge_status,judge_model,judge_provider,difficulty_score,difficulty_score_raw,difficulty_index,
+        reasoning_depth,task_scope,constraint_density,tool_dependency,verification_burden,context_burden,difficulty_method_version,
+        p_low,p_mid,p_mid_high,p_high,
         judge_confidence,judge_latency_ms,judge_tokens,judge_cost,requested_model,recommended_model,
         actual_model,input_tokens,output_tokens,actual_cost,latency_ms,final_status,had_tools,error_category
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(request_id) DO UPDATE SET
         actual_model=COALESCE(excluded.actual_model,routing_requests.actual_model),
         input_tokens=COALESCE(excluded.input_tokens,routing_requests.input_tokens),
@@ -284,7 +304,11 @@ export class AcuRoutingStore {
     `).run(
       evaluation.requestId, new Date().toISOString(), metadata.sessionHash ?? null, evaluation.contextSha256,
       evaluation.promptVersion, evaluation.routingModelVersion, evaluation.judgeStatus, evaluation.judgeModel,
-      evaluation.judgeProvider, evaluation.difficultyScore, evaluation.judge.pLow, evaluation.judge.pMid,
+      evaluation.judgeProvider, evaluation.difficultyIndex, evaluation.difficultyScoreRaw, evaluation.difficultyIndex,
+      evaluation.difficultyFactors.reasoningDepth, evaluation.difficultyFactors.taskScope,
+      evaluation.difficultyFactors.constraintDensity, evaluation.difficultyFactors.toolDependency,
+      evaluation.difficultyFactors.verificationBurden, evaluation.difficultyFactors.contextBurden,
+      evaluation.difficultyMethodVersion, evaluation.judge.pLow, evaluation.judge.pMid,
       evaluation.judge.pMidHigh, evaluation.judge.pHigh, evaluation.judge.confidence, evaluation.judgeLatencyMs,
       judgeTokens, evaluation.judgeCost, metadata.requestedModel ?? null, evaluation.recommendation.recommended.modelId,
       metadata.actualModel ?? null, metadata.inputTokens ?? null, metadata.outputTokens ?? null,

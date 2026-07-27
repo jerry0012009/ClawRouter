@@ -4178,7 +4178,8 @@ function validateAssistantOutput(args) {
 import { createHash as createHash5, randomUUID } from "crypto";
 
 // src/acu/config.ts
-var ACU_PROMPT_VERSION = "acu-tier-requirement-v2";
+var ACU_PROMPT_VERSION = "acu-tier-requirement-v3";
+var ACU_DIFFICULTY_METHOD_VERSION = "acu-difficulty-index-v1";
 var ACU_ROUTING_MODEL_VERSION = "acu-routing-model-v0.1";
 var ACU_DEFAULT_JUDGE_MODEL = "deepseek-v4-flash";
 var ACU_DEFAULT_JUDGE_BASE_URL = "https://api.deepseek.com";
@@ -4327,7 +4328,7 @@ var model_catalog_default = {
       model: "deepseek-v4-flash",
       baseUrl: "https://api.deepseek.com",
       mode: "non-thinking",
-      promptVersion: "acu-tier-requirement-v2",
+      promptVersion: "acu-tier-requirement-v3",
       timeoutMs: 8e3,
       maxContextTokens: 6e3,
       maxOutputTokens: 300
@@ -6283,138 +6284,109 @@ import { dirname as dirname2, join as join5 } from "path";
 
 // src/acu/catalog/twin-few-shots.json
 var twin_few_shots_default = {
-  promptVersion: "acu-tier-requirement-v2",
+  promptVersion: "acu-tier-requirement-v3",
   examples: [
     {
-      exampleId: "low-1",
-      context: "[SYSTEM]\nYou are a helpful assistant that can use tools.\n\n[USER]\nguide me",
+      exampleId: "simple-rewrite-1",
+      context: "[USER]\n\u628A\u8FD9\u53E5\u8BDD\u6539\u5F97\u66F4\u793C\u8C8C\uFF1A\u4ECA\u5929\u628A\u6587\u4EF6\u7ED9\u6211\u3002",
       minimumSufficientTier: "low",
-      explanation: "\u5355\u4E00\u660E\u786E\u52A8\u4F5C\uFF0C\u7EA6\u675F\u5C11\uFF0C\u4F4E\u6863\u80FD\u529B\u5373\u53EF\u7A33\u5B9A\u5B8C\u6210\u3002"
+      explanation: "\u5355\u53E5\u5C40\u90E8\u6539\u5199\uFF0C\u8303\u56F4\u548C\u9A8C\u8BC1\u8D1F\u62C5\u5F88\u4F4E\u3002",
+      expected: {
+        difficulty_score_raw: 8.7,
+        factors: { reasoning_depth: 0.8, task_scope: 0.7, constraint_density: 1.5, tool_dependency: 0, verification_burden: 1, context_burden: 0.4 },
+        p_low: 0.94,
+        p_mid: 0.05,
+        p_mid_high: 0.01,
+        p_high: 0,
+        confidence: 0.93,
+        signals: ["single_rewrite", "no_tools"],
+        explanation: "\u5355\u53E5\u793C\u8C8C\u6539\u5199\uFF0C\u7EA6\u675F\u660E\u786E\u4E14\u5BB9\u6613\u6838\u9A8C\u3002"
+      }
     },
     {
-      exampleId: "low-2",
-      context: "[SYSTEM]\nYou are a helpful assistant that can use tools.\n\n[USER]\ndelete all txt files",
+      exampleId: "json-extraction-1",
+      context: "[USER]\n\u4ECE\u8BA2\u5355\u8BF4\u660E\u4E2D\u63D0\u53D6order_id\u3001amount\u548Ccurrency\uFF0C\u53EA\u8FD4\u56DE\u5408\u6CD5JSON\uFF0C\u7F3A\u5931\u503C\u4E3Anull\u3002",
       minimumSufficientTier: "low",
-      explanation: "\u5355\u4E00\u660E\u786E\u52A8\u4F5C\uFF0C\u7EA6\u675F\u5C11\uFF0C\u4F4E\u6863\u80FD\u529B\u5373\u53EF\u7A33\u5B9A\u5B8C\u6210\u3002"
+      explanation: "\u63D0\u53D6\u8303\u56F4\u6709\u9650\uFF0C\u4F46\u683C\u5F0F\u4E0E\u5B57\u6BB5\u7EA6\u675F\u63D0\u9AD8\u4E86\u7EA6\u675F\u5BC6\u5EA6\u3002",
+      expected: {
+        difficulty_score_raw: 22.6,
+        factors: { reasoning_depth: 1.3, task_scope: 1.2, constraint_density: 4.7, tool_dependency: 0, verification_burden: 1.1, context_burden: 0.9 },
+        p_low: 0.78,
+        p_mid: 0.2,
+        p_mid_high: 0.02,
+        p_high: 0,
+        confidence: 0.89,
+        signals: ["strict_json", "field_constraints"],
+        explanation: "\u7ED3\u6784\u7B80\u5355\uFF0C\u4F46\u9700\u4E25\u683C\u6EE1\u8DB3JSON\u5B57\u6BB5\u7EA6\u675F\u3002"
+      }
     },
     {
-      exampleId: "mid-1",
-      context: "[SYSTEM]\nYou are a helpful assistant that can use tools.\n\n[USER]\nI'd like to know how to retrieve a weather forecast for New York City on the 4th of July this year.",
+      exampleId: "code-fix-1",
+      context: "[USER]\n\u4FEE\u590D\u8FD9\u4E2APython\u51FD\u6570\u5728\u7A7A\u5217\u8868\u65F6\u9664\u96F6\u7684\u95EE\u9898\uFF0C\u7ED9\u51FA\u4FEE\u6539\u540E\u7684\u51FD\u6570\u5E76\u89E3\u91CA\u539F\u56E0\u3002",
       minimumSufficientTier: "mid",
-      explanation: "\u5B58\u5728\u591A\u4E2A\u7EA6\u675F\u6216\u5DE5\u5177\u53C2\u6570\uFF0C\u9700\u8981\u4E2D\u6863\u80FD\u529B\u4FDD\u6301\u4E00\u81F4\u6027\u3002"
+      explanation: "\u9700\u8981\u5B9A\u4F4D\u8FB9\u754C\u6761\u4EF6\u3001\u4FEE\u6539\u5B9E\u73B0\u5E76\u89E3\u91CA\uFF0C\u4F46\u8303\u56F4\u5C40\u90E8\u3002",
+      expected: {
+        difficulty_score_raw: 38.2,
+        factors: { reasoning_depth: 3.4, task_scope: 3.2, constraint_density: 2.8, tool_dependency: 2.5, verification_burden: 3.6, context_burden: 1.4 },
+        p_low: 0.24,
+        p_mid: 0.66,
+        p_mid_high: 0.09,
+        p_high: 0.01,
+        confidence: 0.84,
+        signals: ["edge_case", "code_change"],
+        explanation: "\u5C40\u90E8\u4EE3\u7801\u4FEE\u590D\uFF0C\u9700\u8981\u6B63\u786E\u5904\u7406\u8FB9\u754C\u5E76\u4FDD\u6301\u884C\u4E3A\u3002"
+      }
     },
     {
-      exampleId: "mid-2",
-      context: "[SYSTEM]\nYou are a helpful assistant that can use tools.\n\n[USER]\nCould you kindly show me the list of files in tmp directory in my file system including the hidden one?",
-      minimumSufficientTier: "mid",
-      explanation: "\u5B58\u5728\u591A\u4E2A\u7EA6\u675F\u6216\u5DE5\u5177\u53C2\u6570\uFF0C\u9700\u8981\u4E2D\u6863\u80FD\u529B\u4FDD\u6301\u4E00\u81F4\u6027\u3002"
-    },
-    {
-      exampleId: "mid_high-1",
-      context: "[SYSTEM]\nYou are a helpful assistant that can use tools.\n\n[USER]\nDelete all the files in the 'Drafts' directory including the directory.",
+      exampleId: "multi-file-fix-1",
+      context: "[SYSTEM]\nYou can inspect and edit repository files and run tests.\n\n[USER]\n\u5B9A\u4F4D\u8BA4\u8BC1\u91CD\u8BD5\u5BFC\u81F4\u7684\u91CD\u590D\u5199\u5165\uFF0C\u4FEE\u6539API\u5C42\u548C\u5B58\u50A8\u5C42\uFF0C\u8865\u56DE\u5F52\u6D4B\u8BD5\u5E76\u8BF4\u660E\u517C\u5BB9\u98CE\u9669\u3002",
       minimumSufficientTier: "mid_high",
-      explanation: "\u4E0A\u4E0B\u6587\u4F9D\u8D56\u548C\u6267\u884C\u72B6\u6001\u8F83\u591A\uFF0C\u9700\u8981\u4E2D\u9AD8\u6863\u80FD\u529B\u7EFC\u5408\u5904\u7406\u3002"
+      explanation: "\u8DE8\u6A21\u5757\u4FEE\u6539\u3001\u6D4B\u8BD5\u4E0E\u517C\u5BB9\u98CE\u9669\u5171\u540C\u63D0\u9AD8\u8303\u56F4\u548C\u9A8C\u8BC1\u8D1F\u62C5\u3002",
+      expected: {
+        difficulty_score_raw: 63.7,
+        factors: { reasoning_depth: 6.2, task_scope: 6.8, constraint_density: 5.4, tool_dependency: 6.1, verification_burden: 5.9, context_burden: 4.2 },
+        p_low: 0.03,
+        p_mid: 0.24,
+        p_mid_high: 0.65,
+        p_high: 0.08,
+        confidence: 0.82,
+        signals: ["multi_module", "regression_tests", "compatibility_risk"],
+        explanation: "\u8DE8\u5C42\u4FEE\u590D\u5E76\u9A8C\u8BC1\u56DE\u5F52\uFF0C\u9700\u8981\u6574\u5408\u591A\u5904\u72B6\u6001\u3002"
+      }
     },
     {
-      exampleId: "mid_high-2",
-      context: "[SYSTEM]\nYou are a helpful assistant for query-based meeting summarization ([TASK]). Answer the user's query using the meeting transcript below. Be accurate, concise, and faithful to what was discussed in the transcript.\n\n[USER]\n## Meeting transcript\nIndustrial Designer: {vocalsound} Okay . Okay , so that's basically the the voice recognition item we were searching for . Okay . This sample sensor uh requires an regular chip , I thought . Um no op I'm not very sure . No , it's not in here . If we want to use the L_C_D_ display , we really need the advanced version , which is a bit l little bit more costly . If we want to use the scroll-wheels we need the regular version . And if we don't want to use uh any of these uh more advanced functions we can keep with the simple uh chip , which is a bit cheaper .\nProject Manager: Okay . Uh well {disfmarker} uh\nIndustrial Designer: Okay .\nProject Manager: d did we already decide on the display ? To {disfmarker}\nIndustrial Designer: Um no , but I think that's something for uh Roo here to think about .\nUser Interface: Yeah . Well , I don't have um {disfmarker} I haven't looked for uh for information about it , but I don't think information {disfmarker} uh y I don't think you need it on a display .\nProject Manager: No .\nUser Interface: Especially when when we have to look at a cost , I don't think uh {disfmarker}\nIndustrial Designer: I I don't think either .\nUser Interface: 'cause uh {gap} uh all {disfmarker} any T_V_ can uh can uh view a digit on uh on screen ,\nIndustrial Designer: No . I don't think you need it .\nProject Manager: On screen display . Yeah .\nUser Interface: yeah .\nProject Manager: Okay\nIndustrial Designer: Okay . Okay ,\n[...deterministic middle truncation...]\nIndustrial Designer: Mm-hmm .\nProject Manager: because it it adds a little ext extra high-tech feeling to it .\nIndustrial Designer: Yes .\nUser Interface: But we already have the scroll-wheels , the sp uh the speaker uh the speak recognition , the rubber , the fancy colours .\nProject Manager: Mm yeah .\nIndustrial Designer: Uh I think our customers will go insane .\nProject Manager: Okay , okay .\nIndustrial Designer: {vocalsound} It's it's too much .\n\n## Query\nWhy did the team decide not to use LCD displays when discussing interface controls?\n\nAnswer this query based only on the transcript above.",
+      exampleId: "multi-tool-agent-1",
+      context: "[SYSTEM]\nUse shell, repository search and browser tools when necessary.\n\n[USER]\n\u8C03\u67E5\u90E8\u7F72\u540E\u652F\u4ED8\u56DE\u8C03\u91CD\u590D\u6267\u884C\uFF1A\u68C0\u67E5\u65E5\u5FD7\u548C\u914D\u7F6E\u3001\u5B9A\u4F4D\u63D0\u4EA4\u3001\u4FEE\u590D\u5E42\u7B49\u903B\u8F91\u3001\u8FD0\u884C\u6D4B\u8BD5\u5E76\u9A8C\u8BC1\u7070\u5EA6\u73AF\u5883\u3002",
       minimumSufficientTier: "mid_high",
-      explanation: "\u4E0A\u4E0B\u6587\u4F9D\u8D56\u548C\u6267\u884C\u72B6\u6001\u8F83\u591A\uFF0C\u9700\u8981\u4E2D\u9AD8\u6863\u80FD\u529B\u7EFC\u5408\u5904\u7406\u3002"
+      explanation: "\u4F9D\u8D56\u591A\u5DE5\u5177\u3001\u73AF\u5883\u72B6\u6001\u548C\u6709\u5E8F\u9A8C\u8BC1\uFF0C\u6267\u884C\u94FE\u8F83\u957F\u3002",
+      expected: {
+        difficulty_score_raw: 76.3,
+        factors: { reasoning_depth: 7, task_scope: 7.6, constraint_density: 6.1, tool_dependency: 8.8, verification_burden: 7.2, context_burden: 6.4 },
+        p_low: 0.01,
+        p_mid: 0.08,
+        p_mid_high: 0.7,
+        p_high: 0.21,
+        confidence: 0.8,
+        signals: ["multi_tool", "environment_state", "ordered_validation"],
+        explanation: "\u591A\u5DE5\u5177\u957F\u94FE\u6267\u884C\uFF0C\u9700\u8981\u6301\u7EED\u8DDF\u8E2A\u73AF\u5883\u4E0E\u9A8C\u8BC1\u72B6\u6001\u3002"
+      }
     },
     {
-      exampleId: "high-1",
-      context: `[SYSTEM]
-You are a helpful, accurate assistant. You are given a multi-turn conversation and reference passages retrieved from a knowledge base. Answer the user's latest question based on the reference passages and conversation history. Be concise and factual. If the passages do not contain enough information, say so honestly.
-
-[USER]
-Here are reference passages from the knowledge base:
-
-[Passage 1]
-
-This command returns either cc, cd, ci, or pr, depending on which pipeline is running. This way, you can reuse the setup script between pipelines if necessary.
-
- Static code scan
-
-The static code scan stage runs a static code analyzer tool on the specified app repo codebases.
-
-CC pipeline provides the repos that are found in the inventory for the scanner.
-
-You can use any of the following methods to add static code to your pipeline:
-
-* Provide an already running SonarQube instance name, URL, and credentials by adding the SonarQube tool to your toolchain. The static-scan task runs a scan on the specified repos.
-* Add your code to the static-scan custom stage in your .pipeline-config.yaml file for a custom implementation.
-
- Dynamic scan
-
-The Dynamic scan stage runs a dynamic application security testing tool to find vulnerabilities in the deployed application.
-
-* Add your own dynamic scan code to the dynamic-scan custom stage in your .pipeline-config.yaml file for a custom implementation.
-
-To learn more about configuring dynamic scan by using OWASP-ZAP, see [Configuring ZAP scan for CC pipeline]([URL]
-
- Scans and checks in compliance checks
-
-Table 3. Compliance scans and checks
-
- Scan or check Description
-
- Detect secrets The [IBM Detect Secrets]([URL] tool identifies where secr
-[...deterministic middle truncation...]
-USER]
-Is Dynamic secret better than Static secret?
-
-[ASSISTANT]
-You can not compare dynamic and static secrets in terms of one being "better" than another. There are differences between them. Dynamic secrets have their expiration date and time enforced when their secret data is read or accessed, while static secrets have their expiration date and time enforced at secret creation or rotation time. With a Secrets Manager, you can create, lease, and centrally manage secrets that are used in IBM Cloud services or your custom-built applications.
-
-[USER]
-Which one protects more from vulnerabilities?`,
+      exampleId: "long-horizon-reasoning-1",
+      context: "[USER]\n\u4E3A\u8DE8\u5730\u533A\u8BA2\u5355\u7CFB\u7EDF\u5236\u5B9A\u4E0D\u505C\u673A\u8FC1\u79FB\u65B9\u6848\uFF0C\u8986\u76D6\u652F\u4ED8\u5E42\u7B49\u3001\u6D88\u606F\u91CD\u653E\u3001\u6570\u636E\u4E00\u81F4\u6027\u3001\u7070\u5EA6\u56DE\u6EDA\u3001\u76D1\u7BA1\u7EA6\u675F\u3001\u9A8C\u8BC1\u6307\u6807\u548C\u6545\u969C\u6F14\u7EC3\uFF0C\u5E76\u7ED9\u51FA\u4F9D\u8D56\u987A\u5E8F\u3002",
       minimumSufficientTier: "high",
-      explanation: "\u9700\u8981\u8DE8\u591A\u6B65\u72B6\u6001\u3001\u957F\u4E0A\u4E0B\u6587\u6216\u9AD8\u98CE\u9669\u63A8\u7406\uFF0C\u9AD8\u6863\u80FD\u529B\u624D\u8F83\u5145\u5206\u3002"
-    },
-    {
-      exampleId: "high-2",
-      context: `[SYSTEM]
-You are a personal assistant running inside OpenClaw.
-## Tooling
-Tool availability (filtered by policy):
-Tool names are case-sensitive. Call tools exactly as listed.
-- read: Read file contents
-- write: Create or overwrite files
-- edit: Make precise edits to files
-- exec: Run shell commands (pty available for TTY-required CLIs)
-- process: Manage background exec sessions
-- web_search: Search the web (Brave API)
-- web_fetch: Fetch and extract readable content from a URL
-- browser: Control web browser
-- canvas: Present/eval/snapshot the Canvas
-- nodes: List/describe/notify/camera/screen on paired nodes
-- cron: Manage cron jobs and wake events (use for reminders; when scheduling a reminder, write the systemEvent text as something that will read like a reminder when it fires, and mention that it is a reminder depending on the time gap between setting and firing; include recent context in reminder text if appropriate)
-- message: Send messages and channel actions
-- gateway: Restart, apply config, or run updates on the running OpenClaw process
-- agents_list: List OpenClaw agent ids allowed for sessions_spawn when runtime="subagent" (not ACP harness ids)
-- sessions_list: List other sessions (incl. sub-agents) with filters/last
-- sessions_history: Fetch history for another session/sub-agent
-- sessions_send: Send a message to another session/sub-agent
-- subagents: List, steer, or kill sub-agent runs for this requester session
-- session_status: Show a /status-equivalent status card (usage + time + Reasoning/Verbose/Elevated); use for model-use questions (\u{1F4CA} session_status); optional per-session model override
-- memory_get: Safe snippet read from MEMORY.md or memory/*.md with o
-[...deterministic middle truncation...]
-he empathy, ethical judgment, and contextual understanding that human healthcare providers bring to patient care. This collaborative approach promises to improve outcomes, reduce costs, and make quality healthcare more accessible to populations around the world.
-
-[ASSISTANT]
-[TOOL_CALL name=write]
-{"path":"/tmp/[TASK]/smartroute-task_05_summary/agent_workspace/summary_output.txt"}
-
-[TOOL name=write]
-Validation failed for tool "write":
-  - content: must have required property 'content'
-
-Received arguments:
-{
-  "path": "/tmp/[TASK]/smartroute-task_05_summary/agent_workspace/summary_output.txt"
-}`,
-      minimumSufficientTier: "high",
-      explanation: "\u9700\u8981\u8DE8\u591A\u6B65\u72B6\u6001\u3001\u957F\u4E0A\u4E0B\u6587\u6216\u9AD8\u98CE\u9669\u63A8\u7406\uFF0C\u9AD8\u6863\u80FD\u529B\u624D\u8F83\u5145\u5206\u3002"
+      explanation: "\u9AD8\u62BD\u8C61\u3001\u591A\u7CFB\u7EDF\u3001\u591A\u7EA6\u675F\u4E14\u96BE\u4EE5\u4E00\u6B21\u6027\u9A8C\u8BC1\uFF0C\u5C5E\u4E8E\u957F\u7A0B\u9AD8\u98CE\u9669\u63A8\u7406\u3002",
+      expected: {
+        difficulty_score_raw: 91.4,
+        factors: { reasoning_depth: 9.1, task_scope: 9, constraint_density: 8.4, tool_dependency: 8.8, verification_burden: 9.2, context_burden: 8.6 },
+        p_low: 0,
+        p_mid: 0.01,
+        p_mid_high: 0.12,
+        p_high: 0.87,
+        confidence: 0.91,
+        signals: ["long_horizon", "cross_system", "high_risk"],
+        explanation: "\u8DE8\u7CFB\u7EDF\u9AD8\u98CE\u9669\u8FC1\u79FB\uFF0C\u63A8\u7406\u3001\u9A8C\u8BC1\u4E0E\u72B6\u6001\u4F9D\u8D56\u90FD\u5F88\u9AD8\u3002"
+      }
     }
   ]
 };
@@ -6525,15 +6497,18 @@ function buildJudgeSystemPrompt() {
     `\u793A\u4F8B ${example.exampleId}`,
     "\u4E0A\u4E0B\u6587\uFF1A",
     example.context,
-    `\u6700\u4F4E\u5145\u5206\u6863\u4F4D\uFF1A${example.minimumSufficientTier}`,
-    `\u89E3\u91CA\uFF1A${example.explanation}`
+    `\u6700\u4F4E\u5145\u5206\u6863\u4F4D\u89E3\u91CA\uFF1A${example.minimumSufficientTier}\uFF1B${example.explanation}`,
+    `\u671F\u671B\u8F93\u51FA\uFF1A${stableJson(example.expected)}`
   ].join("\n")).join("\n\n---\n\n");
   return [
     "\u4F60\u662F ACU \u4EFB\u52A1\u80FD\u529B\u9700\u6C42\u5206\u7C7B\u5668\u3002\u5224\u65AD\u5F53\u524D\u5B8C\u6574\u3001\u53EF\u89C1 API \u4E0A\u4E0B\u6587\u4E2D\uFF0C\u5B8C\u6210\u4E0B\u4E00\u6B21\u6A21\u578B\u54CD\u5E94\u6240\u9700\u7684\u6700\u4F4E\u5145\u5206\u80FD\u529B\u3002",
     "\u4E0D\u5F97\u56DE\u7B54\u539F\u4EFB\u52A1\uFF0C\u4E0D\u5F97\u63A8\u8350\u5177\u4F53\u6A21\u578B\uFF0C\u4E0D\u5F97\u6839\u636E\u6A21\u578B\u54C1\u724C\u5224\u65AD\uFF0C\u4E0D\u5F97\u8F93\u51FA\u4EE3\u7801\u6216\u601D\u7EF4\u8FC7\u7A0B\u3002",
-    '\u53EA\u8F93\u51FA\u4E25\u683C JSON\uFF1A{"difficulty_score":0,"p_low":0,"p_mid":0,"p_mid_high":0,"p_high":0,"confidence":0,"signals":[],"explanation":""}',
-    "difficulty_score\u662F0\u5230100\u7684\u8FDE\u7EED\u5224\u65AD\uFF0C\u4FDD\u7559\u4E00\u4F4D\u5C0F\u6570\uFF1Alow=0\u201429\uFF0Cmid=30\u201454\uFF0Cmid_high=55\u201479\uFF0Chigh=80\u2014100\u3002",
-    "\u6982\u7387\u8868\u8FBE\u5206\u7C7B\u4E0D\u786E\u5B9A\u6027\uFF1B\u9664\u6781\u5176\u660E\u786E\u5916\u4E0D\u8981\u673A\u68B0\u8F93\u51FA\u5355\u6863100%\uFF0C\u76F8\u90BB\u6863\u5B58\u5728\u5408\u7406\u53EF\u80FD\u65F6\u5E94\u7ED9\u8F6F\u6982\u7387\u3002difficulty_score\u4E0E\u4E3B\u8981\u6863\u4F4D\u5E94\u5927\u4F53\u4E00\u81F4\uFF0C\u4F46\u4E0D\u8981\u6C42\u7B49\u4E8E\u6982\u7387\u671F\u671B\u3002",
+    '\u53EA\u8F93\u51FA\u4E25\u683C JSON\uFF1A{"difficulty_score_raw":0,"factors":{"reasoning_depth":0,"task_scope":0,"constraint_density":0,"tool_dependency":0,"verification_burden":0,"context_burden":0},"p_low":0,"p_mid":0,"p_mid_high":0,"p_high":0,"confidence":0,"signals":[],"explanation":""}',
+    "difficulty_score_raw\u662F0\u5230100\u7684\u539F\u59CB\u603B\u4F53\u5224\u65AD\uFF1B\u516D\u4E2Afactors\u5747\u4E3A0\u523010\u3001\u5141\u8BB8\u4E00\u4F4D\u5C0F\u6570\u3002\u540E\u7AEF\u4F1A\u786E\u5B9A\u6027\u8BA1\u7B97\u6700\u7EC8\u96BE\u5EA6\u6307\u6570\uFF0C\u4E0D\u8981\u81EA\u884C\u8F93\u51FA\u6700\u7EC8\u6307\u6570\u3002",
+    "reasoning_depth\u8861\u91CF\u63A8\u7406\u94FE\u957F\u5EA6\u548C\u62BD\u8C61\u7A0B\u5EA6\uFF1Btask_scope\u8861\u91CF\u6B65\u9AA4\u3001\u6587\u4EF6\u3001\u6A21\u5757\u3001\u5B9E\u4F53\u548C\u76EE\u6807\u8303\u56F4\uFF1Bconstraint_density\u8861\u91CF\u683C\u5F0F\u3001\u4E8B\u5B9E\u3001\u98CE\u683C\u3001\u4E1A\u52A1\u548C\u8D28\u91CF\u7EA6\u675F\u53CA\u5176\u76F8\u4E92\u5F71\u54CD\u3002",
+    "tool_dependency\u8861\u91CF\u5DE5\u5177\u8C03\u7528\u3001\u4EE3\u7801\u6267\u884C\u3001\u68C0\u7D22\u3001\u591A\u8F6EAgent\u884C\u4E3A\u548C\u73AF\u5883\u72B6\u6001\u4F9D\u8D56\uFF1Bverification_burden\u8D8A\u96BE\u901A\u8FC7JSON\u3001\u6D4B\u8BD5\u6216\u660E\u786E\u7B54\u6848\u9A8C\u8BC1\u5219\u8D8A\u9AD8\uFF1Bcontext_burden\u8861\u91CF\u4E0A\u4E0B\u6587\u957F\u5EA6\u3001\u5206\u6563\u7A0B\u5EA6\u548C\u5386\u53F2\u4F9D\u8D56\u3002",
+    "\u4E0D\u8981\u4E3A\u4E86\u7B80\u6D01\u9ED8\u8BA4\u4F7F\u75285\u7684\u500D\u6570\u3002\u8BF7\u5206\u522B\u5224\u65AD\u5404\u80FD\u529B\u9700\u6C42\u56E0\u5B50\uFF0C\u603B\u96BE\u5EA6\u7531\u540E\u7AEF\u8BA1\u7B97\uFF1B\u53EA\u6709\u771F\u5B9E\u5224\u65AD\u6070\u597D\u843D\u5728\u6574\u6570\u62165\u7684\u500D\u6570\u65F6\u624D\u53EF\u8F93\u51FA\u8BE5\u503C\u3002",
+    "\u6982\u7387\u8868\u8FBE\u5206\u7C7B\u4E0D\u786E\u5B9A\u6027\uFF1B\u9664\u6781\u5176\u660E\u786E\u5916\u4E0D\u8981\u673A\u68B0\u8F93\u51FA\u5355\u6863100%\uFF0C\u76F8\u90BB\u6863\u5B58\u5728\u5408\u7406\u53EF\u80FD\u65F6\u5E94\u7ED9\u8F6F\u6982\u7387\u3002\u539F\u59CB\u603B\u5206\u4E0E\u4E3B\u8981\u6863\u4F4D\u5E94\u5927\u4F53\u4E00\u81F4\uFF0C\u4F46\u4E0D\u8981\u6C42\u7B49\u4E8E\u6982\u7387\u671F\u671B\u3002",
     "\u56DB\u6863\u6982\u7387\u5FC5\u987B\u57280\u52301\u4E14\u603B\u548C\u4E3A1\uFF1Bsignals\u6700\u591A5\u4E2A\uFF1Bexplanation\u4E0D\u8D85\u8FC780\u4E2A\u4E2D\u6587\u5B57\u7B26\u3002",
     "\u4EE5\u4E0B\u793A\u4F8B\u53EA\u5305\u542B\u5F53\u65F6\u53EF\u89C1\u4E0A\u4E0B\u6587\uFF0C\u4E0D\u542B\u672A\u6765\u6D88\u606F\uFF1A",
     examples
@@ -6559,12 +6534,38 @@ function dominantTier(result) {
   return values.indexOf(Math.max(...values));
 }
 function hasSevereTierConflict(result) {
-  return Math.abs(scoreTier(result.difficultyScore) - dominantTier(result)) >= 2;
+  const tiers = [scoreTier(result.difficultyIndex), scoreTier(result.difficultyScoreRaw), dominantTier(result)];
+  return Math.max(...tiers) - Math.min(...tiers) >= 2;
+}
+var FACTOR_KEYS = [
+  ["reasoning_depth", "reasoningDepth"],
+  ["task_scope", "taskScope"],
+  ["constraint_density", "constraintDensity"],
+  ["tool_dependency", "toolDependency"],
+  ["verification_burden", "verificationBurden"],
+  ["context_burden", "contextBurden"]
+];
+function oneDecimal(value, name, maximum) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric < 0 || numeric > maximum) throw new Error(`Judge ${name} must be finite and in [0, ${maximum}]`);
+  if (Math.abs(numeric * 10 - Math.round(numeric * 10)) > 1e-8) throw new Error(`Judge ${name} must have at most one decimal place`);
+  return Math.round(numeric * 10) / 10;
+}
+function computeDifficultyIndex(difficultyScoreRaw, factors) {
+  const factorComposite = 10 * (0.25 * factors.reasoningDepth + 0.15 * factors.taskScope + 0.15 * factors.constraintDensity + 0.2 * factors.toolDependency + 0.15 * factors.verificationBurden + 0.1 * factors.contextBurden);
+  const difficultyIndex = Math.max(0, Math.min(100, 0.8 * factorComposite + 0.2 * difficultyScoreRaw));
+  return {
+    factorComposite: Math.round(factorComposite * 10) / 10,
+    difficultyIndex: Math.round(difficultyIndex * 10) / 10
+  };
 }
 function parseJudgeResult(text) {
   const parsed = extractJson(text);
-  const score = Number(parsed.difficulty_score);
-  if (!Number.isFinite(score) || score < 0 || score > 100) throw new Error("Judge difficulty_score must be finite and in [0, 100]");
+  const difficultyScoreRaw = oneDecimal(parsed.difficulty_score_raw, "difficulty_score_raw", 100);
+  if (!parsed.factors || typeof parsed.factors !== "object" || Array.isArray(parsed.factors)) throw new Error("Judge factors must be an object");
+  const rawFactors = parsed.factors;
+  const factors = Object.fromEntries(FACTOR_KEYS.map(([wire, local]) => [local, oneDecimal(rawFactors[wire], `factors.${wire}`, 10)]));
+  const { factorComposite, difficultyIndex } = computeDifficultyIndex(difficultyScoreRaw, factors);
   const probabilities = normalizeProbabilities({
     pLow: Number(parsed.p_low),
     pMid: Number(parsed.p_mid),
@@ -6578,19 +6579,32 @@ function parseJudgeResult(text) {
   if (typeof parsed.explanation !== "string" || Array.from(parsed.explanation).length > 80) {
     throw new Error("Judge explanation must be a string no longer than 80 characters");
   }
-  return { ...probabilities, difficultyScore: Math.round(score * 10) / 10, signals: parsed.signals, explanation: parsed.explanation };
+  return {
+    ...probabilities,
+    difficultyScoreRaw,
+    factors,
+    factorComposite,
+    difficultyIndex,
+    difficultyMethodVersion: ACU_DIFFICULTY_METHOD_VERSION,
+    difficultyScore: difficultyIndex,
+    signals: parsed.signals,
+    explanation: parsed.explanation
+  };
 }
 function cachePath(config) {
-  return config.cachePath || join5(homedir4(), ".claw-router", "acu-judge-cache-v2.json");
+  if (config.cachePath && config.promptVersion === "acu-tier-requirement-v3") {
+    return config.cachePath.replace(/v2(?=\.json$)/, "v3");
+  }
+  return config.cachePath || join5(homedir4(), ".claw-router", "acu-judge-cache-v3.json");
 }
 function readCache(path) {
-  if (!existsSync(path)) return { schemaVersion: "acu-judge-cache-v2", entries: {} };
+  if (!existsSync(path)) return { schemaVersion: "acu-judge-cache-v3", entries: {} };
   try {
     const parsed = JSON.parse(readFileSync(path, "utf8"));
-    if (parsed.schemaVersion !== "acu-judge-cache-v2" || !parsed.entries) throw new Error("wrong schema");
+    if (parsed.schemaVersion !== "acu-judge-cache-v3" || !parsed.entries) throw new Error("wrong schema");
     return parsed;
   } catch {
-    return { schemaVersion: "acu-judge-cache-v2", entries: {} };
+    return { schemaVersion: "acu-judge-cache-v3", entries: {} };
   }
 }
 function writeCache(path, cache) {
@@ -6668,7 +6682,7 @@ ${contextSha256}`).digest("hex");
             messages: [
               { role: "system", content: buildJudgeSystemPrompt() },
               { role: "user", content: `\u5F53\u524DAPI\u4E0A\u4E0B\u6587\uFF1A
-${truncated.text}${attempt ? "\n\n\u4E0A\u6B21\u7ED3\u679C\u7684\u8FDE\u7EED\u5206\u6570\u4E0E\u4E3B\u8981\u6863\u4F4D\u4E25\u91CD\u51B2\u7A81\uFF0C\u8BF7\u91CD\u65B0\u68C0\u67E5\u5E76\u8F93\u51FA\u4E00\u81F4\u7ED3\u679C\u3002" : ""}` }
+${truncated.text}${attempt ? "\n\n\u4E0A\u6B21\u7ED3\u679C\u7684\u6700\u7EC8\u6307\u6570\u3001\u539F\u59CB\u603B\u5206\u6216\u4E3B\u8981\u6982\u7387\u8DE8\u8D8A\u4E86\u4E24\u4E2A\u4EE5\u4E0A\u6863\u4F4D\uFF0C\u8BF7\u91CD\u65B0\u68C0\u67E5\u516D\u56E0\u5B50\u5E76\u8F93\u51FA\u4E00\u81F4\u7ED3\u679C\u3002" : ""}` }
             ],
             temperature: 0,
             max_tokens: Math.min(300, this.config.maxOutputTokens),
@@ -6690,7 +6704,7 @@ ${truncated.text}${attempt ? "\n\n\u4E0A\u6B21\u7ED3\u679C\u7684\u8FDE\u7EED\u52
           break;
         }
       }
-      if (!result || !lastPayload || !lastResponse) throw new Error("ACU Judge score remained inconsistent with its dominant tier after retry");
+      if (!result || !lastPayload || !lastResponse) throw new Error("ACU Judge index, raw score and dominant tier remained severely inconsistent after retry");
       const usageStatus = lastPayload.usage?.prompt_tokens !== void 0 && lastPayload.usage?.completion_tokens !== void 0 ? "reported" : "usage_missing";
       const promptTokens = lastPayload.usage?.prompt_tokens ?? truncated.tokenEstimate;
       const completionTokens = lastPayload.usage?.completion_tokens ?? this.config.maxOutputTokens;
@@ -6749,9 +6763,24 @@ function rulesFallbackJudge(decision) {
     pHigh: selected === "high" ? confidence : remainder,
     confidence: decision.confidence
   });
+  const difficultyScoreRaw = { low: 15, mid: 42, mid_high: 67, high: 90 }[selected];
+  const factorValue = Math.round(difficultyScoreRaw) / 10;
+  const factors = {
+    reasoningDepth: factorValue,
+    taskScope: factorValue,
+    constraintDensity: factorValue,
+    toolDependency: factorValue,
+    verificationBurden: factorValue,
+    contextBurden: factorValue
+  };
   return {
     ...probabilities,
-    difficultyScore: { low: 15, mid: 42, mid_high: 67, high: 90 }[selected],
+    difficultyScoreRaw,
+    factors,
+    factorComposite: difficultyScoreRaw,
+    difficultyIndex: difficultyScoreRaw,
+    difficultyMethodVersion: ACU_DIFFICULTY_METHOD_VERSION,
+    difficultyScore: difficultyScoreRaw,
     signals: ["rules_strategy_fallback", decision.tier.toLowerCase()],
     explanation: "Difficulty Judge\u4E0D\u53EF\u7528\uFF0C\u5DF2\u4F7F\u7528\u73B0\u6709RulesStrategy\u5B89\u5168\u56DE\u9000\u3002"
   };
@@ -6826,7 +6855,7 @@ ${contextSha256}`).digest("hex");
     const entropy = normalizedEntropy(judge);
     const recommendation = recommendModel({
       probabilities: judge,
-      difficultyScore: judge.difficultyScore,
+      difficultyScore: judge.difficultyIndex,
       inputTokens: contextTokenEstimate,
       expectedOutputTokens: input.expectedOutputTokens ?? 800,
       judgeCost,
@@ -6858,7 +6887,12 @@ ${contextSha256}`).digest("hex");
       contextSha256,
       contextTokenEstimate,
       contextTruncated,
-      difficultyScore: judge.difficultyScore,
+      difficultyScoreRaw: judge.difficultyScoreRaw,
+      difficultyFactors: judge.factors,
+      factorComposite: judge.factorComposite,
+      difficultyIndex: judge.difficultyIndex,
+      difficultyMethodVersion: judge.difficultyMethodVersion,
+      difficultyScore: judge.difficultyIndex,
       judgeEntropy: entropy,
       routingModelVersion: ACU_ROUTING_MODEL_VERSION,
       shadowMode: this.config.shadowMode,
@@ -6910,6 +6944,15 @@ var AcuRoutingStore = class {
         judge_model TEXT NOT NULL,
         judge_provider TEXT NOT NULL,
         difficulty_score REAL NOT NULL CHECK(difficulty_score BETWEEN 0 AND 100),
+        difficulty_score_raw REAL,
+        difficulty_index REAL,
+        reasoning_depth REAL,
+        task_scope REAL,
+        constraint_density REAL,
+        tool_dependency REAL,
+        verification_burden REAL,
+        context_burden REAL,
+        difficulty_method_version TEXT,
         p_low REAL NOT NULL, p_mid REAL NOT NULL, p_mid_high REAL NOT NULL, p_high REAL NOT NULL,
         judge_confidence REAL NOT NULL,
         judge_latency_ms INTEGER NOT NULL,
@@ -7018,6 +7061,15 @@ var AcuRoutingStore = class {
     this.ensureColumn("routing_requests", "thinking_mode", "TEXT");
     this.ensureColumn("routing_requests", "request_parameter_applied", "INTEGER");
     this.ensureColumn("routing_requests", "upstream_model", "TEXT");
+    this.ensureColumn("routing_requests", "difficulty_score_raw", "REAL");
+    this.ensureColumn("routing_requests", "difficulty_index", "REAL");
+    this.ensureColumn("routing_requests", "reasoning_depth", "REAL");
+    this.ensureColumn("routing_requests", "task_scope", "REAL");
+    this.ensureColumn("routing_requests", "constraint_density", "REAL");
+    this.ensureColumn("routing_requests", "tool_dependency", "REAL");
+    this.ensureColumn("routing_requests", "verification_burden", "REAL");
+    this.ensureColumn("routing_requests", "context_burden", "REAL");
+    this.ensureColumn("routing_requests", "difficulty_method_version", "TEXT");
     this.ensureColumn("routing_attempts", "attempt_type", "TEXT");
     this.ensureColumn("routing_attempts", "execution_profile_id", "TEXT");
     this.ensureColumn("routing_attempts", "thinking_mode", "TEXT");
@@ -7040,10 +7092,12 @@ var AcuRoutingStore = class {
     this.database.prepare(`
       INSERT INTO routing_requests (
         request_id,created_at,session_hash,context_sha256,prompt_version,routing_model_version,
-        judge_status,judge_model,judge_provider,difficulty_score,p_low,p_mid,p_mid_high,p_high,
+        judge_status,judge_model,judge_provider,difficulty_score,difficulty_score_raw,difficulty_index,
+        reasoning_depth,task_scope,constraint_density,tool_dependency,verification_burden,context_burden,difficulty_method_version,
+        p_low,p_mid,p_mid_high,p_high,
         judge_confidence,judge_latency_ms,judge_tokens,judge_cost,requested_model,recommended_model,
         actual_model,input_tokens,output_tokens,actual_cost,latency_ms,final_status,had_tools,error_category
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(request_id) DO UPDATE SET
         actual_model=COALESCE(excluded.actual_model,routing_requests.actual_model),
         input_tokens=COALESCE(excluded.input_tokens,routing_requests.input_tokens),
@@ -7062,7 +7116,16 @@ var AcuRoutingStore = class {
       evaluation.judgeStatus,
       evaluation.judgeModel,
       evaluation.judgeProvider,
-      evaluation.difficultyScore,
+      evaluation.difficultyIndex,
+      evaluation.difficultyScoreRaw,
+      evaluation.difficultyIndex,
+      evaluation.difficultyFactors.reasoningDepth,
+      evaluation.difficultyFactors.taskScope,
+      evaluation.difficultyFactors.constraintDensity,
+      evaluation.difficultyFactors.toolDependency,
+      evaluation.difficultyFactors.verificationBurden,
+      evaluation.difficultyFactors.contextBurden,
+      evaluation.difficultyMethodVersion,
       evaluation.judge.pLow,
       evaluation.judge.pMid,
       evaluation.judge.pMidHigh,

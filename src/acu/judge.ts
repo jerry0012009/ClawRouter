@@ -3,8 +3,9 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import fewShotData from "./catalog/twin-few-shots.json";
-import type { AcuJudgeResult, AcuVisibleMessage } from "./types.js";
+import type { AcuDifficultyFactors, AcuJudgeResult, AcuVisibleMessage } from "./types.js";
 import type { AcuRuntimeConfig } from "./config.js";
+import { ACU_DIFFICULTY_METHOD_VERSION } from "./config.js";
 import { estimateCallCost, judgeModelPrice } from "./decision.js";
 import { normalizeProbabilities } from "./math.js";
 
@@ -13,6 +14,7 @@ type FewShot = {
   context: string;
   minimumSufficientTier: string;
   explanation: string;
+  expected: Record<string, unknown>;
 };
 
 type CacheRecord = {
@@ -28,7 +30,7 @@ type CacheRecord = {
   usageStatus: "reported" | "usage_missing";
 };
 
-type CacheFile = { schemaVersion: "acu-judge-cache-v2"; entries: Record<string, CacheRecord> };
+type CacheFile = { schemaVersion: "acu-judge-cache-v3"; entries: Record<string, CacheRecord> };
 
 export type JudgeRequestResult = {
   result: AcuJudgeResult;
@@ -157,15 +159,18 @@ export function buildJudgeSystemPrompt(): string {
     `示例 ${example.exampleId}`,
     "上下文：",
     example.context,
-    `最低充分档位：${example.minimumSufficientTier}`,
-    `解释：${example.explanation}`,
+    `最低充分档位解释：${example.minimumSufficientTier}；${example.explanation}`,
+    `期望输出：${stableJson(example.expected)}`,
   ].join("\n")).join("\n\n---\n\n");
   return [
     "你是 ACU 任务能力需求分类器。判断当前完整、可见 API 上下文中，完成下一次模型响应所需的最低充分能力。",
     "不得回答原任务，不得推荐具体模型，不得根据模型品牌判断，不得输出代码或思维过程。",
-    '只输出严格 JSON：{"difficulty_score":0,"p_low":0,"p_mid":0,"p_mid_high":0,"p_high":0,"confidence":0,"signals":[],"explanation":""}',
-    "difficulty_score是0到100的连续判断，保留一位小数：low=0—29，mid=30—54，mid_high=55—79，high=80—100。",
-    "概率表达分类不确定性；除极其明确外不要机械输出单档100%，相邻档存在合理可能时应给软概率。difficulty_score与主要档位应大体一致，但不要求等于概率期望。",
+    '只输出严格 JSON：{"difficulty_score_raw":0,"factors":{"reasoning_depth":0,"task_scope":0,"constraint_density":0,"tool_dependency":0,"verification_burden":0,"context_burden":0},"p_low":0,"p_mid":0,"p_mid_high":0,"p_high":0,"confidence":0,"signals":[],"explanation":""}',
+    "difficulty_score_raw是0到100的原始总体判断；六个factors均为0到10、允许一位小数。后端会确定性计算最终难度指数，不要自行输出最终指数。",
+    "reasoning_depth衡量推理链长度和抽象程度；task_scope衡量步骤、文件、模块、实体和目标范围；constraint_density衡量格式、事实、风格、业务和质量约束及其相互影响。",
+    "tool_dependency衡量工具调用、代码执行、检索、多轮Agent行为和环境状态依赖；verification_burden越难通过JSON、测试或明确答案验证则越高；context_burden衡量上下文长度、分散程度和历史依赖。",
+    "不要为了简洁默认使用5的倍数。请分别判断各能力需求因子，总难度由后端计算；只有真实判断恰好落在整数或5的倍数时才可输出该值。",
+    "概率表达分类不确定性；除极其明确外不要机械输出单档100%，相邻档存在合理可能时应给软概率。原始总分与主要档位应大体一致，但不要求等于概率期望。",
     "四档概率必须在0到1且总和为1；signals最多5个；explanation不超过80个中文字符。",
     "以下示例只包含当时可见上下文，不含未来消息：",
     examples,
@@ -195,13 +200,52 @@ function dominantTier(result: AcuJudgeResult): number {
 }
 
 export function hasSevereTierConflict(result: AcuJudgeResult): boolean {
-  return Math.abs(scoreTier(result.difficultyScore) - dominantTier(result)) >= 2;
+  const tiers = [scoreTier(result.difficultyIndex), scoreTier(result.difficultyScoreRaw), dominantTier(result)];
+  return Math.max(...tiers) - Math.min(...tiers) >= 2;
+}
+
+const FACTOR_KEYS = [
+  ["reasoning_depth", "reasoningDepth"],
+  ["task_scope", "taskScope"],
+  ["constraint_density", "constraintDensity"],
+  ["tool_dependency", "toolDependency"],
+  ["verification_burden", "verificationBurden"],
+  ["context_burden", "contextBurden"],
+] as const;
+
+function oneDecimal(value: unknown, name: string, maximum: number): number {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric < 0 || numeric > maximum) throw new Error(`Judge ${name} must be finite and in [0, ${maximum}]`);
+  if (Math.abs(numeric * 10 - Math.round(numeric * 10)) > 1e-8) throw new Error(`Judge ${name} must have at most one decimal place`);
+  return Math.round(numeric * 10) / 10;
+}
+
+export function computeDifficultyIndex(
+  difficultyScoreRaw: number,
+  factors: AcuDifficultyFactors,
+): { factorComposite: number; difficultyIndex: number } {
+  const factorComposite = 10 * (
+    0.25 * factors.reasoningDepth
+    + 0.15 * factors.taskScope
+    + 0.15 * factors.constraintDensity
+    + 0.20 * factors.toolDependency
+    + 0.15 * factors.verificationBurden
+    + 0.10 * factors.contextBurden
+  );
+  const difficultyIndex = Math.max(0, Math.min(100, 0.80 * factorComposite + 0.20 * difficultyScoreRaw));
+  return {
+    factorComposite: Math.round(factorComposite * 10) / 10,
+    difficultyIndex: Math.round(difficultyIndex * 10) / 10,
+  };
 }
 
 export function parseJudgeResult(text: string): AcuJudgeResult {
   const parsed = extractJson(text);
-  const score = Number(parsed.difficulty_score);
-  if (!Number.isFinite(score) || score < 0 || score > 100) throw new Error("Judge difficulty_score must be finite and in [0, 100]");
+  const difficultyScoreRaw = oneDecimal(parsed.difficulty_score_raw, "difficulty_score_raw", 100);
+  if (!parsed.factors || typeof parsed.factors !== "object" || Array.isArray(parsed.factors)) throw new Error("Judge factors must be an object");
+  const rawFactors = parsed.factors as Record<string, unknown>;
+  const factors = Object.fromEntries(FACTOR_KEYS.map(([wire, local]) => [local, oneDecimal(rawFactors[wire], `factors.${wire}`, 10)])) as AcuDifficultyFactors;
+  const { factorComposite, difficultyIndex } = computeDifficultyIndex(difficultyScoreRaw, factors);
   const probabilities = normalizeProbabilities({
     pLow: Number(parsed.p_low), pMid: Number(parsed.p_mid), pMidHigh: Number(parsed.p_mid_high), pHigh: Number(parsed.p_high), confidence: Number(parsed.confidence),
   });
@@ -211,21 +255,34 @@ export function parseJudgeResult(text: string): AcuJudgeResult {
   if (typeof parsed.explanation !== "string" || Array.from(parsed.explanation).length > 80) {
     throw new Error("Judge explanation must be a string no longer than 80 characters");
   }
-  return { ...probabilities, difficultyScore: Math.round(score * 10) / 10, signals: parsed.signals as string[], explanation: parsed.explanation };
+  return {
+    ...probabilities,
+    difficultyScoreRaw,
+    factors,
+    factorComposite,
+    difficultyIndex,
+    difficultyMethodVersion: ACU_DIFFICULTY_METHOD_VERSION,
+    difficultyScore: difficultyIndex,
+    signals: parsed.signals as string[],
+    explanation: parsed.explanation,
+  };
 }
 
 function cachePath(config: AcuRuntimeConfig): string {
-  return config.cachePath || join(homedir(), ".claw-router", "acu-judge-cache-v2.json");
+  if (config.cachePath && config.promptVersion === "acu-tier-requirement-v3") {
+    return config.cachePath.replace(/v2(?=\.json$)/, "v3");
+  }
+  return config.cachePath || join(homedir(), ".claw-router", "acu-judge-cache-v3.json");
 }
 
 function readCache(path: string): CacheFile {
-  if (!existsSync(path)) return { schemaVersion: "acu-judge-cache-v2", entries: {} };
+  if (!existsSync(path)) return { schemaVersion: "acu-judge-cache-v3", entries: {} };
   try {
     const parsed = JSON.parse(readFileSync(path, "utf8")) as CacheFile;
-    if (parsed.schemaVersion !== "acu-judge-cache-v2" || !parsed.entries) throw new Error("wrong schema");
+    if (parsed.schemaVersion !== "acu-judge-cache-v3" || !parsed.entries) throw new Error("wrong schema");
     return parsed;
   } catch {
-    return { schemaVersion: "acu-judge-cache-v2", entries: {} };
+    return { schemaVersion: "acu-judge-cache-v3", entries: {} };
   }
 }
 
@@ -290,7 +347,7 @@ export class AcuJudgeClient {
             model: this.config.judgeModel,
             messages: [
               { role: "system", content: buildJudgeSystemPrompt() },
-              { role: "user", content: `当前API上下文：\n${truncated.text}${attempt ? "\n\n上次结果的连续分数与主要档位严重冲突，请重新检查并输出一致结果。" : ""}` },
+              { role: "user", content: `当前API上下文：\n${truncated.text}${attempt ? "\n\n上次结果的最终指数、原始总分或主要概率跨越了两个以上档位，请重新检查六因子并输出一致结果。" : ""}` },
             ],
             temperature: 0, max_tokens: Math.min(300, this.config.maxOutputTokens), response_format: { type: "json_object" },
             thinking: { type: "disabled" }, stream: false,
@@ -306,7 +363,7 @@ export class AcuJudgeClient {
         lastResponse = response;
         if (!hasSevereTierConflict(parsed)) { result = parsed; break; }
       }
-      if (!result || !lastPayload || !lastResponse) throw new Error("ACU Judge score remained inconsistent with its dominant tier after retry");
+      if (!result || !lastPayload || !lastResponse) throw new Error("ACU Judge index, raw score and dominant tier remained severely inconsistent after retry");
       const usageStatus = lastPayload.usage?.prompt_tokens !== undefined && lastPayload.usage?.completion_tokens !== undefined
         ? "reported" as const : "usage_missing" as const;
       const promptTokens = lastPayload.usage?.prompt_tokens ?? truncated.tokenEstimate;

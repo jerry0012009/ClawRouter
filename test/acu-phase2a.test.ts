@@ -1,17 +1,20 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   AcuJudgeClient,
+  computeDifficultyIndex,
   buildModelCurve,
   continuousTierProbabilities,
   difficultyScore,
   estimatedQuality,
   getAcuCatalog,
+  hasSevereTierConflict,
   interpolateModelCurve,
   normalizeProbabilities,
   parseJudgeResult,
+  buildJudgeSystemPrompt,
   recommendModel,
   serializeVisibleContext,
   selectValueRoute,
@@ -51,7 +54,8 @@ describe("Phase 2A constrained tier model", () => {
 
   it("rejects malformed strict Judge JSON", () => {
     expect(() => parseJudgeResult(JSON.stringify({
-      difficulty_score: 40,
+      difficulty_score_raw: 40,
+      factors: { reasoning_depth: 4.1, task_scope: 3.8, constraint_density: 4.2, tool_dependency: 3.5, verification_burden: 4.0, context_burden: 3.7 },
       p_low: 0.4,
       p_mid: 0.3,
       p_mid_high: 0.2,
@@ -61,6 +65,37 @@ describe("Phase 2A constrained tier model", () => {
       explanation: "too many signals",
     }))).toThrow(/signals/);
     expect(() => parseJudgeResult("not-json")).toThrow(/JSON object/);
+  });
+
+  it("computes the deterministic v1 difficulty index without noise", () => {
+    const factors = {
+      reasoningDepth: 2.8, taskScope: 2.1, constraintDensity: 3.4,
+      toolDependency: 0, verificationBurden: 2.6, contextBurden: 1.3,
+    };
+    const first = computeDifficultyIndex(25, factors);
+    const second = computeDifficultyIndex(25, factors);
+    expect(first).toEqual({ factorComposite: 20.5, difficultyIndex: 21.4 });
+    expect(second).toEqual(first);
+    expect(computeDifficultyIndex.toString()).not.toContain("Math.random");
+  });
+
+  it("freezes six continuous-factor few-shots in the v3 prompt", () => {
+    const prompt = buildJudgeSystemPrompt();
+    expect(prompt).toContain("ACU");
+    expect(prompt).toContain("difficulty_score_raw");
+    expect(prompt).toContain("reasoning_depth");
+    expect(prompt).toContain("不要为了简洁默认使用5的倍数");
+    expect((prompt.match(/期望输出：/g) || [])).toHaveLength(6);
+  });
+
+  it("retries only when index, raw score, or dominant probability span at least two tiers", () => {
+    const base = {
+      difficultyScoreRaw: 25, factors: { reasoningDepth: 2.8, taskScope: 2.1, constraintDensity: 3.4, toolDependency: 0, verificationBurden: 2.6, contextBurden: 1.3 },
+      factorComposite: 20.5, difficultyIndex: 25.8, difficultyMethodVersion: "acu-difficulty-index-v1" as const,
+      difficultyScore: 25.8, pLow: 0.76, pMid: 0.22, pMidHigh: 0.02, pHigh: 0, confidence: 0.87, signals: [], explanation: "",
+    };
+    expect(hasSevereTierConflict(base)).toBe(false);
+    expect(hasSevereTierConflict({ ...base, difficultyScoreRaw: 85 })).toBe(true);
   });
 
   it("solves the aggregate anchor and preserves tier monotonicity", () => {
@@ -232,10 +267,14 @@ describe("Phase 2A Judge transport", () => {
   it("sends a non-thinking JSON-only request and reuses the hash cache", async () => {
     const directory = await mkdtemp(join(tmpdir(), "acu-judge-test-"));
     temporaryDirectories.push(directory);
-    const cachePath = join(directory, "cache.json");
+    const legacyCachePath = join(directory, "acu-judge-cache-v2.json");
+    const cachePath = join(directory, "acu-judge-cache-v3.json");
+    const legacyContents = '{"schemaVersion":"acu-judge-cache-v2","entries":{"audit":"preserved"}}\n';
+    await writeFile(legacyCachePath, legacyContents);
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
       choices: [{ message: { content: JSON.stringify({
-        difficulty_score: 68.4,
+        difficulty_score_raw: 68.4,
+        factors: { reasoning_depth: 6.8, task_scope: 6.2, constraint_density: 6.5, tool_dependency: 7.4, verification_burden: 6.9, context_burden: 5.7 },
         p_low: 0.1,
         p_mid: 0.2,
         p_mid_high: 0.6,
@@ -246,7 +285,7 @@ describe("Phase 2A Judge transport", () => {
       }) } }],
       usage: { prompt_tokens: 1_000, completion_tokens: 90 },
     }), { status: 200, headers: { "Content-Type": "application/json" } }));
-    const config = readAcuRuntimeConfig({ enabled: true, apiKey: "secret", cachePath });
+    const config = readAcuRuntimeConfig({ enabled: true, apiKey: "secret", cachePath: legacyCachePath });
     const client = new AcuJudgeClient(config, fetchMock);
     const messages = [{ role: "user", content: "Inspect the failing tests and repair them." }];
 
@@ -266,8 +305,10 @@ describe("Phase 2A Judge transport", () => {
     });
     expect(JSON.stringify(body)).not.toContain("recommend");
     const cache = await readFile(cachePath, "utf8");
+    expect(JSON.parse(cache)).toMatchObject({ schemaVersion: "acu-judge-cache-v3" });
     expect(cache).not.toContain("Inspect the failing tests");
     expect(cache).not.toContain("secret");
+    expect(await readFile(legacyCachePath, "utf8")).toBe(legacyContents);
   });
 
   it("serializes tool calls, tool results, structured content, and tools deterministically", () => {

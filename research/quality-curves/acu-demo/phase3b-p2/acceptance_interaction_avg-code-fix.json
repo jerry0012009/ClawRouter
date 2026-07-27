@@ -1,23 +1,25 @@
 {
-  "generatedAt": "2026-07-27T15:18:41.949Z",
+  "generatedAt": "2026-07-27T15:52:11.815Z",
   "baseUrl": "https://eu.jerrypsy.top/acu-router-dev/",
   "cases": [
     {
       "id": "avg-code-fix",
       "preset": 1,
-      "requestId": "b2e4ea7b-7bb6-4b72-b705-bb2f54bb8037",
-      "difficultyScore": 25,
+      "requestId": "fc2074a9-1d5d-46c3-ba6f-3f0b265bfdac",
+      "difficultyScore": 14.1,
       "judgeStatus": "cache_hit",
       "qualityCeilingModel": "gpt-5.6-luna",
-      "qualityCeilingScore": 95.29495616835193,
+      "qualityCeilingScore": 98.43229167503166,
       "recommendedModel": "qwen3.6-plus",
-      "recommendedScore": 82.72637519142147,
+      "recommendedScore": 89.41598643986724,
       "actualModel": "qwen3.6-plus",
       "featuredModels": [
         "gpt-5.6-luna",
         "qwen3.6-plus",
         "glm-5.1",
-        "kimi-k2.6"
+        "kimi-k2.6",
+        "gpt-5.6-terra",
+        "gpt-5.6-sol"
       ],
       "featuredView": {
         "x": [
@@ -26,28 +28,28 @@
         ],
         "global": true
       },
-      "baselineMeta": "GPT-5.6 Luna预计 95.3分Default模型调用 3149ms本次实际成本 US$0.00170upstream_usage",
-      "routerMeta": "实际 qwen3.6-plus任务评估 0ms模型调用 8268ms总耗时 8293ms本次实际成本 US$0.00065upstream_usage",
-      "comparison": "ACU 预计以 12.6分的模型得分差距，换取成本降低 61.6%。质量上界实际成本 US$0.00170；ACU 本次实际成本 US$0.00065。",
+      "baselineMeta": "GPT-5.6 Luna预计 98.4分Default模型调用 3077ms本次实际成本 US$0.00168upstream_usage",
+      "routerMeta": "实际 qwen3.6-plus任务评估 0ms模型调用 7837ms总耗时 7882ms本次实际成本 US$0.00063upstream_usage",
+      "comparison": "ACU 预计以 9.0分的模型得分差距，换取成本降低 62.5%。质量上界实际成本 US$0.00168；ACU 本次实际成本 US$0.00063。",
       "executionStatus": "推荐已执行",
       "wheelZoomView": {
         "x": [
-          10.097894736842104,
-          39.6178947368421
+          2.5815789473684223,
+          27.18157894736842
         ],
         "global": false
       },
       "dragPanView": {
         "x": [
-          13.334736842105261,
-          42.85473684210526
+          5.278947368421053,
+          29.87894736842105
         ],
         "global": false
       },
       "doubleClickView": {
         "x": [
-          7,
-          43
+          0,
+          30
         ],
         "global": false
       },
@@ -55,18 +57,18 @@
         "qwen3.6-plus",
         "glm-5.1",
         "kimi-k2.6",
-        "kimi-k2.7-code",
-        "gpt-5.6-luna",
-        "deepseek-v4-pro",
-        "glm-5.2",
-        "qwen3.7-max",
         "gemini-2.5-flash",
-        "qwen/qwen3-235b-a22b",
+        "deepseek-v4-pro",
         "deepseek-v4-flash",
-        "gemini-3.5-flash",
-        "meta-llama/llama-4-maverick",
         "qwen3.5-flash",
+        "kimi-k2.7-code",
+        "meta-llama/llama-4-maverick",
+        "gpt-5.6-luna",
+        "glm-5.2",
+        "qwen/qwen3-235b-a22b",
         "meta-llama/llama-3.3-70b-instruct",
+        "qwen3.7-max",
+        "gemini-3.5-flash",
         "deepseek/deepseek-chat-v3-0324",
         "gpt-5.4-mini",
         "gpt-5.6-terra",
@@ -77,8 +79,8 @@
       ],
       "allView": {
         "x": [
-          7,
-          43
+          0,
+          30
         ],
         "global": false
       },

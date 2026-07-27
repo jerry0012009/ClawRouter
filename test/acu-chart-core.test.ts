@@ -47,12 +47,12 @@ describe("investor chart presentation helpers", () => {
 
   it("filters unavailable models and always features ceiling, recommendation and actual execution", async () => {
     const core = await loadCore();
-    const candidates = [candidate("ceiling", 95, .1), candidate("recommended", 90, .01), candidate("actual", 89, .02), candidate("cooldown", 99, .03, { healthStatus: "cooldown" })];
-    const visible = core.visibleCandidates(candidates, ["ceiling", "recommended", "actual", "cooldown"]) as Candidate[];
-    expect(visible.map((item) => item.modelId)).toEqual(["ceiling", "recommended", "actual"]);
+    const candidates = [candidate("ceiling", 95, .1), candidate("recommended", 90, .01), candidate("actual", 89, .02), candidate("four", 88, .03), candidate("five", 87, .04), candidate("six", 86, .05), candidate("cooldown", 99, .03, { healthStatus: "cooldown" })];
+    const visible = core.visibleCandidates(candidates, ["ceiling", "recommended", "actual", "four", "five", "six", "cooldown"]) as Candidate[];
+    expect(visible.map((item) => item.modelId)).toEqual(["ceiling", "recommended", "actual", "four", "five", "six"]);
     const featured = core.featuredModelIds({ candidates: visible, ceilingId: "ceiling", recommendedId: "recommended", actualId: "actual", attemptIds: [] }) as string[];
     expect(featured).toEqual(expect.arrayContaining(["ceiling", "recommended", "actual"]));
-    expect(featured.length).toBeLessThanOrEqual(6);
+    expect(featured).toHaveLength(6);
   });
 
   it("sorts the model list without making network calls", async () => {

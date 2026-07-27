@@ -272,6 +272,9 @@ describe("ACU Router demo reliability", () => {
     expect(html).toContain("acu-decision-module");
     expect(html).toContain("当前任务最高预计得分模型");
     expect(html).toContain("全部备选");
+    expect(html).toContain("<span class=\"num\">04</span>");
+    expect(html).toContain("<span class=\"num\">05</span>");
+    expect(html).toContain("Cost & Quality Ledger / 最近请求");
     expect(html).not.toContain("真实数据闭环");
     expect(html.match(/id="feedback-row"/g)).toHaveLength(1);
     expect(main).toContain("/acu/api/plan");
@@ -290,6 +293,9 @@ describe("ACU Router demo reliability", () => {
     expect(integrated).toContain("推荐模型${reason}，已切换");
     expect(integrated).toContain("质量复核后升级");
     expect(integrated).toContain("state.locked.size >= 3");
+    expect(integrated).not.toContain("样本不足");
+    expect(integrated).not.toContain("证据等级");
+    expect(integrated).toContain("function displayLatencyMs");
   });
 
   it("resolves production and Dev API prefixes without allowing Dev to call production", async () => {

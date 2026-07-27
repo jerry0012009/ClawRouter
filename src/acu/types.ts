@@ -10,7 +10,22 @@ export type AcuTierProbabilities = {
   confidence: number;
 };
 
+export type AcuDifficultyFactors = {
+  reasoningDepth: number;
+  taskScope: number;
+  constraintDensity: number;
+  toolDependency: number;
+  verificationBurden: number;
+  contextBurden: number;
+};
+
 export type AcuJudgeResult = AcuTierProbabilities & {
+  difficultyScoreRaw: number;
+  factors: AcuDifficultyFactors;
+  factorComposite: number;
+  difficultyIndex: number;
+  difficultyMethodVersion: "acu-difficulty-index-v1";
+  /** Compatibility alias; always identical to difficultyIndex for v3 results. */
   difficultyScore: number;
   signals: string[];
   explanation: string;
@@ -153,6 +168,11 @@ export type AcuEvaluation = {
   contextSha256: string;
   contextTokenEstimate: number;
   contextTruncated: boolean;
+  difficultyScoreRaw: number;
+  difficultyFactors: AcuDifficultyFactors;
+  factorComposite: number;
+  difficultyIndex: number;
+  difficultyMethodVersion: "acu-difficulty-index-v1";
   difficultyScore: number;
   judgeEntropy: number;
   routingModelVersion: string;

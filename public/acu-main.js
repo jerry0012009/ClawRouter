@@ -4,6 +4,8 @@
   const modelCatalogMap = {};
   let currentRun = null;
   let running = false;
+  let totalCeilingCost = 0;
+  let totalRouterCost = 0;
 
   const PRESETS = [
     { label: '结构化抽取', task: 'structured_extraction', checks: ['accuracy', 'completeness', 'direct_usability'], text: '请把下面这段文本提取成 JSON，字段包括 name、company、amount、deadline。只返回合法 JSON，不要 markdown，不要解释。\n\n"张三是北京字节跳动的产品经理，他在 2025 年 3 月前需要完成一笔 50 万元的采购。"' },
@@ -196,6 +198,47 @@
       const costPhrase = actualSavings >= 0 ? `成本降低 ${actualSavings.toFixed(1)}%` : `成本增加 ${Math.abs(actualSavings).toFixed(1)}%`;
       banner.textContent = `ACU 预计以 ${gap.toFixed(1)}分的模型得分差距，换取${costPhrase}。质量上界实际成本 US$${state.ceiling.cost.toFixed(5)}；ACU 本次实际成本 US$${state.router.cost.toFixed(5)}。`;
     }
+    if (!state.ledgerAdded) {
+      state.ledgerAdded = true;
+      totalCeilingCost += state.ceiling.cost;
+      totalRouterCost += state.router.cost;
+      addLedgerRow({
+        time: new Date().toLocaleTimeString(), task: detectTaskType($('prompt-input').value), preference: `${state.spec.threshold}分`,
+        model: state.router.model, cost: state.router.cost, ceiling: state.ceiling.cost, savings: actualSavings,
+        quality: `${state.router.quality.label} ${state.router.quality.score}分`, validator: validatorLabel(state.router.trace),
+        switched: (state.router.trace?.attempts?.length || 0) > 1 ? '是' : '否',
+        latency: `ACU ${state.router.latency}ms / 上界 ${state.ceiling.latency}ms`,
+      });
+    }
+  }
+
+  function validatorLabel(trace) {
+    if (!trace?.validator || trace.validator === 'not_applicable') return '不适用';
+    return `${trace.validator}: ${trace.validator_result || '—'}`;
+  }
+
+  function renderTrace(trace, plan) {
+    const attempts = (trace?.attempts || []).map((attempt, index) => `#${index + 1} ${attempt.model}: ${attempt.status}${attempt.error_category ? `/${attempt.error_category}` : ''} ${attempt.latency_ms}ms`).join(' → ') || '—';
+    const values = {
+      difficulty_index: plan.difficultyIndex ?? plan.difficultyScore,
+      difficulty_raw: plan.difficultyScoreRaw ?? '—',
+      quality_ceiling: plan.qualityCeilingModel?.modelId || '—',
+      recommended: plan.recommendation?.recommended?.modelId || '—',
+      actual: trace?.actual_model_used || '—', attempts,
+      usage_source: trace?.usage_audit?.usageSource || '—',
+      router_latency: `${trace?.latency_breakdown?.total_router_latency_ms ?? 0}ms`,
+    };
+    $('trace-grid').innerHTML = Object.entries(values).map(([key, value]) => `<span class="pill">${key}: ${value}</span>`).join('');
+  }
+
+  function addLedgerRow(row) {
+    const body = $('ledger-body');
+    if (body.querySelector('.subtle')) body.innerHTML = '';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${row.time}</td><td>${row.task}</td><td>${row.preference}</td><td>${row.model}</td><td class="green-text">$${row.cost.toFixed(5)}</td><td>$${row.ceiling.toFixed(5)}</td><td class="green-text">${row.savings.toFixed(1)}%</td><td>${row.quality}</td><td>${row.validator}</td><td>${row.switched}</td><td>${row.latency}</td>`;
+    body.prepend(tr);
+    [...body.children].slice(8).forEach((node) => node.remove());
+    $('ledger-summary').innerHTML = `<span>累计ACU实际成本 $${totalRouterCost.toFixed(5)}</span><span>质量上界成本 $${totalCeilingCost.toFixed(5)}</span><span>累计节省 $${(totalCeilingCost - totalRouterCost).toFixed(5)}</span>`;
   }
 
   async function runComparison() {
@@ -211,7 +254,7 @@
     const maxTokens = maxTokensForTask(spec.task_type, prompt);
     const messages = [{ role: 'system', content: qualitySpecPrompt(spec) }, { role: 'user', content: prompt }];
     renderQualityPreview();
-    const state = { plan: null, ceiling: null, router: null, ceilingDone: false, routerDone: false, spec };
+    const state = { plan: null, ceiling: null, router: null, ceilingDone: false, routerDone: false, ledgerAdded: false, spec };
     try {
       const plan = await planTask(messages, spec.threshold / 100, maxTokens);
       state.plan = plan;
@@ -251,6 +294,7 @@
         renderQualityResult('router-quality', 'ACU Router', quality, spec);
         $('router-meta').innerHTML = `<span class="pill ok">实际 ${model}</span><span class="pill">任务评估 ${latency.judge_latency_ms ?? 0}ms</span><span class="pill">模型调用 ${trace?.attempts?.[0]?.latency_ms ?? 0}ms</span><span class="pill">总耗时 ${latency.total_router_latency_ms ?? wallLatency}ms</span><span class="pill ok">本次实际成本 US$${cost.toFixed(5)}</span><span class="pill">${usageSourceLabel(response, trace)}</span>`;
         state.router = { response, trace, model, cost, quality, latency: wallLatency };
+        renderTrace(trace, plan);
         currentRun = { routerQuality: quality, spec, model, ceilingModel: ceiling.modelId };
         $('feedback-row').style.display = 'flex';
         if (!state.ceilingDone) $('baseline-answer').textContent = 'ACU Router 已完成；质量上界模型仍在生成…';

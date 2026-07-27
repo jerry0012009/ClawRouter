@@ -783,7 +783,21 @@ type AcuTierProbabilities = {
     pHigh: number;
     confidence: number;
 };
+type AcuDifficultyFactors = {
+    reasoningDepth: number;
+    taskScope: number;
+    constraintDensity: number;
+    toolDependency: number;
+    verificationBurden: number;
+    contextBurden: number;
+};
 type AcuJudgeResult = AcuTierProbabilities & {
+    difficultyScoreRaw: number;
+    factors: AcuDifficultyFactors;
+    factorComposite: number;
+    difficultyIndex: number;
+    difficultyMethodVersion: "acu-difficulty-index-v1";
+    /** Compatibility alias; always identical to difficultyIndex for v3 results. */
     difficultyScore: number;
     signals: string[];
     explanation: string;
@@ -923,6 +937,11 @@ type AcuEvaluation = {
     contextSha256: string;
     contextTokenEstimate: number;
     contextTruncated: boolean;
+    difficultyScoreRaw: number;
+    difficultyFactors: AcuDifficultyFactors;
+    factorComposite: number;
+    difficultyIndex: number;
+    difficultyMethodVersion: "acu-difficulty-index-v1";
     difficultyScore: number;
     judgeEntropy: number;
     routingModelVersion: string;
@@ -965,6 +984,12 @@ type JudgeRequestResult = {
 };
 declare function serializeVisibleContext(messages: AcuVisibleMessage[], tools?: unknown[]): string;
 declare function estimateVisibleTokens(text: string): number;
+declare function buildJudgeSystemPrompt(): string;
+declare function hasSevereTierConflict(result: AcuJudgeResult): boolean;
+declare function computeDifficultyIndex(difficultyScoreRaw: number, factors: AcuDifficultyFactors): {
+    factorComposite: number;
+    difficultyIndex: number;
+};
 declare function parseJudgeResult(text: string): AcuJudgeResult;
 declare class AcuJudgeClient {
     private readonly config;
@@ -1325,4 +1350,4 @@ declare const VERSION: string;
 
 declare const plugin: OpenClawPluginDefinition;
 
-export { ACU_TIERS, type AcuBenchmarkEvidence, type AcuCurvePoint, AcuDemoStrategy, type AcuEvaluateInput, type AcuEvaluation, AcuJudgeClient, type AcuJudgeResult, type AcuJudgeResultSource, type AcuJudgeStatus, type AcuModelCatalogEntry, type AcuModelEstimate, type AcuRecommendation, AcuRoutingStore, type AcuRuntimeConfig, type AcuTier, type AcuTierProbabilities, type AcuVisibleMessage, BLOCKRUN_MODELS, type CachedResponse, DEFAULT_ROUTING_CONFIG, type ExecutionProfile, type ExecutionProfileHealth, type FeedbackInput, MODEL_ALIASES, OPENCLAW_MODELS, type OutcomeInput, RequestDeduplicator, ResponseCache, type RoutingConfig, type RoutingDecision, type RoutingRecordMetadata, type SessionConfig, type SessionEntry, SessionStore, type ThinkingMode, type Tier, type UsageEntry, VERSION, blockrunProvider, buildModelCurve, buildProviderModels, calculateModelCost, continuousTierProbabilities, plugin as default, difficultyScore, estimateCallCost, estimateVisibleTokens, estimatedQuality, executionProfileFor, getAcuCatalog, getAcuModel, getFallbackChain, getModelContextWindow, getProxyPort, getSessionId, hashRequestContent, hashSession, interpolateModelCurve, isParetoEfficient, isReasoningModel, logUsage, normalizeProbabilities, normalizedEntropy, openAcuRoutingStore, parseJudgeResult, publicCatalogPayload, readAcuRuntimeConfig, recommendModel, resolveApiKey, resolveModelAlias, route, rulesFallbackJudge, saveApiKey, selectValueRoute, serializeVisibleContext, solveAbilityParameter, startProxy, supportsToolCalling, supportsVision, tierSufficiency };
+export { ACU_TIERS, type AcuBenchmarkEvidence, type AcuCurvePoint, AcuDemoStrategy, type AcuDifficultyFactors, type AcuEvaluateInput, type AcuEvaluation, AcuJudgeClient, type AcuJudgeResult, type AcuJudgeResultSource, type AcuJudgeStatus, type AcuModelCatalogEntry, type AcuModelEstimate, type AcuRecommendation, AcuRoutingStore, type AcuRuntimeConfig, type AcuTier, type AcuTierProbabilities, type AcuVisibleMessage, BLOCKRUN_MODELS, type CachedResponse, DEFAULT_ROUTING_CONFIG, type ExecutionProfile, type ExecutionProfileHealth, type FeedbackInput, MODEL_ALIASES, OPENCLAW_MODELS, type OutcomeInput, RequestDeduplicator, ResponseCache, type RoutingConfig, type RoutingDecision, type RoutingRecordMetadata, type SessionConfig, type SessionEntry, SessionStore, type ThinkingMode, type Tier, type UsageEntry, VERSION, blockrunProvider, buildJudgeSystemPrompt, buildModelCurve, buildProviderModels, calculateModelCost, computeDifficultyIndex, continuousTierProbabilities, plugin as default, difficultyScore, estimateCallCost, estimateVisibleTokens, estimatedQuality, executionProfileFor, getAcuCatalog, getAcuModel, getFallbackChain, getModelContextWindow, getProxyPort, getSessionId, hasSevereTierConflict, hashRequestContent, hashSession, interpolateModelCurve, isParetoEfficient, isReasoningModel, logUsage, normalizeProbabilities, normalizedEntropy, openAcuRoutingStore, parseJudgeResult, publicCatalogPayload, readAcuRuntimeConfig, recommendModel, resolveApiKey, resolveModelAlias, route, rulesFallbackJudge, saveApiKey, selectValueRoute, serializeVisibleContext, solveAbilityParameter, startProxy, supportsToolCalling, supportsVision, tierSufficiency };

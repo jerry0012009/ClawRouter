@@ -35,7 +35,7 @@
       "model": "deepseek-v4-flash",
       "baseUrl": "https://api.deepseek.com",
       "mode": "non-thinking",
-      "promptVersion": "acu-tier-requirement-v2",
+      "promptVersion": "acu-tier-requirement-v3",
       "timeoutMs": 8000,
       "maxContextTokens": 6000,
       "maxOutputTokens": 300

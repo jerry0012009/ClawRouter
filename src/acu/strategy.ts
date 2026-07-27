@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { ACU_DEMO_DISCLAIMER, ACU_ROUTING_MODEL_VERSION, type AcuRuntimeConfig } from "./config.js";
+import { ACU_DEMO_DISCLAIMER, ACU_DIFFICULTY_METHOD_VERSION, ACU_ROUTING_MODEL_VERSION, type AcuRuntimeConfig } from "./config.js";
 import { normalizeProbabilities, normalizedEntropy } from "./math.js";
 import { recommendModel } from "./decision.js";
 import {
@@ -26,9 +26,20 @@ export function rulesFallbackJudge(decision: RoutingDecision): AcuJudgeResult {
     pHigh: selected === "high" ? confidence : remainder,
     confidence: decision.confidence,
   });
+  const difficultyScoreRaw = ({ low: 15, mid: 42, mid_high: 67, high: 90 } as const)[selected];
+  const factorValue = Math.round(difficultyScoreRaw) / 10;
+  const factors = {
+    reasoningDepth: factorValue, taskScope: factorValue, constraintDensity: factorValue,
+    toolDependency: factorValue, verificationBurden: factorValue, contextBurden: factorValue,
+  };
   return {
     ...probabilities,
-    difficultyScore: ({ low: 15, mid: 42, mid_high: 67, high: 90 } as const)[selected],
+    difficultyScoreRaw,
+    factors,
+    factorComposite: difficultyScoreRaw,
+    difficultyIndex: difficultyScoreRaw,
+    difficultyMethodVersion: ACU_DIFFICULTY_METHOD_VERSION,
+    difficultyScore: difficultyScoreRaw,
     signals: ["rules_strategy_fallback", decision.tier.toLowerCase()],
     explanation: "Difficulty Judge不可用，已使用现有RulesStrategy安全回退。",
   };
@@ -109,7 +120,7 @@ export class AcuDemoStrategy {
     const entropy = normalizedEntropy(judge);
     const recommendation = recommendModel({
       probabilities: judge,
-      difficultyScore: judge.difficultyScore,
+      difficultyScore: judge.difficultyIndex,
       inputTokens: contextTokenEstimate,
       expectedOutputTokens: input.expectedOutputTokens ?? 800,
       judgeCost,
@@ -141,7 +152,12 @@ export class AcuDemoStrategy {
       contextSha256,
       contextTokenEstimate,
       contextTruncated,
-      difficultyScore: judge.difficultyScore,
+      difficultyScoreRaw: judge.difficultyScoreRaw,
+      difficultyFactors: judge.factors,
+      factorComposite: judge.factorComposite,
+      difficultyIndex: judge.difficultyIndex,
+      difficultyMethodVersion: judge.difficultyMethodVersion,
+      difficultyScore: judge.difficultyIndex,
       judgeEntropy: entropy,
       routingModelVersion: ACU_ROUTING_MODEL_VERSION,
       shadowMode: this.config.shadowMode,

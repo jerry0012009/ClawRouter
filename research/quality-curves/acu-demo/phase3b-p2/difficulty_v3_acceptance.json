@@ -1,0 +1,439 @@
+{
+  "generatedAt": "2026-07-27T15:46:59.541Z",
+  "baseUrl": "https://eu.jerrypsy.top/acu-router-dev",
+  "summary": {
+    "count": 12,
+    "liveCount": 12,
+    "rulesFallbackCount": 0,
+    "integerCount": 1,
+    "nonIntegerCount": 11,
+    "multipleOfFiveCount": 1,
+    "uniqueIndexCount": 12,
+    "formulaMismatchCount": 0,
+    "repeatStatus": "cache_hit",
+    "repeatedExactly": true
+  },
+  "rows": [
+    {
+      "id": "polite-rewrite",
+      "contextSha256": "90413ff4cc6e543df1c08d359de0f879aa1ca49afcc2181608f34339590ef1e8",
+      "judgeStatus": "live",
+      "difficultyScoreRaw": 8.7,
+      "factors": {
+        "reasoningDepth": 0.8,
+        "taskScope": 0.7,
+        "constraintDensity": 1.5,
+        "toolDependency": 0,
+        "verificationBurden": 1,
+        "contextBurden": 0.4
+      },
+      "factorComposite": 7.2,
+      "difficultyIndex": 7.5,
+      "recomputedIndex": 7.5,
+      "probabilities": {
+        "pLow": 0.94,
+        "pMid": 0.05,
+        "pMidHigh": 0.01,
+        "pHigh": 0
+      },
+      "confidence": 0.93,
+      "signals": [
+        "single_rewrite",
+        "no_tools"
+      ],
+      "explanation": "单句礼貌改写，约束明确且容易核验。",
+      "promptVersion": "acu-tier-requirement-v3",
+      "methodVersion": "acu-difficulty-index-v1",
+      "upstreamRequestId": "chatcmpl-783e2a78-64d6-9aeb-92ff-b7cde0ce73b5",
+      "latencyMs": 3781,
+      "cost": 0.00028395
+    },
+    {
+      "id": "json-extraction",
+      "contextSha256": "89b16c0cbbe398e70521e9b48ad97d3c8946de94823886a34cd343f6a42365fe",
+      "judgeStatus": "live",
+      "difficultyScoreRaw": 21.3,
+      "factors": {
+        "reasoningDepth": 1.2,
+        "taskScope": 1.1,
+        "constraintDensity": 4.5,
+        "toolDependency": 0,
+        "verificationBurden": 1,
+        "contextBurden": 0.3
+      },
+      "factorComposite": 13.2,
+      "difficultyIndex": 14.8,
+      "recomputedIndex": 14.8,
+      "probabilities": {
+        "pLow": 0.82,
+        "pMid": 0.16,
+        "pMidHigh": 0.02,
+        "pHigh": 0
+      },
+      "confidence": 0.91,
+      "signals": [
+        "strict_json",
+        "field_extraction"
+      ],
+      "explanation": "单句提取三个字段，格式约束明确，验证容易。",
+      "promptVersion": "acu-tier-requirement-v3",
+      "methodVersion": "acu-difficulty-index-v1",
+      "upstreamRequestId": "chatcmpl-91dc41ef-ecd0-9bb8-ab62-52ab370563fe",
+      "latencyMs": 2682,
+      "cost": 0.00028710000000000004
+    },
+    {
+      "id": "email-writing",
+      "contextSha256": "9268ff0c5066f8d050753be7b12b980dbfc21ff3e09e369f0a7bf975039abbf2",
+      "judgeStatus": "live",
+      "difficultyScoreRaw": 6.3,
+      "factors": {
+        "reasoningDepth": 0.5,
+        "taskScope": 0.6,
+        "constraintDensity": 1.8,
+        "toolDependency": 0,
+        "verificationBurden": 0.8,
+        "contextBurden": 0.3
+      },
+      "factorComposite": 6.4,
+      "difficultyIndex": 6.3,
+      "recomputedIndex": 6.3,
+      "probabilities": {
+        "pLow": 0.96,
+        "pMid": 0.03,
+        "pMidHigh": 0.01,
+        "pHigh": 0
+      },
+      "confidence": 0.95,
+      "signals": [
+        "single_email",
+        "length_limit"
+      ],
+      "explanation": "单封短邮件，约束明确且验证容易。",
+      "promptVersion": "acu-tier-requirement-v3",
+      "methodVersion": "acu-difficulty-index-v1",
+      "upstreamRequestId": "chatcmpl-123b8098-6af7-9bca-bcd9-8911f13858de",
+      "latencyMs": 2354,
+      "cost": 0.0002844
+    },
+    {
+      "id": "local-code-fix",
+      "contextSha256": "676a3482760b5b92e8d8623fa00639d2d7712001448f898c80a902063f95d294",
+      "judgeStatus": "live",
+      "difficultyScoreRaw": 36.5,
+      "factors": {
+        "reasoningDepth": 3.2,
+        "taskScope": 3,
+        "constraintDensity": 2.6,
+        "toolDependency": 2.4,
+        "verificationBurden": 3.4,
+        "contextBurden": 1.3
+      },
+      "factorComposite": 27.6,
+      "difficultyIndex": 29.4,
+      "recomputedIndex": 29.4,
+      "probabilities": {
+        "pLow": 0.26,
+        "pMid": 0.64,
+        "pMidHigh": 0.09,
+        "pHigh": 0.01
+      },
+      "confidence": 0.85,
+      "signals": [
+        "edge_case",
+        "code_change"
+      ],
+      "explanation": "局部代码修复，需处理边界条件并解释行为。",
+      "promptVersion": "acu-tier-requirement-v3",
+      "methodVersion": "acu-difficulty-index-v1",
+      "upstreamRequestId": "chatcmpl-abbc5aa1-7c1c-9e6b-9ac6-aaff3fc3baec",
+      "latencyMs": 2563,
+      "cost": 0.00028544999999999997
+    },
+    {
+      "id": "sql-analysis",
+      "contextSha256": "5d9fb0cc9ef07136423eb08bf2166f7c95876c95bde575d325b71621fc42713b",
+      "judgeStatus": "live",
+      "difficultyScoreRaw": 44.5,
+      "factors": {
+        "reasoningDepth": 4.2,
+        "taskScope": 4,
+        "constraintDensity": 3.5,
+        "toolDependency": 0,
+        "verificationBurden": 4.8,
+        "contextBurden": 2.1
+      },
+      "factorComposite": 31.1,
+      "difficultyIndex": 33.7,
+      "recomputedIndex": 33.7,
+      "probabilities": {
+        "pLow": 0.18,
+        "pMid": 0.68,
+        "pMidHigh": 0.12,
+        "pHigh": 0.02
+      },
+      "confidence": 0.85,
+      "signals": [
+        "sql_debug",
+        "join_aggregation",
+        "verification_queries"
+      ],
+      "explanation": "定位SQL重复原因并修正JOIN与聚合，需理解数据关系并验证。",
+      "promptVersion": "acu-tier-requirement-v3",
+      "methodVersion": "acu-difficulty-index-v1",
+      "upstreamRequestId": "chatcmpl-1c3bc4d8-ae5a-93cc-99a0-390c4a1a0f97",
+      "latencyMs": 3731,
+      "cost": 0.00029039999999999996
+    },
+    {
+      "id": "multi-file-fix",
+      "contextSha256": "866bba54ef0a3cfe7d9ab50e4e513d624d8b0d4e33a7d6d6384e78b22e75fce6",
+      "judgeStatus": "live",
+      "difficultyScoreRaw": 63.7,
+      "factors": {
+        "reasoningDepth": 6.2,
+        "taskScope": 6.8,
+        "constraintDensity": 5.4,
+        "toolDependency": 6.1,
+        "verificationBurden": 5.9,
+        "contextBurden": 4.2
+      },
+      "factorComposite": 59.1,
+      "difficultyIndex": 60,
+      "recomputedIndex": 60,
+      "probabilities": {
+        "pLow": 0.03,
+        "pMid": 0.24,
+        "pMidHigh": 0.65,
+        "pHigh": 0.08
+      },
+      "confidence": 0.82,
+      "signals": [
+        "multi_module",
+        "regression_tests",
+        "compatibility_risk"
+      ],
+      "explanation": "跨层修复并验证回归，需要整合多处状态。",
+      "promptVersion": "acu-tier-requirement-v3",
+      "methodVersion": "acu-difficulty-index-v1",
+      "upstreamRequestId": "chatcmpl-f17df0be-4712-931f-b1d3-e51ec6a89b08",
+      "latencyMs": 2452,
+      "cost": 0.00028934999999999996
+    },
+    {
+      "id": "tool-debug",
+      "contextSha256": "2c391fbfc4f67b32dc14092b6e7066cd7abe773334496f01a4e59d40bad0aba0",
+      "judgeStatus": "live",
+      "difficultyScoreRaw": 58.4,
+      "factors": {
+        "reasoningDepth": 5.6,
+        "taskScope": 5.2,
+        "constraintDensity": 4.8,
+        "toolDependency": 6.3,
+        "verificationBurden": 5.1,
+        "contextBurden": 4.5
+      },
+      "factorComposite": 53.7,
+      "difficultyIndex": 54.7,
+      "recomputedIndex": 54.7,
+      "probabilities": {
+        "pLow": 0.08,
+        "pMid": 0.35,
+        "pMidHigh": 0.52,
+        "pHigh": 0.05
+      },
+      "confidence": 0.85,
+      "signals": [
+        "log_analysis",
+        "git_diff",
+        "idempotency_fix",
+        "test_validation"
+      ],
+      "explanation": "多步骤定位与修复，涉及日志、Git和测试，但范围较集中。",
+      "promptVersion": "acu-tier-requirement-v3",
+      "methodVersion": "acu-difficulty-index-v1",
+      "upstreamRequestId": "chatcmpl-0a14cde6-3b37-9b0a-a544-f8335460c943",
+      "latencyMs": 3853,
+      "cost": 0.00029265
+    },
+    {
+      "id": "research-compare",
+      "contextSha256": "7953c0f4c2029e4d6d99f18e37923280c3c32dfd16d4309ada8b48a553087be1",
+      "judgeStatus": "live",
+      "difficultyScoreRaw": 42.5,
+      "factors": {
+        "reasoningDepth": 5.3,
+        "taskScope": 4.8,
+        "constraintDensity": 4.2,
+        "toolDependency": 0,
+        "verificationBurden": 3.6,
+        "contextBurden": 2.1
+      },
+      "factorComposite": 34.3,
+      "difficultyIndex": 35.9,
+      "recomputedIndex": 35.9,
+      "probabilities": {
+        "pLow": 0.18000000000000002,
+        "pMid": 0.7200000000000001,
+        "pMidHigh": 0.08000000000000002,
+        "pHigh": 0.020000000000000004
+      },
+      "confidence": 0.85,
+      "signals": [
+        "comparative_analysis",
+        "multi_dimension",
+        "assumption_explicit"
+      ],
+      "explanation": "多方案比较分析，需权衡多维度并明确假设。",
+      "promptVersion": "acu-tier-requirement-v3",
+      "methodVersion": "acu-difficulty-index-v1",
+      "upstreamRequestId": "chatcmpl-1bf10ec6-4c48-9141-b9b9-df4bca655060",
+      "latencyMs": 2553,
+      "cost": 0.00028845
+    },
+    {
+      "id": "migration-plan",
+      "contextSha256": "200c74d548a97ca6338c86e5b30c6a8e7424f8c51c090f670799ab782bb55ff9",
+      "judgeStatus": "live",
+      "difficultyScoreRaw": 85.3,
+      "factors": {
+        "reasoningDepth": 8.8,
+        "taskScope": 8.5,
+        "constraintDensity": 8.2,
+        "toolDependency": 7.6,
+        "verificationBurden": 8.9,
+        "contextBurden": 7.9
+      },
+      "factorComposite": 83.5,
+      "difficultyIndex": 83.9,
+      "recomputedIndex": 83.9,
+      "probabilities": {
+        "pLow": 0,
+        "pMid": 0.02,
+        "pMidHigh": 0.16,
+        "pHigh": 0.82
+      },
+      "confidence": 0.88,
+      "signals": [
+        "cross_region",
+        "zero_downtime",
+        "multi_constraint"
+      ],
+      "explanation": "跨地区库存迁移，涉及双写校验灰度回滚监控，高抽象多约束。",
+      "promptVersion": "acu-tier-requirement-v3",
+      "methodVersion": "acu-difficulty-index-v1",
+      "upstreamRequestId": "chatcmpl-f706635e-1216-9e08-b127-20d761764c9e",
+      "latencyMs": 3733,
+      "cost": 0.00029085000000000005
+    },
+    {
+      "id": "security-review",
+      "contextSha256": "d53d5c65b7f460f100d61e83eb3677219593f5fd0ea7d09ebbcbbc94c160832a",
+      "judgeStatus": "live",
+      "difficultyScoreRaw": 68.4,
+      "factors": {
+        "reasoningDepth": 7.1,
+        "taskScope": 7.5,
+        "constraintDensity": 6.2,
+        "toolDependency": 4.3,
+        "verificationBurden": 6.9,
+        "contextBurden": 5.8
+      },
+      "factorComposite": 63.1,
+      "difficultyIndex": 64.1,
+      "recomputedIndex": 64.1,
+      "probabilities": {
+        "pLow": 0.02,
+        "pMid": 0.28,
+        "pMidHigh": 0.55,
+        "pHigh": 0.15
+      },
+      "confidence": 0.85,
+      "signals": [
+        "security_audit",
+        "multi_dimension",
+        "priority_ranking"
+      ],
+      "explanation": "多维度安全审计，需跨模块推理并给出优先级与验证。",
+      "promptVersion": "acu-tier-requirement-v3",
+      "methodVersion": "acu-difficulty-index-v1",
+      "upstreamRequestId": "chatcmpl-822b7040-9bfa-9dee-af31-ec942134eea0",
+      "latencyMs": 2439,
+      "cost": 0.0002901
+    },
+    {
+      "id": "incident-response",
+      "contextSha256": "f054a3b64a722e1fed5e6d86bf41ff4f48a7c814130bb9600689606c1e7f4ac9",
+      "judgeStatus": "live",
+      "difficultyScoreRaw": 78.4,
+      "factors": {
+        "reasoningDepth": 8.1,
+        "taskScope": 8.5,
+        "constraintDensity": 6.8,
+        "toolDependency": 8.9,
+        "verificationBurden": 8.3,
+        "contextBurden": 7.2
+      },
+      "factorComposite": 80.7,
+      "difficultyIndex": 80.2,
+      "recomputedIndex": 80.2,
+      "probabilities": {
+        "pLow": 0.01,
+        "pMid": 0.08,
+        "pMidHigh": 0.56,
+        "pHigh": 0.35
+      },
+      "confidence": 0.85,
+      "signals": [
+        "cross_service",
+        "multi_tool",
+        "root_cause",
+        "compensation",
+        "verification"
+      ],
+      "explanation": "跨服务事故调查需多工具长链推理与验证。",
+      "promptVersion": "acu-tier-requirement-v3",
+      "methodVersion": "acu-difficulty-index-v1",
+      "upstreamRequestId": "chatcmpl-7c664df8-f567-9525-91b2-3b5a7b7bd82e",
+      "latencyMs": 2586,
+      "cost": 0.00029130000000000003
+    },
+    {
+      "id": "long-horizon",
+      "contextSha256": "5300ddd5297a0f842e12473659b8757bfd9666c2e9d400f369169b58469f7102",
+      "judgeStatus": "live",
+      "difficultyScoreRaw": 89.5,
+      "factors": {
+        "reasoningDepth": 9,
+        "taskScope": 8.9,
+        "constraintDensity": 8.3,
+        "toolDependency": 8.7,
+        "verificationBurden": 9.1,
+        "contextBurden": 8.5
+      },
+      "factorComposite": 87.9,
+      "difficultyIndex": 88.2,
+      "recomputedIndex": 88.2,
+      "probabilities": {
+        "pLow": 0,
+        "pMid": 0.01,
+        "pMidHigh": 0.14,
+        "pHigh": 0.85
+      },
+      "confidence": 0.88,
+      "signals": [
+        "long_horizon",
+        "cross_system",
+        "high_risk",
+        "multi_region",
+        "regulatory"
+      ],
+      "explanation": "跨系统高风险迁移，推理、验证与状态依赖都很高。",
+      "promptVersion": "acu-tier-requirement-v3",
+      "methodVersion": "acu-difficulty-index-v1",
+      "upstreamRequestId": "chatcmpl-b2ad2e67-bf33-9ba4-a5a9-d5503018e01b",
+      "latencyMs": 2451,
+      "cost": 0.00029295
+    }
+  ]
+}

@@ -13,9 +13,14 @@
   const $ = (id) => document.getElementById(id);
   const money = (value) => `US$${Number(value || 0).toFixed(value < 0.01 ? 5 : 3)}`;
   const score = (value) => `${Number(value).toFixed(1)}分`;
-  const healthLabel = (status) => ({ healthy: '正常', degraded: '当前性能波动', cooldown: '冷却中', unknown: '样本不足' })[status] || '样本不足';
-  const evidenceLabel = (confidence) => ({ high: '高可信公开证据', medium: '公开Benchmark锚定估算', low: '相对估算' })[confidence] || '相对估算';
+  const healthLabel = (status) => ({ healthy: '正常', degraded: '当前性能波动', cooldown: '冷却中', unknown: '可用' })[status] || '可用';
   const modeLabel = (candidate) => candidate?.thinkingMode === 'disabled' ? 'Non-thinking' : candidate?.thinkingMode === 'enabled' ? 'Thinking' : 'Default';
+
+  function displayLatencyMs(item) {
+    if (Number.isFinite(item?.p50LatencyMs)) return item.p50LatencyMs;
+    const profile = state.catalog?.models?.find((model) => model.modelId === item?.modelId)?.curveProfile;
+    return ({ efficient_fast: 2800, coding_specialist: 4800, balanced_frontier: 5200, frontier_resilient: 7500 })[profile] || 4500;
+  }
 
   function sourceLabel(evaluation) {
     if (evaluation.judgeStatus === 'live') return ['实时任务评估', 'live'];
@@ -26,6 +31,13 @@
   function difficultyLevel(value) { return value < 30 ? '简单' : value < 55 ? '标准' : value < 80 ? '复杂' : '高难度'; }
   function inputScale(tokens) { return tokens < 500 ? '短上下文' : tokens <= 4000 ? '中等上下文' : '长上下文'; }
   function qualityMode(value) { return value < 75 ? '成本优先' : value < 88 ? '质量成本均衡' : '质量优先'; }
+  const factorLabels = { reasoningDepth: '推理深度', taskScope: '任务范围', constraintDensity: '约束密度', toolDependency: '工具依赖', verificationBurden: '结果验证', contextBurden: '上下文负担' };
+
+  function leadingFactors(evaluation) {
+    return Object.entries(evaluation.difficultyFactors || evaluation.judge?.factors || {})
+      .sort((left, right) => Number(right[1]) - Number(left[1]))
+      .slice(0, 2).map(([key]) => factorLabels[key] || key).join(' · ') || '规则综合判断';
+  }
 
   function candidates() {
     if (!state.plan || !state.catalog) return [];
@@ -40,9 +52,15 @@
     if (modelId === state.plan?.recommendation?.recommended?.modelId) labels.push('ACU推荐');
     if (modelId === (state.evaluation?.actualModel || state.trace?.actual_model_used)) labels.push('实际执行');
     (state.trace?.attempts || []).forEach((attempt, index) => { if (attempt.model === modelId) labels.push(`第${index + 1}次尝试`); });
-    if (candidate(modelId)?.evidenceConfidence === 'low') labels.push('相对估算');
     if (candidate(modelId)?.healthStatus === 'degraded') labels.push('当前性能波动');
     return [...new Set(labels)];
+  }
+
+  function modelColor(modelId, fallbackIndex) {
+    if (modelId === state.plan?.qualityCeilingModel?.modelId) return '#9fc7ff';
+    if (modelId === (state.evaluation?.actualModel || state.trace?.actual_model_used)) return '#ffd76a';
+    if (modelId === state.plan?.recommendation?.recommended?.modelId) return '#90e8a0';
+    return colors[fallbackIndex % colors.length];
   }
 
   function visibleModelIds() {
@@ -107,6 +125,7 @@
     $('acu-quality-mode').textContent = qualityMode(preference);
     $('acu-input-tokens').textContent = `${evaluation.contextTokenEstimate} tokens`;
     $('acu-input-scale').textContent = inputScale(evaluation.contextTokenEstimate);
+    $('acu-factor-sources').textContent = leadingFactors(evaluation);
   }
 
   function updateSummary() {
@@ -170,7 +189,7 @@
       const placeRight = item.px < (bounds.left + bounds.right) / 2;
       const boxX = placeRight ? Math.min(bounds.right - width, item.px + 13) : Math.max(bounds.left, item.px - width - 13);
       ctx.strokeStyle = item.color; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(item.px, item.py); ctx.lineTo(placeRight ? boxX : boxX + width, item.labelY); ctx.stroke();
-      ctx.fillStyle = item.modelId === state.plan?.recommendation?.recommended?.modelId ? 'rgba(70,65,28,.97)' : 'rgba(15,15,17,.97)';
+      ctx.fillStyle = item.modelId === state.plan?.qualityCeilingModel?.modelId ? 'rgba(30,49,73,.97)' : item.modelId === state.plan?.recommendation?.recommended?.modelId ? 'rgba(35,62,42,.97)' : 'rgba(15,15,17,.97)';
       ctx.fillRect(boxX, item.labelY - height / 2, width, height); ctx.strokeStyle = item.color; ctx.strokeRect(boxX, item.labelY - height / 2, width, height);
       ctx.textAlign = 'left'; ctx.fillStyle = '#f3f3f4'; ctx.font = '600 10px sans-serif'; ctx.fillText(item.candidate.displayName, boxX + 7, item.labelY - 3);
       ctx.font = '600 9px ui-monospace, monospace'; ctx.fillText(`${score(item.candidate.predictedScore)}    ${money(item.candidate.expectedTotalCost)}`, boxX + 7, item.labelY + 11);
@@ -194,7 +213,7 @@
     modelIds.forEach((modelId, index) => {
       const curve = state.catalog.curves[modelId], item = candidate(modelId);
       if (!curve || !item) return;
-      const color = colors[index % colors.length];
+      const color = modelColor(modelId, index);
       const highlighted = state.hovered === modelId || state.selected === modelId || state.locked.has(modelId);
       ctx.strokeStyle = color; ctx.globalAlpha = state.hovered && !highlighted ? 0.24 : 1; ctx.lineWidth = highlighted ? 3.2 : roleLabels(modelId).length ? 2.4 : 1.25; ctx.beginPath();
       const visiblePoints = curve.filter((point) => point.difficultyScore >= domain.x[0] - 1 && point.difficultyScore <= domain.x[1] + 1);
@@ -219,7 +238,7 @@
 
   function tooltipHtml(item) {
     const roles = roleLabels(item.modelId);
-    return `<strong>${item.displayName} · ${modeLabel(item)}</strong><div class="acu-tooltip-roles">${roles.map((role) => `<span>${role}</span>`).join('')}</div><dl><dt>预计模型得分</dt><dd>${score(item.predictedScore)}</dd><dt>保守预计得分</dt><dd>${score(item.conservativeScore)}</dd><dt>预计综合成本</dt><dd>${money(item.expectedTotalCost)}</dd><dt>预计模型调用成本</dt><dd>${money(item.estimatedCallCost)}</dd><dt>预计P50延迟</dt><dd>${item.p50LatencyMs === null ? '样本不足' : `${(item.p50LatencyMs / 1000).toFixed(1)}秒`}</dd><dt>当前健康状态</dt><dd>${healthLabel(item.healthStatus)}</dd><dt>执行模式</dt><dd>${modeLabel(item)}</dd><dt>证据等级</dt><dd>${evidenceLabel(item.evidenceConfidence)}</dd><dt>Pareto有效前沿</dt><dd>${item.paretoEfficient ? '是' : '否'}</dd></dl>`;
+    return `<strong>${item.displayName} · ${modeLabel(item)}</strong><div class="acu-tooltip-roles">${roles.map((role) => `<span>${role}</span>`).join('')}</div><dl><dt>预计模型得分</dt><dd>${score(item.predictedScore)}</dd><dt>保守预计得分</dt><dd>${score(item.conservativeScore)}</dd><dt>预计综合成本</dt><dd>${money(item.expectedTotalCost)}</dd><dt>预计模型调用成本</dt><dd>${money(item.estimatedCallCost)}</dd><dt>预计P50延迟</dt><dd>${(displayLatencyMs(item) / 1000).toFixed(1)}秒</dd><dt>当前健康状态</dt><dd>${healthLabel(item.healthStatus)}</dd><dt>执行模式</dt><dd>${modeLabel(item)}</dd><dt>Pareto有效前沿</dt><dd>${item.paretoEfficient ? '是' : '否'}</dd></dl>`;
   }
 
   function showTooltip(modelId, clientX, clientY, lock = false) {
@@ -244,7 +263,8 @@
     const items = core.sortCandidates(candidates().filter((item) => selectedIds.has(item.modelId)), sortKey);
     $('acu-integrated-legend').innerHTML = items.map((item) => {
       const roles = roleLabels(item.modelId);
-      return `<button type="button" class="acu-model-row${state.selected === item.modelId || state.locked.has(item.modelId) ? ' selected' : ''}" data-model-id="${item.modelId}"><span class="acu-model-title"><b>${item.displayName}</b><em>${roles.map((role) => `<i>${role}</i>`).join('')}</em></span><span class="acu-model-metrics"><strong>${score(item.predictedScore)}<small>预计得分</small></strong><strong>${money(item.expectedTotalCost)}<small>预计综合成本</small></strong></span><span class="acu-model-detail">${item.p50LatencyMs === null ? 'P50 样本不足' : `P50 ${(item.p50LatencyMs / 1000).toFixed(1)}s`} · ${healthLabel(item.healthStatus)} · ${evidenceLabel(item.evidenceConfidence)}</span></button>`;
+      const emphasis = `${roles.includes('质量上界') ? ' ceiling' : ''}${roles.includes('ACU推荐') ? ' recommended' : ''}${roles.includes('实际执行') ? ' actual' : ''}`;
+      return `<button type="button" class="acu-model-row${emphasis}${state.selected === item.modelId || state.locked.has(item.modelId) ? ' selected' : ''}" data-model-id="${item.modelId}"><span class="acu-model-title"><b>${item.displayName}</b><em>${roles.map((role) => `<i>${role}</i>`).join('')}</em></span><span class="acu-model-metrics"><strong>${score(item.predictedScore)}<small>预计得分</small></strong><strong>${money(item.expectedTotalCost)}<small>预计综合成本</small></strong></span><span class="acu-model-detail">预计P50 ${(displayLatencyMs(item) / 1000).toFixed(1)}s · ${healthLabel(item.healthStatus)}</span></button>`;
     }).join('');
   }
 
@@ -255,6 +275,10 @@
     const fields = [
       ['任务评估来源', sourceLabel(evaluation)[0]], ['执行状态', executionStatus()], ['路由模式', evaluation.shadowMode ? 'Shadow观察' : 'ACU实际执行'],
       ['Judge模型', evaluation.judgeModel], ['Prompt版本', evaluation.promptVersion], ['缓存状态', evaluation.judgeStatus], ['Context Hash', `…${evaluation.contextSha256.slice(-8)}`],
+      ['最终难度指数', evaluation.difficultyIndex ?? evaluation.difficultyScore], ['Judge原始总分', evaluation.difficultyScoreRaw ?? '旧记录无此字段'],
+      ['六因子', Object.entries(evaluation.difficultyFactors || {}).map(([key, value]) => `${factorLabels[key] || key} ${value}`).join(' · ') || '—'],
+      ['四档概率', `Low ${evaluation.judge.pLow.toFixed(3)} · Mid ${evaluation.judge.pMid.toFixed(3)} · Mid-high ${evaluation.judge.pMidHigh.toFixed(3)} · High ${evaluation.judge.pHigh.toFixed(3)}`],
+      ['Judge置信度', evaluation.judge.confidence.toFixed(3)], ['难度方法', evaluation.difficultyMethodVersion ?? 'legacy'],
       ['曲线计算', '冻结曲线线性插值'], ['Routing Model Version', evaluation.routingModelVersion], ['Request ID', evaluation.requestId],
       ['executionProfileId', trace.execution_profile_id], ['完整Attempts', attempts], ['validator_result', trace.validator_result], ['validator', trace.validator],
       ['validator_reason', trace.validator_reason], ['quality_fallback_used', String(trace.quality_fallback_used === true)], ['任务评估耗时', `${latency.judge_latency_ms ?? evaluation.judgeLatencyMs} ms`],

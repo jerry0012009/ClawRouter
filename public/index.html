@@ -79,9 +79,10 @@
     <p class="section-intro">系统综合任务难度、质量偏好与调用成本选择当前模型。</p>
     <div class="acu-task-overview" id="acu-task-overview">
       <div><span>任务类型</span><strong id="acu-task-type">—</strong></div>
-      <div><span>预计难度</span><strong id="acu-live-difficulty">—</strong><small id="acu-difficulty-level">—</small></div>
+      <div><span>预计难度指数</span><strong id="acu-live-difficulty">—</strong><small id="acu-difficulty-level">—</small></div>
       <div><span>质量偏好</span><strong id="acu-quality-preference">—</strong><small id="acu-quality-mode">—</small></div>
       <div><span>输入规模</span><strong id="acu-input-tokens">—</strong><small id="acu-input-scale">—</small></div>
+      <div><span>主要难度来源</span><strong id="acu-factor-sources">—</strong></div>
       <div><span>当前策略</span><strong>质量与成本综合优化</strong></div>
     </div>
     <div class="acu-recommend-strip">
@@ -92,7 +93,7 @@
     <div class="acu-chart-toolbar" id="acu-chart-toolbar">
       <div class="acu-mode-switch"><button type="button" data-chart-mode="featured" class="active">精选模型</button><button type="button" data-chart-mode="all">全部备选</button></div>
       <div class="acu-zoom-controls"><button type="button" data-chart-action="zoom-in" aria-label="放大">＋</button><button type="button" data-chart-action="zoom-out" aria-label="缩小">－</button><button type="button" data-chart-action="fit">适配当前任务</button><button type="button" data-chart-action="global">查看全局</button></div>
-      <label>排序 <select id="acu-model-sort"><option value="value">综合价值</option><option value="score">预计得分</option><option value="cost">预计成本</option><option value="latency">预计延迟</option><option value="name">模型名称</option></select></label>
+      <label>排序 <select id="acu-model-sort"><option value="score">预计得分</option><option value="value">综合价值</option><option value="cost">预计成本</option><option value="latency">预计延迟</option><option value="name">模型名称</option></select></label>
       <span id="acu-local-view-note" hidden>当前为局部放大视图</span>
     </div>
     <div class="acu-chart-layout"><div class="acu-canvas-wrap"><canvas id="acu-integrated-chart" aria-label="当前请求模型难度和预计得分曲线" tabindex="0"></canvas><div id="acu-chart-tooltip" hidden></div></div><div id="acu-integrated-legend" aria-label="当前备选模型列表"></div></div>
@@ -108,6 +109,9 @@
     <div class="feedback" id="feedback-row" style="display:none"><button onclick="recordFeedback('router_win')">Router 更好</button><button onclick="recordFeedback('baseline_win')">质量上界模型更好</button><button onclick="recordFeedback('tie')">差不多</button><button onclick="recordFeedback('router_adopted')">采用 Router</button><button onclick="recordFeedback('router_thumb_up')">👍 Router 满意</button><button onclick="recordFeedback('router_thumb_down')">👎 Router 不满意</button></div>
     <p class="note" id="feedback-summary" style="margin-top:12px">反馈将用于持续校准模型选择。</p>
   </section>
+
+  <section class="section glass"><div class="head"><span class="num">04</span><span class="title">Routing Trace</span></div><div class="meta trace-box" id="trace-grid"><span class="pill">发送请求后显示路由详情</span></div></section>
+  <section class="section glass"><div class="head"><span class="num">05</span><span class="title">Cost & Quality Ledger / 最近请求</span></div><div class="table-wrap"><table><thead><tr><th>时间</th><th>任务类型</th><th>质量偏好</th><th>ACU模型</th><th>ACU实际成本</th><th>质量上界成本</th><th>节省</th><th>质量状态</th><th>Validator</th><th>切换</th><th>延迟</th></tr></thead><tbody id="ledger-body"><tr><td colspan="11" class="subtle">暂无数据</td></tr></tbody></table></div><div class="footer-sum" id="ledger-summary"></div></section>
 </div>
 <script src="./public/acu-main.js" defer></script>
 <script src="./public/acu-chart-core.js" defer></script>

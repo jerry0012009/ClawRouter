@@ -18,11 +18,12 @@ function evaluation(requestId: string): AcuEvaluation {
   };
   return {
     estimateLabel: "public-benchmark constrained estimate", promptVersion: "test", judgeModel: "test",
-    judgeMode: "non-thinking", judge: { difficultyScore: 40, pLow: 0.1, pMid: 0.7, pMidHigh: 0.15, pHigh: 0.05, confidence: 0.8, signals: [], explanation: "test" },
+    judgeMode: "non-thinking", judge: { difficultyScoreRaw: 40, factors: { reasoningDepth: 4, taskScope: 4, constraintDensity: 4, toolDependency: 4, verificationBurden: 4, contextBurden: 4 }, factorComposite: 40, difficultyIndex: 40, difficultyMethodVersion: "acu-difficulty-index-v1", difficultyScore: 40, pLow: 0.1, pMid: 0.7, pMidHigh: 0.15, pHigh: 0.05, confidence: 0.8, signals: [], explanation: "test" },
     judgeStatus: "live", judgeResultSource: "upstream_live", judgeProvider: "test", judgeEndpointHost: "test",
     upstreamRequestId: null, contextSha256: requestId.padEnd(64, "0"), cacheKeySha256: requestId.padEnd(64, "1"),
     cacheCreatedAt: new Date().toISOString(), judgeLatencyMs: 1, judgePromptTokens: 1, judgeCompletionTokens: 1,
-    judgeCost: 0, usageStatus: "reported", routingModelVersion: "test", difficultyScore: 40,
+    judgeCost: 0, usageStatus: "reported", routingModelVersion: "test", difficultyScoreRaw: 40,
+    difficultyFactors: { reasoningDepth: 4, taskScope: 4, constraintDensity: 4, toolDependency: 4, verificationBurden: 4, contextBurden: 4 }, factorComposite: 40, difficultyIndex: 40, difficultyMethodVersion: "acu-difficulty-index-v1", difficultyScore: 40,
     qualityTarget: 0.8, judgeEntropy: 0.4, shadowMode: false, requestId,
     contextTokenEstimate: 10, contextTruncated: false, disclaimer: "test",
     recommendation: { recommended: estimate, valueAlternative: null, flagshipAlternative: estimate, fallbackModel: estimate, estimates: [estimate], reason: "test" },

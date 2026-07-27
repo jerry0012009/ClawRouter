@@ -351,13 +351,28 @@
     try {
       const response = await safeFetch(`${API}/v1/models`);
       const payload = await response.json();
+      const body = $('models-body');
+      if (body) body.innerHTML = '';
       for (const model of payload.data || []) {
+        const input = Number(model.pricing?.prompt ?? model.pricing?.input ?? 0);
+        const output = Number(model.pricing?.completion ?? model.pricing?.output ?? 0);
         modelCatalogMap[model.id] = {
-          input: Number(model.pricing?.prompt ?? model.pricing?.input ?? 0),
-          output: Number(model.pricing?.completion ?? model.pricing?.output ?? 0),
+          input,
+          output,
         };
+        if (body) {
+          const capabilities = model.capabilities || {};
+          const tags = [capabilities.vision ? 'vision' : '', capabilities.reasoning ? 'reasoning' : '', capabilities.tool_calling ? 'tool' : '']
+            .filter(Boolean).map((tag) => `<span class="tag ${tag === 'reasoning' ? 'warn' : ''}">${tag}</span>`).join('');
+          const row = document.createElement('tr');
+          row.innerHTML = `<td>${model.id}</td><td>${model.upstream || model.owned_by || '-'}</td><td class="green-text">$${input.toFixed(2)}</td><td class="green-text">$${output.toFixed(2)}</td><td>${model.context_length || '-'}</td><td>${tags || '-'}</td>`;
+          body.appendChild(row);
+        }
       }
-    } catch { /* comparison still renders estimates from the ACU plan */ }
+    } catch {
+      const body = $('models-body');
+      if (body) body.innerHTML = '<tr><td colspan="6" class="subtle">模型列表加载失败</td></tr>';
+    }
   }
 
   document.addEventListener('change', (event) => {

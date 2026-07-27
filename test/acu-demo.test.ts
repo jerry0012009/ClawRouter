@@ -274,12 +274,16 @@ describe("ACU Router demo reliability", () => {
     expect(html).toContain("全部备选");
     expect(html).toContain("<span class=\"num\">04</span>");
     expect(html).toContain("<span class=\"num\">05</span>");
+    expect(html).toContain("<span class=\"num\">06</span>");
     expect(html).toContain("Cost & Quality Ledger / 最近请求");
+    expect(html).toContain("Model Catalog");
+    expect(html).toContain("id=\"models-body\"");
     expect(html).not.toContain("真实数据闭环");
     expect(html.match(/id="feedback-row"/g)).toHaveLength(1);
     expect(main).toContain("/acu/api/plan");
     expect(main).toContain("acu_plan_id: plan.planId");
     expect(main).toContain("window.dispatchEvent(new CustomEvent('acu:evaluation'");
+    expect(main).toContain("body.appendChild(row)");
     expect(main).toContain("Promise.allSettled");
     expect(main).toContain("exhaustedWithoutVisibleOutput");
     expect(main).toContain("已自动重试，成本含两次调用");

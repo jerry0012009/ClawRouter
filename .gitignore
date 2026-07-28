@@ -14,5 +14,6 @@ research/quality-curves/openhands/.cache/
 .env
 .env.protocol-recon
 .env.protocol-recon.local
+new-api-protocol-recon.env
 .protocol-captures-raw/
 protocol-captures-raw/

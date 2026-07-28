@@ -82,4 +82,9 @@ export type ProtocolFixtureManifest = {
   capture_points: CapturePoint[];
   sanitized: true;
   capture_status: "complete" | "partial" | "blocked" | "failed";
+  chain?: string;
+  provider_kind?: "real" | "mock";
+  through_acu?: boolean;
+  retry_setting?: number | "not_applicable" | "unknown";
+  capture_completeness?: Record<CapturePoint, "captured" | "not_available" | "not_applicable">;
 };

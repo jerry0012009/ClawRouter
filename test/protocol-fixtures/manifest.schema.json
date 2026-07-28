@@ -50,6 +50,26 @@
       "items": { "enum": ["A", "B", "C", "D"] }
     },
     "sanitized": { "const": true },
-    "capture_status": { "enum": ["complete", "partial", "blocked", "failed"] }
+    "capture_status": { "enum": ["complete", "partial", "blocked", "failed"] },
+    "chain": { "type": "string", "minLength": 1 },
+    "provider_kind": { "enum": ["real", "mock"] },
+    "through_acu": { "type": "boolean" },
+    "retry_setting": {
+      "oneOf": [
+        { "type": "integer", "minimum": 0 },
+        { "enum": ["not_applicable", "unknown"] }
+      ]
+    },
+    "capture_completeness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["A", "B", "C", "D"],
+      "properties": {
+        "A": { "enum": ["captured", "not_available", "not_applicable"] },
+        "B": { "enum": ["captured", "not_available", "not_applicable"] },
+        "C": { "enum": ["captured", "not_available", "not_applicable"] },
+        "D": { "enum": ["captured", "not_available", "not_applicable"] }
+      }
+    }
   }
 }

@@ -25,6 +25,19 @@ export function validateManifest(value: unknown): string[] {
     errors.push("capture_points must contain only A/B/C/D");
   }
   if (typeof manifest.captured_at === "string" && Number.isNaN(Date.parse(manifest.captured_at))) errors.push("captured_at must be ISO-8601");
+  if (manifest.provider_kind !== undefined && !new Set(["real", "mock"]).has(String(manifest.provider_kind))) errors.push("provider_kind is invalid");
+  if (manifest.through_acu !== undefined && typeof manifest.through_acu !== "boolean") errors.push("through_acu must be boolean");
+  if (manifest.retry_setting !== undefined
+    && !(Number.isInteger(manifest.retry_setting) && Number(manifest.retry_setting) >= 0)
+    && !new Set(["not_applicable", "unknown"]).has(String(manifest.retry_setting))) errors.push("retry_setting is invalid");
+  if (manifest.capture_completeness !== undefined) {
+    const completeness = manifest.capture_completeness as Record<string, unknown>;
+    for (const point of ["A", "B", "C", "D"]) {
+      if (!new Set(["captured", "not_available", "not_applicable"]).has(String(completeness?.[point]))) {
+        errors.push(`capture_completeness.${point} is invalid`);
+      }
+    }
+  }
   return errors;
 }
 

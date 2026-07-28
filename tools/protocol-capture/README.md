@@ -21,6 +21,8 @@ Use a second instance for B/C when deployment allows Base URL insertion. The inc
 
 `npm run protocol:mock` starts an isolated Responses/Messages/Chat Completions provider for harness and native-client tests. A Mock result proves only the observed client and capture behavior; it must never be labelled as real Provider compatibility.
 
+Controlled failure variables are `PROTOCOL_MOCK_STATUS`, `PROTOCOL_MOCK_FAIL_COUNT`, `PROTOCOL_MOCK_DELAY_MS`, and `PROTOCOL_MOCK_STREAM_DELAY_MS`. A non-200 status fails every request unless `PROTOCOL_MOCK_FAIL_COUNT` limits failures; the next request then returns the normal protocol response. The stream delay sends SSE headers immediately, then delays the first event for idle-timeout tests. These controls are for retry/timeout observation only.
+
 ## Raw record
 
 Each completed or interrupted exchange produces a mode-0600 JSON record containing:

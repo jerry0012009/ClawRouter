@@ -11,6 +11,8 @@ claude-code/<client-version>/<scenario>/
 
 Every scenario includes `manifest.json`, `header-diff.json`, `body-diff.json`, and `observation.md`. Files for an unobservable hop are deliberately absent. Partial direct-to-capture or direct-to-provider tests use truthful names such as `client-to-capture-request.json`; they do not create files named `newapi-to-acu-request.json` when New API/ACU were not in the chain.
 
+For A/B captures, `hop-diffs.json` pairs every upstream Attempt with the client request that caused it. It records Header/Body differences, SSE event summaries, Error/Usage differences, Request ID mapping, Model mapping, and Tool ID mapping. A retry can therefore produce more than one hop-diff entry for one client request. Explicit `client-to-newapi`, `newapi-to-provider` or `newapi-to-acu` artifacts are emitted only when those components were actually present.
+
 `capture-<point>-<n>.json` is the complete sanitized harness record. `.sse` files preserve event bytes and ordering; they are not reconstructed from final text.
 
 ## Status meanings

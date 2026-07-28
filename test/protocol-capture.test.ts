@@ -12,6 +12,7 @@ import {
   scanFixtureDirectory,
   scanTextForSecrets,
   startCaptureProxy,
+  startMockProvider,
   validateManifest,
   type CaptureRecord,
 } from "../tools/protocol-capture/index.js";
@@ -90,6 +91,7 @@ describe("protocol capture proxy", () => {
     expect(saved.response.streaming_events[0].text_delta).toBe("one");
     expect(saved.response.streaming_events[1].completed_stop_event).toBe(true);
     expect(saved.response.streaming_events.map((event) => event.raw_event).join("")).toBe(raw.join(""));
+    expect(saved.connection.client_cancelled).toBe(false);
   });
 
   it("propagates and records client cancellation", async () => {
@@ -154,6 +156,24 @@ describe("redaction and fixture safety", () => {
     expect(scanTextForSecrets(JSON.stringify(sanitized))).toEqual([]);
   });
 
+  it("redacts Claude session headers and structured values inside raw SSE", () => {
+    const sample = {
+      schema_version: "acu-protocol-capture-v1", fixture_id: "f", capture_id: "c", capture_point: "A",
+      connection: { started_at: "now", request_ended_at: null, response_started_at: null, response_ended_at: null, interrupted_at: null, client_cancelled: false, client_cancelled_at: null },
+      request: { method: "POST", path: "/v1/messages", query: "", headers: { "x-claude-code-session-id": "private-session" }, body: { encoding: "utf8", raw: "{}", byte_length: 2, sha256: "plain" } },
+      response: {
+        status_code: 200, headers: { "content-type": "text/event-stream" },
+        body: { encoding: "utf8", raw: "data: {\"type\":\"message_start\",\"user_id\":\"private-account\"}\n\n", byte_length: 69, sha256: "plain" },
+        streaming_events: [{ event_name: "message_start", event_sequence: 1, raw_event: "data: {\"type\":\"message_start\",\"user_id\":\"private-account\"}\n\n", raw_event_json: { type: "message_start", user_id: "private-account" }, arrived_at: "now", text_delta: null, tool_arguments_delta: null, thinking_reasoning_delta: null, usage_event: null, completed_stop_event: false, error_event: null }],
+      },
+      ids: { upstream_request_id: null, new_api_request_id: null, acu_request_id: null, provider_request_id: null }, model: null, provider: null, protocol: "messages", upstream_url: "http://example.test", capture_error: null,
+    } satisfies CaptureRecord;
+    const sanitized = sanitizeCapture(sample, new DeterministicRedactor(), Buffer.alloc(32, 8));
+    expect(sanitized.request.headers["x-claude-code-session-id"]).toMatch(/^<REDACTED_/);
+    expect(sanitized.response.body.raw).not.toContain("private-account");
+    expect(sanitized.response.streaming_events[0].raw_event).not.toContain("private-account");
+  });
+
   it("fails fixture scans for secrets and .env files", async () => {
     const root = await mkdtemp(join(tmpdir(), "acu-secret-test-"));
     await mkdir(join(root, "fixture"));
@@ -182,5 +202,29 @@ describe("fixture schema and diffs", () => {
       { path: "$.model", before: "alias", after: "actual" },
       { path: "$.stream", after: true },
     ]);
+  });
+});
+
+describe("controlled mock provider failures", () => {
+  it("fails the configured number of requests before succeeding", async () => {
+    const mock = await startMockProvider({ status: 503, failCount: 1 });
+    closers.push(mock.close);
+    const body = JSON.stringify({ model: "mock-model", input: "hello", stream: false });
+
+    const first = await fetch(`${mock.baseUrl}/v1/responses`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body,
+    });
+    expect(first.status).toBe(503);
+    expect(first.headers.get("x-mock-attempt")).toBe("1");
+
+    const second = await fetch(`${mock.baseUrl}/v1/responses`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body,
+    });
+    expect(second.status).toBe(200);
+    expect((await second.json()) as { model: string }).toMatchObject({ model: "mock-model" });
   });
 });

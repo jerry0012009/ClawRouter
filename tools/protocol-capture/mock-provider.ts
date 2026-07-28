@@ -2,6 +2,14 @@ import { randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 
+export type MockProviderOptions = {
+  port?: number;
+  status?: number;
+  failCount?: number;
+  delayMs?: number;
+  streamDelayMs?: number;
+};
+
 export type MockProviderHandle = { baseUrl: string; close: () => Promise<void> };
 
 async function jsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
@@ -10,8 +18,9 @@ async function jsonBody(req: IncomingMessage): Promise<Record<string, unknown>> 
   return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}") as Record<string, unknown>;
 }
 
-function sendSse(res: ServerResponse, events: Array<{ event: string; data: unknown }>): void {
+function sendSse(res: ServerResponse, events: Array<{ event: string; data: unknown }>, initialDelayMs = 0): void {
   res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", "x-request-id": `mock-${randomUUID()}` });
+  res.flushHeaders();
   let index = 0;
   const writeNext = (): void => {
     const item = events[index++];
@@ -22,7 +31,7 @@ function sendSse(res: ServerResponse, events: Array<{ event: string; data: unkno
     res.write(`event: ${item.event}\ndata: ${JSON.stringify(item.data)}\n\n`);
     setTimeout(writeNext, 2);
   };
-  writeNext();
+  setTimeout(writeNext, initialDelayMs);
 }
 
 function responsesPayload(model: string, text: string): Record<string, unknown> {
@@ -52,7 +61,25 @@ function responsesEvents(payload: Record<string, unknown>, text: string): Array<
   ];
 }
 
-export async function startMockProvider(port = 0): Promise<MockProviderHandle> {
+function errorPayload(status: number, attempt: number): Record<string, unknown> {
+  return {
+    error: {
+      type: status === 429 ? "rate_limit_error" : "mock_provider_error",
+      message: `controlled mock status ${status}`,
+      status,
+      attempt,
+    },
+  };
+}
+
+export async function startMockProvider(options: number | MockProviderOptions = 0): Promise<MockProviderHandle> {
+  const normalized = typeof options === "number" ? { port: options } : options;
+  const port = normalized.port ?? 0;
+  const status = normalized.status ?? 200;
+  const failCount = normalized.failCount ?? (status === 200 ? 0 : Number.POSITIVE_INFINITY);
+  const delayMs = normalized.delayMs ?? 0;
+  const streamDelayMs = normalized.streamDelayMs ?? 0;
+  let requestCount = 0;
   const server = createServer(async (req, res) => {
     const path = new URL(req.url ?? "/", "http://mock.invalid").pathname;
     if (req.method !== "POST") {
@@ -61,10 +88,21 @@ export async function startMockProvider(port = 0): Promise<MockProviderHandle> {
     }
     const body = await jsonBody(req);
     const model = typeof body.model === "string" ? body.model : "mock-model";
+    const attempt = ++requestCount;
+    if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
+    if (attempt <= failCount) {
+      res.writeHead(status, {
+        "content-type": "application/json",
+        "retry-after": "0",
+        "x-mock-attempt": String(attempt),
+        "x-request-id": `mock-${randomUUID()}`,
+      }).end(JSON.stringify(errorPayload(status, attempt)));
+      return;
+    }
     if (path.endsWith("/responses")) {
       const text = "mock protocol response";
       const payload = responsesPayload(model, text);
-      if (body.stream === true) sendSse(res, responsesEvents(payload, text));
+      if (body.stream === true) sendSse(res, responsesEvents(payload, text), streamDelayMs);
       else res.writeHead(200, { "content-type": "application/json", "x-request-id": `mock-${randomUUID()}` }).end(JSON.stringify(payload));
       return;
     }
@@ -77,7 +115,7 @@ export async function startMockProvider(port = 0): Promise<MockProviderHandle> {
         { event: "content_block_stop", data: { type: "content_block_stop", index: 0 } },
         { event: "message_delta", data: { type: "message_delta", delta: { stop_reason: "end_turn", stop_sequence: null }, usage: { output_tokens: 4 } } },
         { event: "message_stop", data: { type: "message_stop" } },
-      ]);
+      ], streamDelayMs);
       else res.writeHead(200, { "content-type": "application/json", "request-id": `mock-${randomUUID()}` }).end(JSON.stringify(payload));
       return;
     }

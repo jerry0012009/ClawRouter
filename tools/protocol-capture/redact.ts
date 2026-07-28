@@ -1,7 +1,7 @@
 import { createHmac, randomBytes } from "node:crypto";
 import type { CaptureRecord } from "./types.js";
 
-const SECRET_HEADER = /^(authorization|proxy-authorization|x-api-key|api-key|cookie|set-cookie|x-new-api-token|x-provider-key|session-id|thread-id|x-client-request-id|x-codex-turn-metadata|x-codex-window-id)$/i;
+const SECRET_HEADER = /^(authorization|proxy-authorization|x-api-key|api-key|cookie|set-cookie|x-new-api-token|x-provider-key|session-id|thread-id|x-client-request-id|x-claude-code-session-id|x-codex-turn-metadata|x-codex-window-id)$/i;
 const SECRET_KEY = /(^|_)(authorization|api_?key|token|cookie|secret|password|account_?id|user_?id|email|session_?id|thread_?id|client_?request_?id|window_?id|prompt_?cache_?key)($|_)/i;
 
 export class DeterministicRedactor {
@@ -57,12 +57,27 @@ export function nonReversibleOriginalHash(value: string | Buffer, ephemeralKey: 
   return `hmac-sha256:${createHmac("sha256", ephemeralKey).update(value).digest("hex")}`;
 }
 
+function sanitizeEventStream(raw: string, redactor: DeterministicRedactor): string {
+  return raw.split(/(?<=\n)/).map((line) => {
+    if (!line.startsWith("data:")) return redactor.text(line);
+    const prefix = line.startsWith("data: ") ? "data: " : "data:";
+    const ending = line.endsWith("\r\n") ? "\r\n" : line.endsWith("\n") ? "\n" : "";
+    const data = line.slice(prefix.length, line.length - ending.length);
+    if (data === "[DONE]") return `${prefix}${data}${ending}`;
+    try {
+      return `${prefix}${JSON.stringify(redactor.value(JSON.parse(data) as unknown))}${ending}`;
+    } catch {
+      return redactor.text(line);
+    }
+  }).join("");
+}
+
 function sanitizeBody(raw: string, encoding: "utf8" | "base64", redactor: DeterministicRedactor): string {
   if (encoding === "base64") return redactor.placeholder(raw, "binary_body");
   try {
     return JSON.stringify(redactor.value(JSON.parse(raw) as unknown));
   } catch {
-    return redactor.text(raw);
+    return /(?:^|\n)(?:event|data):/.test(raw) ? sanitizeEventStream(raw, redactor) : redactor.text(raw);
   }
 }
 
@@ -83,7 +98,7 @@ export function sanitizeCapture(
   clone.upstream_url = redactor.text(clone.upstream_url);
   clone.response.streaming_events = clone.response.streaming_events.map((event) => ({
     ...event,
-    raw_event: redactor.text(event.raw_event),
+    raw_event: sanitizeEventStream(event.raw_event, redactor),
     raw_event_json: redactor.value(event.raw_event_json),
     text_delta: event.text_delta === null ? null : redactor.text(event.text_delta),
     tool_arguments_delta: event.tool_arguments_delta === null ? null : redactor.text(event.tool_arguments_delta),

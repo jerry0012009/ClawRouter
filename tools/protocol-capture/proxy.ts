@@ -161,6 +161,7 @@ export async function startCaptureProxy(options: CaptureProxyOptions): Promise<C
       responseStatus = upstreamRes.statusCode ?? 502;
       responseHeaders = headersObject(upstreamRes.headers);
       res.writeHead(responseStatus, upstreamRes.headers);
+      res.flushHeaders();
       const isSse = String(upstreamRes.headers["content-type"] ?? "").includes("text/event-stream");
       upstreamRes.on("data", (value: Buffer | string) => {
         const chunk = Buffer.isBuffer(value) ? value : Buffer.from(value);
@@ -198,7 +199,8 @@ export async function startCaptureProxy(options: CaptureProxyOptions): Promise<C
       void finalize();
     });
     res.on("close", () => {
-      if (connection.response_ended_at || completed) return;
+      const protocolCompleted = events.events.some((event) => event.completed_stop_event);
+      if (connection.response_ended_at || completed || upstreamResponse?.complete || upstreamResponse?.readableEnded || protocolCompleted) return;
       connection.client_cancelled = true;
       connection.client_cancelled_at = new Date().toISOString();
       connection.interrupted_at ??= connection.client_cancelled_at;

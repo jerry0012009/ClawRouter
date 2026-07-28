@@ -1,0 +1,26 @@
+{
+  "status_code": 403,
+  "headers": {
+    "date": "Tue, 28 Jul 2026 19:49:22 GMT",
+    "content-type": "application/json",
+    "transfer-encoding": "chunked",
+    "connection": "keep-alive",
+    "access-control-allow-origin": "*",
+    "access-control-expose-headers": "X-Generation-Id,X-Provider-Name,cf-ray",
+    "set-cookie": [
+      "<REDACTED_SET_COOKIE_1>"
+    ],
+    "permissions-policy": "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")",
+    "referrer-policy": "no-referrer, strict-origin-when-cross-origin",
+    "x-content-type-options": "nosniff",
+    "server": "cloudflare",
+    "cf-ray": "a226681df9b8dbbd-FRA"
+  },
+  "body": {
+    "encoding": "utf8",
+    "raw": "{\"error\":{\"message\":\"The request is prohibited due to a violation of provider Terms Of Service.\",\"code\":403,\"metadata\":{\"provider_name\":null,\"previous_errors\":[{\"code\":403,\"message\":\"The request is prohibited due to a violation of provider Terms Of Service.\"}]}},\"user_id\":\"<REDACTED_USER_ID_1>\"}",
+    "byte_length": 308,
+    "sha256": "hmac-sha256:5646a73f7f3561a59504f962eee412bcb62628767836fefcd795d07ba6a4f832"
+  },
+  "streaming_events": []
+}

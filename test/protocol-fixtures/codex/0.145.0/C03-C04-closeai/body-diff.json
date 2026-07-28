@@ -1,0 +1,30 @@
+{
+  "status": "computed",
+  "differences": [
+    {
+      "path": "$.input[3]",
+      "after": {
+        "type": "reasoning",
+        "summary": [],
+        "encrypted_content": "gAAAAABqaQg-nYg5mlS-OhiRLmwhNtVu92RjgKxYasoEwOw1C7XX6l4NZ5SYkILXmydDUF8DV9YfhmCoj1Yr6RcUPsT_9erwgrqoqyHjdMvaSSVIPKlB3IBbtGux-siJhAbtL4W_l79-YMTEjNgMb_SzUOmTc7t_JqGuNV6StGmj9buuXVR7aBJi3LMQGTqeYfiyZwnL8JKvcxnNEP-z2Yn72_0FxS3D0g9Qn1NvmMYqCzRkNiY9HDvpdFQirkT2izAbFJtA_gTjxsjg-dwlpiWNajStZUPLEXIVFWi89Dbs2BF0rHZL-3B4yy75c2A3UJi0DoU4tLe_cf4FNi5xglsnDou060biRA4WLYfdgEHwx24smzf2e_8nMP79FcqeqN-vXtlMuzomu10lmH-gihrdf_G6KXVMt694kscGSR2k9SOZ8Ezyyaoq9fzM0YX8MeP5Fr1FTpgsZDOw45R85RuTV8now9xrPhz-I-WNX3ooJeDb1UUYu6NdZnFLl07edl_Cik3ydQ8TZ7NTuQKUvkLl64O-t11MUyTFqzS9UjMarjlpDOSzwG-3vJBX622-0eViLBTJS_316UOqPx8TCbdvYqjNQLKYOd_hrSJizI2OTzJ2fgtoK1L0PmT0LV24bUwJogkqqLWfXiT0BSlf-RPWJS19sfOeszxLBK0zJjkWoDGrsCAs4PIkRkOvfUz4ZYZX4JZ7vHR2iZCXigXEJZ5jqHES5WoHXXPtRjwzaTHudMe3prfg0Crzq8WZWsgfNec1-OIAcQXoWkqqRPJ6kyv_jElEBPW2oygY7vm9DqN2RSA9RFFJqrQoWncz41xcw9NJ2sFvPgCM-EJKvEsLOaA-GfztownuZ4R3eZGlo3XjnacJkUFy29LdEgo_dl5i-gKJkkS_QXaoQByHjp0gqhHtSHejefyHd_NV3k-lkgenEaLoi-_O7361t7gkZSzyQWSqBmPQdIoG2x1vYEv7rQ5hKrqR6rICcg=="
+      }
+    },
+    {
+      "path": "$.input[4]",
+      "after": {
+        "type": "function_call",
+        "name": "exec_command",
+        "arguments": "{\"cmd\":\"sed -n '1,120p' notes/hello.txt\",\"workdir\":\"<REDACTED_USER_HOME_1>/jerry/claw-router/test/protocol-sandbox/work\",\"yield_time_ms\":10000,\"max_output_tokens\":2000}",
+        "call_id": "call_KJpEU5o6HxfUkrIkZfUnTs9l"
+      }
+    },
+    {
+      "path": "$.input[5]",
+      "after": {
+        "type": "function_call_output",
+        "call_id": "call_KJpEU5o6HxfUkrIkZfUnTs9l",
+        "output": "Chunk ID: 33e4ef\nWall time: 0.0461 seconds\nProcess exited with code 0\nOriginal token count: 20\nOutput:\nProject codename: ORBIT-LANTERN\nThis is synthetic protocol reconnaissance data.\n"
+      }
+    }
+  ]
+}

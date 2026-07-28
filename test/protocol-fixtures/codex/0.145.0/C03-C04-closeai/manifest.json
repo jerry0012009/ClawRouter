@@ -1,0 +1,24 @@
+{
+  "fixture_id": "codex-0.145.0-C03-C04-closeai-001",
+  "captured_at": "2026-07-28T19:51:24.632Z",
+  "client": "codex",
+  "client_version": "0.145.0",
+  "os": "Ubuntu 24.04.4 LTS x86_64",
+  "newapi_version": "not-present",
+  "acu_commit": "7d92759",
+  "provider": "closeai",
+  "requested_model": "gpt-5.5",
+  "actual_model": "gpt-5.5",
+  "protocol": "responses",
+  "stream": true,
+  "scenario": "C03_single_shell_tool_call_and_C04_multiple_steps",
+  "request_count": 2,
+  "contains_tools": true,
+  "contains_reasoning": true,
+  "contains_plan_signal": true,
+  "capture_points": [
+    "A"
+  ],
+  "sanitized": true,
+  "capture_status": "partial"
+}

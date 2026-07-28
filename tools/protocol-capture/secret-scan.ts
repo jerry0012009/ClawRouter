@@ -7,7 +7,7 @@ const RULES: Array<[string, RegExp]> = [
   ["common-sk-key", /\bsk-[A-Za-z0-9_-]{8,}\b/],
   ["authorization-bearer", /Authorization["']?\s*[:=]\s*["']?Bearer\s+(?!<REDACTED_)[^\s"']+/i],
   ["x-api-key", /x-api-key["']?\s*[:=]\s*["']?(?!<REDACTED_)[^\s,"'}]+/i],
-  ["cookie", /(?:^|["'\s])(?:Cookie|Set-Cookie)["']?\s*[:=]\s*["']?(?!<REDACTED_)[^\n"']+/i],
+  ["cookie", /(?:["'](?:Cookie|Set-Cookie)["']\s*:\s*["'](?!<REDACTED_)[^"'\n]+|(?:^|\s)(?:Cookie|Set-Cookie)\s*:\s*(?!\[|<REDACTED_)[^\n]+)/i],
   ["credentialed-git-url", /https?:\/\/(?!<REDACTED_)[^\s/@:]+:[^\s/@]+@/i],
   ["private-key", /-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/],
 ];

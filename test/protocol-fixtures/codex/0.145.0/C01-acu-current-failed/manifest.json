@@ -1,0 +1,24 @@
+{
+  "fixture_id": "codex-0.145.0-C01-acu-current-001",
+  "captured_at": "2026-07-28T19:55:00.300Z",
+  "client": "codex",
+  "client_version": "0.145.0",
+  "os": "Ubuntu 24.04.4 LTS x86_64",
+  "newapi_version": "not-present",
+  "acu_commit": "runtime-dist-commit-unverified",
+  "provider": "not-reached",
+  "requested_model": "gpt-5.5",
+  "actual_model": "unconfirmed",
+  "protocol": "responses",
+  "stream": true,
+  "scenario": "C01_current_acu_responses_ingress_failure",
+  "request_count": 6,
+  "contains_tools": true,
+  "contains_reasoning": false,
+  "contains_plan_signal": true,
+  "capture_points": [
+    "A"
+  ],
+  "sanitized": true,
+  "capture_status": "failed"
+}

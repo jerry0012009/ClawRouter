@@ -42,6 +42,7 @@
     "protocol:capture": "tsx tools/protocol-capture/cli.ts",
     "protocol:mock": "tsx tools/protocol-capture/mock-provider-cli.ts",
     "protocol:scan": "tsx tools/protocol-capture/scan-cli.ts test/protocol-fixtures",
+    "protocol:fixture": "tsx tools/protocol-capture/fixture-cli.ts",
     "test:e2e:tool-ids": "npm run build && tsx test/e2e-tool-id-sanitization.ts",
     "test:docker:install": "bash test/run-docker-test.sh",
     "test:docker:edge-cases": "bash test/docker/run-edge-cases.sh",

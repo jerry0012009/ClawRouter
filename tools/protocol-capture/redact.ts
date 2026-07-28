@@ -1,8 +1,8 @@
 import { createHmac, randomBytes } from "node:crypto";
 import type { CaptureRecord } from "./types.js";
 
-const SECRET_HEADER = /^(authorization|proxy-authorization|x-api-key|api-key|cookie|set-cookie|x-new-api-token|x-provider-key)$/i;
-const SECRET_KEY = /(^|_)(authorization|api_?key|token|cookie|secret|password|account_?id|user_?id|email)($|_)/i;
+const SECRET_HEADER = /^(authorization|proxy-authorization|x-api-key|api-key|cookie|set-cookie|x-new-api-token|x-provider-key|session-id|thread-id|x-client-request-id|x-codex-turn-metadata|x-codex-window-id)$/i;
+const SECRET_KEY = /(^|_)(authorization|api_?key|token|cookie|secret|password|account_?id|user_?id|email|session_?id|thread_?id|client_?request_?id|window_?id|prompt_?cache_?key)($|_)/i;
 
 export class DeterministicRedactor {
   private readonly values = new Map<string, string>();

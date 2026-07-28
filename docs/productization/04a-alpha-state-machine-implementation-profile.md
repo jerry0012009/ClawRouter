@@ -1,48 +1,37 @@
 # ACU Router 五日 Alpha 状态机实施剖面
 
-> 状态：五日 Alpha 开发的实施约束  
-> 版本：v0.1  
+> 状态：五日 Alpha 开发约束  
+> 版本：v0.2  
 > 日期：2026-07-29  
 > 上位规范：`04-session-task-routing-segment-state-machine-v2.md`  
 > 适用范围：3—10 名邀请制 OPC 程序员，原生 Codex / Claude Code，经 New API 接入 ACU
 
 ## 1. 文档目的
 
-`04-session-task-routing-segment-state-machine-v2.md` 是完整产品语义规范，用于保证长期设计一致性；它不是要求五日 Alpha 一次实现全部状态、规则和持久化对象。
+`04-session-task-routing-segment-state-machine-v2.md` 是长期产品语义规范，不代表五日 Alpha 必须一次实现全部状态和规则。
 
-本文件将完整规范压缩为五日开发必须落地的最小闭环，回答：
+本文只定义五日开发必须落地的最小闭环。发生冲突时：
 
-1. 五日内必须识别哪些协议事件；
-2. 哪些状态必须真实持久化；
-3. 哪些事件必须重新 Judge；
-4. 哪些复杂规则暂不实现；
-5. Alpha 通过验收的最小场景是什么。
+- 产品语义以 04 v2.1 为准；
+- 五日开发范围以本文 P0 为准；
+- P1 和延期项不得伪装成已实现能力。
 
-发生冲突时：
-
-- 产品语义以 04 v2 为准；
-- 五日开发范围和优先级以本文件为准；
-- 本文件未实现的 04 v2 规则视为延期，不得伪装成已支持。
-
-## 2. 五日 Alpha 的核心目标
-
-五日版本只证明以下闭环：
+## 2. 五日 Alpha 核心目标
 
 ```text
 原生 Codex / Claude Code
 → New API 鉴权与余额
-→ ACU 识别连续任务状态
+→ ACU 识别连续 Session / Task
 → 必要时运行 Judge
 → 选择并锁定 Execution Profile
-→ 透传 Tool / Streaming
-→ 记录实际模型、Attempt、Usage 和成本
-→ 后续正常 Step 复用 Route
-→ 在少数高置信度事件下重新评估
+→ 透明转发 Streaming / Tool
+→ 记录 Attempt、实际模型、Usage 和成本
+→ 普通后续 Step 复用当前 Route
 ```
 
-五日版本不追求完美理解任意 Coding Agent 轨迹，也不追求实现完整自治工作流引擎。
+Alpha 只证明任务级路由闭环，不建设完整自治工作流引擎。
 
-## 3. Alpha 必须实现的最小对象
+## 3. P0 最小领域对象
 
 ### 3.1 Session
 
@@ -54,98 +43,93 @@
 - 规范化历史链 Hash；
 - 最近 Tool Call ID；
 - `last_activity_at`；
-- `active / dormant`；
 - 当前 `task_id`；
 - 当前 `segment_id`。
 
 实现约束：
 
-- 30 分钟仅使用惰性过期检查，不实现后台 Session 定时任务；
-- 以历史前缀、Tool ID 因果关系和可信身份组合识别连续性；
+- Session 不设置固定身份过期时间；
+- 强历史前缀、Tool ID 因果关系或可信 Resume 证据成立时，可以长期关联原 Session；
+- `last_activity_at` 不用于终止 Session；
 - 不把工作目录或单个 Session Header 当作唯一主键；
 - 连续性不确定时创建新 Session并重新 Judge。
 
 ### 3.2 Task
 
-Alpha 采用“一次 Session 同时只有一个活动 Task”的简化规则。
+Alpha 简化为：一个 Session 同时只有一个活动 Task。
 
 必须保存：
 
 - `task_id`；
 - `session_id`；
-- 初始目标或首个高置信度 HumanMessage；
+- 初始目标；
 - 当前阶段；
 - 基础质量偏好；
 - 能力升级下限；
-- 创建和更新时间。
-
-Alpha 不实现独立语义 Task 切分器。
+- 创建与更新时间。
 
 仅在以下情况创建新 Task：
 
 1. 新 Session；
-2. 客户端出现明确 Reset / New Goal 信号；
-3. 新 HumanMessage 明确替换原目标，且规则置信度高；
-4. 连续性无法确认，按安全规则拆分。
+2. 客户端明确 Reset / New Goal；
+3. HumanMessage 明确替换原目标且置信度高；
+4. 连续性无法确认。
 
 “继续”“补充约束”“重做”“还是不行”默认延续当前 Task。
 
 ### 3.3 Routing Segment
-
-Routing Segment 是 Alpha 必须真实持久化的核心路由对象。
 
 必须保存：
 
 - `segment_id`；
 - `task_id`；
 - 创建原因；
-- 阶段：`execution / planning / recovery / resume / availability_recovery`；
+- 阶段：`execution / planning / recovery / resume / availability_recovery / compatibility_recovery`；
 - Judge Evaluation 引用；
 - Route Decision 引用；
 - 锁定的 Execution Profile；
-- 基础质量、能力下限和临时覆盖快照；
+- 基础质量、能力下限、临时覆盖快照；
 - `last_activity_at`；
-- `active / superseded / lease_expired / blocked / completed`。
+- 状态：`active / superseded / lease_expired / blocked / completed`。
 
 实现约束：
 
 - 同一 Task 只允许一个活动 Segment；
 - 普通 Tool 循环复用当前 Segment；
-- 同一 Segment 不自动换模型；
-- 同模型等价 Channel 的实际 Attempt 变化不创建新 Segment；
+- 同一 Segment 不因成本或一次成功自动换模型；
+- 同模型等价 Channel 的 Attempt 变化不创建新 Segment；
 - 实际模型必须变化时创建新 Segment。
 
 ### 3.4 Event
 
-Alpha 只要求稳定产生以下七类标准事件：
+P0 只要求稳定产生：
 
 1. `human_message`；
 2. `tool_call`；
 3. `tool_result`；
 4. `plan_started`；
 5. `plan_finished`；
-6. `execution_failure`；
-7. `provider_error`。
+6. `provider_error`。
 
-`retry_attempt` 作为 Attempt 属性记录，不要求进入完整业务事件状态机。
+`execution_failure` 在 P0 只记录为 Evidence，不要求完成 Recovery 状态机；正式 Failure 处理列入 P1。
 
-每个事件至少保存：
+每个 Event 至少保存：
 
 - 类型；
-- Session / Task / Segment 候选；
+- Session / Task / Segment；
 - 原始协议证据引用；
 - Tool / Call ID；
-- 事件 Hash；
+- Event Hash；
 - 是否重复；
 - 证据强度；
 - 时间。
 
 ### 3.5 Attempt
 
-每次真实上游调用必须单独记录：
+每次实际上游调用必须单独记录：
 
 - `attempt_id`；
-- 逻辑请求或 Step 关联；
+- 逻辑请求关联；
 - Provider / Channel；
 - 请求模型与实际模型；
 - 上游 Request ID；
@@ -156,27 +140,24 @@ Alpha 只要求稳定产生以下七类标准事件：
 - Retry Owner；
 - 开始和结束时间。
 
-客户端或 New API 的重试只能新增 Attempt，不得重复创建 Judge、Segment 或逻辑结果。
+客户端或 New API Retry 只能新增 Attempt，不得重复创建 Judge、Segment 或计费逻辑结果。
 
 ### 3.6 Step
 
-Step 保留为领域概念，但 Alpha 不要求先实现完整七状态 Step 工作流或独立复杂 Step 引擎。
+P0 不实现完整 Step 状态机。
 
-最小实现允许：
+最小实现：
 
-- 根据已接受的 Model Response 创建 `step_id`；
-- 用 Tool Call ID 关联其 Tool Result；
-- 保存 `open / closed / cancelled / unresolved` 四种状态；
+- 接受的 Model Response 可生成 `step_id`；
+- Tool Call ID 关联 Tool Result；
 - 历史重发不得重复创建 Step；
-- Retry 不得创建新 Step。
+- Retry 不创建新 Step。
 
-多 Tool Call、长期 unresolved 和复杂 Resume 的完整清理规则延期。
+多 Tool 并行、长期 unresolved、复杂取消恢复列入 P1 / P2。
 
-## 4. Alpha 必须识别的协议事实
+## 4. P0 必须支持的原生协议
 
 ### 4.1 Codex Responses
-
-必须支持：
 
 - `/v1/responses`；
 - 增长的 Responses Item 历史；
@@ -190,68 +171,57 @@ Step 保留为领域概念，但 Alpha 不要求先实现完整七状态 Step �
 
 ### 4.2 Claude Messages
 
-必须支持：
-
 - `/v1/messages`；
 - 增长的 Messages 历史；
 - `tool_use.id`；
 - `tool_result.tool_use_id`；
-- Thinking / Signature 透传；
+- Thinking / Signature 透明转发；
 - Streaming；
 - Usage；
 - 版本门控的 Plan-only 指纹；
 - 实际 `ExitPlanMode`。
 
-必须先从 `role=user` 内容中拆出 `tool_result`，不能直接把整个 user Role 视为 HumanMessage。
+必须先从 `role=user` 内容中拆出 `tool_result`，再判断剩余 Text 是否为 HumanMessage。
 
-## 5. Alpha 的 Judge 触发器
+## 5. P0 Judge 触发器
 
-只有以下事件重新 Judge：
+P0 只在以下情况重新 Judge：
 
-1. 新 `acu-auto` / `acu-high` Task 的首个请求；
-2. 高置信度 `human_message`；
-3. `plan_started`；
-4. 相同核心 Failure Signature 第二次出现且无明确进展；
-5. 用户明确拒绝或要求重做，由 `human_message` Evidence 标记；
-6. 10 分钟 Routing Lease 过期后的下一次请求；
-7. dormant Session Resume；
-8. 当前 Execution Profile 因硬兼容条件失效，且需要换模型。
+1. 新 `acu-auto` / `acu-high` Task 首次请求；
+2. 高置信度 `human_message`，包括“继续”、补充约束、拒绝或重做；
+3. `plan_started`。
 
-以下事件不重新 Judge：
+P0 不重新 Judge：
 
-- 普通 Tool Call；
-- 正常 Tool Result；
+- 普通 ToolCall；
+- 正常 ToolResult；
 - Agent 自动继续；
 - 普通 Model Response；
-- 第一次 Execution Failure；
-- Failure Signature 已变化或明确改善；
 - Provider 429、5xx、Timeout；
 - Retry Attempt；
 - Plan 内部状态更新；
-- Plan Finished 且没有新能力需求。
+- PlanFinished 且没有新能力需求；
+- 单纯硬兼容变化。
 
-## 6. Alpha 的 Segment 边界
+硬兼容变化只使用最近有效 Evaluation 重筛候选；若实际模型必须变化，创建 `compatibility_recovery` Segment，但不因兼容问题重新解释任务难度。
 
-### 6.1 创建新 Segment
+## 6. P0 Segment 边界
 
-Alpha 只实现以下创建原因：
+P0 创建新 Segment 的原因：
 
 - `task_start`；
 - `human_message`；
 - `planning_start`；
 - `planning_end`；
-- `first_failure_recovery`；
-- `capability_block`；
-- `lease_expired`；
-- `resume`；
-- `availability_recovery`。
+- `availability_recovery`；
+- `compatibility_recovery`。
 
-### 6.2 Planning
+### 6.1 Planning 开始
 
-Planning 开始：
+强信号：
 
-- Codex 实际 `update_plan`；
-- Claude Plan-only 版本化指纹。
+- Codex 实际调用 `update_plan`；
+- Claude 命中版本门控的 Plan-only 指纹。
 
 动作：
 
@@ -260,139 +230,90 @@ Planning 开始：
 - 重新 Judge；
 - 临时质量覆盖暂定为 88。
 
-Planning 结束：
+### 6.2 Planning 结束
+
+强信号：
 
 - Claude 实际 `ExitPlanMode`；
-- Codex Plan 完成并出现执行转移强证据。
+- Codex Plan 完成并出现执行转移证据。
 
 动作：
 
 - 创建 Execution Segment；
 - 撤销 Planning 临时覆盖；
 - 默认复用最近 Judge Evaluation；
-- 仅出现重大新范围或约束时再次 Judge。
+- 只有出现重大新范围或约束时才重新 Judge。
 
-Alpha 不实现基于 Read / Search 比例、单词 plan 或自然语言计划的弱信号自动切换。
+P0 不使用 Read / Search 比例、单词 plan 或自然语言计划作为自动强信号。
 
-### 6.3 Failure
+## 7. P1：首批用户期间补齐
 
-第一次确定性执行失败：
+1. 10 分钟 Routing Segment Lease 的惰性检查；
+2. 长期 Resume 后保留原 Session / Task，Lease 过期则新建 Segment并重新 Judge；
+3. 第一次确定性失败创建 Recovery Segment；
+4. 相同 Failure Signature 第二次且无进展时重新 Judge；
+5. 同模型等价 Channel 可用性恢复；
+6. 管理员轨迹查询；
+7. Step 的 `open / closed / cancelled / unresolved` 状态。
 
-- 记录 Failure Signature；
-- 创建 Recovery Segment；
-- 继承原 Judge Evaluation 和模型；
-- 不重新 Judge；
-- 不提高能力下限。
+P1 仍不引入 Session 固定身份过期规则。
 
-相同核心 Failure Signature 第二次出现且无进展：
+## 8. P2 / 延期项
 
-- 标记 `capability_block`；
-- 创建新 Segment；
-- 重新 Judge；
-- 只允许保持或升级；
-- 由新 Evaluation 决定是否提高能力下限。
+- 独立 Task 语义切分模型；
+- Embedding Session 匹配；
+- 完整 Client Turn 状态机；
+- 完整 Step 引擎；
+- 弱信号自主 Planning；
+- 高级 Failure 分类器；
+- 修改—撤销振荡识别；
+- 虚构符号持续引用识别；
+- Completed 置信度；
+- 多 Agent / Subagent 状态；
+- 自动 Context Compaction；
+- 用户连续质量分；
+- 显式模型自动替换；
+- 因成本或一次成功自动降级；
+- 9B Router 训练。
 
-Alpha 只实现“标准化错误签名 + 重复次数 + 是否改善”规则。
-
-以下高级阻塞识别延期：
-
-- 修改—撤销振荡；
-- 虚构符号持续引用；
-- 语义等价但文本不同的复杂错误聚类；
-- 大量 Read / Search 无进展；
-- 多错误之间的因果图。
-
-### 6.4 Lease
-
-- Session idle lease：30 分钟；
-- Routing Segment lease：10 分钟；
-- 均采用请求到达时惰性判断；
-- 不实现后台扫描；
-- 有效 Streaming、Model Response、ToolCall、ToolResult、HumanMessage 更新活动时间；
-- 租约过期不删除历史。
-
-## 7. Alpha 明确不实现
-
-1. 独立 Task 语义切分模型；
-2. Embedding Session 匹配；
-3. 完整 Client Turn 状态机；
-4. 完整七状态 Step 引擎；
-5. 后台 Session / Segment 定时任务；
-6. 弱信号自主 Planning 推断；
-7. 复杂阻塞分类器；
-8. Completed 置信度引擎；
-9. 多 Agent / Subagent 专用状态模型；
-10. 自动 Context Compaction；
-11. 用户可调连续质量分；
-12. 显式模型自动替换；
-13. 因成本或一次成功自动降级；
-14. 9B Router 训练；
-15. 大规模生产级状态修复工具。
-
-## 8. Alpha 实施优先级
-
-### P0：没有则不能上线测试
+## 9. P0 实施优先级
 
 1. Responses 与 Messages 原生入口；
-2. Streaming 和 Tool ID 透明透传；
+2. Streaming、Thinking 和 Tool ID 透明转发；
 3. 显式模型跳过 Judge；
 4. `acu-auto` 首请求 Judge + Route；
-5. 当前 Segment 路由复用；
+5. 当前 Segment Route 复用；
 6. HumanMessage 与 ToolResult 区分；
 7. Planning 强信号；
 8. Attempt / Retry 独立记录；
-9. PostgreSQL 基础持久化；
-10. New API 鉴权身份和最终 Usage / 成本关联。
+9. PostgreSQL 最小持久化；
+10. New API 鉴权身份与最终 Usage / 成本关联。
 
-### P1：首批用户使用期间补齐
+五日开发只承诺完成 P0。P1 仅在 P0 全链路通过后继续。
 
-1. 第一次失败 Recovery Segment；
-2. 重复错误签名后重新 Judge；
-3. Session / Segment 惰性 Lease；
-4. dormant Resume；
-5. 同模型等价 Channel 可用性恢复；
-6. 管理员轨迹查询。
-
-### P2：Alpha 后评估
-
-1. 复杂 Task 拆分；
-2. 弱 Planning 识别；
-3. 高级 Failure 规则；
-4. 自动模型降级；
-5. 多 Agent 状态；
-6. 数据驱动 Q-Context / Q-Difficulty 训练。
-
-五日开发只承诺完成 P0。P1 仅在 P0 全链路通过后实施，不得为了状态机完整性牺牲原生协议、扣费和基础路由的正确性。
-
-## 9. 最小验收场景
+## 10. P0 最小验收场景
 
 1. 显式模型请求完整透传，Judge 调用数为 0；
 2. `acu-auto` 首请求调用一次 Judge并产生 Route Decision；
-3. Codex Tool Call / Output 连续循环复用同一 Segment；
+3. Codex Tool Call / Output 连续循环复用当前 Segment；
 4. Claude `role=user` 仅含 Tool Result 时不产生 HumanMessage；
 5. Claude混合 Tool Result +真实文本时正确拆分；
-6. 用户输入“继续”延续 Task、新建 Segment并重新 Judge；
+6. “继续”延续 Task、新建 Segment并重新 Judge；
 7. Codex 实际 `update_plan` 创建 Planning Segment；
 8. Claude Plan-only / `ExitPlanMode` 创建 Planning与Execution Segment；
-9. 第一次相同测试失败不升级；
-10. 相同错误第二次无进展时重新 Judge且不降级；
-11. New API或客户端Retry只增加Attempt；
-12. 10分钟后下一次请求创建新Segment并重新Judge；
-13. Streaming响应正文和Tool ID不被ACU改写；
-14. 实际模型、渠道、Usage和成本可关联到同一逻辑请求；
-15. ProviderError不改变任务难度。
+9. New API或客户端 Retry 只增加 Attempt；
+10. Streaming正文、Thinking和Tool ID不被ACU改写；
+11. 实际模型、渠道、Usage和成本关联到同一逻辑请求；
+12. ProviderError不改变任务难度；
+13. 硬兼容变化不调用 Judge，只使用现有 Evaluation 重筛候选。
 
-P0 上线门槛只要求场景 1—8、11、13、14 通过；其余为 P1 验收。
+## 11. 后续文档约束
 
-## 10. 后续文档写作约束
-
-`05`—`11` 每份文档都必须分成：
+`05`—`11` 每份文档必须明确区分：
 
 - Alpha P0；
 - Alpha P1；
 - 延期项；
 - 验收场景。
 
-不得把长期产品能力全部写成五日实施要求。
-
-在正式开工前，再生成一份单独的五日执行计划，把 P0 映射到代码模块、负责人、依赖、测试和每日可验收产物。
+正式开工前，再将 P0 映射为五日执行计划、代码模块、依赖和每日验收产物。

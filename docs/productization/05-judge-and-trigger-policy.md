@@ -1,7 +1,7 @@
 # ACU Router Judge 与触发策略
 
 > 状态：产品设计基线，关键策略已确认  
-> 版本：v0.2  
+> 版本：v0.3  
 > 日期：2026-07-29  
 > 依赖：`02-native-protocol-observations.md`、`04-session-task-routing-segment-state-machine-v2.md`、`04a-alpha-state-machine-implementation-profile.md`
 
@@ -14,10 +14,11 @@
 3. Judge 读取什么上下文；
 4. Judge 输出什么；
 5. 普通 Agent 循环如何复用 Evaluation；
-6. Judge 失败时如何安全继续；
-7. 五日 Alpha 的 P0、P1 与延期边界。
+6. 自治任务如何避免永远不再触发 Judge；
+7. Judge 失败时如何安全继续；
+8. 五日 Alpha 的 P0、P1 与延期边界。
 
-本文不负责具体模型选择公式和 Provider 恢复顺序，相关内容由 `08-routing-and-recovery-policy.md` 定义。
+具体模型选择和 Provider 恢复由 `08-routing-and-recovery-policy.md` 定义。
 
 ## 2. 核心原则
 
@@ -25,49 +26,41 @@
 
 Judge 不回答“最新一句话难不难”，而回答：
 
-> 基于完整 Task 目标、原生上下文、当前 Plan、执行进展、失败、用户反馈和现有 Profile，下一 Routing Segment 所需的最低充分能力与风险水平是什么？
+> 基于完整 Task、原生上下文、当前 Plan、执行进展、失败、用户反馈和现有 Profile，下一 Routing Segment 所需的最低充分能力与风险水平是什么？
 
-“继续”“执行吧”“好的”等短输入必须与完整 Task 上下文一起评估。
+“继续”“执行吧”“好的”等短输入必须和完整 Task 上下文一起评估。
 
 ### 2.2 Trigger Engine 与 Judge 分离
 
 - Trigger Engine 使用确定性协议事件和状态规则，决定是否调用 Judge；
 - Judge 只评估上下文和能力需求；
-- Judge 不决定 Session、Task 或 Segment 身份；
+- Judge 不决定 Session / Task / Segment 身份；
 - Judge 不调用 Provider、不直接选择模型、不修改状态。
 
 ### 2.3 Judge 不推荐具体模型
 
-Judge 不输出：
-
-- 模型名称；
-- Provider / Channel；
-- 价格；
-- 节省率；
-- 最终 Route Decision。
-
-Route Decision Engine 根据 Evaluation、质量曲线、硬兼容、健康度和成本选择 Execution Profile。
+Judge 不输出模型名、Provider、价格、节省率或 Route Decision。Route Decision Engine 再结合 Evaluation、质量曲线、硬兼容、健康度和成本选择 Execution Profile。
 
 ### 2.4 原生上下文优先
 
-JudgeContextEnvelope 以原生 Codex Responses 或 Claude Messages 为第一事实来源。第一阶段不使用本地模型或额外 LLM 对上下文做摘要替换。
+JudgeContextEnvelope 以 Codex Responses 或 Claude Messages 为第一事实来源。第一阶段不使用额外 LLM 对上下文做摘要替换。
 
 ### 2.5 一个 Segment 默认只 Judge 一次
 
-Segment 创建时产生或继承 Judge Evaluation。普通 Model Response、ToolCall、ToolResult、Streaming 和 Retry 不重复 Judge。
+普通 Model Response、ToolCall、ToolResult、Streaming 和 Retry 不重复 Judge。只有明确 Trigger 创建新 Segment 或新 Evaluation。
 
 ### 2.6 显式模型完全跳过 Judge
 
 用户指定具体模型时：
 
-- Judge 调用数必须为 0；
+- Judge 调用数为 0；
 - 不执行 ACU 模型选择；
-- 不因 Planning、Failure 或 HumanMessage 自动替换模型；
-- 仍记录完整状态、Attempt、Usage、成本和错误。
+- 不因 Planning、Failure 或 HumanMessage 替换模型；
+- 仍记录状态、Attempt、Usage、成本和错误。
 
 ## 3. Judge 的逻辑职责
 
-第一阶段由一个 LLM Judge 同时承担两个逻辑职责。
+第一阶段由一个 LLM Judge 同时承担：
 
 ### 3.1 Q-Context
 
@@ -79,7 +72,7 @@ Segment 创建时产生或继承 Judge Evaluation。普通 Model Response、Tool
 - 最近 Tool、Test、Build 和错误表示进展、失败还是环境问题；
 - 当前 Plan 是否暴露新的范围、约束或能力需求。
 
-Q-Context 的输出是 Evaluation Evidence，不替代 Trigger Engine 的确定性身份判断。
+Q-Context 只提供 Evaluation Evidence，不替代 Trigger Engine 的确定性身份判断。
 
 ### 3.2 Q-Difficulty
 
@@ -93,8 +86,6 @@ Q-Context 的输出是 Evaluation Evidence，不替代 Trigger Engine 的确定�
 - 上下文负担；
 - 能力档位概率；
 - 评估置信度。
-
-未来可以拆分为独立模型，但不属于五日 Alpha。
 
 ## 4. 模式行为
 
@@ -112,18 +103,17 @@ Q-Context 的输出是 Evaluation Evidence，不替代 Trigger Engine 的确定�
 ```text
 Trigger 成立
 → 构造 JudgeContextEnvelope
-→ 调用 Judge
-→ 校验 Evaluation
+→ 调用并校验 Judge
 → Route Decision Engine 选择满足质量要求的最高性价比 Profile
 ```
 
 ### 4.3 acu-high
 
-使用相同 Trigger 和 Judge，只提高基础质量偏好和不确定性惩罚。`acu-high` 不等于固定使用最贵模型，也不作为五日上线阻断项。
+与 `acu-auto` 使用相同 Trigger 和 Judge，只提高基础质量偏好和不确定性惩罚；不等于固定使用最贵模型，也不作为五日上线阻断项。
 
 ## 5. P0 Judge 触发器
 
-五日 Alpha 只实现三类触发器。
+P0 必须实现四类 Trigger，不是只有用户新消息。
 
 ### 5.1 新 Task 首次请求
 
@@ -158,15 +148,35 @@ Claude Messages 必须先拆出 `tool_result`：
 强信号：
 
 - Codex 实际调用 `update_plan`；
-- Claude 命中版本门控的 Plan-only 指纹；
-- P1 中 Recovery 后出现强 Replanning 信号。
+- Claude 命中版本门控 Plan-only 指纹；
+- Recovery 后再次出现强 Replanning 信号。
 
 动作：
 
 - 创建 Planning Segment；
 - 调用 Judge；
 - `temporary_phase_override = 88`；
-- Route Decision Engine 重新选择适合 Planning 的 Profile。
+- 重新选择适合 Planning 的 Profile。
+
+### 5.4 自治任务安全 Trigger：重复核心失败
+
+为避免 Agent 在没有新 HumanMessage、也没有 Planning 强信号时永久复用错误 Route，P0 增加一个最小安全 Trigger：
+
+```text
+同一标准化核心 Failure Signature 第二次出现
++ 中间没有明确进展
++ 不是 Provider / 协议 / 权限 / 依赖 / 环境错误
+→ 重新 Judge
+```
+
+动作：
+
+- 创建 `capability_recovery` Segment；
+- 新 Evaluation 读取两次失败及中间策略；
+- Route Decision 只允许保持或升级；
+- 是否提高 `capability_escalation_floor` 由新 Evaluation 决定。
+
+第一次失败只记录 Evidence，不重新 Judge。具体分类和 Signature 规则见 `07-failure-taxonomy-and-blockage-rules.md`。
 
 ## 6. P0 不触发 Judge
 
@@ -178,44 +188,49 @@ Claude Messages 必须先拆出 `tool_result`：
 - 成功 ToolResult；
 - 单纯 Tool Result 历史重发；
 - Streaming 增量；
+- 第一次 ExecutionFailure；
+- Failure Signature 改变或存在明确进展；
 - Plan 内部状态更新；
 - PlanFinished 且没有新范围或能力需求；
 - Provider 429、5xx、Timeout、Overload；
 - Client / New API / Provider Retry；
-- 单纯协议、上下文、Tool 或模态硬兼容变化。
+- 协议、上下文、Tool 或模态硬兼容变化。
 
-硬兼容变化只使用最近 Evaluation 重筛候选。若必须换模型，创建 compatibility-recovery Segment，但不重新解释任务难度。
+硬兼容变化只使用最近 Evaluation 重筛候选。若必须换模型，创建 `compatibility_recovery` Segment，但不重新解释任务难度。
 
 ## 7. P1 触发器
 
 P0 全链路稳定后补充：
 
-### 7.1 重复核心失败且无进展
+- 语义相近但文本不同的重复失败；
+- 复杂“有进展 / 无进展”判断；
+- 10 分钟 Routing Lease 过期；
+- 长期 Resume 且旧 Segment Lease 已过期；
+- UserRejected 的更细粒度风险覆盖；
+- Judge 模型健康度和自动切换。
 
-同一标准化 Failure Signature 第二次出现，且错误和结果没有明确改善时：
+Session 不设置固定身份过期。
 
-- 创建 capability-block Segment；
-- 重新 Judge；
-- 只允许保持或升级；
-- 由新 Evaluation 决定是否提高 `capability_escalation_floor`。
+## 8. Trigger 去重与优先级
 
-第一次失败不重新 Judge。
+一个原生请求可产生多个 Event，但每个逻辑状态变化只能执行一次。
 
-### 7.2 10 分钟 Routing Lease 过期
-
-下一请求到达时惰性检查：
+建议优先级：
 
 ```text
-now - segment.last_activity_at > 10 分钟
+new_task
+> human_message / user_rejected
+> plan_started / replanning
+> repeated_failure
+> compatibility_recovery
+> no_trigger
 ```
 
-若过期，保留 Session / Task，创建新 Segment并重新 Judge。
+同一请求同时包含 ToolResult 和 HumanMessage时：先归档 ToolResult，再由 HumanMessage 触发一次 Judge。
 
-### 7.3 长期 Resume
+同一 Trigger 因 Client / New API Retry 重复送达时，只生成一个逻辑 Evaluation。
 
-Session 不设置固定身份过期。强连续性证据成立时保留原 Session / Task；旧 Segment Lease 已过期时创建 resume Segment并重新 Judge。
-
-## 8. Trigger Engine 输入
+## 9. Trigger Engine 输入
 
 Trigger Engine 仅使用确定性事实：
 
@@ -225,17 +240,17 @@ Trigger Engine 仅使用确定性事实：
 - Codex `update_plan`；
 - Claude Plan-only 指纹与 `ExitPlanMode`；
 - 当前 Session、Task、Segment；
-- Failure Signature 与重复次数；
+- Failure Signature、类别、重复次数和进展 Evidence；
 - 当前 Profile 的硬兼容状态；
 - 是否为重试、重放或重复事件。
 
-Trigger Engine 不调用额外 LLM、不使用 Embedding，也不根据单词匹配直接推断 Planning 或新 Task。
+Trigger Engine 不调用额外 LLM、不使用 Embedding，也不根据单词匹配直接推断 Planning 或能力阻塞。
 
-## 9. JudgeContextEnvelope
+## 10. JudgeContextEnvelope
 
 每次 Judge 请求包含两部分。
 
-### 9.1 原生 API 上下文
+### 10.1 原生 API 上下文
 
 尽可能保留：
 
@@ -245,9 +260,9 @@ Trigger Engine 不调用额外 LLM、不使用 Embedding，也不根据单词匹
 - Tool Call / Tool Result；
 - 可见 Reasoning / Thinking；
 - 最新 HumanMessage；
-- 影响任务能力的请求参数。
+- 影响能力需求的请求参数。
 
-### 9.2 ACU 确定性状态
+### 10.2 ACU 确定性状态
 
 从 PostgreSQL 和事件规则读取：
 
@@ -259,14 +274,14 @@ Trigger Engine 不调用额外 LLM、不使用 Embedding，也不根据单词匹
 - `task_base_quality_target`；
 - `capability_escalation_floor`；
 - `temporary_phase_override`；
-- 最近 Tool / Test / Build 结果；
-- Failure Signature 和重复次数；
-- 用户拒绝、重试、成功和进展 Evidence；
+- 最近 Tool / Test / Build；
+- Failure Signature、类别、重复次数和进展 Evidence；
+- 用户拒绝、成功和重试 Evidence；
 - 当前上下文、Tool、模态和协议硬要求。
 
-数据库随机 ID 只用于追踪，不应作为 Judge 推断难度的语义输入。
+数据库随机 ID 只用于追踪，不应作为难度语义输入。
 
-## 10. 上下文超限
+## 11. 上下文超限
 
 第一阶段不调用额外摘要模型。
 
@@ -283,17 +298,9 @@ Trigger Engine 不调用额外 LLM、不使用 Embedding，也不根据单词匹
 9. 最近 Model Response；
 10. 当前原生请求尾部。
 
-优先删除：
+优先删除重复历史、重复 Tool Schema、已完成的大段 Read 输出、重复错误正文和被后续结果覆盖的中间输出。每次裁剪记录内容 Hash、类型、Token 估计和删除原因。
 
-- 完全重复的历史 Item；
-- 重复 Tool Schema；
-- 已完成且未被引用的大段 Read 输出；
-- 重复错误正文，只保留一次正文和计数；
-- 已被后续结果覆盖的中间输出。
-
-每次裁剪记录内容 Hash、类型、Token 估计和删除原因。Judge 最大上下文可配置，并优先使用长上下文 Judge 模型。
-
-## 11. Judge 输出契约
+## 12. Judge 输出契约
 
 Judge 只输出严格 JSON：
 
@@ -326,19 +333,14 @@ Judge 只输出严格 JSON：
 - 六项因子：0—10；
 - 四档概率和为 1；
 - `confidence`：0—1；
-- `evidence_tags` 最多 8 个；
 - `explanation` 简短、可审计，不输出思维过程；
 - 不得输出具体模型、Provider 或价格。
 
-后端以版本化公式计算 `factor_composite`、`difficulty_index`、主档位、不确定性惩罚和 Evaluation Hash。
+后端以版本化公式计算 Difficulty Index、主档位、不确定性惩罚和 Evaluation Hash。
 
-## 12. Evaluation 复用与幂等
+## 13. Evaluation 复用与幂等
 
-### 12.1 Segment 复用
-
-没有新 Trigger 时，直接复用当前 Segment 的 Evaluation 和 Route Decision。
-
-### 12.2 Judge 幂等键
+建议幂等键：
 
 ```text
 SHA256(
@@ -350,132 +352,63 @@ SHA256(
 )
 ```
 
-同一 Trigger Event 因 Client 或 New API Retry 重复送达时，只产生一个逻辑 Evaluation。
+允许复用同一 Trigger 的网络重试、并发去重和完全相同 Evaluation Key。不得用旧 Cache 跳过新 HumanMessage、新 PlanStarted、重复失败 Trigger 或 Lease 过期后的评估。
 
 不得只依赖 `x-client-request-id`、New API Request ID 或 Provider Request ID。
 
-### 12.3 Cache 边界
-
-允许复用同一 Trigger Event 的网络重试、并发去重和完全相同的 Evaluation Key。
-
-不得用旧 Cache 跳过新 HumanMessage、新 PlanStarted、P1 capability block 或 Lease 过期后的评估。
-
-## 13. Judge 失败与安全降级
-
-Judge 故障不能让所有 Coding Agent 请求直接不可用，也不能静默切到最顶尖、最昂贵的模型。
+## 14. Judge 失败与安全降级
 
 处理顺序：
 
-1. **最近有效 Evaluation**：若当前 Task 连续，且本次 Trigger 不涉及明显新目标或重大范围变化，则带风险惩罚复用；
-2. **Rules Strategy**：根据确定性任务特征、历史 Evaluation、Planning 状态和硬要求生成 fallback Evaluation；
-3. **管理员配置的安全性价比 Profile**：前两项均不可用时，选择上下文容量足够、协议和 Tool 能力兼容、健康且价格合理的保守 Profile；
-4. 记录 `judge_status`、错误类别、Fallback 来源、风险标记和实际成本；
-5. 不选择低于基础质量下限或能力升级下限的模型。
+1. 当前 Task 的最近有效 Evaluation，且本次 Trigger 不涉及明显新目标或重大范围变化；
+2. Rules Strategy；
+3. 管理员配置的安全性价比 Profile；
+4. 无安全候选时返回明确错误。
 
-### 13.1 安全性价比 Profile 选择规则
+安全性价比 Profile 必须：
 
-该 Profile 不是“质量最高模型”，而是“在安全下限之上最具性价比的可用模型”。候选必须同时满足：
+- 原生协议、Tool、Thinking、模态兼容；
+- 上下文容量覆盖当前请求和预期输出，并保留安全余量；
+- Channel 健康；
+- 不低于安全质量下限；
+- 在合格候选中优先预计总成本较低者。
 
-- 原生协议兼容；
-- Tool / Thinking / 模态能力兼容；
-- 上下文容量覆盖当前请求和预期输出，并保留配置化安全余量；
-- 当前 Channel 健康；
-- 不低于管理员配置的安全质量下限；
-- 在满足上述条件的候选中，优先预计总成本更低者。
+可配置 DeepSeek V4 Pro 级别的长上下文性价比模型作为候选，但不把具体模型名写死。Judge 故障时不自动选择最顶尖、最贵模型，也不静默选择低质量模型。
 
-Alpha 可将 **DeepSeek V4 Pro 级别的长上下文性价比模型** 配置为候选安全档，但不得把具体模型名写死在 Judge Prompt 或业务规则中。模型不可用或不兼容时，应从同一安全档候选组中选择其他 Profile。
+## 15. 调用校验与账本
 
-若没有任何候选满足硬要求和安全质量下限，返回明确的“无安全可用 Profile”错误，不自动升级到最贵模型，也不静默降级到不合格模型。
+每次 Judge 调用校验 HTTP、严格 JSON、Schema Version、数值范围、概率、六项因子和非法字段。损坏结果进入 Fallback。
 
-用户显式指定模型时不受 Judge 故障影响。
+每次真实调用记录 Judge 模型、Provider、Prompt / Policy Version、Trigger、Context Hash、Token、延迟、成本、Usage 来源、Evaluation 状态、Cache / Fallback 和每个真实 Attempt。
 
-具体候选排序、成本公式和配置字段由 `08` 定义。
+Judge 实际成本按 1.0 倍计入用户总成本；同一逻辑 Evaluation 不重复扣费，但实际上游重复计费 Attempt 必须进入账本。
 
-## 14. 调用校验与账本
+## 16. P0 实施范围
 
-每次 Judge 调用至少校验：
+- 显式模型跳过 Judge；
+- 新 Task、HumanMessage、PlanStarted、重复核心失败 Trigger；
+- Segment 内 Evaluation 复用；
+- Codex / Claude 原生上下文解析；
+- ToolResult 与 HumanMessage 区分；
+- JudgeContextEnvelope；
+- 严格 Schema 校验；
+- Evaluation 幂等；
+- Rules Fallback；
+- Judge Token、成本和延迟记录。
 
-- HTTP 成功；
-- 严格 JSON 可解析；
-- Schema Version 支持；
-- 数值范围合法；
-- 概率可归一化；
-- 六项因子完整；
-- Explanation 长度受限；
-- 不包含模型推荐或非法字段。
+## 17. P0 验收场景
 
-损坏或部分结果不得直接使用，必须进入第 13 节 Fallback。
-
-每次真实调用记录：
-
-- Judge 模型和 Provider；
-- Prompt / Policy Version；
-- Trigger Reason；
-- Context Hash；
-- 输入、缓存、输出 Token；
-- 延迟和实际成本；
-- Usage 来源；
-- Evaluation 状态；
-- Cache Hit / Fallback；
-- 每个真实 Attempt。
-
-Alpha 按实际 Judge 成本 1.0 倍计入用户总成本。同一 Trigger Event 的重复传输不得重复创建逻辑费用；上游实际产生的多次计费 Attempt 必须分别入账。
-
-## 15. P0 实施范围
-
-五日内必须实现：
-
-1. 显式模型跳过 Judge；
-2. 新 Task 首次 Judge；
-3. 所有高置信度 HumanMessage Judge；
-4. PlanStarted Judge；
-5. Segment 内 Evaluation 复用；
-6. Codex / Claude 原生上下文解析；
-7. ToolResult 与 HumanMessage 区分；
-8. JudgeContextEnvelope；
-9. 严格 JSON 校验；
-10. Evaluation 幂等；
-11. Rules Fallback；
-12. 安全性价比 Profile Fallback；
-13. Judge Token、成本和延迟记录。
-
-## 16. P1 实施范围
-
-- 重复 Failure Signature 后重新 Judge；
-- 10 分钟 Routing Lease；
-- 长期 Resume 后重新 Judge；
-- UserRejected 的临时风险权重；
-- 更完整的 Success / Progress Evidence；
-- 管理员查看 Context 裁剪记录；
-- Judge 模型健康度和自动切换。
-
-## 17. 延期项
-
-- 独立 Q-Context / Q-Difficulty 模型；
-- 本地 Router 模型；
-- Embedding Session 匹配；
-- LLM 上下文摘要器；
-- 弱 Planning 自动识别；
-- 复杂 Failure 分类器；
-- 用户连续质量分；
-- 在线学习和自动更新 Prompt；
-- 9B Router 训练。
-
-## 18. P0 验收场景
-
-1. 显式模型请求 Judge 调用数为 0；
-2. 新 `acu-auto` Task 恰好调用一次 Judge；
+1. 显式模型 Judge 调用数为 0；
+2. 新 `acu-auto` Task 恰好 Judge 一次；
 3. 普通 Tool 循环不重复 Judge；
-4. Claude 仅含 Tool Result 的 `role=user` 不触发 Judge；
-5. Claude Tool Result + Human Text 正确拆分并触发一次 Judge；
-6. “继续”触发新 Evaluation，Context 包含原 Task、Plan、最近 Tool 和当前 Profile；
-7. Codex 实际 `update_plan` 触发 Planning Evaluation；
-8. Claude Plan-only 触发 Planning Evaluation；
-9. PlanFinished 无新需求时不再次 Judge；
-10. Provider 503 和 Retry 不触发 Judge；
-11. 同一 Trigger Event 经 New API Retry 只生成一个逻辑 Evaluation；
-12. Judge 输出非法 JSON 时按既定顺序 Fallback；
-13. Judge 故障且无可复用 Evaluation 时，选择上下文足够的安全性价比 Profile，而不是最顶尖模型；
-14. 没有安全候选时返回明确错误；
-15. Judge 不输出模型名称，Route Decision 由独立模块完成；
-16. Judge Token、成本、延迟和 Attempt 可审计。
+4. Claude 仅 Tool Result 的 `role=user` 不触发；
+5. Claude Tool Result +真实 Text 触发一次；
+6. “继续”使用完整上下文生成新 Evaluation；
+7. Codex `update_plan` 与 Claude Plan-only 触发 Planning Evaluation；
+8. PlanFinished 无新约束时不再次 Judge；
+9. 第一次核心失败不触发，第二次相同核心失败且无进展时触发一次；
+10. Provider 503、权限错误、依赖错误和 Retry 不触发能力 Judge；
+11. 同一 Trigger 经 New API Retry 只生成一个逻辑 Evaluation；
+12. Judge 非法 JSON 进入 Fallback；
+13. Judge 不输出具体模型；
+14. Judge 成本、Token、延迟和 Attempt 可审计。

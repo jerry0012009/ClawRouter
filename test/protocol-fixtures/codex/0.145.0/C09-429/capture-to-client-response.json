@@ -1,0 +1,20 @@
+{
+  "status_code": 429,
+  "headers": {
+    "content-type": "application/json",
+    "retry-after": "0",
+    "x-mock-attempt": "1",
+    "x-request-id": "mock-1e2898be-7780-4a66-a62d-851ab2e76c50",
+    "date": "Tue, 28 Jul 2026 20:54:16 GMT",
+    "connection": "keep-alive",
+    "keep-alive": "timeout=5",
+    "transfer-encoding": "chunked"
+  },
+  "body": {
+    "encoding": "utf8",
+    "raw": "{\"error\":{\"type\":\"rate_limit_error\",\"message\":\"controlled mock status 429\",\"status\":429,\"attempt\":1}}",
+    "byte_length": 101,
+    "sha256": "hmac-sha256:9dcab8ed92c493adbaca529f7576166fe34cb570e1f9b9a6bd01145c534896a0"
+  },
+  "streaming_events": []
+}

@@ -1,0 +1,16 @@
+[
+  {
+    "capture_point": "A",
+    "method": "GET",
+    "path": "/v1/models",
+    "query": "client_version=0.145.0",
+    "response_status": 200,
+    "request_started_at": "2026-07-28T20:25:33.815Z",
+    "response_ended_at": "2026-07-28T20:25:33.843Z",
+    "request_body_bytes": 0,
+    "request_body_original_hmac": "hmac-sha256:10174a657b3dfb68934a50b02f7db874234e6484ed6a31144f50cdd63312422b",
+    "response_body_bytes": 486,
+    "response_body_original_hmac": "hmac-sha256:41847a571c9823f80981925dd3160a6b5cd26eece0d3e067807579a2a1f1b89b",
+    "capture_error": null
+  }
+]

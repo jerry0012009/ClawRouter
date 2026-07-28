@@ -1,0 +1,20 @@
+{
+  "status_code": 500,
+  "headers": {
+    "content-type": "application/json",
+    "retry-after": "0",
+    "x-mock-attempt": "13",
+    "x-request-id": "mock-6b7151ea-79f0-4e47-bc82-be01e1afc1df",
+    "date": "Tue, 28 Jul 2026 20:54:48 GMT",
+    "connection": "keep-alive",
+    "keep-alive": "timeout=5",
+    "transfer-encoding": "chunked"
+  },
+  "body": {
+    "encoding": "utf8",
+    "raw": "{\"error\":{\"type\":\"mock_provider_error\",\"message\":\"controlled mock status 500\",\"status\":500,\"attempt\":13}}",
+    "byte_length": 105,
+    "sha256": "hmac-sha256:6e8e03243250381589b950e9cc0c51326854c57cbf4d80470a0de285ba0a228d"
+  },
+  "streaming_events": []
+}

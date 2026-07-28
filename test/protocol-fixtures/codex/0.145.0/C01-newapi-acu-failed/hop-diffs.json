@@ -1,0 +1,782 @@
+[
+  {
+    "sequence": 1,
+    "status": {
+      "client_hop": 404,
+      "upstream_hop": 404
+    },
+    "header_diff": {
+      "added": [
+        {
+          "path": "accept-encoding",
+          "after": "gzip"
+        }
+      ],
+      "removed": [
+        {
+          "path": "x-codex-beta-features",
+          "before": "remote_compaction_v2"
+        },
+        {
+          "path": "x-codex-window-id",
+          "before": "<REDACTED_CODEX_WINDOW_ID_1>"
+        },
+        {
+          "path": "x-codex-turn-metadata",
+          "before": "<REDACTED_CODEX_TURN_METADATA_1>"
+        },
+        {
+          "path": "x-client-request-id",
+          "before": "<REDACTED_CLIENT_REQUEST_ID_1>"
+        },
+        {
+          "path": "session-id",
+          "before": "<REDACTED_CLIENT_REQUEST_ID_1>"
+        },
+        {
+          "path": "thread-id",
+          "before": "<REDACTED_CLIENT_REQUEST_ID_1>"
+        },
+        {
+          "path": "originator",
+          "before": "codex_exec"
+        }
+      ],
+      "changed": [
+        {
+          "path": "authorization",
+          "before": "<REDACTED_AUTHORIZATION_1>",
+          "after": "<REDACTED_AUTHORIZATION_2>"
+        },
+        {
+          "path": "user-agent",
+          "before": "codex_exec/0.145.0 (Ubuntu 24.4.0; x86_64) vscode/1.126.0 (codex_exec; 0.145.0)",
+          "after": "Go-http-client/1.1"
+        },
+        {
+          "path": "host",
+          "before": "127.0.0.1:3313",
+          "after": "172.17.0.1:3200"
+        },
+        {
+          "path": "content-length",
+          "before": "183636",
+          "after": "184066"
+        }
+      ]
+    },
+    "body_diff": [],
+    "streaming_event_diff": {
+      "client_hop": {
+        "count": 1,
+        "names": [
+          null
+        ],
+        "raw_bytes": 115,
+        "completed": false,
+        "error_count": 0
+      },
+      "upstream_hop": {
+        "count": 0,
+        "names": [],
+        "raw_bytes": 0,
+        "completed": false,
+        "error_count": 0
+      }
+    },
+    "error_diff": {
+      "client_capture_error": null,
+      "upstream_capture_error": null,
+      "status_equal": true
+    },
+    "usage_diff": {
+      "client_hop": [],
+      "upstream_hop": []
+    },
+    "request_id_mapping": {
+      "client_hop": {
+        "captured_ids": {
+          "upstream_request_id": null,
+          "new_api_request_id": null,
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "x-client-request-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "session-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "thread-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "x-oneapi-request-id": "202607282026278069062288268d9d6AGCAUT4E"
+        }
+      },
+      "upstream_hop": {
+        "captured_ids": {
+          "upstream_request_id": null,
+          "new_api_request_id": null,
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {}
+      }
+    },
+    "model_mapping": {
+      "client_hop": "acu-recon-model",
+      "upstream_hop": "acu-recon-model",
+      "unchanged": true
+    },
+    "tool_id_mapping": {
+      "client_hop": [],
+      "upstream_hop": [],
+      "unchanged": true
+    }
+  },
+  {
+    "sequence": 2,
+    "status": {
+      "client_hop": 404,
+      "upstream_hop": 404
+    },
+    "header_diff": {
+      "added": [
+        {
+          "path": "accept-encoding",
+          "after": "gzip"
+        }
+      ],
+      "removed": [
+        {
+          "path": "x-codex-beta-features",
+          "before": "remote_compaction_v2"
+        },
+        {
+          "path": "x-codex-window-id",
+          "before": "<REDACTED_CODEX_WINDOW_ID_1>"
+        },
+        {
+          "path": "x-codex-turn-metadata",
+          "before": "<REDACTED_CODEX_TURN_METADATA_1>"
+        },
+        {
+          "path": "x-client-request-id",
+          "before": "<REDACTED_CLIENT_REQUEST_ID_1>"
+        },
+        {
+          "path": "session-id",
+          "before": "<REDACTED_CLIENT_REQUEST_ID_1>"
+        },
+        {
+          "path": "thread-id",
+          "before": "<REDACTED_CLIENT_REQUEST_ID_1>"
+        },
+        {
+          "path": "originator",
+          "before": "codex_exec"
+        }
+      ],
+      "changed": [
+        {
+          "path": "authorization",
+          "before": "<REDACTED_AUTHORIZATION_1>",
+          "after": "<REDACTED_AUTHORIZATION_2>"
+        },
+        {
+          "path": "user-agent",
+          "before": "codex_exec/0.145.0 (Ubuntu 24.4.0; x86_64) vscode/1.126.0 (codex_exec; 0.145.0)",
+          "after": "Go-http-client/1.1"
+        },
+        {
+          "path": "host",
+          "before": "127.0.0.1:3313",
+          "after": "172.17.0.1:3200"
+        },
+        {
+          "path": "content-length",
+          "before": "183636",
+          "after": "184066"
+        }
+      ]
+    },
+    "body_diff": [],
+    "streaming_event_diff": {
+      "client_hop": {
+        "count": 1,
+        "names": [
+          null
+        ],
+        "raw_bytes": 115,
+        "completed": false,
+        "error_count": 0
+      },
+      "upstream_hop": {
+        "count": 0,
+        "names": [],
+        "raw_bytes": 0,
+        "completed": false,
+        "error_count": 0
+      }
+    },
+    "error_diff": {
+      "client_capture_error": null,
+      "upstream_capture_error": null,
+      "status_equal": true
+    },
+    "usage_diff": {
+      "client_hop": [],
+      "upstream_hop": []
+    },
+    "request_id_mapping": {
+      "client_hop": {
+        "captured_ids": {
+          "upstream_request_id": null,
+          "new_api_request_id": null,
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "x-client-request-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "session-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "thread-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "x-oneapi-request-id": "202607282026282444569698268d9d6Tg74F5QR"
+        }
+      },
+      "upstream_hop": {
+        "captured_ids": {
+          "upstream_request_id": null,
+          "new_api_request_id": null,
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {}
+      }
+    },
+    "model_mapping": {
+      "client_hop": "acu-recon-model",
+      "upstream_hop": "acu-recon-model",
+      "unchanged": true
+    },
+    "tool_id_mapping": {
+      "client_hop": [],
+      "upstream_hop": [],
+      "unchanged": true
+    }
+  },
+  {
+    "sequence": 3,
+    "status": {
+      "client_hop": 404,
+      "upstream_hop": 404
+    },
+    "header_diff": {
+      "added": [
+        {
+          "path": "accept-encoding",
+          "after": "gzip"
+        }
+      ],
+      "removed": [
+        {
+          "path": "x-codex-beta-features",
+          "before": "remote_compaction_v2"
+        },
+        {
+          "path": "x-codex-window-id",
+          "before": "<REDACTED_CODEX_WINDOW_ID_1>"
+        },
+        {
+          "path": "x-codex-turn-metadata",
+          "before": "<REDACTED_CODEX_TURN_METADATA_1>"
+        },
+        {
+          "path": "x-client-request-id",
+          "before": "<REDACTED_CLIENT_REQUEST_ID_1>"
+        },
+        {
+          "path": "session-id",
+          "before": "<REDACTED_CLIENT_REQUEST_ID_1>"
+        },
+        {
+          "path": "thread-id",
+          "before": "<REDACTED_CLIENT_REQUEST_ID_1>"
+        },
+        {
+          "path": "originator",
+          "before": "codex_exec"
+        }
+      ],
+      "changed": [
+        {
+          "path": "authorization",
+          "before": "<REDACTED_AUTHORIZATION_1>",
+          "after": "<REDACTED_AUTHORIZATION_2>"
+        },
+        {
+          "path": "user-agent",
+          "before": "codex_exec/0.145.0 (Ubuntu 24.4.0; x86_64) vscode/1.126.0 (codex_exec; 0.145.0)",
+          "after": "Go-http-client/1.1"
+        },
+        {
+          "path": "host",
+          "before": "127.0.0.1:3313",
+          "after": "172.17.0.1:3200"
+        },
+        {
+          "path": "content-length",
+          "before": "183636",
+          "after": "184066"
+        }
+      ]
+    },
+    "body_diff": [],
+    "streaming_event_diff": {
+      "client_hop": {
+        "count": 1,
+        "names": [
+          null
+        ],
+        "raw_bytes": 115,
+        "completed": false,
+        "error_count": 0
+      },
+      "upstream_hop": {
+        "count": 0,
+        "names": [],
+        "raw_bytes": 0,
+        "completed": false,
+        "error_count": 0
+      }
+    },
+    "error_diff": {
+      "client_capture_error": null,
+      "upstream_capture_error": null,
+      "status_equal": true
+    },
+    "usage_diff": {
+      "client_hop": [],
+      "upstream_hop": []
+    },
+    "request_id_mapping": {
+      "client_hop": {
+        "captured_ids": {
+          "upstream_request_id": null,
+          "new_api_request_id": null,
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "x-client-request-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "session-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "thread-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "x-oneapi-request-id": "202607282026287982126968268d9d6boMrNAaU"
+        }
+      },
+      "upstream_hop": {
+        "captured_ids": {
+          "upstream_request_id": null,
+          "new_api_request_id": null,
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {}
+      }
+    },
+    "model_mapping": {
+      "client_hop": "acu-recon-model",
+      "upstream_hop": "acu-recon-model",
+      "unchanged": true
+    },
+    "tool_id_mapping": {
+      "client_hop": [],
+      "upstream_hop": [],
+      "unchanged": true
+    }
+  },
+  {
+    "sequence": 4,
+    "status": {
+      "client_hop": 404,
+      "upstream_hop": 404
+    },
+    "header_diff": {
+      "added": [
+        {
+          "path": "accept-encoding",
+          "after": "gzip"
+        }
+      ],
+      "removed": [
+        {
+          "path": "x-codex-beta-features",
+          "before": "remote_compaction_v2"
+        },
+        {
+          "path": "x-codex-window-id",
+          "before": "<REDACTED_CODEX_WINDOW_ID_1>"
+        },
+        {
+          "path": "x-codex-turn-metadata",
+          "before": "<REDACTED_CODEX_TURN_METADATA_1>"
+        },
+        {
+          "path": "x-client-request-id",
+          "before": "<REDACTED_CLIENT_REQUEST_ID_1>"
+        },
+        {
+          "path": "session-id",
+          "before": "<REDACTED_CLIENT_REQUEST_ID_1>"
+        },
+        {
+          "path": "thread-id",
+          "before": "<REDACTED_CLIENT_REQUEST_ID_1>"
+        },
+        {
+          "path": "originator",
+          "before": "codex_exec"
+        }
+      ],
+      "changed": [
+        {
+          "path": "authorization",
+          "before": "<REDACTED_AUTHORIZATION_1>",
+          "after": "<REDACTED_AUTHORIZATION_2>"
+        },
+        {
+          "path": "user-agent",
+          "before": "codex_exec/0.145.0 (Ubuntu 24.4.0; x86_64) vscode/1.126.0 (codex_exec; 0.145.0)",
+          "after": "Go-http-client/1.1"
+        },
+        {
+          "path": "host",
+          "before": "127.0.0.1:3313",
+          "after": "172.17.0.1:3200"
+        },
+        {
+          "path": "content-length",
+          "before": "183636",
+          "after": "184066"
+        }
+      ]
+    },
+    "body_diff": [],
+    "streaming_event_diff": {
+      "client_hop": {
+        "count": 1,
+        "names": [
+          null
+        ],
+        "raw_bytes": 115,
+        "completed": false,
+        "error_count": 0
+      },
+      "upstream_hop": {
+        "count": 0,
+        "names": [],
+        "raw_bytes": 0,
+        "completed": false,
+        "error_count": 0
+      }
+    },
+    "error_diff": {
+      "client_capture_error": null,
+      "upstream_capture_error": null,
+      "status_equal": true
+    },
+    "usage_diff": {
+      "client_hop": [],
+      "upstream_hop": []
+    },
+    "request_id_mapping": {
+      "client_hop": {
+        "captured_ids": {
+          "upstream_request_id": null,
+          "new_api_request_id": null,
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "x-client-request-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "session-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "thread-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "x-oneapi-request-id": "202607282026297823558788268d9d6QhtGoImC"
+        }
+      },
+      "upstream_hop": {
+        "captured_ids": {
+          "upstream_request_id": null,
+          "new_api_request_id": null,
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {}
+      }
+    },
+    "model_mapping": {
+      "client_hop": "acu-recon-model",
+      "upstream_hop": "acu-recon-model",
+      "unchanged": true
+    },
+    "tool_id_mapping": {
+      "client_hop": [],
+      "upstream_hop": [],
+      "unchanged": true
+    }
+  },
+  {
+    "sequence": 5,
+    "status": {
+      "client_hop": 404,
+      "upstream_hop": 404
+    },
+    "header_diff": {
+      "added": [
+        {
+          "path": "accept-encoding",
+          "after": "gzip"
+        }
+      ],
+      "removed": [
+        {
+          "path": "x-codex-beta-features",
+          "before": "remote_compaction_v2"
+        },
+        {
+          "path": "x-codex-window-id",
+          "before": "<REDACTED_CODEX_WINDOW_ID_1>"
+        },
+        {
+          "path": "x-codex-turn-metadata",
+          "before": "<REDACTED_CODEX_TURN_METADATA_1>"
+        },
+        {
+          "path": "x-client-request-id",
+          "before": "<REDACTED_CLIENT_REQUEST_ID_1>"
+        },
+        {
+          "path": "session-id",
+          "before": "<REDACTED_CLIENT_REQUEST_ID_1>"
+        },
+        {
+          "path": "thread-id",
+          "before": "<REDACTED_CLIENT_REQUEST_ID_1>"
+        },
+        {
+          "path": "originator",
+          "before": "codex_exec"
+        }
+      ],
+      "changed": [
+        {
+          "path": "authorization",
+          "before": "<REDACTED_AUTHORIZATION_1>",
+          "after": "<REDACTED_AUTHORIZATION_2>"
+        },
+        {
+          "path": "user-agent",
+          "before": "codex_exec/0.145.0 (Ubuntu 24.4.0; x86_64) vscode/1.126.0 (codex_exec; 0.145.0)",
+          "after": "Go-http-client/1.1"
+        },
+        {
+          "path": "host",
+          "before": "127.0.0.1:3313",
+          "after": "172.17.0.1:3200"
+        },
+        {
+          "path": "content-length",
+          "before": "183636",
+          "after": "184066"
+        }
+      ]
+    },
+    "body_diff": [],
+    "streaming_event_diff": {
+      "client_hop": {
+        "count": 1,
+        "names": [
+          null
+        ],
+        "raw_bytes": 115,
+        "completed": false,
+        "error_count": 0
+      },
+      "upstream_hop": {
+        "count": 0,
+        "names": [],
+        "raw_bytes": 0,
+        "completed": false,
+        "error_count": 0
+      }
+    },
+    "error_diff": {
+      "client_capture_error": null,
+      "upstream_capture_error": null,
+      "status_equal": true
+    },
+    "usage_diff": {
+      "client_hop": [],
+      "upstream_hop": []
+    },
+    "request_id_mapping": {
+      "client_hop": {
+        "captured_ids": {
+          "upstream_request_id": null,
+          "new_api_request_id": null,
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "x-client-request-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "session-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "thread-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "x-oneapi-request-id": "202607282026315453796758268d9d6lOFwmLpP"
+        }
+      },
+      "upstream_hop": {
+        "captured_ids": {
+          "upstream_request_id": null,
+          "new_api_request_id": null,
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {}
+      }
+    },
+    "model_mapping": {
+      "client_hop": "acu-recon-model",
+      "upstream_hop": "acu-recon-model",
+      "unchanged": true
+    },
+    "tool_id_mapping": {
+      "client_hop": [],
+      "upstream_hop": [],
+      "unchanged": true
+    }
+  },
+  {
+    "sequence": 6,
+    "status": {
+      "client_hop": 404,
+      "upstream_hop": 404
+    },
+    "header_diff": {
+      "added": [
+        {
+          "path": "accept-encoding",
+          "after": "gzip"
+        }
+      ],
+      "removed": [
+        {
+          "path": "x-codex-beta-features",
+          "before": "remote_compaction_v2"
+        },
+        {
+          "path": "x-codex-window-id",
+          "before": "<REDACTED_CODEX_WINDOW_ID_1>"
+        },
+        {
+          "path": "x-codex-turn-metadata",
+          "before": "<REDACTED_CODEX_TURN_METADATA_1>"
+        },
+        {
+          "path": "x-client-request-id",
+          "before": "<REDACTED_CLIENT_REQUEST_ID_1>"
+        },
+        {
+          "path": "session-id",
+          "before": "<REDACTED_CLIENT_REQUEST_ID_1>"
+        },
+        {
+          "path": "thread-id",
+          "before": "<REDACTED_CLIENT_REQUEST_ID_1>"
+        },
+        {
+          "path": "originator",
+          "before": "codex_exec"
+        }
+      ],
+      "changed": [
+        {
+          "path": "authorization",
+          "before": "<REDACTED_AUTHORIZATION_1>",
+          "after": "<REDACTED_AUTHORIZATION_2>"
+        },
+        {
+          "path": "user-agent",
+          "before": "codex_exec/0.145.0 (Ubuntu 24.4.0; x86_64) vscode/1.126.0 (codex_exec; 0.145.0)",
+          "after": "Go-http-client/1.1"
+        },
+        {
+          "path": "host",
+          "before": "127.0.0.1:3313",
+          "after": "172.17.0.1:3200"
+        },
+        {
+          "path": "content-length",
+          "before": "183636",
+          "after": "184066"
+        }
+      ]
+    },
+    "body_diff": [],
+    "streaming_event_diff": {
+      "client_hop": {
+        "count": 1,
+        "names": [
+          null
+        ],
+        "raw_bytes": 115,
+        "completed": false,
+        "error_count": 0
+      },
+      "upstream_hop": {
+        "count": 0,
+        "names": [],
+        "raw_bytes": 0,
+        "completed": false,
+        "error_count": 0
+      }
+    },
+    "error_diff": {
+      "client_capture_error": null,
+      "upstream_capture_error": null,
+      "status_equal": true
+    },
+    "usage_diff": {
+      "client_hop": [],
+      "upstream_hop": []
+    },
+    "request_id_mapping": {
+      "client_hop": {
+        "captured_ids": {
+          "upstream_request_id": null,
+          "new_api_request_id": null,
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "x-client-request-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "session-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "thread-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "x-oneapi-request-id": "202607282026346853440928268d9d6xVMaOyNg"
+        }
+      },
+      "upstream_hop": {
+        "captured_ids": {
+          "upstream_request_id": null,
+          "new_api_request_id": null,
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {}
+      }
+    },
+    "model_mapping": {
+      "client_hop": "acu-recon-model",
+      "upstream_hop": "acu-recon-model",
+      "unchanged": true
+    },
+    "tool_id_mapping": {
+      "client_hop": [],
+      "upstream_hop": [],
+      "unchanged": true
+    }
+  }
+]

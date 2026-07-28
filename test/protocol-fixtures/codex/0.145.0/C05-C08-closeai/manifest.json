@@ -1,0 +1,34 @@
+{
+  "fixture_id": "codex-0.145.0-C05-C08-closeai-direct-001",
+  "captured_at": "2026-07-28T20:39:03.722Z",
+  "client": "codex",
+  "client_version": "0.145.0",
+  "os": "Ubuntu 24.04.4 LTS x86_64",
+  "newapi_version": "not_applicable",
+  "acu_commit": "d4c06855e668dfd8673cff7711d68d624a83278b",
+  "provider": "CloseAI OpenAI",
+  "requested_model": "gpt-5.5",
+  "actual_model": "gpt-5.5",
+  "protocol": "responses",
+  "stream": true,
+  "scenario": "C05 five human-input variants and C08 same/different-directory resume",
+  "request_count": 10,
+  "contains_tools": true,
+  "contains_reasoning": true,
+  "contains_plan_signal": false,
+  "capture_points": [
+    "A"
+  ],
+  "sanitized": true,
+  "capture_status": "partial",
+  "chain": "Codex -> Capture A -> CloseAI OpenAI",
+  "provider_kind": "real",
+  "through_acu": false,
+  "retry_setting": "not_applicable",
+  "capture_completeness": {
+    "A": "captured",
+    "B": "not_applicable",
+    "C": "not_applicable",
+    "D": "not_available"
+  }
+}

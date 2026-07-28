@@ -1,0 +1,17 @@
+{
+  "status_code": 404,
+  "headers": {
+    "content-type": "application/json",
+    "date": "Tue, 28 Jul 2026 20:26:27 GMT",
+    "connection": "keep-alive",
+    "keep-alive": "timeout=5",
+    "transfer-encoding": "chunked"
+  },
+  "body": {
+    "encoding": "utf8",
+    "raw": "{\"error\":\"Not found\",\"detail\":{\"message\":\"Not found: /v1/responses\",\"type\":\"not_found\"}}",
+    "byte_length": 88,
+    "sha256": "hmac-sha256:08c604e51fd5d56a382f368965ee480b1c67d498942d9996613998aae4a2fd44"
+  },
+  "streaming_events": []
+}

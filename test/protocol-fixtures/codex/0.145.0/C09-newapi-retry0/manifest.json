@@ -1,0 +1,35 @@
+{
+  "fixture_id": "codex-0.145.0-C09-newapi-retry0-503-001",
+  "captured_at": "2026-07-28T20:48:27.806Z",
+  "client": "codex",
+  "client_version": "0.145.0",
+  "os": "Ubuntu 24.04.4 LTS x86_64",
+  "newapi_version": "v1.0.0-rc.22@sha256:d600f20c2781",
+  "acu_commit": "d4c06855e668dfd8673cff7711d68d624a83278b",
+  "provider": "controlled Responses mock",
+  "requested_model": "retry-mock-codex",
+  "actual_model": "controlled-503",
+  "protocol": "responses",
+  "stream": true,
+  "scenario": "C09 fixed 503 with New API Retry=0",
+  "request_count": 60,
+  "contains_tools": false,
+  "contains_reasoning": false,
+  "contains_plan_signal": false,
+  "capture_points": [
+    "A",
+    "B"
+  ],
+  "sanitized": true,
+  "capture_status": "complete",
+  "chain": "Codex -> A -> New API -> B -> controlled mock",
+  "provider_kind": "mock",
+  "through_acu": false,
+  "retry_setting": 0,
+  "capture_completeness": {
+    "A": "captured",
+    "B": "captured",
+    "C": "not_applicable",
+    "D": "not_applicable"
+  }
+}

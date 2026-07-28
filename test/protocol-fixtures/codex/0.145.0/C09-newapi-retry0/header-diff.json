@@ -1,0 +1,60 @@
+{
+  "added": [
+    {
+      "path": "accept-encoding",
+      "after": "gzip"
+    }
+  ],
+  "removed": [
+    {
+      "path": "x-codex-beta-features",
+      "before": "remote_compaction_v2"
+    },
+    {
+      "path": "x-codex-window-id",
+      "before": "<REDACTED_CODEX_WINDOW_ID_1>"
+    },
+    {
+      "path": "x-codex-turn-metadata",
+      "before": "<REDACTED_CODEX_TURN_METADATA_1>"
+    },
+    {
+      "path": "x-client-request-id",
+      "before": "<REDACTED_CLIENT_REQUEST_ID_1>"
+    },
+    {
+      "path": "session-id",
+      "before": "<REDACTED_CLIENT_REQUEST_ID_1>"
+    },
+    {
+      "path": "thread-id",
+      "before": "<REDACTED_CLIENT_REQUEST_ID_1>"
+    },
+    {
+      "path": "originator",
+      "before": "codex_exec"
+    }
+  ],
+  "changed": [
+    {
+      "path": "authorization",
+      "before": "<REDACTED_AUTHORIZATION_1>",
+      "after": "<REDACTED_AUTHORIZATION_2>"
+    },
+    {
+      "path": "user-agent",
+      "before": "codex_exec/0.145.0 (Ubuntu 24.4.0; x86_64) vscode/1.126.0 (codex_exec; 0.145.0)",
+      "after": "Go-http-client/1.1"
+    },
+    {
+      "path": "host",
+      "before": "127.0.0.1:3319",
+      "after": "172.17.0.1:3203"
+    },
+    {
+      "path": "content-length",
+      "before": "42660",
+      "after": "43250"
+    }
+  ]
+}

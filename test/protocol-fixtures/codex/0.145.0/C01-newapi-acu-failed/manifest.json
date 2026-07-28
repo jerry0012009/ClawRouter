@@ -1,0 +1,35 @@
+{
+  "fixture_id": "codex-0.145.0-C01-newapi-acu-001",
+  "captured_at": "2026-07-28T20:26:27.318Z",
+  "client": "codex",
+  "client_version": "0.145.0",
+  "os": "Ubuntu 24.04.4 LTS x86_64",
+  "newapi_version": "v1.0.0-rc.22@sha256:d600f20c2781",
+  "acu_commit": "running-acu-build-commit-unconfirmed",
+  "provider": "current ACU (provider not reached)",
+  "requested_model": "acu-recon-model",
+  "actual_model": "not_reached",
+  "protocol": "responses",
+  "stream": true,
+  "scenario": "C01 current ACU /v1/responses ingress failure",
+  "request_count": 12,
+  "contains_tools": false,
+  "contains_reasoning": false,
+  "contains_plan_signal": false,
+  "capture_points": [
+    "A",
+    "B"
+  ],
+  "sanitized": true,
+  "capture_status": "failed",
+  "chain": "Codex -> A -> New API -> B -> current ACU",
+  "provider_kind": "real",
+  "through_acu": true,
+  "retry_setting": 0,
+  "capture_completeness": {
+    "A": "captured",
+    "B": "captured",
+    "C": "not_available",
+    "D": "not_available"
+  }
+}

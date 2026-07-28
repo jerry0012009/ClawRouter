@@ -1,0 +1,153 @@
+[
+  {
+    "sequence": 1,
+    "status": {
+      "client_hop": 200,
+      "upstream_hop": 200
+    },
+    "header_diff": {
+      "added": [
+        {
+          "path": "accept-encoding",
+          "after": "gzip"
+        }
+      ],
+      "removed": [],
+      "changed": [
+        {
+          "path": "authorization",
+          "before": "<REDACTED_AUTHORIZATION_1>",
+          "after": "<REDACTED_AUTHORIZATION_2>"
+        },
+        {
+          "path": "host",
+          "before": "127.0.0.1:3312",
+          "after": "172.17.0.1:3201"
+        },
+        {
+          "path": "content-length",
+          "before": "59806",
+          "after": "60331"
+        }
+      ]
+    },
+    "body_diff": [],
+    "streaming_event_diff": {
+      "client_hop": {
+        "count": 13,
+        "names": [
+          "response.created",
+          "response.in_progress",
+          "response.output_item.added",
+          "response.content_part.added",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.done",
+          "response.content_part.done",
+          "response.output_item.done",
+          "response.completed"
+        ],
+        "raw_bytes": 78569,
+        "completed": true,
+        "error_count": 0
+      },
+      "upstream_hop": {
+        "count": 13,
+        "names": [
+          "response.created",
+          "response.in_progress",
+          "response.output_item.added",
+          "response.content_part.added",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.done",
+          "response.content_part.done",
+          "response.output_item.done",
+          "response.completed"
+        ],
+        "raw_bytes": 78569,
+        "completed": true,
+        "error_count": 0
+      }
+    },
+    "error_diff": {
+      "client_capture_error": "upstream_response_aborted",
+      "upstream_capture_error": "upstream_response_aborted",
+      "status_equal": true
+    },
+    "usage_diff": {
+      "client_hop": [
+        {
+          "input_tokens": 12252,
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "output_tokens": 9,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 12261
+        }
+      ],
+      "upstream_hop": [
+        {
+          "input_tokens": 12252,
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "output_tokens": 9,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 12261
+        }
+      ]
+    },
+    "request_id_mapping": {
+      "client_hop": {
+        "captured_ids": {
+          "upstream_request_id": null,
+          "new_api_request_id": null,
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "x-client-request-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "session-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "thread-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "x-oneapi-request-id": "202607282025356628602018268d9d6DKAIcqMG"
+        }
+      },
+      "upstream_hop": {
+        "captured_ids": {
+          "upstream_request_id": "485eb8e9-5d41-4273-9f0f-e2100e764cec",
+          "new_api_request_id": "485eb8e9-5d41-4273-9f0f-e2100e764cec",
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "session-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "thread-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "x-client-request-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "x-request-id": "485eb8e9-5d41-4273-9f0f-e2100e764cec"
+        }
+      }
+    },
+    "model_mapping": {
+      "client_hop": "gpt-5.6-terra",
+      "upstream_hop": "gpt-5.6-terra",
+      "unchanged": true
+    },
+    "tool_id_mapping": {
+      "client_hop": [],
+      "upstream_hop": [],
+      "unchanged": true
+    }
+  }
+]

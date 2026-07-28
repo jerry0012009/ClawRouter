@@ -1,0 +1,19 @@
+{
+  "status_code": 200,
+  "headers": {
+    "content-type": "text/event-stream",
+    "cache-control": "no-cache",
+    "x-request-id": "mock-d16e0da8-c3a8-4a34-911a-338b29b959b0",
+    "date": "Tue, 28 Jul 2026 20:57:36 GMT",
+    "connection": "keep-alive",
+    "keep-alive": "timeout=5",
+    "transfer-encoding": "chunked"
+  },
+  "body": {
+    "encoding": "utf8",
+    "raw": "",
+    "byte_length": 0,
+    "sha256": "hmac-sha256:265e49093f50b8b0f5f3df324d6a7048f86349302f3d9daef13d2ed12ae0d603"
+  },
+  "streaming_events": []
+}

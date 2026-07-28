@@ -1,0 +1,26 @@
+{
+  "added": [
+    {
+      "path": "accept-encoding",
+      "after": "gzip"
+    }
+  ],
+  "removed": [],
+  "changed": [
+    {
+      "path": "authorization",
+      "before": "<REDACTED_AUTHORIZATION_1>",
+      "after": "<REDACTED_AUTHORIZATION_2>"
+    },
+    {
+      "path": "host",
+      "before": "127.0.0.1:3311",
+      "after": "172.17.0.1:3201"
+    },
+    {
+      "path": "content-length",
+      "before": "40559",
+      "after": "40844"
+    }
+  ]
+}

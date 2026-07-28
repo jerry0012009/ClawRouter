@@ -1,0 +1,358 @@
+[
+  {
+    "sequence": 1,
+    "status": {
+      "client_hop": 200,
+      "upstream_hop": 503
+    },
+    "header_diff": {
+      "added": [
+        {
+          "path": "accept-encoding",
+          "after": "gzip"
+        }
+      ],
+      "removed": [
+        {
+          "path": "x-codex-beta-features",
+          "before": "remote_compaction_v2"
+        },
+        {
+          "path": "x-codex-window-id",
+          "before": "<REDACTED_CODEX_WINDOW_ID_1>"
+        },
+        {
+          "path": "x-codex-turn-metadata",
+          "before": "<REDACTED_CODEX_TURN_METADATA_1>"
+        },
+        {
+          "path": "x-client-request-id",
+          "before": "<REDACTED_CLIENT_REQUEST_ID_1>"
+        },
+        {
+          "path": "session-id",
+          "before": "<REDACTED_CLIENT_REQUEST_ID_1>"
+        },
+        {
+          "path": "thread-id",
+          "before": "<REDACTED_CLIENT_REQUEST_ID_1>"
+        },
+        {
+          "path": "originator",
+          "before": "codex_exec"
+        }
+      ],
+      "changed": [
+        {
+          "path": "authorization",
+          "before": "<REDACTED_AUTHORIZATION_1>",
+          "after": "<REDACTED_AUTHORIZATION_2>"
+        },
+        {
+          "path": "user-agent",
+          "before": "codex_exec/0.145.0 (Ubuntu 24.4.0; x86_64) vscode/1.126.0 (codex_exec; 0.145.0)",
+          "after": "Go-http-client/1.1"
+        },
+        {
+          "path": "host",
+          "before": "127.0.0.1:3319",
+          "after": "172.17.0.1:3203"
+        },
+        {
+          "path": "content-length",
+          "before": "42660",
+          "after": "43250"
+        }
+      ]
+    },
+    "body_diff": [],
+    "streaming_event_diff": {
+      "client_hop": {
+        "count": 8,
+        "names": [
+          "response.created",
+          "response.output_item.added",
+          "response.content_part.added",
+          "response.output_text.delta",
+          "response.output_text.done",
+          "response.content_part.done",
+          "response.output_item.done",
+          "response.completed"
+        ],
+        "raw_bytes": 2510,
+        "completed": true,
+        "error_count": 0
+      },
+      "upstream_hop": {
+        "count": 0,
+        "names": [],
+        "raw_bytes": 0,
+        "completed": false,
+        "error_count": 0
+      }
+    },
+    "error_diff": {
+      "client_capture_error": "upstream_response_aborted",
+      "upstream_capture_error": null,
+      "status_equal": false
+    },
+    "usage_diff": {
+      "client_hop": [
+        {
+          "input_tokens": 12,
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "output_tokens": 4,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 16
+        },
+        {
+          "input_tokens": 12,
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "output_tokens": 4,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 16
+        }
+      ],
+      "upstream_hop": []
+    },
+    "request_id_mapping": {
+      "client_hop": {
+        "captured_ids": {
+          "upstream_request_id": null,
+          "new_api_request_id": null,
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "x-client-request-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "session-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "thread-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "x-oneapi-request-id": "202607282049355086088468268d9d6Cv2SicPR"
+        }
+      },
+      "upstream_hop": {
+        "captured_ids": {
+          "upstream_request_id": "mock-32e92660-e5d6-4b68-8f51-118d370fdd6b",
+          "new_api_request_id": "mock-32e92660-e5d6-4b68-8f51-118d370fdd6b",
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "x-request-id": "mock-32e92660-e5d6-4b68-8f51-118d370fdd6b"
+        }
+      }
+    },
+    "model_mapping": {
+      "client_hop": "retry-mock-codex",
+      "upstream_hop": "retry-mock-codex",
+      "unchanged": true
+    },
+    "tool_id_mapping": {
+      "client_hop": [],
+      "upstream_hop": [],
+      "unchanged": true
+    }
+  },
+  {
+    "sequence": 2,
+    "status": {
+      "client_hop": 200,
+      "upstream_hop": 200
+    },
+    "header_diff": {
+      "added": [
+        {
+          "path": "accept-encoding",
+          "after": "gzip"
+        }
+      ],
+      "removed": [
+        {
+          "path": "x-codex-beta-features",
+          "before": "remote_compaction_v2"
+        },
+        {
+          "path": "x-codex-window-id",
+          "before": "<REDACTED_CODEX_WINDOW_ID_1>"
+        },
+        {
+          "path": "x-codex-turn-metadata",
+          "before": "<REDACTED_CODEX_TURN_METADATA_1>"
+        },
+        {
+          "path": "x-client-request-id",
+          "before": "<REDACTED_CLIENT_REQUEST_ID_1>"
+        },
+        {
+          "path": "session-id",
+          "before": "<REDACTED_CLIENT_REQUEST_ID_1>"
+        },
+        {
+          "path": "thread-id",
+          "before": "<REDACTED_CLIENT_REQUEST_ID_1>"
+        },
+        {
+          "path": "originator",
+          "before": "codex_exec"
+        }
+      ],
+      "changed": [
+        {
+          "path": "authorization",
+          "before": "<REDACTED_AUTHORIZATION_1>",
+          "after": "<REDACTED_AUTHORIZATION_2>"
+        },
+        {
+          "path": "user-agent",
+          "before": "codex_exec/0.145.0 (Ubuntu 24.4.0; x86_64) vscode/1.126.0 (codex_exec; 0.145.0)",
+          "after": "Go-http-client/1.1"
+        },
+        {
+          "path": "host",
+          "before": "127.0.0.1:3319",
+          "after": "172.17.0.1:3203"
+        },
+        {
+          "path": "content-length",
+          "before": "42660",
+          "after": "43250"
+        }
+      ]
+    },
+    "body_diff": [],
+    "streaming_event_diff": {
+      "client_hop": {
+        "count": 8,
+        "names": [
+          "response.created",
+          "response.output_item.added",
+          "response.content_part.added",
+          "response.output_text.delta",
+          "response.output_text.done",
+          "response.content_part.done",
+          "response.output_item.done",
+          "response.completed"
+        ],
+        "raw_bytes": 2510,
+        "completed": true,
+        "error_count": 0
+      },
+      "upstream_hop": {
+        "count": 8,
+        "names": [
+          "response.created",
+          "response.output_item.added",
+          "response.content_part.added",
+          "response.output_text.delta",
+          "response.output_text.done",
+          "response.content_part.done",
+          "response.output_item.done",
+          "response.completed"
+        ],
+        "raw_bytes": 2510,
+        "completed": true,
+        "error_count": 0
+      }
+    },
+    "error_diff": {
+      "client_capture_error": "upstream_response_aborted",
+      "upstream_capture_error": null,
+      "status_equal": true
+    },
+    "usage_diff": {
+      "client_hop": [
+        {
+          "input_tokens": 12,
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "output_tokens": 4,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 16
+        },
+        {
+          "input_tokens": 12,
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "output_tokens": 4,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 16
+        }
+      ],
+      "upstream_hop": [
+        {
+          "input_tokens": 12,
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "output_tokens": 4,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 16
+        },
+        {
+          "input_tokens": 12,
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "output_tokens": 4,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 16
+        }
+      ]
+    },
+    "request_id_mapping": {
+      "client_hop": {
+        "captured_ids": {
+          "upstream_request_id": null,
+          "new_api_request_id": null,
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "x-client-request-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "session-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "thread-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "x-oneapi-request-id": "202607282049355086088468268d9d6Cv2SicPR"
+        }
+      },
+      "upstream_hop": {
+        "captured_ids": {
+          "upstream_request_id": "mock-2d106b0a-6bae-4664-a09b-0c7d8d29f4c0",
+          "new_api_request_id": "mock-2d106b0a-6bae-4664-a09b-0c7d8d29f4c0",
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "x-request-id": "mock-2d106b0a-6bae-4664-a09b-0c7d8d29f4c0"
+        }
+      }
+    },
+    "model_mapping": {
+      "client_hop": "retry-mock-codex",
+      "upstream_hop": "retry-mock-codex",
+      "unchanged": true
+    },
+    "tool_id_mapping": {
+      "client_hop": [],
+      "upstream_hop": [],
+      "unchanged": true
+    }
+  }
+]

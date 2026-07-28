@@ -1,0 +1,741 @@
+[
+  {
+    "sequence": 1,
+    "status": {
+      "client_hop": 200,
+      "upstream_hop": 200
+    },
+    "header_diff": {
+      "added": [
+        {
+          "path": "accept-encoding",
+          "after": "gzip"
+        }
+      ],
+      "removed": [],
+      "changed": [
+        {
+          "path": "authorization",
+          "before": "<REDACTED_AUTHORIZATION_1>",
+          "after": "<REDACTED_AUTHORIZATION_2>"
+        },
+        {
+          "path": "host",
+          "before": "127.0.0.1:3311",
+          "after": "172.17.0.1:3201"
+        },
+        {
+          "path": "content-length",
+          "before": "40559",
+          "after": "40844"
+        }
+      ]
+    },
+    "body_diff": [],
+    "streaming_event_diff": {
+      "client_hop": {
+        "count": 36,
+        "names": [
+          "response.created",
+          "response.in_progress",
+          "response.output_item.added",
+          "response.content_part.added",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.done",
+          "response.content_part.done",
+          "response.output_item.done",
+          "response.output_item.added",
+          "response.function_call_arguments.delta",
+          "response.function_call_arguments.done",
+          "response.output_item.done",
+          "response.output_item.added",
+          "response.function_call_arguments.delta",
+          "response.function_call_arguments.done",
+          "response.output_item.done",
+          "response.completed"
+        ],
+        "raw_bytes": 110757,
+        "completed": true,
+        "error_count": 0
+      },
+      "upstream_hop": {
+        "count": 36,
+        "names": [
+          "response.created",
+          "response.in_progress",
+          "response.output_item.added",
+          "response.content_part.added",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.done",
+          "response.content_part.done",
+          "response.output_item.done",
+          "response.output_item.added",
+          "response.function_call_arguments.delta",
+          "response.function_call_arguments.done",
+          "response.output_item.done",
+          "response.output_item.added",
+          "response.function_call_arguments.delta",
+          "response.function_call_arguments.done",
+          "response.output_item.done",
+          "response.completed"
+        ],
+        "raw_bytes": 110757,
+        "completed": true,
+        "error_count": 0
+      }
+    },
+    "error_diff": {
+      "client_capture_error": null,
+      "upstream_capture_error": null,
+      "status_equal": true
+    },
+    "usage_diff": {
+      "client_hop": [
+        {
+          "input_tokens": 12045,
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "output_tokens": 137,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 12182
+        }
+      ],
+      "upstream_hop": [
+        {
+          "input_tokens": 12045,
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "output_tokens": 137,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 12182
+        }
+      ]
+    },
+    "request_id_mapping": {
+      "client_hop": {
+        "captured_ids": {
+          "upstream_request_id": null,
+          "new_api_request_id": null,
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "x-client-request-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "session-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "thread-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "x-oneapi-request-id": "202607282111334530377678268d9d6dO9VVEgG"
+        }
+      },
+      "upstream_hop": {
+        "captured_ids": {
+          "upstream_request_id": "a676cbba-aa59-4125-a1ad-4694ded77a84",
+          "new_api_request_id": "a676cbba-aa59-4125-a1ad-4694ded77a84",
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "session-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "thread-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "x-client-request-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "x-request-id": "a676cbba-aa59-4125-a1ad-4694ded77a84"
+        }
+      }
+    },
+    "model_mapping": {
+      "client_hop": "gpt-5.5",
+      "upstream_hop": "gpt-5.5",
+      "unchanged": true
+    },
+    "tool_id_mapping": {
+      "client_hop": [],
+      "upstream_hop": [],
+      "unchanged": true
+    }
+  },
+  {
+    "sequence": 2,
+    "status": {
+      "client_hop": 200,
+      "upstream_hop": 200
+    },
+    "header_diff": {
+      "added": [
+        {
+          "path": "accept-encoding",
+          "after": "gzip"
+        }
+      ],
+      "removed": [],
+      "changed": [
+        {
+          "path": "authorization",
+          "before": "<REDACTED_AUTHORIZATION_1>",
+          "after": "<REDACTED_AUTHORIZATION_2>"
+        },
+        {
+          "path": "host",
+          "before": "127.0.0.1:3311",
+          "after": "172.17.0.1:3201"
+        },
+        {
+          "path": "content-length",
+          "before": "41704",
+          "after": "41989"
+        }
+      ]
+    },
+    "body_diff": [],
+    "streaming_event_diff": {
+      "client_hop": {
+        "count": 56,
+        "names": [
+          "response.created",
+          "response.in_progress",
+          "response.output_item.added",
+          "response.output_item.done",
+          "response.output_item.added",
+          "response.content_part.added",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.done",
+          "response.content_part.done",
+          "response.output_item.done",
+          "response.output_item.added",
+          "response.function_call_arguments.delta",
+          "response.function_call_arguments.done",
+          "response.output_item.done",
+          "response.output_item.added",
+          "response.function_call_arguments.delta",
+          "response.function_call_arguments.done",
+          "response.output_item.done",
+          "response.completed"
+        ],
+        "raw_bytes": 119198,
+        "completed": true,
+        "error_count": 0
+      },
+      "upstream_hop": {
+        "count": 56,
+        "names": [
+          "response.created",
+          "response.in_progress",
+          "response.output_item.added",
+          "response.output_item.done",
+          "response.output_item.added",
+          "response.content_part.added",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.done",
+          "response.content_part.done",
+          "response.output_item.done",
+          "response.output_item.added",
+          "response.function_call_arguments.delta",
+          "response.function_call_arguments.done",
+          "response.output_item.done",
+          "response.output_item.added",
+          "response.function_call_arguments.delta",
+          "response.function_call_arguments.done",
+          "response.output_item.done",
+          "response.completed"
+        ],
+        "raw_bytes": 119198,
+        "completed": true,
+        "error_count": 0
+      }
+    },
+    "error_diff": {
+      "client_capture_error": null,
+      "upstream_capture_error": null,
+      "status_equal": true
+    },
+    "usage_diff": {
+      "client_hop": [
+        {
+          "input_tokens": 12293,
+          "input_tokens_details": {
+            "cached_tokens": 11648
+          },
+          "output_tokens": 180,
+          "output_tokens_details": {
+            "reasoning_tokens": 35
+          },
+          "total_tokens": 12473
+        }
+      ],
+      "upstream_hop": [
+        {
+          "input_tokens": 12293,
+          "input_tokens_details": {
+            "cached_tokens": 11648
+          },
+          "output_tokens": 180,
+          "output_tokens_details": {
+            "reasoning_tokens": 35
+          },
+          "total_tokens": 12473
+        }
+      ]
+    },
+    "request_id_mapping": {
+      "client_hop": {
+        "captured_ids": {
+          "upstream_request_id": null,
+          "new_api_request_id": null,
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "x-client-request-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "session-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "thread-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "x-oneapi-request-id": "202607282111373390400278268d9d6409wMp0L"
+        }
+      },
+      "upstream_hop": {
+        "captured_ids": {
+          "upstream_request_id": "79c3dac8-105b-4fbd-8a1e-faede59a2742",
+          "new_api_request_id": "79c3dac8-105b-4fbd-8a1e-faede59a2742",
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "session-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "thread-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "x-client-request-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "x-request-id": "79c3dac8-105b-4fbd-8a1e-faede59a2742"
+        }
+      }
+    },
+    "model_mapping": {
+      "client_hop": "gpt-5.5",
+      "upstream_hop": "gpt-5.5",
+      "unchanged": true
+    },
+    "tool_id_mapping": {
+      "client_hop": [
+        "call_7J4feNTdboVI4Sl7tKVLE5Vi",
+        "call_QPK00aOT0cpjnRMqmMIyDQCN"
+      ],
+      "upstream_hop": [
+        "call_7J4feNTdboVI4Sl7tKVLE5Vi",
+        "call_QPK00aOT0cpjnRMqmMIyDQCN"
+      ],
+      "unchanged": true
+    }
+  },
+  {
+    "sequence": 3,
+    "status": {
+      "client_hop": 200,
+      "upstream_hop": 200
+    },
+    "header_diff": {
+      "added": [
+        {
+          "path": "accept-encoding",
+          "after": "gzip"
+        }
+      ],
+      "removed": [],
+      "changed": [
+        {
+          "path": "authorization",
+          "before": "<REDACTED_AUTHORIZATION_1>",
+          "after": "<REDACTED_AUTHORIZATION_2>"
+        },
+        {
+          "path": "host",
+          "before": "127.0.0.1:3311",
+          "after": "172.17.0.1:3201"
+        },
+        {
+          "path": "content-length",
+          "before": "44354",
+          "after": "44639"
+        }
+      ]
+    },
+    "body_diff": [],
+    "streaming_event_diff": {
+      "client_hop": {
+        "count": 82,
+        "names": [
+          "response.created",
+          "response.in_progress",
+          "response.output_item.added",
+          "response.content_part.added",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.done",
+          "response.content_part.done",
+          "response.output_item.done",
+          "response.completed"
+        ],
+        "raw_bytes": 121556,
+        "completed": true,
+        "error_count": 0
+      },
+      "upstream_hop": {
+        "count": 82,
+        "names": [
+          "response.created",
+          "response.in_progress",
+          "response.output_item.added",
+          "response.content_part.added",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.delta",
+          "response.output_text.done",
+          "response.content_part.done",
+          "response.output_item.done",
+          "response.completed"
+        ],
+        "raw_bytes": 121556,
+        "completed": true,
+        "error_count": 0
+      }
+    },
+    "error_diff": {
+      "client_capture_error": null,
+      "upstream_capture_error": null,
+      "status_equal": true
+    },
+    "usage_diff": {
+      "client_hop": [
+        {
+          "input_tokens": 12615,
+          "input_tokens_details": {
+            "cached_tokens": 12160
+          },
+          "output_tokens": 78,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 12693
+        }
+      ],
+      "upstream_hop": [
+        {
+          "input_tokens": 12615,
+          "input_tokens_details": {
+            "cached_tokens": 12160
+          },
+          "output_tokens": 78,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 12693
+        }
+      ]
+    },
+    "request_id_mapping": {
+      "client_hop": {
+        "captured_ids": {
+          "upstream_request_id": null,
+          "new_api_request_id": null,
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "x-client-request-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "session-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "thread-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "x-oneapi-request-id": "202607282111404071757748268d9d6CpkvXYWo"
+        }
+      },
+      "upstream_hop": {
+        "captured_ids": {
+          "upstream_request_id": "7896886a-1881-4b5e-9974-de9a97aadb0b",
+          "new_api_request_id": "7896886a-1881-4b5e-9974-de9a97aadb0b",
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "session-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "thread-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "x-client-request-id": "<REDACTED_CLIENT_REQUEST_ID_1>",
+          "x-request-id": "7896886a-1881-4b5e-9974-de9a97aadb0b"
+        }
+      }
+    },
+    "model_mapping": {
+      "client_hop": "gpt-5.5",
+      "upstream_hop": "gpt-5.5",
+      "unchanged": true
+    },
+    "tool_id_mapping": {
+      "client_hop": [
+        "call_7J4feNTdboVI4Sl7tKVLE5Vi",
+        "call_IB62VUnn3bGYb12gtWMyQr7n",
+        "call_QPK00aOT0cpjnRMqmMIyDQCN",
+        "call_eoOZdf81VBye8YTyFgDzBOY7"
+      ],
+      "upstream_hop": [
+        "call_7J4feNTdboVI4Sl7tKVLE5Vi",
+        "call_IB62VUnn3bGYb12gtWMyQr7n",
+        "call_QPK00aOT0cpjnRMqmMIyDQCN",
+        "call_eoOZdf81VBye8YTyFgDzBOY7"
+      ],
+      "unchanged": true
+    }
+  }
+]

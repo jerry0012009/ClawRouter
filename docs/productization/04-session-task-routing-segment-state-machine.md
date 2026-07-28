@@ -1,28 +1,30 @@
 # ACU Router Session / Task / Routing Segment 状态机
 
-> 状态：Productization Phase 0 已确认设计基线  
-> 版本：v0.2  
+> 状态：产品化阶段 0 设计基线，待创始人终审  
+> 版本：v0.3  
 > 日期：2026-07-29  
 > 依赖文档：`01-glossary-and-domain-model.md`
 
 ## 1. 文档目标
 
-本文件定义 ACU Router 在原生 Codex / Claude Code 流量下如何回答四个问题：
+本文件定义 ACU Router 在原生 Codex / Claude Code 流量下如何回答五个问题：
 
 1. 当前请求属于哪个 Session 和 Task / Goal；
 2. 当前请求是否延续已有 Routing Segment；
 3. 是否需要重新调用 LLM Judge；
-4. 应保持、临时提高、升级或重新选择哪个 Execution Profile。
+4. 应保持、临时提高、升级或重新选择哪个 Execution Profile；
+5. 上游、协议、环境和模型能力失败分别应如何处理。
 
 状态机的首要目标不是最大化切换频率，而是：
 
 - 在同一连续工作片段中保持模型稳定；
-- 只在任务能力需求可能变化时重新 Judge；
+- 让多个连续 Step 共享一次上下文与难度评估；
+- 只在能力需求可能变化时重新 Judge；
 - 只在高置信度能力阻塞时升级；
-- 避免把普通工具失败、环境失败和上游失败误判为模型能力不足；
+- 避免把正常探索、普通测试失败、环境问题和上游故障误判为模型能力不足；
 - 完整记录轨迹，为后续训练 Q-Context、Q-Difficulty 和失败识别模型积累数据。
 
-## 2. 设计原则
+## 2. 已确认的设计原则
 
 ### 2.1 原生请求优先
 
@@ -30,31 +32,35 @@ ACU 不是 Coding Agent，不能控制 Codex 或 Claude Code 提供哪些字段�
 
 状态判断必须以原生 API 请求为第一事实来源，并允许：
 
-- 某些客户端提供显式线程 / Response 关联；
+- 某些客户端提供显式 Thread / Response 关联；
 - 某些客户端重新发送完整历史；
 - 某些客户端只发送部分历史；
-- Goal 模式在没有新的人类输入时产生多个内部 Turn。
+- Goal 模式在没有新的人类输入时产生多个内部 Turn；
+- Tool Result 使用 `user` 角色但并非真实用户输入。
 
-### 2.2 Routing Segment 而非 Turn 是路由锁定单位
+系统不得依赖用户添加自定义 Header、Task ID 或定制 SDK 才能工作。
+
+### 2.2 Routing Segment 是路由锁定单位
 
 同一 Task 内可能有多个 Client Turn；同一 Client Turn 也可能包含多个模型 Step。
 
-ACU 不将“出现一个新 Turn”机械等同于“必须换模型”。真正共享一次难度评估和执行配置的单位是 Routing Segment。
+ACU 不将“出现一个新 Turn”机械等同于“必须换模型”。真正共享一次 Judge Evaluation 和 Execution Profile 的单位是 Routing Segment。
 
 ### 2.3 高精度、低频触发
 
-第一期宁可少识别一些能力阻塞，也不要频繁错误升级。
+第一阶段宁可漏掉一部分轻微阻塞，也不要频繁错误升级。
 
-普通 Coding Agent 即使使用强模型，也会经历：
+即使使用强模型，Coding Agent 也会正常经历：
 
-- 第一次搜索没有找到目标；
+- 第一次搜索未找到目标；
 - 第一次测试失败；
 - 一次工具参数错误；
-- 暂时走错路径后自行修正。
+- 暂时走错路径后自行修正；
+- 若干次 Read / Search 后才形成有效理解。
 
-这些是正常探索过程，不应自动触发升级。
+这些不应自动触发升级。
 
-### 2.4 当前 Segment 只保持或升级
+### 2.4 同一 Segment 只保持或升级
 
 同一个 Routing Segment 内：
 
@@ -62,7 +68,35 @@ ACU 不将“出现一个新 Turn”机械等同于“必须换模型”。真�
 - 明确能力阻塞后可升级；
 - 不自动降级。
 
-Planning 临时质量覆盖结束后创建新的 Execution Segment，可以恢复 Task 基础质量偏好。这不是同一 Segment 内降级。
+Planning 使用临时质量覆盖。Planning 结束后创建新的 Execution Segment，可以撤销临时覆盖；这不是同一 Segment 内降级。
+
+### 2.5 Planning 临时覆盖与真实能力升级分离
+
+系统维护：
+
+```text
+effective_quality_target = max(
+  task_base_quality_target,
+  capability_escalation_floor,
+  temporary_phase_override
+)
+```
+
+- `task_base_quality_target`：`acu-auto` / `acu-high` 的基础偏好；
+- `capability_escalation_floor`：真实阻塞后形成的最低质量下限；
+- `temporary_phase_override`：Planning 等阶段性临时覆盖。
+
+Planning 结束后可以撤销 `temporary_phase_override`，但不能撤销 `capability_escalation_floor`。
+
+### 2.6 Judge 由事件触发，不按周期触发
+
+第一阶段不做：
+
+- 每 N 个 Step 固定 Judge；
+- 每 N 分钟后台 Judge；
+- 上下文每增长一定比例自动 Judge。
+
+只在新请求到来时检查事件与 Routing Lease。
 
 ## 3. 状态层级
 
@@ -89,42 +123,39 @@ Session
         ↓
 识别或创建 Task / Goal
         ↓
-解析新增事件类型
+识别本次增量事件
         ↓
 识别当前 Task Phase
         ↓
-判断已有 Routing Segment 和 Lease 是否可复用
+读取已有 Routing Segment 与 Routing Lease
         ↓
-检查 Judge 触发器
-        ├── 不触发：复用当前 Route Decision
-        ├── 只需兼容过滤：保留难度，重筛 Execution Profile
-        └── 需要重评估：创建新 Segment，构造 JudgeContextEnvelope
+判断处理类型
+        ├── 复用当前 Route Decision
+        ├── 结束临时覆盖并新建 Segment，但不重新 Judge
+        ├── 保留难度，仅重筛 Execution Profile
+        └── 创建新 Segment 并重新 Judge
                 ↓
-             运行 Judge
-                ↓
-             价值路由与约束过滤
-        ↓
 执行上游模型请求
         ↓
 保存 Step、Attempt、Tool Event、成本和结果证据
         ↓
-更新 Phase、阻塞计数、Lease 和当前 Segment 状态
+更新 Phase、阻塞计数、质量下限、Lease 和 Segment 状态
 ```
 
 ## 5. Session 识别
 
-第一期采用分层确定性识别，不依赖本地模型或 Embedding。
+第一阶段采用分层确定性识别，不依赖本地模型或 Embedding。
 
 ### 5.1 优先级一：原生协议强关联
 
-优先使用实际请求中存在且经过抓包验证的字段，例如：
+优先使用真实流量中存在且经过验证的字段，例如：
 
 - Responses 的 `previous_response_id` 与 Response ID；
 - Function Call `call_id` 与 Function Call Output 关联；
 - Anthropic `tool_use.id` 与 `tool_result.tool_use_id`；
 - 原生客户端可能透传的 Session / Thread 标识。
 
-这些字段是否稳定存在，必须在协议侦察阶段通过真实 Codex 和 Claude Code 流量确认。
+这些字段是否稳定存在，必须在协议侦察阶段用真实 Codex 和 Claude Code 流量确认。
 
 ### 5.2 优先级二：工具调用因果关系
 
@@ -133,7 +164,7 @@ Session
 - 归入同一 Session；
 - 通常归入同一 Task；
 - 默认归入同一 Routing Segment；
-- 除非 Tool Result 本身构成高置信度能力阻塞证据。
+- 除非 Tool Result 本身构成高置信度阻塞证据。
 
 ### 5.3 优先级三：精确上下文前缀链
 
@@ -180,19 +211,19 @@ chain_hash[n] = SHA256(chain_hash[n-1] + item_hash[n])
 
 弱关联不能仅依靠“同一用户十分钟内又发了一次请求”。
 
-### 5.5 无法确认
+### 5.5 无法确认连续性
 
-如果无法高置信度确认连续性：
+如果无法高置信度确认：
 
 - 创建新 Session 或新 Task；
 - 运行 Judge；
 - 不静默沿用旧低难度和旧模型。
 
-错误拆分只增加一次 Judge；错误合并可能让高难度新任务沿用不充分模型，风险更高。
+错误拆分最多增加一次 Judge；错误合并可能让高难度新任务沿用不充分模型，风险更高。
 
 ## 6. Task / Goal 识别
 
-Task / Goal 是语义连续目标，但第一期不使用独立 LLM 进行 Task 切分。
+Task / Goal 是语义连续目标，但第一阶段不使用独立 LLM 进行 Task 切分。
 
 ### 6.1 默认延续当前 Task
 
@@ -200,12 +231,12 @@ Task / Goal 是语义连续目标，但第一期不使用独立 LLM 进行 Task 
 
 - `previous_response_id` / Tool Call 因果关系延续；
 - 原始上下文完整前缀延续；
-- Goal Continuation 没有新增目标或约束；
+- Goal Continuation 没有新增目标或关键约束；
 - 用户输入“请继续”且上下文仍指向原任务。
 
 ### 6.2 可能创建新 Task 或重大扩展
 
-以下事件作为 Judge 证据：
+以下事件作为 Judge Evidence：
 
 - 新增显著不同的目标；
 - 任务范围从单文件扩大到系统级；
@@ -214,7 +245,7 @@ Task / Goal 是语义连续目标，但第一期不使用独立 LLM 进行 Task 
 - 新项目 / 新仓库 / 新工作目录；
 - 客户端明确发出新 Goal / Reset 信号。
 
-是否新建 Task 可由第一期规则结合 Judge 输出决定；所有判断和证据必须保存。
+是否新建 Task，可由确定性规则结合 Judge 输出决定；所有判断和证据必须保存。
 
 ### 6.3 Goal 模式
 
@@ -223,10 +254,37 @@ Goal 模式可能在没有新的人类输入时产生多个内部 Turn 或 Subgo
 原则：
 
 - 客户端内部 Turn 变化不自动创建新 Routing Segment；
-- 明确新的 Goal、Planning、Replanning 或能力需求变化才创建新 Segment；
-- 仅仅是自动继续执行已有计划，复用现有 Segment。
+- 自动继续执行已有计划时复用现有 Segment；
+- 明确新 Goal、Planning、Replanning、阻塞或能力需求变化才创建新 Segment；
+- 无法识别客户端内部 Turn 并不阻止路由，只要上下文或工具因果关系连续即可。
 
-## 7. Routing Segment 生命周期
+## 7. 增量事件分类
+
+每次原生请求到达后，系统应识别新增内容属于哪类事件。
+
+建议枚举：
+
+- `new_external_input`：新的真实用户输入；
+- `goal_start`：新的 Goal；
+- `goal_continue`：已有 Goal 自动继续；
+- `tool_result`：工具结果返回；
+- `plan_start`：Planning 开始；
+- `plan_update`：计划更新；
+- `plan_end`：Planning 明确结束；
+- `replanning`：原 Plan 被否定并重新规划；
+- `normal_step`：普通连续模型 Step；
+- `verification_result`：Test / Build / Patch 结果；
+- `user_dissatisfaction`：用户明确不满意；
+- `capability_block_candidate`：能力阻塞候选；
+- `provider_error`；
+- `protocol_error`；
+- `environment_error`；
+- `compatibility_change`；
+- `unknown`。
+
+事件分类第一阶段仅用原生字段、结构规则、字符串规则和 PostgreSQL 历史记录，不调用额外本地模型。
+
+## 8. Routing Segment 生命周期
 
 建议状态：
 
@@ -238,7 +296,7 @@ Goal 模式可能在没有新的人类输入时产生多个内部 Turn 或 Subgo
 - `incompatible`；
 - `abandoned`。
 
-### 7.1 创建 Segment
+### 8.1 创建 Segment
 
 创建新 Routing Segment 的主要原因：
 
@@ -258,12 +316,14 @@ Goal 模式可能在没有新的人类输入时产生多个内部 Turn 或 Subgo
 - 上一 Segment；
 - 当前 Task Phase；
 - Task 基础质量偏好；
+- 能力升级质量下限；
 - 临时质量覆盖；
-- 当前最低允许质量等级；
+- 当前有效质量偏好；
 - JudgeContextEnvelope Hash；
-- Judge 与路由策略版本。
+- Judge 与路由策略版本；
+- 是否真正运行了 Judge。
 
-### 7.2 复用 Segment
+### 8.2 复用 Segment
 
 以下条件同时满足时复用：
 
@@ -274,19 +334,19 @@ Goal 模式可能在没有新的人类输入时产生多个内部 Turn 或 Subgo
 - 没有高置信度能力阻塞；
 - 当前活动属于正常连续 Step / Tool Event。
 
-### 7.3 完成或替代
+### 8.3 Segment 替代
 
-新 Segment 创建后，上一 Segment 标记为 `superseded` 或 `completed`，并记录结束原因。
+新 Segment 创建后，上一 Segment 标记为 `superseded`、`completed`、`blocked`、`lease_expired` 或 `incompatible`，并记录结束原因。
 
-## 8. Routing Lease
+## 9. Routing Lease
 
-### 8.1 默认时长
+### 9.1 默认时长
 
 ```text
 10 分钟
 ```
 
-### 8.2 续租事件
+### 9.2 续租事件
 
 任何有效活动都会更新 `last_activity_at`：
 
@@ -298,7 +358,7 @@ Goal 模式可能在没有新的人类输入时产生多个内部 Turn 或 Subgo
 - 用户输入；
 - 可确认属于当前任务的其他客户端事件。
 
-### 8.3 过期行为
+### 9.3 过期行为
 
 当：
 
@@ -313,25 +373,65 @@ now - last_activity_at > 10 分钟
 - 当前 Segment 标记为 `lease_expired`；
 - 创建新 Segment；
 - 重新构造完整 JudgeContextEnvelope；
-- Judge 结合既往任务状态决定维持还是重新选择能力需求。
+- Judge 结合既往状态决定维持还是重新选择能力需求。
 
 系统不运行后台定时 Judge，只在新请求到来时检查 Lease。
 
-## 9. Judge 触发策略
+## 10. Judge 处理类型
 
-## 9.1 必须重新 Judge
+状态机不是简单的“Judge / 不 Judge”二分，而是四种处理类型。
 
-### A. 新 Task 或无法确认连续性
+### 10.1 `REUSE_ROUTE`
+
+复用当前 Judge Evaluation 和 Route Decision。
+
+适用于正常连续 Step、普通 Tool Result、正常 Read / Search / Edit、单次失败和已有 Goal 自动继续。
+
+### 10.2 `END_TEMP_OVERRIDE`
+
+结束 Planning 等临时质量覆盖，创建新的 Execution Segment，但不强制重新 Judge。
+
+处理：
+
+```text
+temporary_phase_override = null
+effective_quality_target = max(
+  task_base_quality_target,
+  capability_escalation_floor
+)
+```
+
+如果 Plan 本身暴露新约束、扩大范围、发生 Replanning 或出现阻塞，则不能使用本类型，应改为 `RUN_JUDGE`。
+
+### 10.3 `REFILTER_ONLY`
+
+保留最近 Judge Evaluation，只更新兼容性、健康状态、渠道和候选集合。
+
+适用于：
+
+- 上下文窗口不足；
+- 新工具 / Vision / 协议能力变化；
+- 当前 Channel 429、5xx、Timeout 或 Overload；
+- 当前 Profile 暂时不可用；
+- Usage 或必要参数在当前渠道不兼容。
+
+### 10.4 `RUN_JUDGE`
+
+创建新 Segment，重新构造 JudgeContextEnvelope，调用 LLM Judge，再执行价值路由。
+
+## 11. 必须重新 Judge 的事件
+
+### 11.1 新 Task 或连续性无法确认
 
 无法确定是否延续已有任务时，重新 Judge。
 
-### B. 新的实质性外部输入
+### 11.2 新的实质性外部输入
 
 新的真实用户输入默认创建新 Segment 并重新 Judge，包括“请继续”“执行吧”等短输入。
 
-但 Judge 不能只读取短文本，必须读取：
+Judge 不能只读取短文本，必须读取：
 
-- 原始当前 API 请求；
+- 当前原生 API 请求；
 - Task 初始目标；
 - 当前 / 最近 Plan；
 - 上一 Judge 与 Route Decision；
@@ -340,46 +440,34 @@ now - last_activity_at > 10 分钟
 - 用户满意 / 不满意信号；
 - 当前 Execution Profile 和升级历史。
 
-### C. 新 Goal 或目标明显变化
+### 11.3 新 Goal 或目标明显变化
 
 包括新增任务范围、关键约束、项目或架构目标。
 
-### D. Planning 开始
+### 11.4 Planning 开始
 
 检测到高置信度 Planning 开始时：
 
 - 创建 Planning Segment；
 - 构造新的 JudgeContextEnvelope；
-- 临时提高 Planning 权重或质量偏好；
-- 默认 `effective_quality_target = max(task_base_quality_target, 88)`。
+- 运行 Judge；
+- 提高 Planning 相关权重；
+- 默认 `temporary_phase_override = 88`；
+- `effective_quality_target = max(task_base_quality_target, capability_escalation_floor, 88)`。
 
-### E. Replanning
+### 11.5 Replanning
 
 原计划被否定、测试或实现路径证明不可行、Agent 明确重新规划时重新 Judge。
 
-### F. Planning 明确结束
+### 11.6 高置信度能力阻塞
 
-Planning 明确结束、准备进入 Execution 时：
+达到第 17 节规则阈值时重新 Judge，并只允许保持或升级。
 
-- 创建新的 Execution Segment；
-- 重新 Judge 接下来执行阶段的难度；
-- Planning 临时质量覆盖结束；
-- 允许恢复 Task 基础质量偏好；
-- 根据新 Segment 重新选择 Execution Profile。
-
-这不是同一 Segment 内降级。
-
-如果无法高置信度识别 Planning 已结束，第一期不自动回落，继续保持当前配置。
-
-### G. 高置信度能力阻塞
-
-达到本文件第 13 节的规则阈值时重新 Judge，并只允许保持或升级。
-
-### H. Routing Lease 过期
+### 11.7 Routing Lease 过期
 
 超过 10 分钟后下一次请求重新 Judge。
 
-### I. 强用户不满意或明确重试
+### 11.8 强用户不满意或明确重试
 
 例如用户明确表示：
 
@@ -388,11 +476,26 @@ Planning 明确结束、准备进入 Execution 时：
 - 理解错了；
 - 重新来；
 - 测试仍然失败；
-- 要求更强模型或重新处理。
+- 要求重新处理。
 
 这些信号不直接硬加固定难度分，而作为结构化 Evidence 交给 Judge。
 
-## 9.2 不重新 Judge
+### 11.9 Planning 结束时发现能力需求变化
+
+Planning 结束本身第一阶段不强制再次 Judge。
+
+只有出现以下情况之一，才在 Plan 结束点重新 Judge：
+
+- Plan 暴露了新的重大约束；
+- 任务范围显著扩大；
+- Plan 否定了原任务理解；
+- Plan 进入 Replanning；
+- Planning 期间已出现阻塞或用户不满意；
+- 执行阶段需要的工具、模态或上下文能力发生实质变化。
+
+未来可基于真实数据评估是否把“Plan 结束二次 Judge”升级为默认策略。
+
+## 12. 默认不重新 Judge 的事件
 
 以下情况默认复用当前 Segment：
 
@@ -402,39 +505,22 @@ Planning 明确结束、准备进入 Execution 时：
 - 第一次测试失败；
 - 错误签名发生改善或有明确进展；
 - 模型正在尝试新的合理策略；
-- 普通上游 429、5xx、Timeout；
+- 普通 Tool 参数错误且下一次已调整；
 - Tool 执行时间较长但有效活动仍在续租；
 - 单纯 Streaming 继续；
 - 相同任务的正常自动 Goal Continuation。
 
-## 9.3 只重新过滤候选，不重新 Judge
+Planning 明确结束且未发现能力需求变化时，使用 `END_TEMP_OVERRIDE`，不运行 Judge。
 
-以下变化影响执行可用性，但不一定改变任务难度：
+## 13. JudgeContextEnvelope 构造
 
-- 当前 Execution Profile 上下文窗口不足；
-- 请求新增当前 Profile 不支持的工具；
-- 新增 Vision 或其他模态；
-- 当前渠道限流或过载；
-- 当前 Profile 不支持 Responses / Messages / Streaming / Tool Calling；
-- Usage 或必要参数在该渠道不兼容。
-
-处理：
-
-```text
-保留最近 Judge Evaluation
-→ 更新兼容性与健康过滤
-→ 重新选择满足最低质量等级的 Execution Profile
-```
-
-## 10. JudgeContextEnvelope 构造
-
-第一期采用：
+第一阶段采用：
 
 > 原始当前 API 输入优先 + PostgreSQL 历史状态 + 确定性规则提取。
 
 不使用本地模型或额外 LLM 做摘要。
 
-### 10.1 必须包含
+### 13.1 必须包含
 
 1. 当前原生 API 请求；
 2. Session / Task / Segment 元数据；
@@ -450,9 +536,10 @@ Planning 明确结束、准备进入 Execution 时：
 12. 用户满意 / 不满意 / 重试 Evidence；
 13. 重复错误签名与次数；
 14. 当前 Task Phase；
-15. 当前 Segment 的升级历史。
+15. 当前 Segment 的升级历史；
+16. `task_base_quality_target`、`capability_escalation_floor` 和临时覆盖。
 
-### 10.2 原始上下文未超限
+### 13.2 原始上下文未超限
 
 尽可能原封不动保留：
 
@@ -465,7 +552,7 @@ Planning 明确结束、准备进入 Execution 时：
 
 再附加 ACU 结构化状态。
 
-### 10.3 原始上下文超限
+### 13.3 原始上下文超限
 
 使用确定性裁剪，不使用 LLM 总结。
 
@@ -499,13 +586,13 @@ Planning 明确结束、准备进入 Execution 时：
 - 原始 Token 数；
 - 裁剪原因。
 
-Judge 最大上下文 Token 应为可配置项，并选择支持长上下文的 Judge 模型。
+Judge 最大上下文 Token 必须是可配置项，并选择支持长上下文的 Judge 模型。
 
-## 11. Planning 识别
+## 14. Planning 识别
 
-第一期目标是高精度识别，不通过“出现单词 plan”机械升级。
+第一阶段目标是高精度识别，不通过“出现单词 plan”机械升级。
 
-### 11.1 强信号
+### 14.1 强信号
 
 需要协议侦察确认具体字段：
 
@@ -514,7 +601,7 @@ Judge 最大上下文 Token 应为可配置项，并选择支持长上下文的 
 - 明确的 Plan 状态结构；
 - 客户端明确从执行切换到规划模式。
 
-### 11.2 组合规则信号
+### 14.2 组合规则信号
 
 可组合使用：
 
@@ -525,18 +612,24 @@ Judge 最大上下文 Token 应为可配置项，并选择支持长上下文的 
 - 明确比较多种实现方案；
 - 明确进行影响范围、风险或兼容性分析。
 
-单一 Read / Search 不足以触发 Planning。
+单一 Read / Search、单独出现 `plan` 字样、普通 TODO 列表都不足以触发 Planning。
 
-### 11.3 Planning 质量覆盖
+### 14.3 Planning 阶段处理
 
 ```text
-task_base_quality_target = acu-auto / acu-high 的基础参数
-planning_effective_quality_target = max(task_base_quality_target, 88)
+temporary_phase_override = 88
+effective_quality_target = max(
+  task_base_quality_target,
+  capability_escalation_floor,
+  88
+)
 ```
 
 Planning Segment 内仍遵守“只保持或升级”。
 
-### 11.4 Planning 结束
+Read / Search 是 Planning 模型控制的工具动作，不按每次工具调用单独切换模型。
+
+### 14.4 Planning 结束识别
 
 高置信度结束信号可包括：
 
@@ -546,11 +639,37 @@ Planning Segment 内仍遵守“只保持或升级”。
 - 从只读工具轨迹稳定切换到实现动作；
 - 抓包确认的其他稳定协议标识。
 
-仅出现一句“开始执行”但轨迹不一致时，不应立即降级。
+仅出现一句“开始执行”但轨迹不一致时，不应立即回落。
 
-第一期不实现“由强模型规划后无条件换便宜模型执行”。
+### 14.5 Planning 结束动作
 
-## 12. Phase 状态转换
+#### 情况 A：未发现新能力需求
+
+```text
+结束 Planning Segment
+→ 创建 Execution Segment
+→ 不重新 Judge
+→ 撤销 temporary_phase_override
+→ effective_quality_target = max(
+    task_base_quality_target,
+    capability_escalation_floor
+  )
+→ 使用最近 Judge Evaluation 重新执行价值路由或复用满足条件的原 Profile
+```
+
+#### 情况 B：发现新约束、范围扩大、Replanning 或阻塞
+
+```text
+结束 Planning Segment
+→ 创建新 Segment
+→ 构造 JudgeContextEnvelope
+→ 重新 Judge
+→ 再执行价值路由
+```
+
+第一阶段不实现“强模型 Plan 完成后无条件换便宜模型执行”。模型变化必须来自有效质量偏好和曲线决策，而不是固定强弱模型映射。
+
+## 15. Task Phase 状态转换
 
 建议基础转换：
 
@@ -577,13 +696,24 @@ Phase 主要用于：
 - Failure Evidence 解释；
 - 后续训练数据。
 
-Phase 不应直接硬编码到某一个固定模型。
+Phase 不应直接硬编码到固定模型。
 
-## 13. 模型能力阻塞识别
+## 16. 错误分类总原则
 
-第一期使用确定性规则，目标是高精度、低频触发。
+必须区分：
 
-## 13.1 Failure Signature
+1. Provider / Channel Error；
+2. Protocol Compatibility Error；
+3. Environment Error；
+4. Capability Failure Candidate。
+
+只有第 4 类可以触发模型能力升级 Judge。
+
+## 17. 模型能力阻塞识别
+
+第一阶段使用确定性规则，目标是高精度、低频触发。
+
+### 17.1 Failure Signature
 
 对失败进行标准化：
 
@@ -604,21 +734,21 @@ failure_signature = SHA256(
 - 时间戳；
 - 内存地址；
 - 临时路径中的随机部分；
-- 行号等可能轻微变化但不影响核心错误的字段。
+- 不影响核心错误的行号和动态数字。
 
-## 13.2 高置信度能力阻塞候选
+### 17.2 高置信度能力阻塞候选
 
-### A. 非法工具选择或参数反复失败
+#### A. 非法工具选择或参数反复失败
 
 - 调用工具列表中不存在的工具；
 - Tool 参数不符合 Schema；
 - 必填字段持续缺失；
 - 参数类型持续错误；
-- 同一 Failure Signature 连续出现至少 2 次，并且模型没有改变策略。
+- 同一 Failure Signature 连续出现至少 2 次，且策略没有有效变化。
 
 一次工具参数错误不触发升级。
 
-### B. 测试 / Build 核心错误无改善
+#### B. 测试 / Build 核心错误无改善
 
 - 第一次失败：正常反馈给当前模型；
 - 修改后第二次仍是同一核心 Failure Signature：累计阻塞 Evidence；
@@ -627,13 +757,13 @@ failure_signature = SHA256(
 
 如果失败数量减少、错误签名变化或测试明显推进，则视为进展，不触发。
 
-### C. 虚构路径或符号反复出现
+#### C. 虚构路径或符号反复出现
 
 - 工具结果已明确文件 / 函数不存在；
 - 模型仍连续访问或引用相同虚构目标；
 - 至少重复 2 次且没有重新搜索有效路径。
 
-### D. 轨迹振荡
+#### D. 轨迹振荡
 
 例如：
 
@@ -650,11 +780,11 @@ failure_signature = SHA256(
 - 错误没有改善；
 - 至少完成一个完整振荡周期。
 
-### E. 用户明确指出同一问题未解决
+#### E. 用户明确指出同一问题未解决
 
 当用户明确不满意，且最近轨迹存在重复失败、无进展或错误理解 Evidence 时，触发重新 Judge。
 
-## 13.3 软阻塞信号
+### 17.3 软阻塞信号
 
 单独出现不触发升级，只累计 Evidence：
 
@@ -666,9 +796,9 @@ failure_signature = SHA256(
 - 表达不确定或需要更多信息；
 - 测试仍失败但失败数量下降。
 
-未来可根据真实数据调整组合阈值。第一期不建议用大量软信号直接自动升级。
+第一阶段不建议用大量软信号直接自动升级。
 
-## 13.4 不属于模型能力失败
+### 17.4 不属于模型能力失败
 
 以下错误不得直接触发能力升级：
 
@@ -689,7 +819,7 @@ failure_signature = SHA256(
 - 上下文超限；
 - Usage 解析缺失。
 
-## 13.5 阻塞后的动作
+### 17.5 阻塞后的动作
 
 ```text
 标记当前 Segment blocked
@@ -699,11 +829,13 @@ failure_signature = SHA256(
 → Route Decision 只允许保持或升级
 ```
 
-升级后，本 Task 当前工作链的最低质量等级随之提高，直到出现新的实质性外部输入、新 Task 或明确 Planning 临时覆盖结束后的新 Segment。
+升级后更新 `capability_escalation_floor`。该下限在当前 Task 内保持，直到新的实质性外部输入、新 Task，或未来明确设计的安全重置规则出现。
 
-## 14. 上游、协议和环境错误处理
+Planning 临时覆盖结束不能清除此下限。
 
-## 14.1 Provider / Channel Error
+## 18. 上游、协议和环境错误处理
+
+### 18.1 Provider / Channel Error
 
 包括：
 
@@ -713,17 +845,41 @@ failure_signature = SHA256(
 - Provider Overload；
 - 网络错误。
 
-动作：
+共同动作：
 
 - 记录 Execution Attempt；
 - 不重新 Judge；
-- 不改变难度；
-- 第一阶段按当前既定行为返回错误或使用已明确设计的服务恢复；
-- 同模型不同渠道切换属于后续 Phase，不在本文第一期核心范围内。
+- 不改变任务难度；
+- 不把 Provider Error 计为模型能力失败；
+- 若上游实际计费，则计入账本。
 
-## 14.2 Protocol Compatibility Error
+#### 显式模型
 
-第一期只维护轻量兼容矩阵：
+用户指定具体模型时，第一阶段：
+
+- 不更换模型；
+- 不自动切换其他渠道；
+- 返回可解释的上游错误；
+- 同模型跨渠道容灾放到后续阶段。
+
+#### `acu-auto` / `acu-high`
+
+第一阶段允许轻量服务恢复：
+
+1. 优先尝试同模型、同 Thinking / Reasoning 配置的其他健康 Channel；
+2. 若不存在，则在最近 Route Decision 的候选中重筛满足以下条件的 Profile：
+   - 协议兼容；
+   - 用户白名单允许；
+   - 预计质量不低于当前 Segment 的最低质量下限；
+   - 当前健康可用；
+3. 此过程使用 `REFILTER_ONLY`，不重新 Judge；
+4. 若无合格候选，返回错误。
+
+这不是因任务难度变化而换模型，而是服务可用性恢复。
+
+### 18.2 Protocol Compatibility Error
+
+第一阶段只维护轻量兼容矩阵：
 
 - Responses；
 - Messages；
@@ -733,15 +889,32 @@ failure_signature = SHA256(
 - Context Window；
 - Usage 解析。
 
-不支持的 Execution Profile 在执行前从候选池过滤，不建设复杂自动协议修复系统。
+不支持的 Execution Profile 在执行前从候选池过滤。
 
-## 14.3 Environment Error
+如果运行时仍出现协议错误：
+
+- 记录 Attempt 和错误结构；
+- 不触发能力升级；
+- 使用 `REFILTER_ONLY` 选择兼容 Profile；
+- 不建设复杂自动协议修复系统。
+
+### 18.3 Environment Error
 
 环境错误保存为 Evidence 并返回客户端，不自动升级模型。
 
-## 15. 显式模型、acu-auto 与 acu-high
+典型包括：
 
-### 15.1 显式模型
+- 缺少依赖；
+- 权限不足；
+- 测试环境未启动；
+- 端口占用；
+- 磁盘不足。
+
+只有当前模型对同一环境错误反复采取明显错误策略时，才可能另行形成 Capability Failure Candidate。
+
+## 19. 显式模型、acu-auto 与 acu-high
+
+### 19.1 显式模型
 
 用户指定具体模型时：
 
@@ -751,27 +924,29 @@ failure_signature = SHA256(
 - 第一阶段不自动切换渠道；
 - 仍保存完整请求、响应、成本和错误记录。
 
-### 15.2 acu-auto
+### 19.2 acu-auto
 
 - 运行事件驱动 Judge；
-- 使用 Task 基础质量偏好；
-- 通过模型曲线、成本、风险和白名单选择 Execution Profile；
-- 同一 Segment 保持或升级。
+- 使用 Task 基础质量偏好，参数可暂定 80；
+- 通过模型曲线、成本、风险、白名单和兼容性选择 Execution Profile；
+- 同一 Segment 保持或升级；
+- Provider 失败时可执行轻量 `REFILTER_ONLY` 服务恢复。
 
-### 15.3 acu-high
+### 19.3 acu-high
 
 - 与 `acu-auto` 使用同一状态机；
 - 基础质量偏好可设为 92；
 - 质量权重和不确定性惩罚更高；
-- 不是某个固定最贵模型的别名。
+- 不是某个固定最贵模型的别名；
+- 第一阶段可不作为首要开发阻断项。
 
-## 16. 质量基准与成本记录
+## 20. 质量基准与成本记录
 
-### 16.1 显式模型
+### 20.1 显式模型
 
 不计算 ACU 节省率，只记录实际成本。
 
-### 16.2 acu-auto / acu-high
+### 20.2 acu-auto / acu-high
 
 质量上界定义为：
 
@@ -784,9 +959,27 @@ failure_signature = SHA256(
 - `quality_gap_vs_ceiling`；
 - `cost_reduction_vs_ceiling`。
 
-所有前端、Trace 和 Ledger 必须使用相同的质量上界定义、价格版本和预计输出长度口径。
+所有前端、Trace 和 Ledger 必须使用相同的：
 
-## 17. PostgreSQL 最小持久化对象
+- 质量上界定义；
+- 价格版本；
+- 输入 Token；
+- 预计输出 Token 口径；
+- Judge 成本；
+- 失败 Attempt 成本。
+
+“节省”必须写为“相对质量上界的反事实成本下降”，不能暗示用户原本必然会调用该上界模型。
+
+### 20.3 Alpha 计费
+
+Alpha 阶段按实际总成本 1.0 倍扣费，包括：
+
+- Judge 成本；
+- 成功上游调用成本；
+- 失败但上游实际计费的 Attempt；
+- 自动服务恢复中的实际调用成本。
+
+## 21. PostgreSQL 最小持久化对象
 
 状态机实现至少需要：
 
@@ -804,16 +997,18 @@ failure_signature = SHA256(
 - `acu_raw_protocol_requests`；
 - `acu_raw_protocol_responses`。
 
-第一期保存完整输入、输出和过程数据，不运行自动定时删除任务。
+第一阶段保存完整输入、输出和过程数据。
 
-## 18. 核心伪代码
+业务告知口径为原始内容默认保存 90 天，但第一阶段不运行自动定时删除任务；实际删除机制后续设计。
+
+## 22. 核心伪代码
 
 ```text
 handle_native_request(request):
     persist_raw_request(request)
 
     if request.model is explicit_model:
-        execute_without_judge(request)
+        execute_explicit_model_without_judge(request)
         persist_step_attempt_response()
         return
 
@@ -822,7 +1017,7 @@ handle_native_request(request):
     event = classify_incremental_event(request, task)
     segment = task.active_routing_segment
 
-    trigger = evaluate_judge_trigger(
+    action = decide_routing_action(
         request=request,
         task=task,
         segment=segment,
@@ -831,19 +1026,33 @@ handle_native_request(request):
         evidence=recent_outcome_evidence(task)
     )
 
-    if trigger == REUSE_ROUTE:
+    if action == REUSE_ROUTE:
         decision = segment.route_decision
 
-    else if trigger == REFILTER_ONLY:
+    else if action == END_TEMP_OVERRIDE:
+        close_or_supersede(segment, "planning_end")
+        new_segment = create_execution_segment_without_judge(task)
+        new_segment.temporary_phase_override = null
+        new_segment.effective_quality_target = max(
+            task.base_quality_target,
+            task.capability_escalation_floor
+        )
+        decision = reroute_with_existing_evaluation_or_reuse_profile(
+            judge_evaluation=segment.judge_evaluation,
+            constraints=new_segment.constraints
+        )
+
+    else if action == REFILTER_ONLY:
         decision = refilter_execution_profiles(
             judge_evaluation=segment.judge_evaluation,
             minimum_quality=segment.minimum_quality_level,
-            request_capabilities=request.capabilities
+            request_capabilities=request.capabilities,
+            channel_health=current_channel_health()
         )
 
     else:
-        close_or_supersede(segment, trigger.reason)
-        new_segment = create_routing_segment(task, trigger.reason)
+        close_or_supersede(segment, action.reason)
+        new_segment = create_routing_segment(task, action.reason)
         envelope = build_judge_context_envelope(request, task, new_segment)
         evaluation = run_llm_judge(envelope)
         decision = select_route(evaluation, new_segment.constraints)
@@ -851,11 +1060,12 @@ handle_native_request(request):
 
     attempt = execute(decision.execution_profile, request)
     persist_step_attempt_response(attempt)
+
     evidence = extract_deterministic_evidence(request, attempt)
-    update_task_phase_segment_lease(evidence)
+    update_task_phase_quality_floor_segment_lease(evidence)
 ```
 
-## 19. 第一阶段验收场景
+## 23. 第一阶段验收场景
 
 ### 场景 A：同一任务正常多 Step
 
@@ -874,60 +1084,76 @@ handle_native_request(request):
 
 ### 场景 C：Planning 临时提高质量
 
-- 识别 Planning 开始；
+- 高置信度识别 Planning 开始；
 - 创建 Planning Segment；
-- 质量偏好至少 88；
-- Planning 连续 Step 保持同一较强 Profile。
+- 重新 Judge；
+- 临时质量覆盖至少 88；
+- Planning 连续 Step 保持同一 Profile。
 
-### 场景 D：Planning 明确结束
+### 场景 D：Planning 明确结束且无新能力需求
 
 - 创建 Execution Segment；
-- 重新 Judge 执行阶段；
-- 临时质量覆盖结束；
-- 允许恢复 Task 基础偏好；
-- 如果结束信号不可靠，则不自动回落。
+- 不再次运行 Judge；
+- 撤销 Planning 临时覆盖；
+- 保留已有能力升级下限；
+- 依据原 Judge Evaluation 和基础质量偏好继续路由；
+- 不无条件切换到便宜模型。
 
-### 场景 E：第一次测试失败
+### 场景 E：Planning 结束时暴露新约束
+
+- 创建新 Segment；
+- 重新 Judge；
+- 根据新范围和约束选择执行配置。
+
+### 场景 F：第一次测试失败
 
 - 不升级；
 - 记录 Failure Signature；
 - 当前模型继续处理。
 
-### 场景 F：同一核心错误连续无改善
+### 场景 G：同一核心错误连续无改善
 
 - 达到规则阈值；
-- 标记 capability block；
-- 创建新 Segment 并重新 Judge；
-- 只允许保持或升级。
+- 标记 Capability Block；
+- 创建新 Segment并重新 Judge；
+- 只允许保持或升级；
+- 更新能力升级下限。
 
-### 场景 G：上游 429 / Timeout
+### 场景 H：显式模型上游失败
+
+- 不运行 Judge；
+- 不替换模型；
+- 第一阶段不自动跨渠道；
+- 返回并记录上游错误。
+
+### 场景 I：acu-auto 上游失败
 
 - 不重新 Judge；
-- 不改变难度；
-- 记录 Provider Error；
-- 按第一期既定服务行为处理。
+- 优先重筛同模型同配置的其他 Channel；
+- 必要时选择满足最低质量下限的健康候选；
+- 无候选时返回错误。
 
-### 场景 H：Goal 模式自动继续
+### 场景 J：Goal 模式自动继续
 
 - 没有人类新输入；
 - 上下文和工具因果关系连续；
 - 不因为内部 Turn 变化而重复 Judge；
 - 新 Goal / Replanning / 阻塞出现时才创建新 Segment。
 
-### 场景 I：10 分钟无活动后恢复
+### 场景 K：10 分钟无活动后恢复
 
 - Session 和 Task 保持；
 - 原 Segment Lease 过期；
 - 下一次请求重新 Judge；
 - Judge 读取此前完整任务状态。
 
-### 场景 J：用户指定具体模型
+### 场景 L：用户指定具体模型
 
 - 不运行 Judge；
 - 不替换模型；
 - 保存完整轨迹和实际成本。
 
-## 20. 第一阶段明确不做
+## 24. 第一阶段明确不做
 
 - 不为每个 Step 调用 Judge；
 - 不使用 Embedding 或本地模型识别 Session；
@@ -936,14 +1162,16 @@ handle_native_request(request):
 - 不因为单独出现 `plan` 单词自动提高质量；
 - 不按 Read / Search / Edit 单个工具动作切换模型；
 - 不在 Planning 结束后无条件换便宜模型；
+- 不在 Planning 结束时无条件再次 Judge；
 - 不对显式模型自动切换模型或渠道；
 - 不建设复杂协议自动修复层；
 - 不运行周期性定时 Judge；
-- 不运行定时自动数据删除。
+- 不运行定时自动数据删除；
+- 不在第一阶段开放 BYOK。
 
-## 21. 开工前协议侦察清单
+## 25. 开工前协议侦察清单
 
-实现状态机前，需要采集原生 Codex 和 Claude Code 样本并更新本文件中的可验证字段：
+实现状态机前，需要采集原生 Codex 和 Claude Code 样本并更新本文中的可验证字段：
 
 - Session / Thread / Response 关联字段；
 - Goal / Continuation 表示；
@@ -954,6 +1182,7 @@ handle_native_request(request):
 - Claude Messages / Thinking 历史方式；
 - Streaming 事件；
 - Usage、Reasoning Token 和缓存 Token；
-- New API 透传或转换后的实际差异。
+- New API 透传或转换后的实际差异；
+- OpenRouter / CloseAI 对两套协议和工具字段的实际差异。
 
 协议侦察完成后，应把“待确认”信号替换为真实字段和 Fixture，并为每种客户端建立回归测试。

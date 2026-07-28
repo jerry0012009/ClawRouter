@@ -1,0 +1,35 @@
+{
+  "fixture_id": "claude-2.1.220-A01-newapi-closeai-001",
+  "captured_at": "2026-07-28T20:24:20.912Z",
+  "client": "claude-code",
+  "client_version": "2.1.220",
+  "os": "Ubuntu 24.04.4 LTS x86_64",
+  "newapi_version": "v1.0.0-rc.22@sha256:d600f20c2781",
+  "acu_commit": "d4c06855e668dfd8673cff7711d68d624a83278b",
+  "provider": "CloseAI Anthropic",
+  "requested_model": "claude-sonnet-4-6",
+  "actual_model": "claude-sonnet-4-6",
+  "protocol": "messages",
+  "stream": true,
+  "scenario": "A01 A02 through isolated New API",
+  "request_count": 4,
+  "contains_tools": false,
+  "contains_reasoning": false,
+  "contains_plan_signal": false,
+  "capture_points": [
+    "A",
+    "B"
+  ],
+  "sanitized": true,
+  "capture_status": "partial",
+  "chain": "Claude Code -> A -> New API -> B -> CloseAI Anthropic",
+  "provider_kind": "real",
+  "through_acu": false,
+  "retry_setting": 0,
+  "capture_completeness": {
+    "A": "captured",
+    "B": "captured",
+    "C": "not_applicable",
+    "D": "not_available"
+  }
+}

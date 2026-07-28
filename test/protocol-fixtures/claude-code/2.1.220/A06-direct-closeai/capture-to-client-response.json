@@ -1,0 +1,26 @@
+{
+  "status_code": 200,
+  "headers": {
+    "access-control-allow-headers": "*",
+    "access-control-allow-methods": "POST, GET, OPTIONS, PUT, PATCH, HEAD, DELETE",
+    "access-control-allow-origin": "*",
+    "access-control-max-age": "2592000",
+    "cache-control": "no-cache, must-revalidate",
+    "content-type": "application/json",
+    "x-ratelimit-limit": "1000",
+    "x-ratelimit-remaining": "999",
+    "x-ratelimit-reset": "1785270994",
+    "x-request-id": "a14aa9d8-0dfe-406d-a395-b8f93b6fb9fa",
+    "date": "Tue, 28 Jul 2026 20:35:36 GMT",
+    "via": "1.1 google",
+    "alt-svc": "h3=\":443\"; ma=2592000",
+    "transfer-encoding": "chunked"
+  },
+  "body": {
+    "encoding": "utf8",
+    "raw": "{\"model\":\"claude-sonnet-4-6\",\"id\":\"msg_bdrk_01H2W5qdKU31XJttp162Cgh3\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"<block>no\"}],\"stop_reason\":\"stop_sequence\",\"stop_sequence\":\"</block>\",\"stop_details\":null,\"usage\":{\"input_tokens\":107,\"cache_creation_input_tokens\":26512,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":26512,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":7},\"context_management\":{\"applied_edits\":[]}}",
+    "byte_length": 466,
+    "sha256": "hmac-sha256:6545dd8c6e743ef2ce74acdc6efacd45c821d40e17f840acef9f094f1a6bee51"
+  },
+  "streaming_events": []
+}

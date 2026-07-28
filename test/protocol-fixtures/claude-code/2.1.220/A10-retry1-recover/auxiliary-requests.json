@@ -1,0 +1,16 @@
+[
+  {
+    "capture_point": "A",
+    "method": "HEAD",
+    "path": "/api/hello",
+    "query": "",
+    "response_status": 404,
+    "request_started_at": "2026-07-28T20:53:49.076Z",
+    "response_ended_at": "2026-07-28T20:53:49.094Z",
+    "request_body_bytes": 0,
+    "request_body_original_hmac": "hmac-sha256:94a163f1dc2ccd6bf585e904893002d47394d7f15405d469af10113c657343b8",
+    "response_body_bytes": 0,
+    "response_body_original_hmac": "hmac-sha256:94a163f1dc2ccd6bf585e904893002d47394d7f15405d469af10113c657343b8",
+    "capture_error": null
+  }
+]

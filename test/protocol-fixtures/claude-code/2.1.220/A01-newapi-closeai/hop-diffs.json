@@ -1,0 +1,293 @@
+[
+  {
+    "sequence": 1,
+    "status": {
+      "client_hop": 200,
+      "upstream_hop": 200
+    },
+    "header_diff": {
+      "added": [
+        {
+          "path": "x-api-key",
+          "after": "<REDACTED_API_KEY_1>"
+        }
+      ],
+      "removed": [
+        {
+          "path": "authorization",
+          "before": "<REDACTED_AUTHORIZATION_1>"
+        },
+        {
+          "path": "x-claude-code-session-id",
+          "before": "<REDACTED_CLAUDE_CODE_SESSION_ID_1>"
+        },
+        {
+          "path": "connection",
+          "before": "keep-alive"
+        }
+      ],
+      "changed": [
+        {
+          "path": "host",
+          "before": "127.0.0.1:3311",
+          "after": "172.17.0.1:3202"
+        },
+        {
+          "path": "accept-encoding",
+          "before": "gzip, deflate, br, zstd",
+          "after": "gzip"
+        },
+        {
+          "path": "content-length",
+          "before": "2275",
+          "after": "2305"
+        }
+      ]
+    },
+    "body_diff": [],
+    "streaming_event_diff": {
+      "client_hop": {
+        "count": 11,
+        "names": [
+          "message_start",
+          "content_block_start",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_stop",
+          "message_delta",
+          "message_stop",
+          null
+        ],
+        "raw_bytes": 1545,
+        "completed": true,
+        "error_count": 0
+      },
+      "upstream_hop": {
+        "count": 10,
+        "names": [
+          "message_start",
+          "content_block_start",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_stop",
+          "message_delta",
+          "message_stop"
+        ],
+        "raw_bytes": 1535,
+        "completed": true,
+        "error_count": 0
+      }
+    },
+    "error_diff": {
+      "client_capture_error": null,
+      "upstream_capture_error": null,
+      "status_equal": true
+    },
+    "usage_diff": {
+      "client_hop": [
+        {
+          "input_tokens": 528,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 12
+        }
+      ],
+      "upstream_hop": [
+        {
+          "input_tokens": 528,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 12
+        }
+      ]
+    },
+    "request_id_mapping": {
+      "client_hop": {
+        "captured_ids": {
+          "upstream_request_id": null,
+          "new_api_request_id": null,
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "x-claude-code-session-id": "<REDACTED_CLAUDE_CODE_SESSION_ID_1>",
+          "x-oneapi-request-id": "202607282024212527841108268d9d66MgGLXqG"
+        }
+      },
+      "upstream_hop": {
+        "captured_ids": {
+          "upstream_request_id": "99c5cc18-f863-4a5b-8d0f-17561258aa7d",
+          "new_api_request_id": "99c5cc18-f863-4a5b-8d0f-17561258aa7d",
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "x-request-id": "99c5cc18-f863-4a5b-8d0f-17561258aa7d"
+        }
+      }
+    },
+    "model_mapping": {
+      "client_hop": "claude-haiku-4-5",
+      "upstream_hop": "claude-haiku-4-5",
+      "unchanged": true
+    },
+    "tool_id_mapping": {
+      "client_hop": [],
+      "upstream_hop": [],
+      "unchanged": true
+    }
+  },
+  {
+    "sequence": 2,
+    "status": {
+      "client_hop": 200,
+      "upstream_hop": 200
+    },
+    "header_diff": {
+      "added": [
+        {
+          "path": "x-api-key",
+          "after": "<REDACTED_API_KEY_1>"
+        }
+      ],
+      "removed": [
+        {
+          "path": "authorization",
+          "before": "<REDACTED_AUTHORIZATION_1>"
+        },
+        {
+          "path": "x-claude-code-session-id",
+          "before": "<REDACTED_CLAUDE_CODE_SESSION_ID_1>"
+        },
+        {
+          "path": "connection",
+          "before": "keep-alive"
+        }
+      ],
+      "changed": [
+        {
+          "path": "host",
+          "before": "127.0.0.1:3311",
+          "after": "172.17.0.1:3202"
+        },
+        {
+          "path": "accept-encoding",
+          "before": "gzip, deflate, br, zstd",
+          "after": "gzip"
+        },
+        {
+          "path": "content-length",
+          "before": "131304",
+          "after": "132739"
+        }
+      ]
+    },
+    "body_diff": [],
+    "streaming_event_diff": {
+      "client_hop": {
+        "count": 8,
+        "names": [
+          "message_start",
+          "content_block_start",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_stop",
+          "message_delta",
+          "message_stop",
+          null
+        ],
+        "raw_bytes": 1316,
+        "completed": true,
+        "error_count": 0
+      },
+      "upstream_hop": {
+        "count": 7,
+        "names": [
+          "message_start",
+          "content_block_start",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_stop",
+          "message_delta",
+          "message_stop"
+        ],
+        "raw_bytes": 1257,
+        "completed": true,
+        "error_count": 0
+      }
+    },
+    "error_diff": {
+      "client_capture_error": null,
+      "upstream_capture_error": null,
+      "status_equal": true
+    },
+    "usage_diff": {
+      "client_hop": [
+        {
+          "input_tokens": 3,
+          "cache_creation_input_tokens": 2655,
+          "cache_read_input_tokens": 31298,
+          "output_tokens": 11,
+          "output_tokens_details": {
+            "thinking_tokens": 0
+          },
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 2655
+          }
+        }
+      ],
+      "upstream_hop": [
+        {
+          "input_tokens": 3,
+          "cache_creation_input_tokens": 2655,
+          "cache_read_input_tokens": 31298,
+          "output_tokens": 11,
+          "output_tokens_details": {
+            "thinking_tokens": 0
+          }
+        }
+      ]
+    },
+    "request_id_mapping": {
+      "client_hop": {
+        "captured_ids": {
+          "upstream_request_id": null,
+          "new_api_request_id": null,
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "x-claude-code-session-id": "<REDACTED_CLAUDE_CODE_SESSION_ID_1>",
+          "x-oneapi-request-id": "202607282024214334713758268d9d6822ltrn3"
+        }
+      },
+      "upstream_hop": {
+        "captured_ids": {
+          "upstream_request_id": "e7f62a70-705b-48e6-af9c-2d2eda9444c6",
+          "new_api_request_id": "e7f62a70-705b-48e6-af9c-2d2eda9444c6",
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "x-request-id": "e7f62a70-705b-48e6-af9c-2d2eda9444c6"
+        }
+      }
+    },
+    "model_mapping": {
+      "client_hop": "claude-sonnet-4-6",
+      "upstream_hop": "claude-sonnet-4-6",
+      "unchanged": true
+    },
+    "tool_id_mapping": {
+      "client_hop": [],
+      "upstream_hop": [],
+      "unchanged": true
+    }
+  }
+]

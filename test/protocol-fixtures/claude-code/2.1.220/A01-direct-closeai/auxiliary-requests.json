@@ -1,0 +1,16 @@
+[
+  {
+    "capture_point": "A",
+    "method": "HEAD",
+    "path": "/anthropic/api/hello",
+    "query": "",
+    "response_status": 404,
+    "request_started_at": "2026-07-28T20:23:03.265Z",
+    "response_ended_at": "2026-07-28T20:23:03.410Z",
+    "request_body_bytes": 0,
+    "request_body_original_hmac": "hmac-sha256:95bb1a4eb7266fe0647b262ddbd42d1f0b803c7f1042356ffc31f26f6c6abd2d",
+    "response_body_bytes": 0,
+    "response_body_original_hmac": "hmac-sha256:95bb1a4eb7266fe0647b262ddbd42d1f0b803c7f1042356ffc31f26f6c6abd2d",
+    "capture_error": null
+  }
+]

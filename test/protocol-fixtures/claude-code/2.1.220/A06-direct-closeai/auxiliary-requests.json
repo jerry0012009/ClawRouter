@@ -1,0 +1,44 @@
+[
+  {
+    "capture_point": "A",
+    "method": "HEAD",
+    "path": "/anthropic/api/hello",
+    "query": "",
+    "response_status": 404,
+    "request_started_at": "2026-07-28T20:37:31.433Z",
+    "response_ended_at": "2026-07-28T20:37:31.743Z",
+    "request_body_bytes": 0,
+    "request_body_original_hmac": "hmac-sha256:10d5f0a83b7f1f289069e4471a126c4a5306df61cec8543e2c58950b870c9061",
+    "response_body_bytes": 0,
+    "response_body_original_hmac": "hmac-sha256:10d5f0a83b7f1f289069e4471a126c4a5306df61cec8543e2c58950b870c9061",
+    "capture_error": null
+  },
+  {
+    "capture_point": "A",
+    "method": "HEAD",
+    "path": "/anthropic/api/hello",
+    "query": "",
+    "response_status": 404,
+    "request_started_at": "2026-07-28T20:35:21.310Z",
+    "response_ended_at": "2026-07-28T20:35:21.456Z",
+    "request_body_bytes": 0,
+    "request_body_original_hmac": "hmac-sha256:10d5f0a83b7f1f289069e4471a126c4a5306df61cec8543e2c58950b870c9061",
+    "response_body_bytes": 0,
+    "response_body_original_hmac": "hmac-sha256:10d5f0a83b7f1f289069e4471a126c4a5306df61cec8543e2c58950b870c9061",
+    "capture_error": null
+  },
+  {
+    "capture_point": "A",
+    "method": "HEAD",
+    "path": "/anthropic/api/hello",
+    "query": "",
+    "response_status": 404,
+    "request_started_at": "2026-07-28T20:38:04.600Z",
+    "response_ended_at": "2026-07-28T20:38:04.729Z",
+    "request_body_bytes": 0,
+    "request_body_original_hmac": "hmac-sha256:10d5f0a83b7f1f289069e4471a126c4a5306df61cec8543e2c58950b870c9061",
+    "response_body_bytes": 0,
+    "response_body_original_hmac": "hmac-sha256:10d5f0a83b7f1f289069e4471a126c4a5306df61cec8543e2c58950b870c9061",
+    "capture_error": null
+  }
+]

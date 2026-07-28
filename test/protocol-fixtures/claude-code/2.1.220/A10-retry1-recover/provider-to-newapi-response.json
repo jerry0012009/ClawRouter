@@ -1,0 +1,20 @@
+{
+  "status_code": 503,
+  "headers": {
+    "content-type": "application/json",
+    "retry-after": "0",
+    "x-mock-attempt": "1",
+    "x-request-id": "mock-ebb5a078-c079-453a-9131-48eb30233de7",
+    "date": "Tue, 28 Jul 2026 20:53:49 GMT",
+    "connection": "keep-alive",
+    "keep-alive": "timeout=5",
+    "transfer-encoding": "chunked"
+  },
+  "body": {
+    "encoding": "utf8",
+    "raw": "{\"error\":{\"type\":\"mock_provider_error\",\"message\":\"controlled mock status 503\",\"status\":503,\"attempt\":1}}",
+    "byte_length": 104,
+    "sha256": "hmac-sha256:920cc146b3de2b9c2f82cf1e4feefd11179fa2dfaf8deca501bb93f917b4d30e"
+  },
+  "streaming_events": []
+}

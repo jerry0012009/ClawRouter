@@ -1,0 +1,34 @@
+{
+  "fixture_id": "claude-2.1.220-A12-direct-mock-cancel-001",
+  "captured_at": "2026-07-28T20:58:12.887Z",
+  "client": "claude-code",
+  "client_version": "2.1.220",
+  "os": "Ubuntu 24.04.4 LTS x86_64",
+  "newapi_version": "not_applicable",
+  "acu_commit": "d4c06855e668dfd8673cff7711d68d624a83278b",
+  "provider": "controlled Messages mock",
+  "requested_model": "retry-mock-claude",
+  "actual_model": "controlled-mock",
+  "protocol": "messages",
+  "stream": true,
+  "scenario": "A12 client cancellation followed by resume",
+  "request_count": 3,
+  "contains_tools": false,
+  "contains_reasoning": false,
+  "contains_plan_signal": false,
+  "capture_points": [
+    "A"
+  ],
+  "sanitized": true,
+  "capture_status": "complete",
+  "chain": "Claude Code -> Capture A -> controlled mock",
+  "provider_kind": "mock",
+  "through_acu": false,
+  "retry_setting": "not_applicable",
+  "capture_completeness": {
+    "A": "captured",
+    "B": "not_applicable",
+    "C": "not_applicable",
+    "D": "not_applicable"
+  }
+}

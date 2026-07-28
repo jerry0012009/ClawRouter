@@ -1,0 +1,35 @@
+{
+  "fixture_id": "claude-2.1.220-A10-newapi-retry0-503-001",
+  "captured_at": "2026-07-28T20:50:10.929Z",
+  "client": "claude-code",
+  "client_version": "2.1.220",
+  "os": "Ubuntu 24.04.4 LTS x86_64",
+  "newapi_version": "v1.0.0-rc.22@sha256:d600f20c2781",
+  "acu_commit": "d4c06855e668dfd8673cff7711d68d624a83278b",
+  "provider": "controlled Messages mock",
+  "requested_model": "retry-mock-claude",
+  "actual_model": "controlled-503",
+  "protocol": "messages",
+  "stream": true,
+  "scenario": "A10 fixed 503 with New API Retry=0",
+  "request_count": 44,
+  "contains_tools": false,
+  "contains_reasoning": false,
+  "contains_plan_signal": false,
+  "capture_points": [
+    "A",
+    "B"
+  ],
+  "sanitized": true,
+  "capture_status": "complete",
+  "chain": "Claude Code -> A -> New API -> B -> controlled mock",
+  "provider_kind": "mock",
+  "through_acu": false,
+  "retry_setting": 0,
+  "capture_completeness": {
+    "A": "captured",
+    "B": "captured",
+    "C": "not_applicable",
+    "D": "not_applicable"
+  }
+}

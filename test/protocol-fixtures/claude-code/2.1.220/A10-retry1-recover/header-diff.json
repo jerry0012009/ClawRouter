@@ -1,0 +1,84 @@
+{
+  "added": [
+    {
+      "path": "x-api-key",
+      "after": "<REDACTED_API_KEY_1>"
+    }
+  ],
+  "removed": [
+    {
+      "path": "authorization",
+      "before": "<REDACTED_AUTHORIZATION_1>"
+    },
+    {
+      "path": "x-claude-code-session-id",
+      "before": "<REDACTED_CLAUDE_CODE_SESSION_ID_1>"
+    },
+    {
+      "path": "x-stainless-arch",
+      "before": "x64"
+    },
+    {
+      "path": "x-stainless-lang",
+      "before": "js"
+    },
+    {
+      "path": "x-stainless-os",
+      "before": "Linux"
+    },
+    {
+      "path": "x-stainless-package-version",
+      "before": "0.94.0"
+    },
+    {
+      "path": "x-stainless-retry-count",
+      "before": "0"
+    },
+    {
+      "path": "x-stainless-runtime",
+      "before": "node"
+    },
+    {
+      "path": "x-stainless-runtime-version",
+      "before": "v26.3.0"
+    },
+    {
+      "path": "x-stainless-timeout",
+      "before": "600"
+    },
+    {
+      "path": "anthropic-dangerous-direct-browser-access",
+      "before": "true"
+    },
+    {
+      "path": "x-app",
+      "before": "cli"
+    },
+    {
+      "path": "connection",
+      "before": "keep-alive"
+    }
+  ],
+  "changed": [
+    {
+      "path": "user-agent",
+      "before": "claude-cli/2.1.220 (external, sdk-cli)",
+      "after": "Go-http-client/1.1"
+    },
+    {
+      "path": "host",
+      "before": "127.0.0.1:3320",
+      "after": "172.17.0.1:3204"
+    },
+    {
+      "path": "accept-encoding",
+      "before": "gzip, deflate, br, zstd",
+      "after": "gzip"
+    },
+    {
+      "path": "content-length",
+      "before": "2235",
+      "after": "2265"
+    }
+  ]
+}

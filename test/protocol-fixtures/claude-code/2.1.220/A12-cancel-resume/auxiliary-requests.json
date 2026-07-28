@@ -1,0 +1,30 @@
+[
+  {
+    "capture_point": "A",
+    "method": "HEAD",
+    "path": "/api/hello",
+    "query": "",
+    "response_status": 404,
+    "request_started_at": "2026-07-28T20:58:29.679Z",
+    "response_ended_at": "2026-07-28T20:58:29.690Z",
+    "request_body_bytes": 0,
+    "request_body_original_hmac": "hmac-sha256:63894784d7af3838ad0ee7baa995ab43d013b4545dcf1a9383091769e5ce8f5d",
+    "response_body_bytes": 0,
+    "response_body_original_hmac": "hmac-sha256:63894784d7af3838ad0ee7baa995ab43d013b4545dcf1a9383091769e5ce8f5d",
+    "capture_error": null
+  },
+  {
+    "capture_point": "A",
+    "method": "HEAD",
+    "path": "/api/hello",
+    "query": "",
+    "response_status": 404,
+    "request_started_at": "2026-07-28T20:58:12.887Z",
+    "response_ended_at": "2026-07-28T20:58:12.909Z",
+    "request_body_bytes": 0,
+    "request_body_original_hmac": "hmac-sha256:63894784d7af3838ad0ee7baa995ab43d013b4545dcf1a9383091769e5ce8f5d",
+    "response_body_bytes": 0,
+    "response_body_original_hmac": "hmac-sha256:63894784d7af3838ad0ee7baa995ab43d013b4545dcf1a9383091769e5ce8f5d",
+    "capture_error": null
+  }
+]

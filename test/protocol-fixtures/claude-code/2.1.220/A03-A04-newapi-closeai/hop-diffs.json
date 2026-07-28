@@ -1,0 +1,472 @@
+[
+  {
+    "sequence": 1,
+    "status": {
+      "client_hop": 200,
+      "upstream_hop": 200
+    },
+    "header_diff": {
+      "added": [
+        {
+          "path": "x-api-key",
+          "after": "<REDACTED_API_KEY_1>"
+        }
+      ],
+      "removed": [
+        {
+          "path": "authorization",
+          "before": "<REDACTED_AUTHORIZATION_1>"
+        },
+        {
+          "path": "x-claude-code-session-id",
+          "before": "<REDACTED_CLAUDE_CODE_SESSION_ID_1>"
+        },
+        {
+          "path": "connection",
+          "before": "keep-alive"
+        }
+      ],
+      "changed": [
+        {
+          "path": "host",
+          "before": "127.0.0.1:3311",
+          "after": "172.17.0.1:3202"
+        },
+        {
+          "path": "accept-encoding",
+          "before": "gzip, deflate, br, zstd",
+          "after": "gzip"
+        },
+        {
+          "path": "content-length",
+          "before": "2341",
+          "after": "2371"
+        }
+      ]
+    },
+    "body_diff": [],
+    "streaming_event_diff": {
+      "client_hop": {
+        "count": 11,
+        "names": [
+          "message_start",
+          "content_block_start",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_stop",
+          "message_delta",
+          "message_stop",
+          null
+        ],
+        "raw_bytes": 1563,
+        "completed": true,
+        "error_count": 0
+      },
+      "upstream_hop": {
+        "count": 10,
+        "names": [
+          "message_start",
+          "content_block_start",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_stop",
+          "message_delta",
+          "message_stop"
+        ],
+        "raw_bytes": 1553,
+        "completed": true,
+        "error_count": 0
+      }
+    },
+    "error_diff": {
+      "client_capture_error": null,
+      "upstream_capture_error": null,
+      "status_equal": true
+    },
+    "usage_diff": {
+      "client_hop": [
+        {
+          "input_tokens": 542,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 17
+        }
+      ],
+      "upstream_hop": [
+        {
+          "input_tokens": 542,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 17
+        }
+      ]
+    },
+    "request_id_mapping": {
+      "client_hop": {
+        "captured_ids": {
+          "upstream_request_id": null,
+          "new_api_request_id": null,
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "x-claude-code-session-id": "<REDACTED_CLAUDE_CODE_SESSION_ID_1>",
+          "x-oneapi-request-id": "202607282100273301447598268d9d6owzhTdnd"
+        }
+      },
+      "upstream_hop": {
+        "captured_ids": {
+          "upstream_request_id": "d563be64-1e37-49f3-9df8-01b8c2af6c6c",
+          "new_api_request_id": "d563be64-1e37-49f3-9df8-01b8c2af6c6c",
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "x-request-id": "d563be64-1e37-49f3-9df8-01b8c2af6c6c"
+        }
+      }
+    },
+    "model_mapping": {
+      "client_hop": "claude-haiku-4-5",
+      "upstream_hop": "claude-haiku-4-5",
+      "unchanged": true
+    },
+    "tool_id_mapping": {
+      "client_hop": [],
+      "upstream_hop": [],
+      "unchanged": true
+    }
+  },
+  {
+    "sequence": 2,
+    "status": {
+      "client_hop": 200,
+      "upstream_hop": 200
+    },
+    "header_diff": {
+      "added": [
+        {
+          "path": "x-api-key",
+          "after": "<REDACTED_API_KEY_1>"
+        }
+      ],
+      "removed": [
+        {
+          "path": "authorization",
+          "before": "<REDACTED_AUTHORIZATION_1>"
+        },
+        {
+          "path": "x-claude-code-session-id",
+          "before": "<REDACTED_CLAUDE_CODE_SESSION_ID_1>"
+        },
+        {
+          "path": "connection",
+          "before": "keep-alive"
+        }
+      ],
+      "changed": [
+        {
+          "path": "host",
+          "before": "127.0.0.1:3311",
+          "after": "172.17.0.1:3202"
+        },
+        {
+          "path": "accept-encoding",
+          "before": "gzip, deflate, br, zstd",
+          "after": "gzip"
+        },
+        {
+          "path": "content-length",
+          "before": "131872",
+          "after": "133307"
+        }
+      ]
+    },
+    "body_diff": [],
+    "streaming_event_diff": {
+      "client_hop": {
+        "count": 21,
+        "names": [
+          "message_start",
+          "content_block_start",
+          "content_block_delta",
+          "content_block_stop",
+          "content_block_start",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_stop",
+          "message_delta",
+          "message_stop",
+          null
+        ],
+        "raw_bytes": 3577,
+        "completed": true,
+        "error_count": 0
+      },
+      "upstream_hop": {
+        "count": 20,
+        "names": [
+          "message_start",
+          "content_block_start",
+          "content_block_delta",
+          "content_block_stop",
+          "content_block_start",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_stop",
+          "message_delta",
+          "message_stop"
+        ],
+        "raw_bytes": 3504,
+        "completed": true,
+        "error_count": 0
+      }
+    },
+    "error_diff": {
+      "client_capture_error": null,
+      "upstream_capture_error": null,
+      "status_equal": true
+    },
+    "usage_diff": {
+      "client_hop": [
+        {
+          "input_tokens": 3,
+          "cache_creation_input_tokens": 34118,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 128,
+          "output_tokens_details": {
+            "thinking_tokens": 50
+          },
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 34118
+          }
+        }
+      ],
+      "upstream_hop": [
+        {
+          "input_tokens": 3,
+          "cache_creation_input_tokens": 34118,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 128,
+          "output_tokens_details": {
+            "thinking_tokens": 50
+          }
+        }
+      ]
+    },
+    "request_id_mapping": {
+      "client_hop": {
+        "captured_ids": {
+          "upstream_request_id": null,
+          "new_api_request_id": null,
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "x-claude-code-session-id": "<REDACTED_CLAUDE_CODE_SESSION_ID_1>",
+          "x-oneapi-request-id": "202607282100274880188698268d9d6HExNd8XT"
+        }
+      },
+      "upstream_hop": {
+        "captured_ids": {
+          "upstream_request_id": "e7e298d6-b283-4e9b-98dc-5fc34fe3767d",
+          "new_api_request_id": "e7e298d6-b283-4e9b-98dc-5fc34fe3767d",
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "x-request-id": "e7e298d6-b283-4e9b-98dc-5fc34fe3767d"
+        }
+      }
+    },
+    "model_mapping": {
+      "client_hop": "claude-sonnet-4-6",
+      "upstream_hop": "claude-sonnet-4-6",
+      "unchanged": true
+    },
+    "tool_id_mapping": {
+      "client_hop": [],
+      "upstream_hop": [],
+      "unchanged": true
+    }
+  },
+  {
+    "sequence": 3,
+    "status": {
+      "client_hop": 200,
+      "upstream_hop": 200
+    },
+    "header_diff": {
+      "added": [
+        {
+          "path": "x-api-key",
+          "after": "<REDACTED_API_KEY_1>"
+        }
+      ],
+      "removed": [
+        {
+          "path": "authorization",
+          "before": "<REDACTED_AUTHORIZATION_1>"
+        },
+        {
+          "path": "x-claude-code-session-id",
+          "before": "<REDACTED_CLAUDE_CODE_SESSION_ID_1>"
+        },
+        {
+          "path": "connection",
+          "before": "keep-alive"
+        }
+      ],
+      "changed": [
+        {
+          "path": "host",
+          "before": "127.0.0.1:3311",
+          "after": "172.17.0.1:3202"
+        },
+        {
+          "path": "accept-encoding",
+          "before": "gzip, deflate, br, zstd",
+          "after": "gzip"
+        },
+        {
+          "path": "content-length",
+          "before": "132793",
+          "after": "134228"
+        }
+      ]
+    },
+    "body_diff": [],
+    "streaming_event_diff": {
+      "client_hop": {
+        "count": 9,
+        "names": [
+          "message_start",
+          "content_block_start",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_stop",
+          "message_delta",
+          "message_stop",
+          null
+        ],
+        "raw_bytes": 1451,
+        "completed": true,
+        "error_count": 0
+      },
+      "upstream_hop": {
+        "count": 8,
+        "names": [
+          "message_start",
+          "content_block_start",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_delta",
+          "content_block_stop",
+          "message_delta",
+          "message_stop"
+        ],
+        "raw_bytes": 1392,
+        "completed": true,
+        "error_count": 0
+      }
+    },
+    "error_diff": {
+      "client_capture_error": null,
+      "upstream_capture_error": null,
+      "status_equal": true
+    },
+    "usage_diff": {
+      "client_hop": [
+        {
+          "input_tokens": 1,
+          "cache_creation_input_tokens": 167,
+          "cache_read_input_tokens": 34118,
+          "output_tokens": 16,
+          "output_tokens_details": {
+            "thinking_tokens": 0
+          },
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 167
+          }
+        }
+      ],
+      "upstream_hop": [
+        {
+          "input_tokens": 1,
+          "cache_creation_input_tokens": 167,
+          "cache_read_input_tokens": 34118,
+          "output_tokens": 16,
+          "output_tokens_details": {
+            "thinking_tokens": 0
+          }
+        }
+      ]
+    },
+    "request_id_mapping": {
+      "client_hop": {
+        "captured_ids": {
+          "upstream_request_id": null,
+          "new_api_request_id": null,
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "x-claude-code-session-id": "<REDACTED_CLAUDE_CODE_SESSION_ID_1>",
+          "x-oneapi-request-id": "202607282100317647027938268d9d6tbwjKAFc"
+        }
+      },
+      "upstream_hop": {
+        "captured_ids": {
+          "upstream_request_id": "c1e443fb-ee3e-4760-8cdf-03df4d0f8227",
+          "new_api_request_id": "c1e443fb-ee3e-4760-8cdf-03df4d0f8227",
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "x-request-id": "c1e443fb-ee3e-4760-8cdf-03df4d0f8227"
+        }
+      }
+    },
+    "model_mapping": {
+      "client_hop": "claude-sonnet-4-6",
+      "upstream_hop": "claude-sonnet-4-6",
+      "unchanged": true
+    },
+    "tool_id_mapping": {
+      "client_hop": [
+        "toolu_bdrk_01J32EzD8JELYVRkxDK4XuiN"
+      ],
+      "upstream_hop": [
+        "toolu_bdrk_01J32EzD8JELYVRkxDK4XuiN"
+      ],
+      "unchanged": true
+    }
+  }
+]

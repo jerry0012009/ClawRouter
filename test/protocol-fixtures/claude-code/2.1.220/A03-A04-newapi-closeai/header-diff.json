@@ -1,0 +1,39 @@
+{
+  "added": [
+    {
+      "path": "x-api-key",
+      "after": "<REDACTED_API_KEY_1>"
+    }
+  ],
+  "removed": [
+    {
+      "path": "authorization",
+      "before": "<REDACTED_AUTHORIZATION_1>"
+    },
+    {
+      "path": "x-claude-code-session-id",
+      "before": "<REDACTED_CLAUDE_CODE_SESSION_ID_1>"
+    },
+    {
+      "path": "connection",
+      "before": "keep-alive"
+    }
+  ],
+  "changed": [
+    {
+      "path": "host",
+      "before": "127.0.0.1:3311",
+      "after": "172.17.0.1:3202"
+    },
+    {
+      "path": "accept-encoding",
+      "before": "gzip, deflate, br, zstd",
+      "after": "gzip"
+    },
+    {
+      "path": "content-length",
+      "before": "2341",
+      "after": "2371"
+    }
+  ]
+}

@@ -1,0 +1,519 @@
+[
+  {
+    "sequence": 1,
+    "status": {
+      "client_hop": 200,
+      "upstream_hop": 503
+    },
+    "header_diff": {
+      "added": [
+        {
+          "path": "x-api-key",
+          "after": "<REDACTED_API_KEY_1>"
+        }
+      ],
+      "removed": [
+        {
+          "path": "authorization",
+          "before": "<REDACTED_AUTHORIZATION_1>"
+        },
+        {
+          "path": "x-claude-code-session-id",
+          "before": "<REDACTED_CLAUDE_CODE_SESSION_ID_1>"
+        },
+        {
+          "path": "x-stainless-arch",
+          "before": "x64"
+        },
+        {
+          "path": "x-stainless-lang",
+          "before": "js"
+        },
+        {
+          "path": "x-stainless-os",
+          "before": "Linux"
+        },
+        {
+          "path": "x-stainless-package-version",
+          "before": "0.94.0"
+        },
+        {
+          "path": "x-stainless-retry-count",
+          "before": "0"
+        },
+        {
+          "path": "x-stainless-runtime",
+          "before": "node"
+        },
+        {
+          "path": "x-stainless-runtime-version",
+          "before": "v26.3.0"
+        },
+        {
+          "path": "x-stainless-timeout",
+          "before": "600"
+        },
+        {
+          "path": "anthropic-dangerous-direct-browser-access",
+          "before": "true"
+        },
+        {
+          "path": "x-app",
+          "before": "cli"
+        },
+        {
+          "path": "connection",
+          "before": "keep-alive"
+        }
+      ],
+      "changed": [
+        {
+          "path": "user-agent",
+          "before": "claude-cli/2.1.220 (external, sdk-cli)",
+          "after": "Go-http-client/1.1"
+        },
+        {
+          "path": "host",
+          "before": "127.0.0.1:3320",
+          "after": "172.17.0.1:3204"
+        },
+        {
+          "path": "accept-encoding",
+          "before": "gzip, deflate, br, zstd",
+          "after": "gzip"
+        },
+        {
+          "path": "content-length",
+          "before": "2235",
+          "after": "2265"
+        }
+      ]
+    },
+    "body_diff": [],
+    "streaming_event_diff": {
+      "client_hop": {
+        "count": 7,
+        "names": [
+          "message_start",
+          "content_block_start",
+          "content_block_delta",
+          "content_block_stop",
+          "message_delta",
+          "message_stop",
+          null
+        ],
+        "raw_bytes": 820,
+        "completed": true,
+        "error_count": 0
+      },
+      "upstream_hop": {
+        "count": 0,
+        "names": [],
+        "raw_bytes": 0,
+        "completed": false,
+        "error_count": 0
+      }
+    },
+    "error_diff": {
+      "client_capture_error": null,
+      "upstream_capture_error": null,
+      "status_equal": false
+    },
+    "usage_diff": {
+      "client_hop": [
+        {
+          "output_tokens": 4,
+          "input_tokens": 12
+        }
+      ],
+      "upstream_hop": []
+    },
+    "request_id_mapping": {
+      "client_hop": {
+        "captured_ids": {
+          "upstream_request_id": null,
+          "new_api_request_id": null,
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "x-claude-code-session-id": "<REDACTED_CLAUDE_CODE_SESSION_ID_1>",
+          "x-oneapi-request-id": "202607282053494470395028268d9d69KT9S6s5"
+        }
+      },
+      "upstream_hop": {
+        "captured_ids": {
+          "upstream_request_id": "mock-ebb5a078-c079-453a-9131-48eb30233de7",
+          "new_api_request_id": "mock-ebb5a078-c079-453a-9131-48eb30233de7",
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "x-request-id": "mock-ebb5a078-c079-453a-9131-48eb30233de7"
+        }
+      }
+    },
+    "model_mapping": {
+      "client_hop": "retry-mock-claude",
+      "upstream_hop": "retry-mock-claude",
+      "unchanged": true
+    },
+    "tool_id_mapping": {
+      "client_hop": [],
+      "upstream_hop": [],
+      "unchanged": true
+    }
+  },
+  {
+    "sequence": 2,
+    "status": {
+      "client_hop": 200,
+      "upstream_hop": 200
+    },
+    "header_diff": {
+      "added": [
+        {
+          "path": "x-api-key",
+          "after": "<REDACTED_API_KEY_1>"
+        }
+      ],
+      "removed": [
+        {
+          "path": "authorization",
+          "before": "<REDACTED_AUTHORIZATION_1>"
+        },
+        {
+          "path": "x-claude-code-session-id",
+          "before": "<REDACTED_CLAUDE_CODE_SESSION_ID_1>"
+        },
+        {
+          "path": "x-stainless-arch",
+          "before": "x64"
+        },
+        {
+          "path": "x-stainless-lang",
+          "before": "js"
+        },
+        {
+          "path": "x-stainless-os",
+          "before": "Linux"
+        },
+        {
+          "path": "x-stainless-package-version",
+          "before": "0.94.0"
+        },
+        {
+          "path": "x-stainless-retry-count",
+          "before": "0"
+        },
+        {
+          "path": "x-stainless-runtime",
+          "before": "node"
+        },
+        {
+          "path": "x-stainless-runtime-version",
+          "before": "v26.3.0"
+        },
+        {
+          "path": "x-stainless-timeout",
+          "before": "600"
+        },
+        {
+          "path": "anthropic-dangerous-direct-browser-access",
+          "before": "true"
+        },
+        {
+          "path": "x-app",
+          "before": "cli"
+        },
+        {
+          "path": "connection",
+          "before": "keep-alive"
+        }
+      ],
+      "changed": [
+        {
+          "path": "user-agent",
+          "before": "claude-cli/2.1.220 (external, sdk-cli)",
+          "after": "Go-http-client/1.1"
+        },
+        {
+          "path": "host",
+          "before": "127.0.0.1:3320",
+          "after": "172.17.0.1:3204"
+        },
+        {
+          "path": "accept-encoding",
+          "before": "gzip, deflate, br, zstd",
+          "after": "gzip"
+        },
+        {
+          "path": "content-length",
+          "before": "2235",
+          "after": "2265"
+        }
+      ]
+    },
+    "body_diff": [],
+    "streaming_event_diff": {
+      "client_hop": {
+        "count": 7,
+        "names": [
+          "message_start",
+          "content_block_start",
+          "content_block_delta",
+          "content_block_stop",
+          "message_delta",
+          "message_stop",
+          null
+        ],
+        "raw_bytes": 820,
+        "completed": true,
+        "error_count": 0
+      },
+      "upstream_hop": {
+        "count": 6,
+        "names": [
+          "message_start",
+          "content_block_start",
+          "content_block_delta",
+          "content_block_stop",
+          "message_delta",
+          "message_stop"
+        ],
+        "raw_bytes": 796,
+        "completed": true,
+        "error_count": 0
+      }
+    },
+    "error_diff": {
+      "client_capture_error": null,
+      "upstream_capture_error": null,
+      "status_equal": true
+    },
+    "usage_diff": {
+      "client_hop": [
+        {
+          "output_tokens": 4,
+          "input_tokens": 12
+        }
+      ],
+      "upstream_hop": [
+        {
+          "output_tokens": 4
+        }
+      ]
+    },
+    "request_id_mapping": {
+      "client_hop": {
+        "captured_ids": {
+          "upstream_request_id": null,
+          "new_api_request_id": null,
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "x-claude-code-session-id": "<REDACTED_CLAUDE_CODE_SESSION_ID_1>",
+          "x-oneapi-request-id": "202607282053494470395028268d9d69KT9S6s5"
+        }
+      },
+      "upstream_hop": {
+        "captured_ids": {
+          "upstream_request_id": "mock-4be76838-005b-426d-a0f6-bb092ef94a2f",
+          "new_api_request_id": "mock-4be76838-005b-426d-a0f6-bb092ef94a2f",
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "x-request-id": "mock-4be76838-005b-426d-a0f6-bb092ef94a2f"
+        }
+      }
+    },
+    "model_mapping": {
+      "client_hop": "retry-mock-claude",
+      "upstream_hop": "retry-mock-claude",
+      "unchanged": true
+    },
+    "tool_id_mapping": {
+      "client_hop": [],
+      "upstream_hop": [],
+      "unchanged": true
+    }
+  },
+  {
+    "sequence": 3,
+    "status": {
+      "client_hop": 200,
+      "upstream_hop": 200
+    },
+    "header_diff": {
+      "added": [
+        {
+          "path": "x-api-key",
+          "after": "<REDACTED_API_KEY_1>"
+        }
+      ],
+      "removed": [
+        {
+          "path": "authorization",
+          "before": "<REDACTED_AUTHORIZATION_1>"
+        },
+        {
+          "path": "x-claude-code-session-id",
+          "before": "<REDACTED_CLAUDE_CODE_SESSION_ID_1>"
+        },
+        {
+          "path": "x-stainless-arch",
+          "before": "x64"
+        },
+        {
+          "path": "x-stainless-lang",
+          "before": "js"
+        },
+        {
+          "path": "x-stainless-os",
+          "before": "Linux"
+        },
+        {
+          "path": "x-stainless-package-version",
+          "before": "0.94.0"
+        },
+        {
+          "path": "x-stainless-retry-count",
+          "before": "0"
+        },
+        {
+          "path": "x-stainless-runtime",
+          "before": "node"
+        },
+        {
+          "path": "x-stainless-runtime-version",
+          "before": "v26.3.0"
+        },
+        {
+          "path": "x-stainless-timeout",
+          "before": "600"
+        },
+        {
+          "path": "anthropic-dangerous-direct-browser-access",
+          "before": "true"
+        },
+        {
+          "path": "x-app",
+          "before": "cli"
+        },
+        {
+          "path": "connection",
+          "before": "keep-alive"
+        }
+      ],
+      "changed": [
+        {
+          "path": "user-agent",
+          "before": "claude-cli/2.1.220 (external, sdk-cli)",
+          "after": "Go-http-client/1.1"
+        },
+        {
+          "path": "host",
+          "before": "127.0.0.1:3320",
+          "after": "172.17.0.1:3204"
+        },
+        {
+          "path": "accept-encoding",
+          "before": "gzip, deflate, br, zstd",
+          "after": "gzip"
+        },
+        {
+          "path": "content-length",
+          "before": "91391",
+          "after": "92001"
+        }
+      ]
+    },
+    "body_diff": [],
+    "streaming_event_diff": {
+      "client_hop": {
+        "count": 7,
+        "names": [
+          "message_start",
+          "content_block_start",
+          "content_block_delta",
+          "content_block_stop",
+          "message_delta",
+          "message_stop",
+          null
+        ],
+        "raw_bytes": 820,
+        "completed": true,
+        "error_count": 0
+      },
+      "upstream_hop": {
+        "count": 6,
+        "names": [
+          "message_start",
+          "content_block_start",
+          "content_block_delta",
+          "content_block_stop",
+          "message_delta",
+          "message_stop"
+        ],
+        "raw_bytes": 796,
+        "completed": true,
+        "error_count": 0
+      }
+    },
+    "error_diff": {
+      "client_capture_error": null,
+      "upstream_capture_error": null,
+      "status_equal": true
+    },
+    "usage_diff": {
+      "client_hop": [
+        {
+          "output_tokens": 4,
+          "input_tokens": 12
+        }
+      ],
+      "upstream_hop": [
+        {
+          "output_tokens": 4
+        }
+      ]
+    },
+    "request_id_mapping": {
+      "client_hop": {
+        "captured_ids": {
+          "upstream_request_id": null,
+          "new_api_request_id": null,
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "x-claude-code-session-id": "<REDACTED_CLAUDE_CODE_SESSION_ID_1>",
+          "x-oneapi-request-id": "202607282053496273468628268d9d6pbnqbxEg"
+        }
+      },
+      "upstream_hop": {
+        "captured_ids": {
+          "upstream_request_id": "mock-22c8e8bd-8a22-4adb-a76d-08f2cf1927bd",
+          "new_api_request_id": "mock-22c8e8bd-8a22-4adb-a76d-08f2cf1927bd",
+          "acu_request_id": null,
+          "provider_request_id": null
+        },
+        "headers": {
+          "x-request-id": "mock-22c8e8bd-8a22-4adb-a76d-08f2cf1927bd"
+        }
+      }
+    },
+    "model_mapping": {
+      "client_hop": "retry-mock-claude",
+      "upstream_hop": "retry-mock-claude",
+      "unchanged": true
+    },
+    "tool_id_mapping": {
+      "client_hop": [],
+      "upstream_hop": [],
+      "unchanged": true
+    }
+  }
+]

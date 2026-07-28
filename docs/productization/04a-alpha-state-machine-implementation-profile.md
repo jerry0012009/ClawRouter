@@ -1,14 +1,14 @@
 # ACU Router 五日 Alpha 状态机实施剖面
 
 > 状态：五日 Alpha 开发约束  
-> 版本：v0.3  
+> 版本：v0.4  
 > 日期：2026-07-29  
 > 上位规范：`04-session-task-routing-segment-state-machine-v2.md`  
 > 适用范围：3—10 名邀请制 OPC 程序员，原生 Codex / Claude Code，经 New API 接入 ACU
 
 ## 1. 文档目的
 
-`04` 是长期产品语义规范；本文只定义五日开发必须落地的最小闭环。
+`04` 是长期产品语义规范；本文只定义五日 Alpha 必须落地的最小闭环。
 
 发生冲突时：
 
@@ -27,7 +27,7 @@
 → 透明转发 Streaming / Tool / Thinking
 → 记录 Attempt、实际模型、Usage 和成本
 → 普通后续 Step 复用当前 Route
-→ 重复明确失败时触发一次安全重评估
+→ 在明确状态变化或陈旧预算耗尽时重新评估
 ```
 
 Alpha 只证明任务级路由闭环，不建设完整自治工作流引擎。
@@ -36,40 +36,30 @@ Alpha 只证明任务级路由闭环，不建设完整自治工作流引擎。
 
 ### 3.1 P0 正式支持
 
-五日 Alpha 的正式验收客户端只有：
-
 - Codex：原生 `/v1/responses`；
 - Claude Code：原生 `/v1/messages`。
 
-原因是两者已经完成协议侦察、Fixture 和 Planning / Tool / Resume 实测。
+两者已经完成协议侦察、Fixture、Planning、Tool、Retry 与 Resume 实测。
 
-### 3.2 OpenClaw 与 Hermes
+### 3.2 OpenClaw、Hermes 与未知 Agent
 
-OpenClaw 官方支持 OpenAI-compatible 和 Anthropic-compatible Endpoint；Hermes Agent 官方支持 OpenAI-compatible `/v1/chat/completions` Endpoint。因此在传输层，它们有机会通过 New API 与 ACU 调用模型。
+标准 OpenAI-compatible / Anthropic-compatible 入口可保留，显式模型透传可以实验性使用，但 P0 不对外宣称其已支持 ACU 任务级自动路由。
 
-但以下能力尚未实测：
+未验证内容包括：
 
-- Session 与 Task 连续性信号；
-- HumanMessage 与 ToolResult 的边界；
+- Session / Task 连续性；
+- HumanMessage 与 ToolResult 边界；
 - Planning 强信号；
-- Retry 行为；
-- Tool ID、Streaming、Usage 和实际模型字段；
-- `acu-auto` 是否能稳定复用 Segment。
+- Retry、Tool ID、Streaming、Usage 与实际模型；
+- Segment 复用。
 
-因此第一阶段口径为：
-
-- 可以保留标准协议入口，避免主动阻断；
-- 显式模型透传可作为实验性兼容；
-- 不对外宣称 OpenClaw / Hermes 已支持 ACU 任务级自动路由；
-- P0 完成后再做最小协议侦察和 Adapter 验收。
-
-不得为了扩大客户端数量，影响 Codex / Claude Code 的五日闭环。
+P0 完成后再进行最小协议侦察和 Adapter 验收。不得为了扩大客户端数量影响 Codex / Claude Code 五日闭环。
 
 ## 4. P0 最小领域对象
 
 ### 4.1 Session
 
-必须保存：
+保存：
 
 - `session_id`；
 - 用户 / API Key；
@@ -77,45 +67,41 @@ OpenClaw 官方支持 OpenAI-compatible 和 Anthropic-compatible Endpoint；Herm
 - 规范化历史链 Hash；
 - 最近 Tool Call ID；
 - `last_activity_at`；
-- 当前 `task_id`；
-- 当前 `segment_id`。
+- 当前 `task_id`、`segment_id`。
 
 约束：
 
-- Session 不设置固定身份过期时间；
-- 强历史前缀、Tool ID 因果关系或可信 Resume 证据成立时，可长期关联原 Session；
+- Session 不设置固定身份过期；
+- 强历史前缀、Tool ID 因果关系或可信 Resume 成立时，可长期恢复；
 - 工作目录、时间相近或单个 Session Header 不能单独作为主键；
 - 连续性不确定时创建新 Session并重新 Judge。
 
 ### 4.2 Task
 
-Alpha 简化为：一个 Session 同时只有一个活动 Task。
+Alpha 简化为一个 Session 同时只有一个活动 Task。
 
-必须保存：
+保存：
 
-- `task_id`；
-- `session_id`；
+- `task_id`、`session_id`；
 - 初始目标；
 - 当前阶段；
 - 基础质量偏好；
 - 能力升级下限；
 - 创建与更新时间。
 
-“继续”“补充约束”“重做”“还是不行”默认延续当前 Task。只有明确 New Goal / Reset、明显目标替换或连续性无法确认时创建新 Task。
+“继续”“补充约束”“重做”“还是不行”默认延续当前 Task。明确 New Goal / Reset、明显目标替换或连续性无法确认时创建新 Task。
 
 ### 4.3 Routing Segment
 
-必须保存：
+保存：
 
-- `segment_id`；
-- `task_id`；
-- 创建原因；
-- 阶段：`execution / planning / capability_recovery / availability_recovery / compatibility_recovery`；
-- Judge Evaluation 引用；
-- Route Decision 引用；
+- `segment_id`、`task_id`；
+- 创建原因和阶段；
+- Judge Evaluation、Route Decision；
 - 锁定的 Execution Profile；
 - 基础质量、能力下限、临时覆盖快照；
 - `last_activity_at`；
+- `accepted_model_responses_since_judge`；
 - 状态。
 
 约束：
@@ -128,7 +114,7 @@ Alpha 简化为：一个 Session 同时只有一个活动 Task。
 
 ### 4.4 Event
 
-P0 稳定产生七类事件：
+P0 稳定产生：
 
 1. `human_message`；
 2. `tool_call`；
@@ -138,28 +124,17 @@ P0 稳定产生七类事件：
 6. `execution_failure`；
 7. `provider_error`。
 
-每个 Event 至少保存类型、Session / Task / Segment、原始证据引用、Tool / Call ID、Event Hash、重复标记、证据强度和时间。
+每个 Event 保存类型、归属对象、原始证据引用、Tool / Call ID、Event Hash、重复标记、证据强度和时间。
 
 ### 4.5 Attempt
 
-每次实际上游调用必须单独记录：
-
-- `attempt_id`；
-- 逻辑请求关联；
-- Provider / Channel；
-- 请求模型与实际模型；
-- 上游 Request ID；
-- 状态；
-- Usage 与成本；
-- 错误类别；
-- Retry Owner；
-- 开始和结束时间。
+每次实际上游调用单独记录 Provider、Channel、请求模型、实际模型、上游 Request ID、状态、Usage、成本、错误类别、Retry Owner、开始与结束时间。
 
 Client、New API 或 Provider Retry 只能新增 Attempt，不得重复创建 Judge、Segment 或逻辑计费结果。
 
 ### 4.6 Step
 
-P0 不实现完整 Step 状态机。只要求：
+P0 不实现完整 Step 状态机，只要求：
 
 - 接受的 Model Response 可生成 `step_id`；
 - Tool Call ID 关联 Tool Result；
@@ -174,8 +149,7 @@ P0 不实现完整 Step 状态机。只要求：
 - 增长的 Responses Item 历史；
 - `function_call.call_id`；
 - `function_call_output.call_id`；
-- Streaming；
-- Usage；
+- Streaming、Usage；
 - 实际 `update_plan`。
 
 不依赖 `previous_response_id`。
@@ -187,43 +161,63 @@ P0 不实现完整 Step 状态机。只要求：
 - `tool_use.id`；
 - `tool_result.tool_use_id`；
 - Thinking / Signature 透明转发；
-- Streaming；
-- Usage；
+- Streaming、Usage；
 - 版本门控 Plan-only 指纹；
 - 实际 `ExitPlanMode`。
 
-必须先从 `role=user` 内容中拆出 `tool_result`，再判断剩余 Text 是否为 HumanMessage。
+必须先从 `role=user` 拆出 `tool_result`，再判断剩余 Text 是否为 HumanMessage。
 
 ## 6. P0 Judge 触发器
 
-P0 不是“只有用户发消息才重新 Judge”。必须实现四类触发器：
+P0 不是每个请求都 Judge，也不是只有用户发消息才 Judge。必须实现六类触发器：
 
 1. 新 `acu-auto` / `acu-high` Task 首次请求；
-2. 所有高置信度 `human_message`，包括“继续”、补充约束、拒绝和重做；
+2. 所有高置信度 `human_message`；
 3. `plan_started`；
-4. **同一 P0 标准化核心 Failure Signature 第二次出现，且中间没有明确进展。**
+4. `plan_finished`；
+5. 同一标准化核心 Failure Signature 第二次出现且中间无明确进展；
+6. Segment 的 Judge 陈旧预算耗尽。
 
-第四项是自治任务的安全触发器，避免客户端长时间没有新 HumanMessage 时永久复用错误 Route。
+### 6.1 Judge 陈旧预算
 
-第一次失败只记录 Evidence，不重新 Judge。第二次相同核心失败且无进展时：
+为兼容不可预期的 Agent 行为，P0 增加客户端无关的兜底：
+
+```text
+accepted_model_responses_since_judge >= max_unjudged_model_responses
+→ 创建 safety_refresh Segment
+→ 重新 Judge
+```
+
+默认：
+
+```text
+max_unjudged_model_responses = 8
+```
+
+该值必须可配置。它按被接受的逻辑 Model Response 计数，不按 HTTP Attempt、Streaming Event 或历史重发计数。
+
+作用：即使没有新 HumanMessage、没有显式 Planning、也没有重复错误，长自治任务也不会永久复用最初 Evaluation。
+
+### 6.2 重复失败
+
+第一次失败只记录 Evidence。第二次相同核心失败且无进展时：
 
 - 创建 `capability_recovery` Segment；
 - 重新 Judge；
 - 新 Route 只允许保持或升级；
 - Provider、协议、权限、依赖和环境错误不得使用此触发器。
 
-P0 不重新 Judge：
+### 6.3 P0 不触发 Judge
 
 - 普通 Model Response；
 - Agent 自动继续；
 - 普通 ToolCall；
 - 成功 ToolResult；
 - 第一次 ExecutionFailure；
-- Failure Signature 已变化或存在明确进展；
+- Failure Signature 改变或有明确进展；
 - Provider 429、5xx、Timeout、Overload；
 - Retry Attempt；
 - Plan 内部更新；
-- PlanFinished 且没有新能力需求；
 - 单纯硬兼容变化。
 
 硬兼容变化只使用最近 Evaluation 重筛候选；若实际模型必须变化，创建 `compatibility_recovery` Segment。
@@ -237,95 +231,71 @@ P0 不重新 Judge：
 - Codex 实际调用 `update_plan`；
 - Claude 命中版本门控 Plan-only 指纹。
 
-动作：
-
-- 创建 Planning Segment；
-- 重新 Judge；
-- `temporary_phase_override = 88`。
+动作：创建 Planning Segment、重新 Judge、设置 `temporary_phase_override = 88`。
 
 ### 7.2 Planning 结束
 
 强信号：
 
 - Claude 实际调用 `ExitPlanMode`；
-- Codex Plan 必要项完成，随后首次出现实际 Edit / Write / Patch / Test / Build 行为，且没有新的 Plan 重建。
+- Codex Plan 必要项完成，随后首次出现实际 Edit / Write / Patch / Test / Build，且没有新 Plan 重建。
 
 动作：
 
 - 创建 Execution Segment；
 - 撤销 Planning 临时覆盖；
-- 默认复用最近 Evaluation；
-- 只有出现重大新范围、约束或硬能力需求时才再次 Judge。
+- **重新 Judge**，读取已完成 Plan 和执行要求；
+- 允许在新 Segment 中保持、升级或降至不低于基础质量与能力下限的 Profile。
+
+PlanFinished Judge 使用幂等键，历史重发不得重复调用。
 
 P0 不使用自然语言中的“计划”、Read / Search 比例或 Reasoning Token 作为强信号。
 
-## 8. P1：首批用户期间补齐
+## 8. P1
 
 - 10 分钟 Routing Segment Lease；
-- 长期 Resume 后的 Route 重评估；
-- 语义相近但文本不同的重复失败；
-- 更完整的进展判断；
-- 同模型等价 Channel 可用性恢复；
+- 长期 Resume 后的 Lease 重评估；
+- 上下文增长阈值 Trigger；
+- 低比例 Shadow Judge 审计未触发请求；
+- OpenClaw / Hermes 协议侦察；
+- 同模型等价 Channel 恢复；
 - 管理员轨迹查询；
-- Step 的 `open / closed / cancelled / unresolved` 状态；
-- OpenClaw / Hermes 最小协议侦察和客户端 Adapter Registry。
+- 更完整 Step 状态。
 
-P1 仍不引入 Session 固定身份过期规则。
+Shadow Judge 仅用于评估 Trigger 漏判，不改变线上 Route，不向用户计费。
 
-## 9. P2 / 延期项
+## 9. 延期项
 
-- 独立 Task 语义切分模型；
+- 独立 Task 切分模型；
+- Learned Trigger Model；
 - Embedding Session 匹配；
-- 完整 Client Turn / Step 引擎；
-- 弱信号 Planning；
-- 高级 Failure 分类器；
-- 修改—撤销振荡与虚构符号识别；
+- 弱 Planning 推断；
+- 高级 Failure 分类；
+- 多 Agent / Subagent 状态；
 - Completed 置信度；
-- 多 Agent / Subagent 专用状态；
 - 自动 Context Compaction；
 - 用户连续质量分；
-- 显式模型自动替换；
-- 因成本或一次成功自动降级；
 - 9B Router 训练。
 
-## 10. 五日 P0 实施优先级
+未来 Learned Trigger Model 用于提高兼容性与召回率，但不能取代新 Task、HumanMessage、Planning、重复失败和陈旧预算等确定性安全触发器。
 
-1. Responses 与 Messages 原生入口；
-2. Streaming、Thinking 和 Tool ID 透明转发；
-3. 显式模型跳过 Judge；
-4. `acu-auto` 首请求 Judge + Route；
-5. 当前 Segment Route 复用；
-6. HumanMessage 与 ToolResult 区分；
-7. Planning 强信号；
-8. P0 Failure Signature 与第二次无进展触发；
-9. Attempt / Retry 独立记录；
-10. PostgreSQL 最小持久化；
-11. New API 鉴权身份与最终 Usage / 成本关联。
+## 10. P0 最小验收
 
-## 11. P0 最小验收场景
-
-1. 显式模型请求 Judge 调用数为 0；
+1. 显式模型 Judge 调用数为 0；
 2. 新 `acu-auto` Task 恰好 Judge 一次；
 3. 普通 Tool 循环复用当前 Segment；
-4. Claude 仅含 Tool Result 的 `role=user` 不触发 Judge；
-5. Claude Tool Result +真实 Text 正确拆分；
-6. “继续”延续 Task、新建 Segment并重新 Judge；
-7. Codex `update_plan` 创建 Planning Segment；
-8. Claude Plan-only / `ExitPlanMode` 创建 Planning 与 Execution Segment；
-9. Codex“Plan 完成 + 首次实际编辑/测试”创建 PlanFinished；
-10. 第一次核心失败不重新 Judge；第二次相同核心失败且无进展时重新 Judge；
-11. ProviderError 和 Retry 不触发 Judge；
-12. Streaming、Thinking 和 Tool ID不被ACU改写；
-13. 实际模型、渠道、Usage 和成本关联到同一逻辑请求；
-14. 硬兼容变化不调用 Judge，只重筛候选。
+4. Claude ToolResult 不误触发 HumanMessage；
+5. “继续”触发一次完整上下文 Judge；
+6. PlanStarted 触发 Planning Judge；
+7. PlanFinished 触发 Execution Judge；
+8. 相同核心错误第二次无进展触发一次 Judge；
+9. 连续 8 个被接受 Model Response 且无其他 Trigger 时触发 safety refresh；
+10. Retry 只增加 Attempt；
+11. Streaming、Thinking、Tool ID 不被改写；
+12. 实际模型、Channel、Usage、成本可关联；
+13. ProviderError 不改变任务难度；
+14. 同一 Trigger 重放不重复 Judge。
 
-## 12. 后续文档约束
+## 11. 后续文档约束
 
-`05`—`11` 必须明确区分：
-
-- Alpha P0；
-- Alpha P1；
-- 延期项；
-- 验收场景。
-
-正式开工前，再把 P0 映射为五日执行计划、代码模块、依赖和每日验收产物。
+`05`—`11` 必须明确区分 Alpha P0、P1、延期项和验收场景。正式开工前，再将 P0 映射为五日执行计划、代码模块、依赖和每日验收产物。

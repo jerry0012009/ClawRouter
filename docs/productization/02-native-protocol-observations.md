@@ -1,8 +1,8 @@
 # ACU Router 原生协议观察记录
 
-> 状态：产品化阶段 0 协议侦察计划，待真实流量补全  
-> 版本：v0.1  
-> 日期：2026-07-29  
+> 状态：产品化阶段 0 协议侦察部分执行，仍待 New API / Claude Code / 完整四段链路补全
+> 版本：v0.2-recon-1
+> 日期：2026-07-28
 > 依赖文档：`00-product-scope.md`、`01-glossary-and-domain-model.md`、`03-system-architecture.md`、`04-session-task-routing-segment-state-machine.md`
 
 ## 1. 文档目的
@@ -946,3 +946,237 @@ Goal 模式、Tool Use 和自动 Agent 循环可能产生多个内部 Turn 和�
 - Anthropic Claude Code LLM Gateway、CLI 和 Plan Mode 文档。
 
 所有参考链接和访问日期应在首次真实协议采集时补入 Fixture Manifest。官方资料用于确定“允许出现什么”，Fixture 用于确定“我们的客户端、New API 和 Provider 实际出现什么”。
+
+## 21. 2026-07-28 首轮实测环境
+
+本节只记录本轮 Fixture 能证明的事实；第 3—20 节的原始矩阵和侦察原则继续有效。
+
+| 项目 | 本轮值 | 事实状态 |
+|---|---|---|
+| OS | Ubuntu 24.04.4 LTS，Linux 6.8.0-134-generic，x86_64 | 环境实测 |
+| Node.js / npm / pnpm | 22.23.1 / 10.9.8 / 10.34.0 | 环境实测 |
+| 基线 main | `bf5e4421635c35343c1ce20a1d33f191f30392b0` | Git 实测 |
+| Recon 分支 | `productization/protocol-recon-v1` | Git 实测 |
+| Codex | `codex-cli 0.145.0` | 客户端实测 |
+| Claude Code | 未安装，命令不存在 | 阻塞 |
+| New API | 未发现进程、版本、测试用户、Key 或余额配置 | 阻塞 |
+| 当前 ACU | 本地 8402/8403 可访问；运行中 `dist` 的加载 Commit 无法确认 | 部分实测 |
+| OpenRouter 凭证 | 测试凭证存在；不记录值 | 环境实测 |
+| CloseAI 凭证 | OpenAI-compatible 测试凭证存在；不记录值 | 环境实测 |
+| Capture 点 | 仅 A；B/C/D 部署插入权限不可用 | 部分实测 |
+
+本轮原始数据保存在仓库外临时目录；仓库只提交确定性脱敏 Fixture。所有 Fixture 已通过自动 Secret 扫描。
+
+## 22. Fixture 索引
+
+| Fixture | 场景 | 原生链路 | 结果 | 状态 |
+|---|---|---|---|---|
+| `codex-0.145.0-C01-mock-001` | C01 最小文本 | Codex → Capture A → controlled Mock | 成功；8 个 SSE 事件 | `partial` |
+| `codex-0.145.0-C01-closeai-001` | C01/C02 文本与 Streaming | Codex → Capture A → CloseAI | 成功；13 个 SSE 事件 | `partial` |
+| `codex-0.145.0-C01-openrouter-001` | C01 Provider 尝试 | Codex → Capture A → OpenRouter | 6 次 403 后失败 | `failed` |
+| `codex-0.145.0-C03-C04-closeai-001` | C03 Tool + C04 多 Step | Codex → Capture A → CloseAI | 2 Step 成功 | `partial` |
+| `codex-0.145.0-C06-closeai-001` | C06 明确 Planning | Codex → Capture A → CloseAI | 8 Step，最终测试通过 | `partial` |
+| `codex-0.145.0-C01-acu-current-001` | 当前 ACU Responses ingress | Codex → Capture A → current ACU | 6 次 404 后失败 | `failed` |
+
+`partial` 表示原生客户端确实执行，但 New API、ACU 或全部四个采集点没有进入链路；不是能力“部分猜测”。
+
+## 23. Codex 0.145.0 实测结论
+
+### 23.1 路径与 Streaming
+
+状态：`实测确认`
+客户端：Codex 0.145.0
+链路：Codex → Capture A → CloseAI
+Fixture：`codex-0.145.0-C01-closeai-001`
+结论：模型调用使用 `POST /v1/responses`，请求 `stream = true`；成功响应为 `text/event-stream`。客户端还会先请求 `GET /v1/models?client_version=0.145.0`。
+生产规则适用性：Path 可作为强协议信号；`/models` 探测是辅助行为，不能创建 Step。
+局限性：只验证自定义 Responses Provider 配置。
+
+### 23.2 模型元数据影响请求形态
+
+状态：`实测确认`
+客户端：Codex 0.145.0
+链路：Mock 与 CloseAI 对照
+Fixture：`codex-0.145.0-C01-mock-001`、`codex-0.145.0-C01-closeai-001`
+结论：当模型元数据缺失并使用 fallback metadata 时，请求声明完整工具和 `instructions`；CloseAI 文本样本中 `gpt-5.6-terra` 请求没有 `tools`/`instructions`。客户端请求形态会受模型元数据影响。
+生产规则适用性：工具是否声明只能作为能力需求事实，不能单独判断 Task Phase。
+局限性：模型也不同，尚不能把差异全部归因于 metadata。
+
+### 23.3 多 Step 上下文
+
+状态：`实测确认`
+客户端：Codex 0.145.0
+链路：Codex → Capture A → CloseAI
+Fixture：`codex-0.145.0-C03-C04-closeai-001`
+结论：两 Step 未出现 `previous_response_id`。第二次 `input` 重发消息，并包含上一 Step 的 `reasoning`、`function_call` 和匹配的 `function_call_output`。
+生产规则适用性：Function Call/Output 因果 ID 与精确历史链可作为强 Session/Task/Segment 关联信号。
+局限性：不能否定其他模式或版本使用 `previous_response_id`。
+
+### 23.4 Correlation Header
+
+状态：`实测确认`
+客户端：Codex 0.145.0
+链路：Codex → Capture A → CloseAI
+Fixture：`codex-0.145.0-C03-C04-closeai-001`、`codex-0.145.0-C06-closeai-001`
+结论：`session-id`、`thread-id`、`x-client-request-id` 在同一多 Step 运行中取值一致；Fixture 中确定性映射到同一占位符。
+生产规则适用性：当前版本强候选，但必须在 C05/C08/Resume 与并发 Session 中验证后才能确定优先级。
+局限性：只观察新建、未 Resume 的非交互 `codex exec`。
+
+### 23.5 Tool Calling
+
+状态：`实测确认`
+客户端：Codex 0.145.0
+链路：Codex → Capture A → CloseAI `gpt-5.5`
+Fixture：`codex-0.145.0-C03-C04-closeai-001`
+结论：Function arguments 通过多个 `response.function_call_arguments.delta` 到达；Codex 本地执行 shell 后，把 `function_call_output` 放入下一请求并保持 Call ID 因果关系。
+生产规则适用性：Call ID 匹配是强连续性信号；Arguments 必须逐 delta 保存。
+局限性：仅一次只读 shell 调用。
+
+### 23.6 Planning
+
+状态：`实测确认`
+客户端：Codex 0.145.0
+链路：Codex → Capture A → CloseAI `gpt-5.5`
+Fixture：`codex-0.145.0-C06-closeai-001`
+结论：实际 `update_plan` Function Call 创建五项计划；测试失败后再次调用以更新完成状态；最终调用完成计划。Plan 没有单独顶层 Responses 字段，而是通过 Function Call/Output 历史进入后续请求。
+生产规则适用性：实际 `update_plan` Call 是 Planning 强信号；仅在 `tools` 中声明 `update_plan` 是弱信号。
+局限性：用户明确要求 Plan；自主 Planning、Plan Permission Mode 不适用 Codex 且未测试；修改后失败的 Replanning 未发生。
+
+## 24. Claude Code 实测结论
+
+状态：`未执行/阻塞`
+客户端：未安装
+链路：无
+Fixture：无
+结论：A01—A12 均没有原生 Claude Code Fixture，不对 Messages、Tool Use、Thinking、Cache、Plan Permission、Continue/Resume 或 Retry 作实测声明。
+生产规则适用性：不可使用。
+所需最小条件：安装并固定 Claude Code 版本；提供隔离测试 Auth；允许指向 Capture A；最好提供 New API 测试链路。
+
+## 25. New API 字段改写结论
+
+状态：`未执行/阻塞`
+客户端：Codex 0.145.0；Claude Code 未安装
+链路：New API 未进入任何 Fixture
+Fixture：无
+结论：Path、Header、Model、Responses/Chat、Messages/OpenAI、Tool ID、Reasoning/Thinking、SSE、Usage、Error、Retry 与成本回写是否改写均未确认。
+生产规则适用性：不可使用。
+
+## 26. Provider 兼容矩阵 v0
+
+| Provider / model | Native protocol | Streaming | Tool Calling | Reasoning | Usage | Actual model | Result | Fixture |
+|---|---|---|---|---|---|---|---|---|
+| CloseAI / `gpt-5.6-terra` | Responses | 文本成功 | 未测 | 请求字段存在；输出 0 reasoning token | completed event 完整 | 响应值匹配请求；无独立日志 | 成功 | `codex-0.145.0-C01-closeai-001` |
+| CloseAI / `gpt-5.5` | Responses | 成功 | shell + multi Step 成功 | Reasoning Item 与 token 可见 | 含 cached/reasoning details | 响应值匹配请求；无独立日志 | 成功 | C03/C04、C06 CloseAI |
+| OpenRouter / `openai/gpt-4.1-mini` | Responses | 未开始 | 未测 | 未测 | 无 | 未确认 | 403 TOS policy，失败 | `codex-0.145.0-C01-openrouter-001` |
+| controlled Mock / `mock-model` | Responses | 成功 | 未测 | 未测 | 合成 | Mock 回显 | 仅 Harness/客户端测试 | `codex-0.145.0-C01-mock-001` |
+
+OpenRouter 没有成功样本；不得标记为支持。CloseAI 成功也只适用于表中模型与能力，不外推 Messages 或其他模型。用户提供的 Anthropic Base URL `/anthropic` 因 Claude Code 缺失未测试。
+
+## 27. Session 关联信号首版排序
+
+基于现有 Codex Fixture，建议在 04 中暂时按以下顺序处理，同时保留版本门控：
+
+1. Tool `call_id` → `function_call_output.call_id` 精确因果关系：实测强信号。
+2. `session-id` / `thread-id` 一致且通过可信入口透传：强候选，待 Resume/并发验证。
+3. 精确 Input Item 前缀链：实测可行；本轮多 Step 采用历史重发。
+4. `x-client-request-id`：同一普通多 Step 一致，但 Provider 重试也复用；只能标识客户端 Turn/运行候选，不能去重计费。
+5. `prompt_cache_key`、`x-codex-window-id`、`x-codex-turn-metadata`：已观察但语义未拆解，暂作辅助信号。
+6. 同 Key、时间和 Tool Schema 指纹：仍是弱关联。
+
+任何 Header 在 New API 是否保留均未确认，因此不能直接写成全链路生产规则。
+
+## 28. 人类输入与 Tool Result 区分
+
+Codex 本轮强结构规则：
+
+- `function_call_output` 是 Tool Result，不是新的真实人类输入；
+- 新的人类输入应来自新增 Message/Input 文本，并结合上一请求尾部做增量比较；
+- `role` 单独不足以跨协议通用判断，Claude Messages 仍未实测；
+- 测试输出、shell 输出和 Plan Tool Output 均不能触发 `new_external_input`。
+
+C05 的“继续/新约束/换任务/重做/不满意”未执行，因此这些文本如何进入 Codex Input 仍未实测。
+
+## 29. Planning 强信号与弱信号
+
+强信号候选：
+
+- 实际 `update_plan` Function Call；
+- 后续 `update_plan` 更新同一计划状态；
+- 全部计划项完成并伴随最终验证，可作为 Plan 结束组合强信号。
+
+弱信号：
+
+- `tools` 中声明 `update_plan`；
+- 用户文本出现 plan；
+- 单次 Read/Search；
+- 第一次 Edit；
+- Assistant 自述“开始计划/执行”。
+
+首次 Edit 可以辅助识别 execution 开始，但本轮不足以证明它总是 Planning 结束。
+
+## 30. Resume / Continue
+
+状态：`未执行`。C05、C08、A05、A08 均无 Fixture。不得假定 Header 在进程重启后稳定，也不得假定 `previous_response_id` 或完整历史重发。当前 04 中“请继续属于新的外部输入并重新 Judge”保持产品设计，但协议提取规则仍待验证。
+
+## 31. Retry Ownership
+
+状态：`实测确认（客户端层）`
+Fixture：`codex-0.145.0-C01-openrouter-001`、`codex-0.145.0-C01-acu-current-001`。
+
+Codex 对 403 和 404 都显示 1/5—5/5 reconnect，并产生六次 POST。OpenRouter 样本的起始间隔约为 0.62s、0.76s、1.09s、1.74s、4.77s。同一 `x-client-request-id` 被复用，但 Body Hash 不同。New API/ACU/SDK Retry 未进入完整链路，无法确定总 Attempt 上限。
+
+生产建议：不得用 `x-client-request-id` 单独做响应 Dedup 或成本 Dedup；后续必须给每一真实 Provider Attempt 独立 ID，并在多层 Retry 测试后设置总预算。
+
+## 32. Usage Source of Truth
+
+本轮可确认：
+
+- Responses 成功流的最终 `response.completed.response.usage` 被 Codex接受；
+- Usage 包含 input、cached input、output、reasoning output 和 total；
+- C03/C04 中缓存输入从 0 增至 12,672；C06 后续 Step 超过 15k；
+- 403/404 失败无 Usage，无法确认是否计费；
+- Provider 响应的模型字段与请求相同，但无 Provider 日志独立佐证；
+- New API 扣费与 ACU Ledger 未进入链路。
+
+因此首版优先级只能暂定为：Provider 最终 Usage 事件（若可信且完整）→ Provider 账单/日志对账 → 明确标记的估算。New API 或 ACU 自算值不能在未对账时覆盖 Provider Usage。
+
+## 33. Streaming 事件差异
+
+CloseAI 文本样本出现 `response.created`、`response.in_progress`、Item/Content start、多个 Text Delta、done 和 `response.completed`。Tool 样本还出现大量 `response.function_call_arguments.delta` 与 done。Capture Harness 按原始事件边界保存，未先聚合再返回。
+
+只有 Capture A，故无法判断 New API/ACU 是否聚合、丢弃、重排或改写事件。Mock 的 8 事件序列只能验证客户端/Harness接受受控事件，不能作为 Provider 基线。
+
+## 34. Actual Model 判定
+
+本轮判定层级：
+
+1. Provider `response.completed.response.model`：CloseAI 两个模型与请求一致；
+2. Provider Request/Generation 日志：本轮不可访问；
+3. New API/ACU 回写：未执行；
+4. 仅请求别名：不能证明实际后端。
+
+因此 CloseAI 表中写“响应声明匹配”，不写“物理后端独立确认”。OpenRouter/ACU 失败样本写 `unconfirmed`。
+
+## 35. 对 04 状态机的事实修订建议
+
+1. 在 Codex 0.145.0 解析器中加入已观察的 Session/Thread Header，但在 New API 透传、Resume 和并发验证前使用版本门控，不作为唯一主键。
+2. 将 Function Call/Output 精确因果关系提升为已实测强信号。
+3. 支持“客户端重发完整/增长的 Responses Item 历史”作为主要上下文链；不能依赖 `previous_response_id`。
+4. `update_plan` 仅声明不触发 `plan_start`；实际 Call 才是强触发。
+5. Plan 更新 Tool Result 属于内部 Tool Event，不是 `new_external_input`。
+6. `x-client-request-id` 跨 Provider Retry 复用，禁止用作 Attempt 唯一键或计费幂等键。
+7. `/models` 探测失败不应自动创建 Task/Step 或能力失败；本轮两种 Provider 上均为非致命。
+8. 本轮没有证据修改 10 分钟 Routing Lease、新外部输入重新 Judge、同 Segment 不降级等已确认产品设计。
+
+## 36. 尚未确认的问题
+
+- C05 五类新人类输入的协议增量；C08 Resume；C11 Cancel。
+- C06 自主 Planning、修改后失败的 Replanning 和 Plan Mode 差异。
+- Claude Code A01—A12 全部协议事实。
+- New API A/B 差异、ACU B/C 差异和响应 D 差异。
+- OpenRouter 成功的 Responses/Tool/Usage/Actual Model。
+- CloseAI Anthropic `/anthropic/v1/messages`。
+- Provider、New API、ACU、SDK 多层 Retry Ownership 与总预算。
+- 客户端取消后的 Provider 计费和孤立 Tool Call。
+- Header 在 New API 中是否保留、可信和可防伪。
+- New API 是否能接收 ACU 实际模型、渠道、Usage 和成本回写。

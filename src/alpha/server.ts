@@ -25,6 +25,7 @@ export type AlphaServiceConfig = {
   port: number;
   databaseUrl: string;
   trustedIdentitySecret: string;
+  adminTraceToken: string;
   newApiInternalBaseUrl: string;
   profiles: ConfiguredExecutionProfile[];
 };
@@ -82,6 +83,7 @@ export async function readAlphaServiceConfig(): Promise<AlphaServiceConfig> {
     port: positivePort(process.env.ACU_PORT),
     databaseUrl: requiredEnvironment("ACU_DATABASE_URL"),
     trustedIdentitySecret: requiredEnvironment("ACU_TRUSTED_IDENTITY_SECRET"),
+    adminTraceToken: requiredEnvironment("ACU_ADMIN_TRACE_TOKEN"),
     newApiInternalBaseUrl: requiredEnvironment("NEW_API_INTERNAL_BASE_URL"),
     profiles: await configuredProfiles(),
   };
@@ -142,13 +144,18 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
     adapters: new Map(profiles.map((item) => [item.profile.executionProfileId, item.adapter])),
     judgeRunner,
   });
+  const repository = new AlphaRepository(database);
   const usageOutbox = new UsageOutboxWorker({
-    repository: new AlphaRepository(database),
+    repository,
     baseUrl: serviceConfig.newApiInternalBaseUrl,
     sharedSecret: serviceConfig.trustedIdentitySecret,
   });
   const server = createAlphaGatewayServer({
     trustedIdentitySecret: serviceConfig.trustedIdentitySecret,
+    adminTrace: {
+      token: serviceConfig.adminTraceToken,
+      load: (logicalRequestId) => repository.getAdminLogicalRequestTrace(logicalRequestId),
+    },
     models: profiles.map((item) => item.profile.modelId),
     resolveExecution: processor.resolveExecution.bind(processor),
     onTrace: processor.handleTrace.bind(processor),

@@ -77,6 +77,47 @@ describe("Alpha native protocol gateway", () => {
     });
   });
 
+  it("protects full traces with an independent administrator bearer token", async () => {
+    let loads = 0;
+    const gatewayPort = await listen(createAlphaGatewayServer({
+      trustedIdentitySecret: sharedSecret,
+      adminTrace: {
+        token: "independent-admin-token-not-production",
+        async load(logicalRequestId) {
+          loads += 1;
+          return logicalRequestId === "req_trace_1"
+            ? { logical_request: { logical_request_id: logicalRequestId }, attempts: [] }
+            : undefined;
+        },
+      },
+      async resolveExecution() { throw new Error("admin traces must not resolve an execution"); },
+    }));
+
+    const unsigned = await fetch(`http://127.0.0.1:${gatewayPort}/internal/admin/traces/req_trace_1`);
+    expect(unsigned.status).toBe(401);
+    const wrong = await fetch(`http://127.0.0.1:${gatewayPort}/internal/admin/traces/req_trace_1`, {
+      headers: { authorization: "Bearer wrong-token" },
+    });
+    expect(wrong.status).toBe(403);
+    expect(loads).toBe(0);
+
+    const authorized = await fetch(`http://127.0.0.1:${gatewayPort}/internal/admin/traces/req_trace_1`, {
+      headers: { authorization: "Bearer independent-admin-token-not-production" },
+    });
+    expect(authorized.status).toBe(200);
+    expect(authorized.headers.get("cache-control")).toBe("no-store");
+    expect(await authorized.json()).toEqual({
+      logical_request: { logical_request_id: "req_trace_1" },
+      attempts: [],
+    });
+    expect(loads).toBe(1);
+
+    const absent = await fetch(`http://127.0.0.1:${gatewayPort}/internal/admin/traces/req_missing`, {
+      headers: { authorization: "Bearer independent-admin-token-not-production" },
+    });
+    expect(absent.status).toBe(404);
+  });
+
   it("forwards an explicit Responses request body unchanged and replaces credentials", async () => {
     let upstreamBody = Buffer.alloc(0);
     let upstreamHeaders: Record<string, string | string[] | undefined> = {};

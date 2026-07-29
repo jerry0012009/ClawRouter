@@ -249,4 +249,68 @@ run("Alpha PostgreSQL foundation", () => {
       await restarted.close();
     }
   });
+
+  it("returns the complete logical request chain only through the explicit admin lookup", async () => {
+    await repository.saveJudgeEvaluation({
+      judgeEvaluationId: "judge_a_1",
+      newapiUserId: "user_a",
+      taskId: "task_user_a",
+      segmentId: "seg_user_a_1",
+      triggerEventId: "evt_a_1",
+      judgeIdempotencyKey: "judge-idempotency-a",
+      judgeStatus: "completed",
+      judgeResultSource: "rules",
+      promptVersion: "alpha-test",
+      policyVersion: "alpha-test",
+      difficultyMethodVersion: "alpha-test",
+      contextHash: "context-hash-a",
+      contextTruncated: false,
+      difficultyScoreRaw: 50,
+      difficultyIndex: 50,
+      factors: {},
+      probabilities: {},
+      evidenceTags: [],
+    });
+    await repository.saveRouteDecision({
+      routeDecisionId: "route_a_1",
+      newapiUserId: "user_a",
+      segmentId: "seg_user_a_1",
+      judgeEvaluationId: "judge_a_1",
+      mode: "acu-auto",
+      policyVersion: "alpha-test",
+      routingModelVersion: "alpha-test",
+      qualityCurveVersion: "alpha-test",
+      priceVersion: "alpha-test",
+      effectiveQualityTarget: 80,
+      formulaInputs: {},
+      candidateEstimates: [],
+      paretoFrontier: [],
+      selectedProfile: { executionProfileId: "profile-a" },
+    });
+
+    const trace = await repository.getAdminLogicalRequestTrace("req_a_1");
+    expect(trace).toMatchObject({
+      logical_request: { logical_request_id: "req_a_1", newapi_user_id: "user_a" },
+      session: { session_id: "ses_user_a" },
+      task: { task_id: "task_user_a" },
+      usage_report: { usage_report_id: "usage_a_1" },
+    });
+    expect(trace?.segments).toEqual(expect.arrayContaining([
+      expect.objectContaining({ segment_id: "seg_user_a_1" }),
+    ]));
+    expect(trace?.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ event_id: "evt_a_1" }),
+    ]));
+    expect(trace?.judge_evaluations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ judge_evaluation_id: "judge_a_1" }),
+    ]));
+    expect(trace?.route_decisions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ route_decision_id: "route_a_1" }),
+    ]));
+    expect(trace?.attempts).toHaveLength(2);
+    expect(trace?.payloads).toEqual(expect.arrayContaining([
+      expect.objectContaining({ payload_id: "payload_a_1" }),
+    ]));
+    expect(await repository.getAdminLogicalRequestTrace("req_missing")).toBeUndefined();
+  });
 });

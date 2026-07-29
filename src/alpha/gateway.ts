@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { normalizeMessagesRequest } from "./protocol/messages.js";
 import { normalizeResponsesRequest } from "./protocol/responses.js";
@@ -35,6 +36,10 @@ export type AlphaGatewayTrace = {
 
 export type AlphaGatewayOptions = {
   trustedIdentitySecret: string;
+  adminTrace?: {
+    token: string;
+    load(logicalRequestId: string): Promise<Record<string, unknown> | undefined>;
+  };
   models?: string[];
   requirePrivateNetwork?: boolean;
   healthCheck?(): Promise<Record<string, unknown>>;
@@ -48,6 +53,18 @@ export type AlphaGatewayOptions = {
   maxRequestBytes?: number;
   now?: () => Date;
 };
+
+function adminBearerToken(request: IncomingMessage): string | undefined {
+  const authorization = request.headers.authorization;
+  if (typeof authorization !== "string") return undefined;
+  return /^Bearer ([^\s]+)$/i.exec(authorization)?.[1];
+}
+
+function tokenMatches(actual: string, expected: string): boolean {
+  const actualDigest = createHash("sha256").update(actual).digest();
+  const expectedDigest = createHash("sha256").update(expected).digest();
+  return timingSafeEqual(actualDigest, expectedDigest);
+}
 
 async function readRequestBody(request: IncomingMessage, maxBytes: number): Promise<Buffer> {
   const chunks: Buffer[] = [];
@@ -106,6 +123,35 @@ export function createAlphaGatewayServer(options: AlphaGatewayOptions): Server {
     }
     if ((options.requirePrivateNetwork ?? true) && !isPrivateNetworkAddress(request.socket.remoteAddress)) {
       jsonError(response, 403, "ACU ingress is restricted to private network sources");
+      return;
+    }
+    const adminTraceMatch = /^\/internal\/admin\/traces\/(req_[A-Za-z0-9_-]{1,128})$/.exec(url.pathname);
+    if (request.method === "GET" && adminTraceMatch) {
+      if (!options.adminTrace) {
+        jsonError(response, 404, "Unsupported ACU endpoint");
+        return;
+      }
+      const token = adminBearerToken(request);
+      if (!token) {
+        jsonError(response, 401, "Administrator bearer token is required");
+        return;
+      }
+      if (!tokenMatches(token, options.adminTrace.token)) {
+        jsonError(response, 403, "Administrator identity is not authorized");
+        return;
+      }
+      try {
+        const trace = await options.adminTrace.load(adminTraceMatch[1]);
+        if (!trace) {
+          jsonError(response, 404, "Logical request trace was not found");
+          return;
+        }
+        response.setHeader("cache-control", "no-store");
+        response.setHeader("content-type", "application/json");
+        response.end(JSON.stringify(trace));
+      } catch {
+        jsonError(response, 503, "ACU trace store is unavailable");
+      }
       return;
     }
     if (request.method === "GET" && url.pathname === "/v1/models") {

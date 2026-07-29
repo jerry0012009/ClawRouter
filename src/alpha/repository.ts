@@ -430,6 +430,62 @@ export class AlphaRepository {
     return this.findUserScoped("acu_logical_requests", "logical_request_id", logicalRequestId, newapiUserId);
   }
 
+  /** Admin-only lookup. Callers must enforce independent administrator authentication. */
+  async getAdminLogicalRequestTrace(logicalRequestId: string): Promise<Record<string, unknown> | undefined> {
+    const result = await this.database.query<{ trace: Record<string, unknown> }>(
+      `WITH requested AS (
+         SELECT * FROM acu_logical_requests WHERE logical_request_id=$1
+       )
+       SELECT jsonb_build_object(
+         'logical_request',to_jsonb(requested),
+         'session',(SELECT to_jsonb(value) FROM acu_sessions value WHERE value.session_id=requested.session_id),
+         'task',(SELECT to_jsonb(value) FROM acu_tasks value WHERE value.task_id=requested.task_id),
+         'segments',COALESCE((
+           SELECT jsonb_agg(to_jsonb(value) ORDER BY value.created_at,value.segment_id)
+           FROM acu_segments value WHERE value.task_id=requested.task_id
+         ),'[]'::jsonb),
+         'events',COALESCE((
+           SELECT jsonb_agg(to_jsonb(value) ORDER BY value.occurred_at,value.event_id)
+           FROM acu_events value WHERE value.task_id=requested.task_id
+         ),'[]'::jsonb),
+         'judge_evaluations',COALESCE((
+           SELECT jsonb_agg(to_jsonb(value) ORDER BY value.created_at,value.judge_evaluation_id)
+           FROM acu_judge_evaluations value WHERE value.task_id=requested.task_id
+         ),'[]'::jsonb),
+         'route_decisions',COALESCE((
+           SELECT jsonb_agg(to_jsonb(value) ORDER BY value.created_at,value.route_decision_id)
+           FROM acu_route_decisions value
+           JOIN acu_segments segment ON segment.segment_id=value.segment_id
+           WHERE segment.task_id=requested.task_id
+         ),'[]'::jsonb),
+         'attempts',COALESCE((
+           SELECT jsonb_agg(to_jsonb(value) ORDER BY value.attempt_index,value.attempt_kind,value.attempt_id)
+           FROM acu_attempts value WHERE value.logical_request_id=requested.logical_request_id
+         ),'[]'::jsonb),
+         'payloads',COALESCE((
+           SELECT jsonb_agg(to_jsonb(value) ORDER BY value.created_at,value.payload_id)
+           FROM acu_payloads value
+           WHERE value.logical_request_id=requested.logical_request_id
+              OR value.payload_id IN (
+                SELECT event.source_payload_id FROM acu_events event
+                WHERE event.task_id=requested.task_id AND event.source_payload_id IS NOT NULL
+                UNION
+                SELECT judge.input_payload_id FROM acu_judge_evaluations judge
+                WHERE judge.task_id=requested.task_id AND judge.input_payload_id IS NOT NULL
+                UNION
+                SELECT judge.output_payload_id FROM acu_judge_evaluations judge
+                WHERE judge.task_id=requested.task_id AND judge.output_payload_id IS NOT NULL
+              )
+         ),'[]'::jsonb),
+         'usage_report',(SELECT to_jsonb(value) FROM acu_usage_reports value
+                         WHERE value.logical_request_id=requested.logical_request_id)
+       ) AS trace
+       FROM requested`,
+      [logicalRequestId],
+    );
+    return result.rows[0]?.trace;
+  }
+
   async nextProviderAttemptIndex(logicalRequestId: string): Promise<number> {
     const result = await this.database.query<{ next_index: number }>(
       `SELECT COALESCE(MAX(attempt_index),0)::int+1 AS next_index

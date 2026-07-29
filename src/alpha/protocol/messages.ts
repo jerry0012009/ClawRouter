@@ -31,10 +31,11 @@ export function normalizeMessagesRequest(
     const message = record(messageValue);
     if (!message) return;
     const blocks = typeof message.content === "string" ? [message.content] : array(message.content);
+    const hasToolResult = blocks.some((block) => record(block)?.type === "tool_result");
     for (const blockValue of blocks) {
       if (typeof blockValue === "string") {
         if (message.role === "user" && blockValue.trim()) {
-          humanCandidates.push({ text: blockValue, sourceIndex, confidence: "candidate" });
+          humanCandidates.push({ text: blockValue, sourceIndex, confidence: "high" });
         }
         continue;
       }
@@ -45,14 +46,24 @@ export function normalizeMessagesRequest(
           toolCallId: String(block.tool_use_id ?? ""),
           content: block.content,
           isError: block.is_error === true,
+          sourceIndex,
         });
         continue;
       }
       if (block.type === "text" && message.role === "user" && typeof block.text === "string" && block.text.trim()) {
-        humanCandidates.push({ text: block.text, sourceIndex, confidence: "candidate" });
+        humanCandidates.push({
+          text: block.text,
+          sourceIndex,
+          confidence: hasToolResult ? "candidate" : "high",
+        });
       }
       if (block.type === "tool_use") {
-        toolCalls.push({ id: String(block.id ?? ""), name: String(block.name ?? ""), input: block.input });
+        toolCalls.push({
+          id: String(block.id ?? ""),
+          name: String(block.name ?? ""),
+          input: block.input,
+          sourceIndex,
+        });
       }
       if (block.type === "thinking" && typeof block.signature === "string") signatures.push(block.signature);
     }

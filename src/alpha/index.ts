@@ -34,3 +34,12 @@ export {
   verifyTrustedIdentity,
   type TrustedNewApiIdentity,
 } from "./trusted-identity.js";
+export { extractIncrementalEvents, failureSignature, type AlphaDomainEvent } from "./events.js";
+export { isExactHistoryPrefix, matchSession, type SessionContinuityRecord } from "./identity.js";
+export {
+  applyFailureEvidence,
+  decideTrigger,
+  incrementAcceptedResponse,
+  type SegmentState,
+  type TriggerDecision,
+} from "./state-machine.js";

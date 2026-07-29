@@ -33,7 +33,7 @@ export function normalizeResponsesRequest(body: unknown, headers: NativeRequestH
       if (typeof argumentsValue === "string") {
         try { argumentsValue = JSON.parse(argumentsValue); } catch { /* preserve provider arguments */ }
       }
-      toolCalls.push({ id, name, input: argumentsValue });
+      toolCalls.push({ id, name, input: argumentsValue, sourceIndex });
       if (name === "update_plan") planCalls.push(id);
     }
     if (item.type === "function_call_output" || item.type === "custom_tool_call_output") {
@@ -41,6 +41,7 @@ export function normalizeResponsesRequest(body: unknown, headers: NativeRequestH
         toolCallId: String(item.call_id ?? item.id ?? ""),
         content: item.output ?? item.content,
         isError: item.is_error === true,
+        sourceIndex,
       });
     }
   });

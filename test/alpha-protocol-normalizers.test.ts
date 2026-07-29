@@ -20,8 +20,8 @@ describe("Responses canonical envelope", () => {
     expect(envelope.humanCandidates).toEqual([{ text: "Fix the bug", sourceIndex: 0, confidence: "high" }]);
     expect(envelope.toolCalls.map((call) => call.id)).toEqual(["call-plan", "call-shell"]);
     expect(envelope.toolResults).toEqual([
-      { toolCallId: "call-plan", content: "Plan updated", isError: false },
-      { toolCallId: "call-shell", content: "failed", isError: true },
+      { toolCallId: "call-plan", content: "Plan updated", isError: false, sourceIndex: 3 },
+      { toolCallId: "call-shell", content: "failed", isError: true, sourceIndex: 5 },
     ]);
     expect(envelope.planning).toMatchObject({ started: true, signalFamily: "codex_update_plan_call" });
     expect(envelope.containsThinking).toBe(true);
@@ -49,7 +49,12 @@ describe("Messages canonical envelope", () => {
         ],
       }],
     });
-    expect(envelope.toolResults).toEqual([{ toolCallId: "tool-1", content: "permission denied", isError: true }]);
+    expect(envelope.toolResults).toEqual([{
+      toolCallId: "tool-1",
+      content: "permission denied",
+      isError: true,
+      sourceIndex: 0,
+    }]);
     expect(envelope.humanCandidates).toEqual([{
       text: "Continue with a read-only approach",
       sourceIndex: 0,
@@ -68,7 +73,7 @@ describe("Messages canonical envelope", () => {
         ],
       }],
     }, {}, "2.1.220");
-    expect(envelope.toolCalls).toEqual([{ id: "tool-exit", name: "ExitPlanMode", input: {} }]);
+    expect(envelope.toolCalls).toEqual([{ id: "tool-exit", name: "ExitPlanMode", input: {}, sourceIndex: 0 }]);
     expect(envelope.thinkingSignatures).toEqual(["signed-thinking"]);
     expect(envelope.planning).toMatchObject({ finished: true, signalFamily: "claude_exit_plan_mode" });
   });

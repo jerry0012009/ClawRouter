@@ -4,12 +4,14 @@ export type CanonicalToolCall = {
   id: string;
   name: string;
   input: unknown;
+  sourceIndex: number;
 };
 
 export type CanonicalToolResult = {
   toolCallId: string;
   content: unknown;
   isError: boolean;
+  sourceIndex: number;
 };
 
 export type CanonicalHumanCandidate = {

@@ -43,7 +43,13 @@ export type ProviderModelProfile = {
   supportedToolTypes: string[];
   thinkingSupport: boolean;
   supportedReasoningEfforts: string[];
-  contextWindow: number | null;
+  canonicalAdvertisedContextWindow: number | null;
+  providerDeclaredContextWindow: number | null;
+  observedSuccessfulInputTokens: number;
+  providerHardContextCap: number | null;
+  contextCapabilityStatus: "verified" | "observed_floor" | "unverified_long_context" | "provider_capped";
+  contextCapabilitySource: string;
+  contextLastVerifiedAt: string | null;
   actualModelVerified: boolean;
   usageTrusted: boolean;
   effectivePriceAvailable: boolean;

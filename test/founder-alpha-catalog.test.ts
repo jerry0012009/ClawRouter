@@ -25,4 +25,24 @@ describe("Founder Alpha New API catalog export", () => {
     expect(new Set(exported.curveModelStatuses.map((item: { modelId: string }) => item.modelId)))
       .toEqual(new Set(source.models.map((item: { modelId: string }) => item.modelId)));
   });
+
+  it("keeps all six Founder catalog surfaces aligned", async () => {
+    const [exported, syncSql, compose] = await Promise.all([
+      readFile("deploy/alpha/newapi-acu-catalog.json", "utf8").then(JSON.parse),
+      readFile("deploy/alpha/sync-newapi-codex-pool.sql", "utf8"),
+      readFile("deploy/alpha/docker-compose.yml", "utf8"),
+    ]);
+    const expected = [
+      "acu-auto", "gpt-5.4-mini", "gpt-5.6-luna",
+      "gpt-5.6-terra", "gpt-5.5", "gpt-5.6-sol",
+    ];
+    expect([exported.auto.modelId, ...exported.responses.map((item: { modelId: string }) => item.modelId)])
+      .toEqual(expected);
+    for (const modelId of expected) expect(syncSql).toContain(modelId);
+    expect(syncSql).toContain("INSERT INTO models");
+    expect(syncSql).toContain(`model_limits = '${expected.join(",")}'`);
+    expect(compose).toContain("0004_rc2_context_ledger.sql");
+    expect(compose).toContain("0005_rc2_judge_reconciliation.sql");
+    expect(compose).toContain("ACU_JUDGE_ECONOMICS_PROVIDER_ID: closeai");
+  });
 });

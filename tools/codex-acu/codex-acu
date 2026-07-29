@@ -76,6 +76,7 @@ case "${1:-}" in
     test -s "$credential_file" || { echo "credential is not configured" >&2; exit 1; }
     test "$(stat -c '%a' "$credential_file")" = "600" || { echo "invalid credential permissions" >&2; exit 1; }
     grep -q '^model = "acu-auto"$' "$acu_home/config.toml"
+    grep -q '^model_context_window = 1050000$' "$acu_home/config.toml"
     base_url=$(sed -n 's/^base_url = "\(https:\/\/.*\/v1\)"$/\1/p' "$acu_home/config.toml")
     test -n "$base_url" || { echo "invalid Base URL" >&2; exit 1; }
     provider=$(sed -n 's/^model_provider = "\([^"]*\)"$/\1/p' "$acu_home/config.toml")

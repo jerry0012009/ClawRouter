@@ -40,6 +40,14 @@ export function usageFinalizeBody(report: PendingUsageReport): Buffer {
     provider_cost_usd: report.providerCostUsd,
     failed_billed_cost_usd: report.failedBilledCostUsd,
     final_user_cost_usd: report.finalUserCostUsd,
+    nominal_provider_cost_usd: report.nominalProviderCostUsd,
+    provider_balance_charge_usd: report.providerBalanceChargeUsd,
+    effective_provider_cash_cost_cny: report.effectiveProviderCashCostCny,
+    judge_cash_cost_cny: report.judgeCashCostCny,
+    failed_attempt_cash_cost_cny: report.failedAttemptCashCostCny,
+    actual_total_cash_cost_cny: report.actualTotalCashCostCny,
+    user_charge_cny: report.userChargeCny,
+    counterfactual_quality_ceiling_cost_cny: report.counterfactualQualityCeilingCostCny,
     cost_breakdown: report.costBreakdown,
   }));
 }

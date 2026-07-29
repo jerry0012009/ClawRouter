@@ -5,6 +5,7 @@ import type { AcuEvaluation, AcuJudgeResult, AcuModelEstimate } from "../acu/typ
 import type { AlphaProtocol } from "./repository.js";
 import type { WebIntent } from "./protocol/types.js";
 import { cashCnyPerNominalUsd, type ProviderEconomics } from "./provider-economics.js";
+import { effectiveContextCeiling, type ContextAdmissionEstimate } from "./context-admission.js";
 
 export type ProfileHealth = "healthy" | "degraded" | "cooldown" | "open" | "half_open" | "disabled" | "unknown";
 export type RoutingPreference = "economy" | "balanced" | "quality";
@@ -44,7 +45,14 @@ export type AlphaExecutionProfile = {
   supportedToolTypes?: ToolCapability[];
   thinkingSupport: boolean;
   supportedReasoningEfforts?: string[];
-  contextWindow: number;
+  contextWindow?: number;
+  canonicalAdvertisedContextWindow?: number;
+  providerDeclaredContextWindow?: number | null;
+  observedSuccessfulInputTokens?: number;
+  providerHardContextCap?: number | null;
+  contextCapabilityStatus?: "verified" | "observed_floor" | "unverified_long_context" | "provider_capped";
+  contextCapabilitySource?: string;
+  contextLastVerifiedAt?: string;
   health: ProfileHealth;
   enabled: boolean;
   administratorAllowed: boolean;
@@ -68,7 +76,8 @@ export type AlphaRouteRequirements = {
   requiredToolTypes?: ToolCapability[];
   requireThinking: boolean;
   reasoningEffort?: string;
-  contextTokens: number;
+  context?: ContextAdmissionEstimate;
+  contextTokens?: number;
   allowedModelIds?: string[];
   clientDeclaredWebTool?: boolean;
   webIntent?: WebIntent;
@@ -88,6 +97,44 @@ export type AlphaRouteInput = {
 };
 
 export type ExcludedProfile = { executionProfileId: string; reasons: string[] };
+
+export type ExclusionCategory = "context_window" | "tool_capability" | "protocol" | "web" | "thinking"
+  | "health" | "allowlist" | "cost" | "adapter";
+
+export function exclusionCategory(reason: string): ExclusionCategory {
+  if (reason === "context_window") return "context_window";
+  if (reason === "native_protocol") return "protocol";
+  if (reason === "tool_call_support" || reason.startsWith("tool_type:")) return "tool_capability";
+  if (reason === "web_search_execution_unverified") return "web";
+  if (reason === "thinking_support" || reason.startsWith("reasoning_effort:")) return "thinking";
+  if (reason.startsWith("health_") || reason === "provider_cooldown" || reason === "disabled") return "health";
+  if (reason === "administrator_policy" || reason === "model_policy") return "allowlist";
+  if (reason === "provider_economics" || reason === "usage_untrusted") return "cost";
+  return "adapter";
+}
+
+function exclusionCounts(excludedProfiles: ExcludedProfile[]): Record<ExclusionCategory, number> {
+  const counts = Object.fromEntries([
+    "context_window", "tool_capability", "protocol", "web", "thinking",
+    "health", "allowlist", "cost", "adapter",
+  ].map((category) => [category, 0])) as Record<ExclusionCategory, number>;
+  for (const reason of excludedProfiles.flatMap((profile) => profile.reasons)) {
+    counts[exclusionCategory(reason)] += 1;
+  }
+  return counts;
+}
+
+export class AlphaAdmissionError extends Error {
+  constructor(
+    readonly errorType: string,
+    message: string,
+    readonly statusCode: number,
+    readonly details: Record<string, unknown>,
+  ) {
+    super(message);
+    this.name = "AlphaAdmissionError";
+  }
+}
 
 export type AlphaRouteDecision = {
   formulaVersion: typeof ACU_ROUTING_MODEL_VERSION;
@@ -156,7 +203,12 @@ function providerSelectionScore(profile: AlphaExecutionProfile, inputTokens: num
     : profile.health === "unknown" ? 1.1 : 1;
   const successRate = Math.max(0.5, Math.min(1, profile.recentSuccessRate ?? 1));
   const latencyFactor = 1 + Math.min(0.05, Math.max(0, profile.observedLatencyMs ?? 0) / 1_200_000);
-  return base * healthFactor * latencyFactor / successRate;
+  const observedFloor = profile.observedSuccessfulInputTokens ?? 0;
+  const longContextFactor = ["observed_floor", "unverified_long_context"].includes(profile.contextCapabilityStatus ?? "")
+    && inputTokens > observedFloor
+    ? 1.03
+    : 1;
+  return base * healthFactor * latencyFactor * longContextFactor / successRate;
 }
 
 function webReliabilityFactor(profile: AlphaExecutionProfile, requirements: AlphaRouteRequirements): number {
@@ -196,7 +248,8 @@ function exclusionReasons(
     && !profile.supportedReasoningEfforts.includes(requirements.reasoningEffort)) {
     reasons.push(`reasoning_effort:${requirements.reasoningEffort}`);
   }
-  if (profile.contextWindow < requirements.contextTokens) reasons.push("context_window");
+  const requiredContextTokens = requirements.context?.requiredTotalContextTokens ?? requirements.contextTokens ?? 0;
+  if (effectiveContextCeiling(profile) < requiredContextTokens) reasons.push("context_window");
   if (["cooldown", "open", "disabled"].includes(profile.health)) reasons.push(`health_${profile.health}`);
   if (profile.health === "half_open") reasons.push("health_half_open_probe_required");
   if (profile.economics && (!profile.economics.enabled || profile.economics.health === "blocked")) reasons.push("provider_economics");
@@ -222,12 +275,42 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
   });
   const eligibleModelIds = [...new Set(eligibleProfiles.map((profile) => profile.modelId))];
   if (eligibleModelIds.length === 0) {
+    const normalizedExclusionCounts = exclusionCounts(excludedProfiles);
+    const contextBlockedProfiles = excludedProfiles.filter((profile) => (
+      profile.reasons.length > 0 && profile.reasons.every((reason) => reason === "context_window")
+    ));
+    if (contextBlockedProfiles.length > 0) {
+      const contextBlockedIds = new Set(contextBlockedProfiles.map((profile) => profile.executionProfileId));
+      const candidateContextLimits = Object.fromEntries(input.profiles
+        .filter((profile) => contextBlockedIds.has(profile.executionProfileId))
+        .map((profile) => [
+        profile.executionProfileId,
+        effectiveContextCeiling(profile),
+      ]));
+      throw new AlphaAdmissionError(
+        "context_length_exceeded",
+        "The request exceeds the maximum context available from eligible execution profiles.",
+        400,
+        {
+          estimated_input_tokens: input.requirements.context?.estimatedInputTokens ?? input.requirements.contextTokens ?? 0,
+          required_total_context_tokens: input.requirements.context?.requiredTotalContextTokens ?? input.requirements.contextTokens ?? 0,
+          maximum_available_context_tokens: Math.max(...Object.values(candidateContextLimits)),
+          candidate_context_limits: candidateContextLimits,
+          exclusion_counts: normalizedExclusionCounts,
+        },
+      );
+    }
     if (input.requirements.webIntent === "required") {
-      throw new Error("No healthy Alpha execution profile has verified Web Search execution capability");
+      throw new AlphaAdmissionError("web_capability_unavailable", "No healthy Alpha execution profile has verified Web Search execution capability", 400, {
+        exclusion_counts: normalizedExclusionCounts,
+      });
     }
     const required = input.requirements.requiredToolTypes ?? [];
     if (required.length > 0) {
-      throw new Error(`No compatible Alpha execution profile supports required tool capabilities: ${required.join(", ")}`);
+      throw new AlphaAdmissionError("tool_capability_unavailable", `No compatible Alpha execution profile supports required tool capabilities: ${required.join(", ")}`, 400, {
+        required_tool_types: required,
+        exclusion_counts: normalizedExclusionCounts,
+      });
     }
     throw new Error("No compatible Alpha execution profile is available");
   }
@@ -337,9 +420,10 @@ export function resolveExplicitProfile(
   profiles: AlphaExecutionProfile[],
   requirements: AlphaRouteRequirements,
 ): AlphaExecutionProfile {
-  const profile = profiles.find((candidate) => (
-    candidate.modelId === requestedModel
-    && exclusionReasons(candidate, requirements, {
+  const matching = profiles.filter((candidate) => candidate.modelId === requestedModel);
+  const evaluated = matching.map((candidate) => ({
+    candidate,
+    reasons: exclusionReasons(candidate, requirements, {
       judge: {} as AcuJudgeResult,
       judgeCost: 0,
       inputTokens: 0,
@@ -347,8 +431,44 @@ export function resolveExplicitProfile(
       effectiveQualityTarget: 0,
       profiles,
       requirements,
-    }).length === 0
+    }),
+  }));
+  const normalizedExclusionCounts = exclusionCounts(evaluated.map(({ candidate, reasons }) => ({
+    executionProfileId: candidate.executionProfileId,
+    reasons,
+  })));
+  const profile = evaluated.find((item) => item.reasons.length === 0)?.candidate;
+  if (profile) return profile;
+  const contextOnly = evaluated.length > 0 && evaluated.every((item) => (
+    item.reasons.length > 0 && item.reasons.every((reason) => reason === "context_window")
   ));
-  if (!profile) throw new Error(`Explicit model ${requestedModel} has no compatible execution profile`);
-  return profile;
+  if (contextOnly) {
+    const candidateContextLimits = Object.fromEntries(evaluated.map(({ candidate }) => (
+      [candidate.executionProfileId, effectiveContextCeiling(candidate)]
+    )));
+    throw new AlphaAdmissionError(
+      "context_length_exceeded",
+      "The request exceeds the maximum context available from eligible execution profiles.",
+      400,
+      {
+        estimated_input_tokens: requirements.context?.estimatedInputTokens ?? requirements.contextTokens ?? 0,
+        required_total_context_tokens: requirements.context?.requiredTotalContextTokens ?? requirements.contextTokens ?? 0,
+        maximum_available_context_tokens: Math.max(...Object.values(candidateContextLimits)),
+        candidate_context_limits: candidateContextLimits,
+        exclusion_counts: normalizedExclusionCounts,
+      },
+    );
+  }
+  if (normalizedExclusionCounts.tool_capability > 0) {
+    throw new AlphaAdmissionError(
+      "tool_capability_unavailable",
+      "No compatible Alpha execution profile supports required tool capabilities.",
+      400,
+      {
+        required_tool_types: requirements.requiredToolTypes ?? [],
+        exclusion_counts: normalizedExclusionCounts,
+      },
+    );
+  }
+  throw new Error(`Explicit model ${requestedModel} has no compatible execution profile`);
 }

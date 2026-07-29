@@ -44,6 +44,9 @@ services:
     volumes:
       - ../../migrations/acu/0001_alpha_p0.sql:/migration/0001_alpha_p0.sql:ro
       - ../../migrations/acu/0002_provider_channel_health.sql:/migration/0002_provider_channel_health.sql:ro
+      - ../../migrations/acu/0003_web_intent_source.sql:/migration/0003_web_intent_source.sql:ro
+      - ../../migrations/acu/0004_rc2_context_ledger.sql:/migration/0004_rc2_context_ledger.sql:ro
+      - ../../migrations/acu/0005_rc2_judge_reconciliation.sql:/migration/0005_rc2_judge_reconciliation.sql:ro
     networks: [alpha-backend]
     command:
       - /bin/sh
@@ -53,6 +56,9 @@ services:
           psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0001_alpha_p0.sql
         fi
         psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0002_provider_channel_health.sql
+        psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0003_web_intent_source.sql
+        psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0004_rc2_context_ledger.sql
+        psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0005_rc2_judge_reconciliation.sql
 
   newapi-codex-pool-sync:
     image: postgres:16-alpine
@@ -64,8 +70,14 @@ services:
       PGPASSWORD: ${POSTGRES_NEWAPI_PASSWORD:?set POSTGRES_NEWAPI_PASSWORD}
     volumes:
       - ./sync-newapi-codex-pool.sql:/sync/sync-newapi-codex-pool.sql:ro
+      - ./reconcile-newapi-rc2-ledger.sql:/sync/reconcile-newapi-rc2-ledger.sql:ro
     networks: [alpha-backend]
-    command: ["psql", "-v", "ON_ERROR_STOP=1", "-h", "postgres-newapi", "-U", "newapi_alpha", "-d", "newapi_alpha", "-f", "/sync/sync-newapi-codex-pool.sql"]
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        psql -v ON_ERROR_STOP=1 -h postgres-newapi -U newapi_alpha -d newapi_alpha -f /sync/sync-newapi-codex-pool.sql
+        psql -v ON_ERROR_STOP=1 -h postgres-newapi -U newapi_alpha -d newapi_alpha -f /sync/reconcile-newapi-rc2-ledger.sql
 
   acu-router:
     build:
@@ -90,6 +102,7 @@ services:
       ACU_JUDGE_API_KEY: ${ACU_JUDGE_API_KEY:?set ACU_JUDGE_API_KEY}
       ACU_JUDGE_MODEL: ${ACU_JUDGE_MODEL:-deepseek-v4-flash}
       ACU_JUDGE_BASE_URL: ${ACU_JUDGE_BASE_URL:-https://api.openai-proxy.org/v1}
+      ACU_JUDGE_ECONOMICS_PROVIDER_ID: closeai
       ACU_JUDGE_TIMEOUT_MS: ${ACU_JUDGE_TIMEOUT_MS:-20000}
       ACU_JUDGE_MAX_CONTEXT_TOKENS: ${ACU_JUDGE_MAX_CONTEXT_TOKENS:-6000}
       ACU_JUDGE_CACHE_PATH: /var/lib/acu/judge-cache-v3.json

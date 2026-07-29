@@ -9,6 +9,8 @@ import { buildAlphaJudgeContext } from "./judge-context.js";
 import type { AlphaJudgeRun, AlphaJudgeRunner } from "./judge-runner.js";
 import { AlphaRepository, alphaId, sha256, type AlphaProtocol } from "./repository.js";
 import {
+  AlphaAdmissionError,
+  exclusionCategory,
   resolveExplicitProfile,
   routeWithCurrentAcuFormula,
   type AlphaExecutionProfile,
@@ -17,9 +19,9 @@ import {
 import type { AlphaGatewayTrace, AlphaIngressContext, AlphaExecutionResolution } from "./gateway.js";
 import type { NativeProviderAdapter } from "./provider.js";
 import type { TrustedNewApiIdentity } from "./trusted-identity.js";
-import { parseProviderUsage, sumCost } from "./usage.js";
+import { parseProviderUsage } from "./usage.js";
 import { getAcuModel } from "../acu/catalog.js";
-import { cashCnyPerNominalUsd, providerCostBreakdown } from "./provider-economics.js";
+import { cashCnyPerNominalUsd, providerCostBreakdown, type ProviderEconomics } from "./provider-economics.js";
 import {
   createRecoveringProviderAdapter,
   type BufferedProviderFailure,
@@ -28,6 +30,7 @@ import {
 } from "./execution.js";
 import { applyAttemptOutcome, classifyAttemptOutcome, type AttemptOutcome, type HealthSnapshot } from "./channel-health.js";
 import { verifyWritableWorkspace } from "./workspace-gate.js";
+import { estimateContextAdmission, effectiveContextCeiling } from "./context-admission.js";
 import {
   classifyWebIntentFallback,
   isWebIntent,
@@ -47,6 +50,7 @@ export type AlphaProcessorOptions = {
   adapters: Map<string, NativeProviderAdapter>;
   networkAdapters?: Map<string, Array<{ endpoint: string; adapter: NativeProviderAdapter }>>;
   judgeRunner: AlphaJudgeRunner;
+  judgeEconomics?: ProviderEconomics;
   maxUnjudgedModelResponses?: number;
   expectedOutputTokens?: number;
 };
@@ -67,6 +71,7 @@ export type AlphaResolutionContext = {
   selectedProfile: AlphaExecutionProfile;
   networkEndpoint?: string;
   judgeCostUsd: string;
+  judgeCashCostCny: string;
   requestBytes: number;
   replayed: boolean;
   clientDeclaredWebTool: boolean;
@@ -89,6 +94,7 @@ export type AlphaResolutionContext = {
     routeReason: string;
     qualityUpperBoundModel?: string;
     estimatedCostReductionVsQualityUpperBoundCny?: number;
+    counterfactualQualityCeilingCostCny?: number;
     providerSelectionReason?: string;
     selectedProvider?: string;
   };
@@ -197,6 +203,9 @@ function routeDisplaySummary(
       estimatedCostReductionVsQualityUpperBoundCny: selected && qualityUpperBound
         ? Math.max(0, numberValue(qualityUpperBound.expectedTotalCost) - numberValue(selected.expectedTotalCost))
         : undefined,
+      counterfactualQualityCeilingCostCny: qualityUpperBound
+        ? numberValue(qualityUpperBound.expectedTotalCost)
+        : undefined,
       selectedProvider: stringValue(record(storedRoute.selected_profile_json)?.provider),
     };
   }
@@ -224,6 +233,7 @@ function routeDisplaySummary(
     estimatedCostReductionVsQualityUpperBoundCny: selected && qualityUpperBound
       ? Math.max(0, qualityUpperBound.expectedTotalCost - selected.expectedTotalCost)
       : undefined,
+    counterfactualQualityCeilingCostCny: qualityUpperBound?.expectedTotalCost,
     providerSelectionReason: route.providerSelectionReason,
     selectedProvider: route.selectedProfile.provider,
   };
@@ -412,6 +422,10 @@ export class AlphaRequestProcessor {
         usageTrusted: runtime?.usageTrusted ?? profile.usageTrusted,
         recentSuccessRate: Math.min(channel?.recentSuccessRate ?? 1, runtime?.recentSuccessRate ?? 1),
         observedLatencyMs: runtime?.totalLatencyMs ?? channel?.totalLatencyMs ?? profile.observedLatencyMs,
+        observedSuccessfulInputTokens: Math.max(
+          runtime?.observedSuccessfulInputTokens ?? 0,
+          profile.observedSuccessfulInputTokens ?? 0,
+        ),
         webSearchRecentSuccessRate: optionalNumber(runtime?.metadata?.webSearchRecentSuccessRate)
           ?? profile.webSearchRecentSuccessRate,
         webSearchObservedLatencyMs: optionalNumber(runtime?.metadata?.webSearchObservedLatencyMs)
@@ -630,12 +644,33 @@ export class AlphaRequestProcessor {
     envelope: CanonicalEnvelope,
     identity: TrustedNewApiIdentity,
     state: PreparedState,
-    rawBytes: number,
+    logicalRequestId: string,
   ): Promise<{ profile: AlphaExecutionProfile; judge?: AlphaJudgeRun; route?: AlphaRouteDecision }> {
     const repository = new AlphaRepository(this.options.database);
+    const contextAdmission = estimateContextAdmission(envelope, this.expectedOutputTokens);
     const { profiles: effectiveProfiles, probeClaims } = await this.effectiveProfiles();
     const storedSegment = await repository.getSegment(state.segmentId, identity.newapiUserId);
     const storedSegmentMetadata = metadata(storedSegment);
+    const startAdmissionTrace = async (judgeEvaluationId?: string) => repository.saveAdmissionTrace({
+      admissionTraceId: alphaId("admission"),
+      admissionIdempotencyKey: sha256([
+        identity.newapiUserId, state.segmentId, envelope.protocol, envelope.historyHash, envelope.requestedModel,
+      ].join("\n")),
+      newapiUserId: identity.newapiUserId,
+      logicalRequestId,
+      sessionId: state.sessionId,
+      taskId: state.taskId,
+      segmentId: state.segmentId,
+      judgeEvaluationId,
+      requestProtocol: envelope.protocol,
+      requestedModel: envelope.requestedModel,
+      ...contextAdmission,
+      metadata: {
+        trigger: state.decision.reason,
+        judgeCalls: state.decision.runJudge ? 1 : 0,
+        judgeReused: !state.decision.runJudge && Boolean(judgeEvaluationId),
+      },
+    });
     const storedWebIntent = state.decision.runJudge ? undefined : webIntentFromMetadata(storedSegmentMetadata);
     if (storedWebIntent) applyWebIntent(envelope, storedWebIntent);
     if (modeForModel(envelope.requestedModel) === "explicit") {
@@ -646,17 +681,46 @@ export class AlphaRequestProcessor {
         rootGoalText: state.rootGoalText,
       }), state.decision.createSegment ? "heuristic_fallback" : "legacy_heuristic");
       applyWebIntent(envelope, webIntentDecision);
-      const profile = resolveExplicitProfile(envelope.requestedModel, effectiveProfiles, {
+      const admission = await startAdmissionTrace();
+      let profile: AlphaExecutionProfile;
+      try {
+        profile = resolveExplicitProfile(envelope.requestedModel, effectiveProfiles, {
         protocol: envelope.protocol,
         requireTools: envelope.requiredToolTypes.length > 0,
         requiredToolTypes: envelope.requiredToolTypes,
         requireThinking: envelope.containsThinking,
         reasoningEffort: envelope.reasoningEffort,
-        contextTokens: Math.ceil(rawBytes / 4),
+        context: contextAdmission,
         clientDeclaredWebTool: envelope.clientDeclaredWebTool,
         webIntent: envelope.webIntent,
+        });
+      } catch (error) {
+        const typed = error instanceof AlphaAdmissionError ? error : undefined;
+        await repository.completeAdmissionTrace({
+          admissionTraceId: admission.admissionTraceId, status: "rejected",
+          errorType: typed?.errorType ?? "admission_failed", httpStatus: typed?.statusCode ?? 502,
+          maximumAvailableContextTokens: Number(typed?.details.maximum_available_context_tokens ?? 0) || undefined,
+          candidateContextLimits: typed?.details.candidate_context_limits as Record<string, number> | undefined,
+          exclusionCounts: typed?.details.exclusion_counts as Record<string, number> | undefined,
+        });
+        if (typed) typed.details.admission_trace_id = admission.admissionTraceId;
+        throw error;
+      }
+      await repository.completeAdmissionTrace({
+        admissionTraceId: admission.admissionTraceId, status: "admitted",
+        maximumAvailableContextTokens: effectiveContextCeiling(profile),
+        metadata: { selectedProfileId: profile.executionProfileId },
       });
       if (state.decision.createSegment || !state.segment.segmentId) {
+        const catalogModel = getAcuModel(profile.modelId);
+        const nominalCost = catalogModel?.inputPricePerMillion === null || catalogModel?.outputPricePerMillion === null
+          ? null
+          : ((contextAdmission.estimatedInputTokens * (catalogModel?.inputPricePerMillion ?? 0))
+            + (this.expectedOutputTokens * (catalogModel?.outputPricePerMillion ?? 0))) / 1_000_000;
+        const effectiveCashCost = nominalCost === null
+          ? null
+          : nominalCost * (profile.economics ? cashCnyPerNominalUsd(profile.economics) : 1);
+        const explicitSelectionReason = "User-selected explicit model; Judge and ACU model selection skipped.";
         const routeDecisionId = alphaId("route");
         await repository.saveRouteDecision({
           routeDecisionId,
@@ -677,11 +741,37 @@ export class AlphaRequestProcessor {
             userRoutingPolicy: identity.routingPolicy,
             routingPreference: identity.routingPreference,
             userRoutingPolicyVersion: identity.routingPolicyVersion,
+            decisionSnapshot: {
+              difficultyIndex: null,
+              difficultyFactors: null,
+              judgeConfidence: null,
+              qualityTarget: 0,
+              routingPreference: identity.routingPreference,
+              webIntent: webIntentDecision.intent,
+              candidateCount: 1,
+              legalCanonicalModelCandidates: [profile.modelId],
+              candidates: [{
+                modelId: profile.modelId,
+                estimatedQuality: null,
+                nominalCost,
+                effectiveCashCost,
+                valueScore: null,
+                pareto: null,
+                exclusionReason: null,
+              }],
+              excludedProfiles: [],
+              selectedModel: profile.modelId,
+              selectedChannel: profile.channelId ?? profile.channel,
+              modelSelectionReason: explicitSelectionReason,
+              channelSelectionReason: explicitSelectionReason,
+              qualityCeilingModel: profile.modelId,
+              costReductionVsCeiling: 0,
+            },
           },
           candidateEstimates: [],
           paretoFrontier: [],
           selectedProfile: { ...profile },
-          routeExplanation: "User-selected explicit model; Judge and ACU model selection skipped.",
+          routeExplanation: explicitSelectionReason,
         });
         await repository.updateSegmentDecision({
           segmentId: state.segmentId,
@@ -714,6 +804,37 @@ export class AlphaRequestProcessor {
       ? storedProfile
       : undefined;
     if (!state.decision.runJudge && reused && reused.health !== "cooldown") {
+      const admission = await startAdmissionTrace(stringValue(storedSegment?.judge_evaluation_id));
+      let compatible: AlphaExecutionProfile;
+      try {
+        compatible = resolveExplicitProfile(reused.modelId, effectiveProfiles, {
+        protocol: envelope.protocol,
+        requireTools: envelope.requiredToolTypes.length > 0,
+        requiredToolTypes: envelope.requiredToolTypes,
+        requireThinking: envelope.containsThinking,
+        reasoningEffort: envelope.reasoningEffort,
+        context: contextAdmission,
+        allowedModelIds: identity.routingPolicy === "custom_allowlist" ? identity.allowedModelIds : undefined,
+        clientDeclaredWebTool: envelope.clientDeclaredWebTool,
+        webIntent: envelope.webIntent,
+        });
+      } catch (error) {
+        const typed = error instanceof AlphaAdmissionError ? error : undefined;
+        await repository.completeAdmissionTrace({
+          admissionTraceId: admission.admissionTraceId, status: "rejected",
+          errorType: typed?.errorType ?? "admission_failed", httpStatus: typed?.statusCode ?? 502,
+          maximumAvailableContextTokens: Number(typed?.details.maximum_available_context_tokens ?? 0) || undefined,
+          candidateContextLimits: typed?.details.candidate_context_limits as Record<string, number> | undefined,
+          exclusionCounts: typed?.details.exclusion_counts as Record<string, number> | undefined,
+        });
+        if (typed) typed.details.admission_trace_id = admission.admissionTraceId;
+        throw error;
+      }
+      await repository.completeAdmissionTrace({
+        admissionTraceId: admission.admissionTraceId, status: "admitted",
+        maximumAvailableContextTokens: effectiveContextCeiling(compatible),
+        metadata: { selectedProfileId: compatible.executionProfileId, judgeReused: true },
+      });
       if (!storedWebIntent) {
         const legacyWebIntent = withWebIntentSource(classifyWebIntentFallback({
           recentUserInputs: envelope.humanCandidates
@@ -727,8 +848,8 @@ export class AlphaRequestProcessor {
           ...webIntentMetadata(legacyWebIntent),
         });
       }
-      await this.releaseUnusedProbeClaims(probeClaims, reused);
-      return { profile: reused };
+      await this.releaseUnusedProbeClaims(probeClaims, compatible);
+      return { profile: compatible };
     }
 
     const context = buildAlphaJudgeContext(envelope, {
@@ -761,13 +882,109 @@ export class AlphaRequestProcessor {
       webIntentFallbackInput,
     });
     applyWebIntent(envelope, judge.webIntentDecision);
-    const judgeEconomics = effectiveProfiles.find((profile) => profile.provider === judge.provider)?.economics;
+    const judgeEconomics = this.options.judgeEconomics
+      ?? effectiveProfiles.find((profile) => profile.provider === judge.provider)?.economics;
     const effectiveJudgeCostCny = Number(judge.costUsd)
       * (judgeEconomics ? cashCnyPerNominalUsd(judgeEconomics) : 1);
-    const route = routeWithCurrentAcuFormula({
+    const judgeEvaluationId = alphaId("judge");
+    const judgeIdempotencyKey = sha256([
+      judge.policyVersion,
+      judge.promptVersion,
+      judge.model ?? "none",
+      state.triggerEventId ?? `${state.decision.reason}:${state.segmentId}`,
+      judge.contextHash,
+    ].join("\n"));
+    const admissionIdempotencyKey = sha256([
+      identity.newapiUserId,
+      state.segmentId,
+      envelope.protocol,
+      envelope.historyHash,
+      envelope.requestedModel,
+    ].join("\n"));
+    const admissionTraceId = alphaId("admission");
+    const persisted = await this.options.database.transaction(async (client) => {
+      const transactional = new AlphaRepository(client);
+      const storedJudge = await transactional.saveJudgeEvaluation({
+        judgeEvaluationId,
+        newapiUserId: identity.newapiUserId,
+        taskId: state.taskId,
+        segmentId: state.segmentId,
+        triggerEventId: state.triggerEventId,
+        judgeIdempotencyKey,
+        judgeStatus: judge.status,
+        judgeResultSource: judge.resultSource,
+        judgeModel: judge.model,
+        judgeProvider: judge.provider,
+        promptVersion: judge.promptVersion,
+        policyVersion: judge.policyVersion,
+        difficultyMethodVersion: judge.judge.difficultyMethodVersion,
+        contextHash: judge.contextHash,
+        contextTokenEstimate: BigInt(judge.contextTokenEstimate),
+        contextTruncated: judge.contextTruncated,
+        difficultyScoreRaw: judge.judge.difficultyScoreRaw,
+        difficultyIndex: judge.judge.difficultyIndex,
+        factors: { ...judge.judge.factors },
+        probabilities: {
+          pLow: judge.judge.pLow,
+          pMid: judge.judge.pMid,
+          pMidHigh: judge.judge.pMidHigh,
+          pHigh: judge.judge.pHigh,
+        },
+        confidence: judge.judge.confidence,
+        judgeEntropy: judge.entropy,
+        evidenceTags: judge.judge.signals,
+        explanation: judge.judge.explanation,
+        webIntent: judge.webIntentDecision.intent,
+        webIntentConfidence: judge.webIntentDecision.confidence,
+        webIntentReason: judge.webIntentDecision.reason,
+        webIntentEvidence: judge.webIntentDecision.evidence,
+        webIntentSource: judge.webIntentDecision.source,
+        promptTokens: BigInt(judge.promptTokens),
+        completionTokens: BigInt(judge.completionTokens),
+        latencyMs: judge.latencyMs,
+        actualCostUsd: judge.costUsd,
+        errorCategory: judge.errorCategory,
+      });
+      const storedAdmission = await transactional.saveAdmissionTrace({
+        admissionTraceId,
+        admissionIdempotencyKey,
+        newapiUserId: identity.newapiUserId,
+        logicalRequestId,
+        sessionId: state.sessionId,
+        taskId: state.taskId,
+        segmentId: state.segmentId,
+        judgeEvaluationId: storedJudge.judgeEvaluationId,
+        requestProtocol: envelope.protocol,
+        requestedModel: envelope.requestedModel,
+        ...contextAdmission,
+        metadata: {
+          trigger: state.decision.reason,
+          judgeCalls: judge.status === "live" ? 1 : 0,
+          webIntent: judge.webIntentDecision.intent,
+          webIntentSource: judge.webIntentDecision.source,
+        },
+      });
+      await transactional.saveJudgeLedgerEntry({
+        judgeLedgerEntryId: alphaId("ledger"),
+        judgeEvaluationId: storedJudge.judgeEvaluationId,
+        admissionTraceId: storedAdmission.admissionTraceId,
+        newapiUserId: identity.newapiUserId,
+        judgeProvider: judge.provider,
+        judgeModel: judge.model,
+        promptTokens: BigInt(judge.promptTokens),
+        completionTokens: BigInt(judge.completionTokens),
+        nominalCostUsd: judge.costUsd,
+        effectiveCashCostCny: effectiveJudgeCostCny.toFixed(10),
+        costSource: judgeEconomics?.effectiveCostSource ?? "judge_cost_without_provider_economics",
+      });
+      return { storedJudge, storedAdmission };
+    });
+    let route: AlphaRouteDecision;
+    try {
+      route = routeWithCurrentAcuFormula({
       judge: judge.judge,
       judgeCost: effectiveJudgeCostCny,
-      inputTokens: Math.ceil(rawBytes / 4),
+      inputTokens: contextAdmission.estimatedInputTokens,
       expectedOutputTokens: this.expectedOutputTokens,
       effectiveQualityTarget: state.effectiveQualityTarget,
       routingPreference: identity.routingPreference,
@@ -778,7 +995,7 @@ export class AlphaRequestProcessor {
         requiredToolTypes: envelope.requiredToolTypes,
         requireThinking: envelope.containsThinking,
         reasoningEffort: envelope.reasoningEffort,
-        contextTokens: Math.ceil(rawBytes / 4),
+        context: contextAdmission,
         allowedModelIds: identity.routingPolicy === "all_routing_eligible"
           ? undefined
           : identity.routingPolicy === "custom_allowlist"
@@ -789,56 +1006,30 @@ export class AlphaRequestProcessor {
       },
       routeDirection: state.decision.routeDirection,
       currentProfile: reused,
-    });
-    const judgeEvaluationId = alphaId("judge");
-    const judgeIdempotencyKey = sha256([
-      judge.policyVersion,
-      judge.promptVersion,
-      judge.model ?? "none",
-      state.triggerEventId ?? `${state.decision.reason}:${state.segmentId}`,
-      judge.contextHash,
-    ].join("\n"));
-    const storedJudge = await repository.saveJudgeEvaluation({
-      judgeEvaluationId,
-      newapiUserId: identity.newapiUserId,
-      taskId: state.taskId,
-      segmentId: state.segmentId,
-      triggerEventId: state.triggerEventId,
-      judgeIdempotencyKey,
-      judgeStatus: judge.status,
-      judgeResultSource: judge.resultSource,
-      judgeModel: judge.model,
-      judgeProvider: judge.provider,
-      promptVersion: judge.promptVersion,
-      policyVersion: judge.policyVersion,
-      difficultyMethodVersion: judge.judge.difficultyMethodVersion,
-      contextHash: judge.contextHash,
-      contextTokenEstimate: BigInt(judge.contextTokenEstimate),
-      contextTruncated: judge.contextTruncated,
-      difficultyScoreRaw: judge.judge.difficultyScoreRaw,
-      difficultyIndex: judge.judge.difficultyIndex,
-      factors: { ...judge.judge.factors },
-      probabilities: {
-        pLow: judge.judge.pLow,
-        pMid: judge.judge.pMid,
-        pMidHigh: judge.judge.pMidHigh,
-        pHigh: judge.judge.pHigh,
-      },
-      confidence: judge.judge.confidence,
-      judgeEntropy: judge.entropy,
-      evidenceTags: judge.judge.signals,
-      explanation: judge.judge.explanation,
-      webIntent: judge.webIntentDecision.intent,
-      webIntentConfidence: judge.webIntentDecision.confidence,
-      webIntentReason: judge.webIntentDecision.reason,
-      webIntentEvidence: judge.webIntentDecision.evidence,
-      webIntentSource: judge.webIntentDecision.source,
-      promptTokens: BigInt(judge.promptTokens),
-      completionTokens: BigInt(judge.completionTokens),
-      latencyMs: judge.latencyMs,
-      actualCostUsd: judge.costUsd,
-      errorCategory: judge.errorCategory,
-    });
+      });
+    } catch (error) {
+      const admission = error instanceof AlphaAdmissionError ? error : undefined;
+      await repository.completeAdmissionTrace({
+        admissionTraceId: persisted.storedAdmission.admissionTraceId,
+        status: "rejected",
+        errorType: admission?.errorType ?? "admission_failed",
+        httpStatus: admission?.statusCode ?? 502,
+        maximumAvailableContextTokens: Number(admission?.details.maximum_available_context_tokens ?? 0) || undefined,
+        candidateContextLimits: admission?.details.candidate_context_limits as Record<string, number> | undefined,
+        exclusionCounts: admission?.details.exclusion_counts as Record<string, number> | undefined,
+        metadata: { message: error instanceof Error ? error.message : "admission_failed" },
+      });
+      if (admission) {
+        admission.details.admission_trace_id = persisted.storedAdmission.admissionTraceId;
+        admission.details.judge_evaluation_id = persisted.storedJudge.judgeEvaluationId;
+        admission.details.judge_cost_usd = judge.costUsd;
+        admission.details.judge_cash_cost_cny = effectiveJudgeCostCny.toFixed(10);
+        admission.details.judge_provider = judge.provider;
+        admission.details.judge_model = judge.model;
+      }
+      throw error;
+    }
+    const storedJudge = persisted.storedJudge;
     if (storedJudge.inserted) {
       const inputPayloadId = alphaId("payload");
       const outputPayloadId = alphaId("payload");
@@ -872,6 +1063,60 @@ export class AlphaRequestProcessor {
         outputPayloadId,
       });
     }
+    await repository.completeAdmissionTrace({
+      admissionTraceId: persisted.storedAdmission.admissionTraceId,
+      status: "admitted",
+      maximumAvailableContextTokens: effectiveContextCeiling(route.selectedProfile),
+      exclusionCounts: Object.fromEntries(route.excludedProfiles.flatMap((item) => item.reasons)
+        .map(exclusionCategory)
+        .reduce((counts, category) => counts.set(category, (counts.get(category) ?? 0) + 1), new Map<string, number>())),
+      metadata: { selectedProfileId: route.selectedProfile.executionProfileId },
+    });
+    const qualityCeiling = route.candidateEstimates.reduce((best, candidate) => (
+      !best || candidate.conservativeScore > best.conservativeScore ? candidate : best
+    ), undefined as (typeof route.candidateEstimates)[number] | undefined);
+    const selectedCandidate = route.candidateEstimates.find((candidate) => (
+      candidate.modelId === route.selectedProfile.modelId
+    ));
+    const routeDecisionSnapshot = {
+      difficultyIndex: judge.judge.difficultyIndex,
+      difficultyFactors: judge.judge.factors,
+      judgeConfidence: judge.judge.confidence,
+      qualityTarget: route.effectiveQualityTarget,
+      routingPreference: route.preference,
+      webIntent: judge.webIntentDecision.intent,
+      candidateCount: route.candidateEstimates.length,
+      legalCanonicalModelCandidates: route.candidateEstimates.map((candidate) => candidate.modelId),
+      candidates: route.candidateEstimates.map((candidate) => {
+        const model = getAcuModel(candidate.modelId);
+        const nominalCost = model?.inputPricePerMillion === null || model?.outputPricePerMillion === null
+          ? null
+          : ((contextAdmission.estimatedInputTokens * (model?.inputPricePerMillion ?? 0))
+            + (this.expectedOutputTokens * (model?.outputPricePerMillion ?? 0))) / 1_000_000;
+        return {
+          modelId: candidate.modelId,
+          estimatedQuality: candidate.estimatedQuality,
+          nominalCost,
+          effectiveCashCost: candidate.estimatedCallCost,
+          valueScore: candidate.valueUtility,
+          pareto: candidate.paretoEfficient,
+          exclusionReason: null,
+        };
+      }),
+      excludedProfiles: route.excludedProfiles.map((profile) => ({
+        executionProfileId: profile.executionProfileId,
+        exclusionReason: exclusionCategory(profile.reasons[0] ?? "adapter"),
+        exclusionDetail: profile.reasons[0] ?? "adapter",
+      })),
+      selectedModel: route.selectedProfile.modelId,
+      selectedChannel: route.selectedProfile.channelId ?? route.selectedProfile.channel,
+      modelSelectionReason: route.recommendation.reason,
+      channelSelectionReason: route.providerSelectionReason,
+      qualityCeilingModel: qualityCeiling?.modelId,
+      costReductionVsCeiling: selectedCandidate && qualityCeiling
+        ? Math.max(0, qualityCeiling.expectedTotalCost - selectedCandidate.expectedTotalCost)
+        : null,
+    };
     const routeDecisionId = alphaId("route");
     await repository.saveRouteDecision({
       routeDecisionId,
@@ -889,7 +1134,14 @@ export class AlphaRequestProcessor {
         judgeCost: judge.costUsd,
         effectiveJudgeCostCny,
         effectiveSwitchCostCny: route.effectiveSwitchCost,
-        inputTokens: Math.ceil(rawBytes / 4),
+        inputTokens: contextAdmission.estimatedInputTokens,
+        estimatedInputTokens: contextAdmission.estimatedInputTokens,
+        estimationMethod: contextAdmission.estimationMethod,
+        requestedMaxOutputTokens: contextAdmission.requestedMaxOutputTokens,
+        reservedOutputTokens: contextAdmission.reservedOutputTokens,
+        safetyMarginTokens: contextAdmission.safetyMarginTokens,
+        requiredTotalContextTokens: contextAdmission.requiredTotalContextTokens,
+        effectiveContextCeiling: effectiveContextCeiling(route.selectedProfile),
         expectedOutputTokens: this.expectedOutputTokens,
         userRoutingPolicy: identity.routingPolicy,
         routingPreference: identity.routingPreference,
@@ -916,6 +1168,7 @@ export class AlphaRequestProcessor {
         requiredToolTypes: envelope.requiredToolTypes,
         clientDeclaredWebTool: envelope.clientDeclaredWebTool,
         ...webIntentMetadata(judge.webIntentDecision),
+        decisionSnapshot: routeDecisionSnapshot,
       },
       candidateEstimates: route.candidateEstimates,
       paretoFrontier: route.paretoFrontier,
@@ -946,7 +1199,6 @@ export class AlphaRequestProcessor {
     current: AlphaExecutionProfile,
     envelope: CanonicalEnvelope,
     mode: AlphaMode,
-    rawBytes: number,
     excludedProfileIds: Set<string> = new Set(),
   ): AlphaExecutionProfile | undefined {
     const equivalent = this.options.profiles.filter((profile) => (
@@ -963,7 +1215,7 @@ export class AlphaRequestProcessor {
       && envelope.requiredToolTypes.every((toolType) => profile.supportedToolTypes?.includes(toolType))
       && (envelope.webIntent !== "required" || profile.webSearchExecutionVerified === true)
       && (!envelope.containsThinking || profile.thinkingSupport)
-      && profile.contextWindow >= Math.ceil(rawBytes / 4)
+      && effectiveContextCeiling(profile) >= estimateContextAdmission(envelope, this.expectedOutputTokens).requiredTotalContextTokens
       && this.options.adapters.has(profile.executionProfileId)
     )).sort((left, right) => {
       const leftRate = left.economics
@@ -1218,14 +1470,7 @@ export class AlphaRequestProcessor {
     await verifyWritableWorkspace(envelope);
     const mode = modeForModel(envelope.requestedModel);
     const state = await this.prepareState(envelope, identity, ingress, mode);
-    const result = await this.judgeAndRoute(envelope, identity, state, ingress.rawBody.byteLength);
     const repository = new AlphaRepository(this.options.database);
-    const executionSegment = await repository.getSegment(state.segmentId, identity.newapiUserId);
-    const routeDecisionId = stringValue(executionSegment?.route_decision_id);
-    const judgeEvaluationId = stringValue(executionSegment?.judge_evaluation_id);
-    const storedRoute = routeDecisionId
-      ? await repository.getRouteDecision(routeDecisionId, identity.newapiUserId)
-      : undefined;
     const ingressIdempotencyKey = sha256([
       identity.newapiUserId,
       state.sessionId,
@@ -1245,7 +1490,6 @@ export class AlphaRequestProcessor {
       ingressIdempotencyKey,
       requestProtocol: envelope.protocol,
       requestedModel: envelope.requestedModel,
-      selectedProfileId: result.profile.executionProfileId,
       streaming: envelope.stream,
       hadTools: envelope.tools.length > 0,
       metadata: {
@@ -1264,12 +1508,21 @@ export class AlphaRequestProcessor {
     if (!logical.inserted && logicalRow?.status === "completed" && stringValue(logicalRow.response_payload_id)) {
       const payload = await repository.getPayload(String(logicalRow.response_payload_id), identity.newapiUserId);
       if (payload) {
+        const replayProfile = this.options.profiles.find((profile) => (
+          profile.executionProfileId === stringValue(logicalRow.selected_profile_id)
+        ));
+        if (!replayProfile) throw new Error("Replayed logical request has no execution profile");
+        const replaySegment = await repository.getSegment(state.segmentId, identity.newapiUserId);
+        const replayRouteDecisionId = stringValue(replaySegment?.route_decision_id);
+        const replayStoredRoute = replayRouteDecisionId
+          ? await repository.getRouteDecision(replayRouteDecisionId, identity.newapiUserId)
+          : undefined;
         return {
           adapter: staticResponseAdapter(payload),
           requestedModel: envelope.requestedModel,
-          actualModel: result.profile.modelId,
-          provider: result.profile.provider,
-          channel: result.profile.channel,
+          actualModel: replayProfile.modelId,
+          provider: replayProfile.provider,
+          channel: replayProfile.channel,
           context: {
             logicalRequestId: logical.logicalRequestId,
             sessionId: state.sessionId,
@@ -1280,8 +1533,9 @@ export class AlphaRequestProcessor {
             newapiLogId: identity.newapiLogId,
             protocol: envelope.protocol,
             reasoningEffort: envelope.reasoningEffort,
-            selectedProfile: result.profile,
-            judgeCostUsd: result.judge?.costUsd ?? "0.0000000000",
+            selectedProfile: replayProfile,
+            judgeCostUsd: "0.0000000000",
+            judgeCashCostCny: "0.0000000000",
             requestBytes: ingress.rawBody.byteLength,
             replayed: true,
             clientDeclaredWebTool: envelope.clientDeclaredWebTool,
@@ -1296,16 +1550,73 @@ export class AlphaRequestProcessor {
             webFallbackChain: [],
             routeSummary: routeDisplaySummary(
               envelope.requestedModel,
-              result.profile.modelId,
+              replayProfile.modelId,
               identity.routingPreference,
-              result.judge,
-              result.route,
-              storedRoute,
+              undefined,
+              undefined,
+              replayStoredRoute,
             ),
           } satisfies AlphaResolutionContext,
         };
       }
     }
+    if (!logical.inserted && logicalRow?.status === "failed") {
+      const logicalMetadata = metadata(logicalRow);
+      const errorType = stringValue(logicalMetadata.admissionErrorType);
+      if (errorType) {
+        throw new AlphaAdmissionError(
+          errorType,
+          stringValue(logicalMetadata.admissionErrorMessage) ?? "Admission failed",
+          numberValue(logicalMetadata.admissionHttpStatus, 400),
+          record(logicalMetadata.admissionErrorDetails) ?? {},
+        );
+      }
+    }
+    if (!logical.inserted) {
+      throw new AlphaAdmissionError(
+        "request_in_progress",
+        "An identical logical request is already being processed.",
+        409,
+        { logical_request_id: logical.logicalRequestId },
+      );
+    }
+    let result: Awaited<ReturnType<AlphaRequestProcessor["judgeAndRoute"]>>;
+    try {
+      result = await this.judgeAndRoute(envelope, identity, state, logical.logicalRequestId);
+    } catch (error) {
+      if (error instanceof AlphaAdmissionError) {
+        await repository.updateLogicalRequestMetadata(logical.logicalRequestId, identity.newapiUserId, {
+          admissionErrorType: error.errorType,
+          admissionErrorMessage: error.message,
+          admissionHttpStatus: error.statusCode,
+          admissionErrorDetails: error.details,
+        });
+        await repository.completeLogicalRequest({
+          logicalRequestId: logical.logicalRequestId,
+          newapiUserId: identity.newapiUserId,
+          status: "failed",
+          errorCategory: error.errorType,
+        });
+        await this.createAdmissionFailureUsageReport({
+          logicalRequestId: logical.logicalRequestId,
+          identity,
+          envelope,
+          error,
+        });
+      }
+      throw error;
+    }
+    await repository.selectLogicalRequestProfile(
+      logical.logicalRequestId,
+      identity.newapiUserId,
+      result.profile.executionProfileId,
+    );
+    const executionSegment = await repository.getSegment(state.segmentId, identity.newapiUserId);
+    const routeDecisionId = stringValue(executionSegment?.route_decision_id);
+    const judgeEvaluationId = stringValue(executionSegment?.judge_evaluation_id);
+    const storedRoute = routeDecisionId
+      ? await repository.getRouteDecision(routeDecisionId, identity.newapiUserId)
+      : undefined;
     const attemptIndex = await repository.nextProviderAttemptIndex(logical.logicalRequestId);
     const maxProviderAttempts = Math.max(2, Math.min(8,
       this.options.profiles.filter((profile) => profile.modelId === result.profile.modelId).length
@@ -1347,6 +1658,13 @@ export class AlphaRequestProcessor {
       routeDecisionId,
       judgeEvaluationId,
     });
+    const judgeEconomics = result.judge
+      ? this.options.judgeEconomics
+        ?? this.options.profiles.find((profile) => profile.provider === result.judge?.provider)?.economics
+      : undefined;
+    const judgeCashCostCny = result.judge
+      ? (Number(result.judge.costUsd) * (judgeEconomics ? cashCnyPerNominalUsd(judgeEconomics) : 1)).toFixed(10)
+      : "0.0000000000";
     const resolutionContext: AlphaResolutionContext = {
       logicalRequestId: logical.logicalRequestId,
       attemptId: initialAttempt.attemptId,
@@ -1363,6 +1681,7 @@ export class AlphaRequestProcessor {
       selectedProfile: result.profile,
       networkEndpoint: initialAttempt.networkEndpoint,
       judgeCostUsd: result.judge?.costUsd ?? "0.0000000000",
+      judgeCashCostCny,
       requestBytes: ingress.rawBody.byteLength,
       replayed: false,
       clientDeclaredWebTool: envelope.clientDeclaredWebTool,
@@ -1396,7 +1715,7 @@ export class AlphaRequestProcessor {
           if (nextEndpoint < this.endpoints(current.profile).length) {
             return { profile: current.profile, networkEndpointIndex: nextEndpoint, reason: "network_endpoint_fallback" };
           }
-          const profile = this.recoveryProfile(current.profile, envelope, mode, ingress.rawBody.byteLength, attemptedProfiles);
+          const profile = this.recoveryProfile(current.profile, envelope, mode, attemptedProfiles);
           if (!profile) return undefined;
           attemptedProfiles.add(profile.executionProfileId);
           return { profile, networkEndpointIndex: 0, reason: "same_model_channel_fallback" };
@@ -1487,7 +1806,20 @@ export class AlphaRequestProcessor {
     usageSource: string;
   }): Promise<void> {
     const providerCostUsd = input.providerCostUsd ?? "0.0000000000";
-    const finalCost = sumCost(input.context.judgeCostUsd, providerCostUsd);
+    const economics = input.context.selectedProfile.economics;
+    const providerCash = economics
+      ? providerCostBreakdown(economics, Number(providerCostUsd))
+      : {
+          nominalProviderCostUsd: Number(providerCostUsd),
+          providerBalanceChargeUsd: Number(providerCostUsd),
+          effectiveCashCostCny: Number(providerCostUsd),
+          effectiveCostSource: "missing_provider_economics",
+          effectiveCostVersion: "missing_provider_economics",
+        };
+    const judgeCashCostCny = Number(input.context.judgeCashCostCny);
+    const failedAttemptCashCostCny = 0;
+    const actualTotalCashCostCny = providerCash.effectiveCashCostCny + judgeCashCostCny + failedAttemptCashCostCny;
+    const counterfactualQualityCeilingCostCny = input.context.routeSummary.counterfactualQualityCeilingCostCny;
     await new AlphaRepository(this.options.database).createUsageReport({
       usageReportId: alphaId("usage"),
       logicalRequestId: input.context.logicalRequestId,
@@ -1505,10 +1837,26 @@ export class AlphaRequestProcessor {
       judgeCostUsd: input.context.judgeCostUsd,
       providerCostUsd,
       failedBilledCostUsd: "0.0000000000",
-      finalUserCostUsd: finalCost,
+      finalUserCostUsd: "0.0000000000",
+      nominalProviderCostUsd: providerCash.nominalProviderCostUsd.toFixed(10),
+      providerBalanceChargeUsd: providerCash.providerBalanceChargeUsd.toFixed(10),
+      effectiveProviderCashCostCny: providerCash.effectiveCashCostCny.toFixed(10),
+      judgeCashCostCny: judgeCashCostCny.toFixed(10),
+      failedAttemptCashCostCny: failedAttemptCashCostCny.toFixed(10),
+      actualTotalCashCostCny: actualTotalCashCostCny.toFixed(10),
+      userChargeCny: actualTotalCashCostCny.toFixed(10),
+      counterfactualQualityCeilingCostCny: counterfactualQualityCeilingCostCny?.toFixed(10),
       costBreakdown: {
-        judge: input.context.judgeCostUsd,
-        provider: providerCostUsd,
+        billing_version: "founder-alpha-actual-cash-v2",
+        judge_nominal_cost_usd: input.context.judgeCostUsd,
+        nominal_provider_cost_usd: providerCash.nominalProviderCostUsd,
+        provider_balance_charge_usd: providerCash.providerBalanceChargeUsd,
+        effective_provider_cash_cost_cny: providerCash.effectiveCashCostCny,
+        judge_cash_cost_cny: judgeCashCostCny,
+        failed_attempt_cash_cost_cny: failedAttemptCashCostCny,
+        actual_total_cash_cost_cny: actualTotalCashCostCny,
+        user_charge_cny: actualTotalCashCostCny,
+        counterfactual_quality_ceiling_cost_cny: counterfactualQualityCeilingCostCny,
         usageSource: input.usageSource,
         reasoning_effort: input.context.reasoningEffort,
         routing_preference: input.context.routeSummary.routingPreference,
@@ -1549,9 +1897,8 @@ export class AlphaRequestProcessor {
         web_tool_pruned: input.context.webToolPruned,
         web_tool_prune_reason: input.context.webToolPruneReason,
         ...(() => {
-          const economics = input.context.selectedProfile.economics;
           if (!economics) return {};
-          const actual = providerCostBreakdown(economics, Number(providerCostUsd));
+          const actual = providerCash;
           const reference = this.options.profiles.find((profile) => (
             profile.provider === "closeai" && profile.modelId === input.context.selectedProfile.modelId
             && profile.economics?.enabled
@@ -1565,7 +1912,8 @@ export class AlphaRequestProcessor {
             effective_cash_cost_cny: actual.effectiveCashCostCny,
             effective_cost_source: actual.effectiveCostSource,
             effective_cost_version: actual.effectiveCostVersion,
-            user_charge: finalCost,
+            user_charge: actualTotalCashCostCny,
+            user_charge_currency: "CNY",
             reference_provider: reference?.provider,
             reference_effective_cash_cost_cny: referenceCost,
             effective_savings_vs_reference_cny: referenceCost === undefined
@@ -1573,6 +1921,49 @@ export class AlphaRequestProcessor {
               : referenceCost - actual.effectiveCashCostCny,
           };
         })(),
+      },
+    });
+  }
+
+  private async createAdmissionFailureUsageReport(input: {
+    logicalRequestId: string;
+    identity: TrustedNewApiIdentity;
+    envelope: CanonicalEnvelope;
+    error: AlphaAdmissionError;
+  }): Promise<void> {
+    const judgeCostUsd = String(input.error.details.judge_cost_usd ?? "0.0000000000");
+    const judgeCashCostCny = String(input.error.details.judge_cash_cost_cny ?? "0.0000000000");
+    await new AlphaRepository(this.options.database).createUsageReport({
+      usageReportId: alphaId("usage"),
+      logicalRequestId: input.logicalRequestId,
+      reportIdempotencyKey: sha256(`${input.logicalRequestId}\nadmission-failure-v2`),
+      newapiUserId: input.identity.newapiUserId,
+      newapiTokenId: input.identity.newapiTokenId,
+      newapiLogId: input.identity.newapiLogId,
+      actualModel: input.envelope.requestedModel,
+      provider: String(input.error.details.judge_provider ?? "judge"),
+      channel: "admission",
+      judgeCostUsd,
+      providerCostUsd: "0.0000000000",
+      failedBilledCostUsd: "0.0000000000",
+      finalUserCostUsd: "0.0000000000",
+      nominalProviderCostUsd: "0.0000000000",
+      providerBalanceChargeUsd: "0.0000000000",
+      effectiveProviderCashCostCny: "0.0000000000",
+      judgeCashCostCny,
+      failedAttemptCashCostCny: "0.0000000000",
+      actualTotalCashCostCny: judgeCashCostCny,
+      userChargeCny: judgeCashCostCny,
+      costBreakdown: {
+        billing_version: "founder-alpha-actual-cash-v2",
+        admission_error_type: input.error.errorType,
+        admission_trace_id: input.error.details.admission_trace_id,
+        judge_evaluation_id: input.error.details.judge_evaluation_id,
+        judge_model: input.error.details.judge_model,
+        judge_nominal_cost_usd: judgeCostUsd,
+        judge_cash_cost_cny: judgeCashCostCny,
+        actual_total_cash_cost_cny: judgeCashCostCny,
+        user_charge_cny: judgeCashCostCny,
       },
     });
   }
@@ -1715,7 +2106,7 @@ export class AlphaRequestProcessor {
       actualModelMismatch: Boolean(usage.actualModel && canonicalModel !== context.selectedProfile.modelId),
       usageTrusted: transportSuccess ? usage.usageSource === "provider_usage" : undefined,
     });
-    if (relay.webSearch.actuallyInvoked || webRequiredFailure) {
+    if (transportSuccess || relay.webSearch.actuallyInvoked || webRequiredFailure) {
       await repository.saveProfileWebHealth({
         executionProfileId: context.selectedProfile.executionProfileId,
         channelId: context.selectedProfile.channelId ?? context.selectedProfile.channel,
@@ -1724,6 +2115,17 @@ export class AlphaRequestProcessor {
         protocol: context.protocol,
         usageTrusted: context.selectedProfile.usageTrusted !== false,
         actualModelVerified: !usage.actualModel || canonicalModel === context.selectedProfile.modelId,
+        canonicalAdvertisedContextWindow: context.selectedProfile.canonicalAdvertisedContextWindow,
+        providerDeclaredContextWindow: context.selectedProfile.providerDeclaredContextWindow,
+        observedSuccessfulInputTokens: transportSuccess ? usage.inputTokens : undefined,
+        providerHardContextCap: context.selectedProfile.providerHardContextCap,
+        contextCapabilityStatus: context.selectedProfile.providerHardContextCap
+          ? "provider_capped"
+          : transportSuccess ? "observed_floor" : context.selectedProfile.contextCapabilityStatus,
+        contextCapabilitySource: transportSuccess
+          ? "provider_usage_observed_success"
+          : context.selectedProfile.contextCapabilitySource,
+        contextLastVerifiedAt: transportSuccess ? new Date() : undefined,
         metadata: {
           webSearchRecentSuccessRate: context.selectedProfile.webSearchRecentSuccessRate,
           webSearchObservedLatencyMs: context.selectedProfile.webSearchObservedLatencyMs,

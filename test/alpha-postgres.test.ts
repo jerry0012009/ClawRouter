@@ -30,10 +30,12 @@ run("Alpha PostgreSQL foundation", () => {
        WHERE table_schema='public' AND table_name LIKE 'acu_%' ORDER BY table_name`,
     );
     expect(result.rows.map((row) => row.table_name)).toEqual([
+      "acu_admission_traces",
       "acu_attempts",
       "acu_channel_health",
       "acu_events",
       "acu_judge_evaluations",
+      "acu_judge_ledger_entries",
       "acu_logical_requests",
       "acu_payloads",
       "acu_provider_health",

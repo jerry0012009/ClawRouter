@@ -1,5 +1,6 @@
 import { createServer, request as httpRequest, type Server } from "node:http";
 import { once } from "node:events";
+import { gzipSync } from "node:zlib";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   createAlphaGatewayServer,
@@ -157,6 +158,33 @@ describe("Alpha native protocol gateway", () => {
     expect(upstreamBody.equals(body)).toBe(true);
     expect(upstreamHeaders.authorization).toBe("Bearer provider-test-key");
     expect(upstreamHeaders["x-acu-newapi-user-id"]).toBeUndefined();
+  });
+
+  it("does not forward gzip metadata after fetch has decoded the Provider body", async () => {
+    const expected = '{"id":"response-gzip","output":[]}';
+    const upstreamPort = await listen(createServer((_request, response) => {
+      response.setHeader("content-type", "application/json");
+      response.setHeader("content-encoding", "gzip");
+      response.end(gzipSync(expected));
+    }));
+    const adapter = createNativeProviderAdapter({
+      provider: "lucen", channel: "lucen-openai",
+      baseUrl: `http://127.0.0.1:${upstreamPort}`,
+      apiKey: "provider-test-key", authMode: "bearer",
+    });
+    const gatewayPort = await listen(createAlphaGatewayServer({
+      trustedIdentitySecret: sharedSecret,
+      async resolveExecution(envelope) {
+        return { adapter, requestedModel: envelope.requestedModel, actualModel: envelope.requestedModel, provider: "lucen", channel: "lucen-openai" };
+      },
+    }));
+    const body = Buffer.from('{"model":"gpt-test","input":"hello","stream":false}');
+    const response = await fetch(`http://127.0.0.1:${gatewayPort}/v1/responses`, {
+      method: "POST", headers: signedHeaders(body), body,
+    });
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-encoding")).toBeNull();
+    expect(await response.text()).toBe(expected);
   });
 
   it("supports Providers whose Responses root omits the /v1 prefix", async () => {

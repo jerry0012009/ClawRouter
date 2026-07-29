@@ -445,12 +445,28 @@ run("Alpha PostgreSQL request processor", () => {
     }, "explicit-1", "user-explicit");
     expect(judgeCalls).toBe(2);
     expect(upstreamBodies.at(-1)?.model).toBe("gpt-5.4-mini");
-    const result = await database.query<{ judge_count: string; route_mode: string }>(
+    const result = await database.query<{
+      judge_count: string; route_mode: string; candidate_count: string;
+      difficulty_index: null; selected_model: string; selected_channel: string;
+      model_reason: string; channel_reason: string;
+    }>(
       `SELECT
        (SELECT count(*) FROM acu_judge_evaluations WHERE newapi_user_id='user-explicit') judge_count,
-       (SELECT mode FROM acu_route_decisions WHERE newapi_user_id='user-explicit' LIMIT 1) route_mode`,
+       mode route_mode,
+       formula_inputs_json->'decisionSnapshot'->>'candidateCount' candidate_count,
+       formula_inputs_json->'decisionSnapshot'->'difficultyIndex' difficulty_index,
+       formula_inputs_json->'decisionSnapshot'->>'selectedModel' selected_model,
+       formula_inputs_json->'decisionSnapshot'->>'selectedChannel' selected_channel,
+       formula_inputs_json->'decisionSnapshot'->>'modelSelectionReason' model_reason,
+       formula_inputs_json->'decisionSnapshot'->>'channelSelectionReason' channel_reason
+       FROM acu_route_decisions WHERE newapi_user_id='user-explicit' LIMIT 1`,
     );
-    expect(result.rows[0]).toEqual({ judge_count: "0", route_mode: "explicit" });
+    expect(result.rows[0]).toMatchObject({
+      judge_count: "0", route_mode: "explicit", candidate_count: "1", difficulty_index: null,
+      selected_model: "gpt-5.4-mini", selected_channel: "test-channel",
+    });
+    expect(result.rows[0].model_reason).toContain("User-selected explicit model");
+    expect(result.rows[0].channel_reason).toContain("User-selected explicit model");
   });
 
   it("creates a new judged Segment when the user later explicitly requests current official docs", async () => {
@@ -694,6 +710,59 @@ run("Alpha PostgreSQL request processor", () => {
     expect(await response.text()).toContain("Codex sandbox must be workspace-write");
     expect(judgeCalls).toBe(beforeJudge);
     expect(upstreamBodies.length).toBe(beforeProvider);
+  });
+
+  it("persists Judge cost and returns one stable 400 when Context admission fails", async () => {
+    const beforeJudge = judgeCalls;
+    const beforeProvider = upstreamBodies.length;
+    const body = Buffer.from(JSON.stringify({
+      model: "acu-auto",
+      input: [{
+        type: "message", role: "user",
+        content: [{ type: "input_text", text: `summarize ${"x".repeat(1_700_000)}` }],
+      }],
+      stream: true,
+    }));
+    const request = () => fetch(`http://127.0.0.1:${gatewayPort}/v1/responses`, {
+      method: "POST",
+      headers: signedHeaders(body, "context-too-long", "user-context-failure", "codex"),
+      body,
+    });
+
+    const first = await request();
+    expect(first.status).toBe(400);
+    const firstError = await first.json() as { error: Record<string, unknown> };
+    expect(firstError.error).toMatchObject({
+      type: "context_length_exceeded",
+      maximum_available_context_tokens: 400_000,
+    });
+    expect(judgeCalls).toBe(beforeJudge + 1);
+    expect(upstreamBodies.length).toBe(beforeProvider);
+
+    const replay = await request();
+    expect(replay.status).toBe(400);
+    expect(judgeCalls).toBe(beforeJudge + 1);
+    expect(upstreamBodies.length).toBe(beforeProvider);
+
+    const result = await database.query<{
+      requests: string; judges: string; judge_ledger: string; admissions: string; attempts: string;
+      usage_reports: string; pending_requests: string; judge_cash: string;
+    }>(
+      `SELECT
+       (SELECT count(*) FROM acu_logical_requests WHERE newapi_user_id='user-context-failure') requests,
+       (SELECT count(*) FROM acu_judge_evaluations WHERE newapi_user_id='user-context-failure') judges,
+       (SELECT count(*) FROM acu_judge_ledger_entries WHERE newapi_user_id='user-context-failure') judge_ledger,
+       (SELECT count(*) FROM acu_admission_traces WHERE newapi_user_id='user-context-failure') admissions,
+       (SELECT count(*) FROM acu_attempts a JOIN acu_logical_requests r USING(logical_request_id)
+        WHERE r.newapi_user_id='user-context-failure') attempts,
+       (SELECT count(*) FROM acu_usage_reports WHERE newapi_user_id='user-context-failure') usage_reports,
+       (SELECT count(*) FROM acu_logical_requests WHERE newapi_user_id='user-context-failure' AND status='pending') pending_requests,
+       (SELECT judge_cash_cost_cny::text FROM acu_usage_reports WHERE newapi_user_id='user-context-failure') judge_cash`,
+    );
+    expect(result.rows[0]).toEqual({
+      requests: "1", judges: "1", judge_ledger: "1", admissions: "1", attempts: "0",
+      usage_reports: "1", pending_requests: "0", judge_cash: "0.0010000000",
+    });
   });
 
   it("keeps Claude tool_result in role=user separate from a HumanMessage and preserves native SSE", async () => {

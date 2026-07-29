@@ -12,6 +12,7 @@ import { AlphaRepository } from "./repository.js";
 import type { AlphaExecutionProfile } from "./routing.js";
 import { readProviderEconomicsCatalog, type ProviderEconomics } from "./provider-economics.js";
 import { UsageOutboxWorker } from "./usage-outbox.js";
+import { canonicalAdvertisedContextWindow } from "./context-admission.js";
 
 export type ConfiguredExecutionProfile = AlphaExecutionProfile & {
   baseUrl?: string;
@@ -53,6 +54,7 @@ export type AlphaServiceConfig = {
   newApiInternalBaseUrl: string;
   profiles: ConfiguredExecutionProfile[];
   providerEconomics: ProviderEconomics[];
+  judgeEconomicsProviderId?: string;
 };
 
 function requiredEnvironment(name: string): string {
@@ -113,6 +115,7 @@ export async function readAlphaServiceConfig(): Promise<AlphaServiceConfig> {
     newApiInternalBaseUrl: requiredEnvironment("NEW_API_INTERNAL_BASE_URL"),
     profiles: await configuredProfiles(),
     providerEconomics: (await readProviderEconomicsCatalog(economicsPath)).providers,
+    judgeEconomicsProviderId: process.env.ACU_JUDGE_ECONOMICS_PROVIDER_ID?.trim() || undefined,
   };
 }
 
@@ -160,6 +163,14 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
       thinkingSupport: profile.thinkingSupport,
       supportedReasoningEfforts: profile.supportedReasoningEfforts,
       contextWindow: profile.contextWindow,
+      canonicalAdvertisedContextWindow: profile.canonicalAdvertisedContextWindow
+        ?? canonicalAdvertisedContextWindow(profile.modelId),
+      providerDeclaredContextWindow: profile.providerDeclaredContextWindow ?? null,
+      observedSuccessfulInputTokens: profile.observedSuccessfulInputTokens ?? 0,
+      providerHardContextCap: profile.providerHardContextCap ?? null,
+      contextCapabilityStatus: profile.contextCapabilityStatus ?? "unverified_long_context",
+      contextCapabilitySource: profile.contextCapabilitySource ?? "canonical_advertised_default",
+      contextLastVerifiedAt: profile.contextLastVerifiedAt,
       health: profile.health,
       enabled: profile.enabled,
       administratorAllowed: profile.administratorAllowed,
@@ -198,16 +209,24 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
       adapters,
     };
   });
+  const judgeConfig = readAcuRuntimeConfig();
   const judgeRunner = createAcuJudgeRunner({
-    config: readAcuRuntimeConfig(),
+    config: judgeConfig,
     rulesDecision: rulesFallbackDecision(),
   });
+  const judgeEconomics = serviceConfig.judgeEconomicsProviderId
+    ? serviceConfig.providerEconomics.find((item) => item.providerId === serviceConfig.judgeEconomicsProviderId)
+    : undefined;
+  if (serviceConfig.judgeEconomicsProviderId && !judgeEconomics) {
+    throw new Error(`No Provider Economics for Judge ${serviceConfig.judgeEconomicsProviderId}`);
+  }
   const processor = new AlphaRequestProcessor({
     database,
     profiles: profiles.map((item) => item.profile),
     adapters: new Map(profiles.map((item) => [item.profile.executionProfileId, item.adapter])),
     networkAdapters: new Map(profiles.map((item) => [item.profile.executionProfileId, item.adapters])),
     judgeRunner,
+    judgeEconomics,
   });
   const repository = new AlphaRepository(database);
   const usageOutbox = new UsageOutboxWorker({

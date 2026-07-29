@@ -14,7 +14,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": false,
@@ -22,7 +21,14 @@
       "health": "disabled",
       "healthReason": "preflight_failed:timeout",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 400000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "blackai-codex-mix-low:gpt-5.5:responses",
@@ -35,7 +41,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": false,
@@ -43,7 +48,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "blackai-codex-mix-low:gpt-5.6-luna:responses",
@@ -64,7 +76,6 @@
         "medium",
         "high"
       ],
-      "contextWindow": 32768,
       "actualModelVerified": true,
       "usageTrusted": true,
       "effectivePriceAvailable": true,
@@ -77,7 +88,14 @@
       "webSearchExecutionVerified": false,
       "webSearchStreamingVerified": false,
       "webSearchResultVerified": false,
-      "webSearchFailureReason": "web_search_output_item_missing"
+      "webSearchFailureReason": "web_search_output_item_missing",
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "blackai-codex-mix-low:gpt-5.6-sol:responses",
@@ -98,7 +116,6 @@
         "medium",
         "high"
       ],
-      "contextWindow": 32768,
       "actualModelVerified": true,
       "usageTrusted": true,
       "effectivePriceAvailable": true,
@@ -111,7 +128,14 @@
       "webSearchExecutionVerified": false,
       "webSearchStreamingVerified": false,
       "webSearchResultVerified": false,
-      "webSearchFailureReason": "web_search_output_item_missing"
+      "webSearchFailureReason": "web_search_output_item_missing",
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "blackai-codex-mix-low:gpt-5.6-terra:responses",
@@ -132,7 +156,6 @@
         "medium",
         "high"
       ],
-      "contextWindow": 32768,
       "actualModelVerified": true,
       "usageTrusted": true,
       "effectivePriceAvailable": true,
@@ -145,7 +168,14 @@
       "webSearchExecutionVerified": false,
       "webSearchStreamingVerified": false,
       "webSearchResultVerified": false,
-      "webSearchFailureReason": "web_search_output_item_missing"
+      "webSearchFailureReason": "web_search_output_item_missing",
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "blackai-pro-1-4:gpt-5.4-mini:responses",
@@ -158,7 +188,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": false,
@@ -166,7 +195,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 400000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "blackai-pro-1-4:gpt-5.5:responses",
@@ -179,7 +215,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": false,
@@ -187,7 +222,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "blackai-pro-1-4:gpt-5.6-luna:responses",
@@ -200,7 +242,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": false,
@@ -208,7 +249,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "blackai-pro-1-4:gpt-5.6-sol:responses",
@@ -221,7 +269,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": false,
@@ -229,7 +276,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "blackai-pro-1-4:gpt-5.6-terra:responses",
@@ -242,7 +296,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": false,
@@ -250,7 +303,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "blackai-claude-reverse:claude-opus-4-8:messages",
@@ -263,7 +323,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": false,
@@ -271,7 +330,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "blackai-claude-reverse:claude-sonnet-5:messages",
@@ -284,7 +350,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": false,
@@ -292,7 +357,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "blackai-codex-mix-pro-fallback:gpt-5.4-mini:responses",
@@ -305,7 +377,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": false,
@@ -313,7 +384,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 400000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "blackai-codex-mix-pro-fallback:gpt-5.5:responses",
@@ -326,7 +404,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": false,
@@ -334,7 +411,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "blackai-codex-mix-pro-fallback:gpt-5.6-luna:responses",
@@ -355,7 +439,6 @@
         "medium",
         "high"
       ],
-      "contextWindow": 32768,
       "actualModelVerified": true,
       "usageTrusted": true,
       "effectivePriceAvailable": false,
@@ -363,7 +446,14 @@
       "health": "degraded",
       "healthReason": "preflight_passed_but_effective_price_missing",
       "lastVerifiedAt": "2026-07-29T15:28:13.936Z",
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "blackai-codex-mix-pro-fallback:gpt-5.6-sol:responses",
@@ -376,7 +466,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": false,
@@ -384,7 +473,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "blackai-codex-mix-pro-fallback:gpt-5.6-terra:responses",
@@ -397,7 +493,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": false,
@@ -405,7 +500,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cn-models-k3-015:glm-5.2:responses",
@@ -418,7 +520,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -426,7 +527,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-claude-clone-020:claude-opus-4-8:messages",
@@ -439,7 +547,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -447,7 +554,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-claude-clone-020:claude-sonnet-5:messages",
@@ -460,7 +574,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -468,7 +581,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-claude-cursor-reverse-030:claude-opus-4-8:messages",
@@ -481,7 +601,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -489,7 +608,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-claude-cursor-reverse-030:claude-sonnet-5:messages",
@@ -502,7 +628,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -510,7 +635,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx003-low:gpt-5.5:responses",
@@ -523,7 +655,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -531,7 +662,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx003-low:gpt-5.6-luna:responses",
@@ -544,7 +682,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -552,7 +689,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx003-low:gpt-5.6-sol:responses",
@@ -565,7 +709,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -573,7 +716,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx003-low:gpt-5.6-terra:responses",
@@ -586,7 +736,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -594,7 +743,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx004-low-dedicated:gpt-5.4-mini:responses",
@@ -607,7 +763,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": 1048576,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -615,7 +770,14 @@
       "health": "disabled",
       "healthReason": "minimal_preflight_failed",
       "lastVerifiedAt": "2026-07-29T15:27:04.673Z",
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 400000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx004-low-dedicated:gpt-5.5:responses",
@@ -628,7 +790,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -636,7 +797,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx004-low-dedicated:gpt-5.6-luna:responses",
@@ -649,7 +817,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -657,7 +824,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx004-low-dedicated:gpt-5.6-sol:responses",
@@ -670,7 +844,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -678,7 +851,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx004-low-dedicated:gpt-5.6-terra:responses",
@@ -691,7 +871,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -699,7 +878,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.4-mini:responses",
@@ -723,7 +909,6 @@
         "medium",
         "high"
       ],
-      "contextWindow": 32768,
       "actualModelVerified": true,
       "usageTrusted": true,
       "effectivePriceAvailable": true,
@@ -739,7 +924,14 @@
       "webSearchRecentSuccessRate": 1,
       "webSearchObservedLatencyMs": 28817,
       "webSearchLastVerifiedAt": "2026-07-29T17:31:45.066Z",
-      "webSearchFailureReason": null
+      "webSearchFailureReason": null,
+      "canonicalAdvertisedContextWindow": 400000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.5:responses",
@@ -752,7 +944,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -760,7 +951,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.6-luna:responses",
@@ -781,7 +979,6 @@
         "medium",
         "high"
       ],
-      "contextWindow": 32768,
       "actualModelVerified": true,
       "usageTrusted": true,
       "effectivePriceAvailable": true,
@@ -797,7 +994,14 @@
       "webSearchRecentSuccessRate": 1,
       "webSearchObservedLatencyMs": 5241,
       "webSearchLastVerifiedAt": "2026-07-29T17:30:59.989Z",
-      "webSearchFailureReason": null
+      "webSearchFailureReason": null,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 229541,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "observed_floor",
+      "contextCapabilitySource": "founder_supplied_provider_usage_record",
+      "contextLastVerifiedAt": "2026-07-30T00:00:00.000Z"
     },
     {
       "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.6-sol:responses",
@@ -810,7 +1014,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -818,7 +1021,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.6-terra:responses",
@@ -839,7 +1049,6 @@
         "medium",
         "high"
       ],
-      "contextWindow": 32768,
       "actualModelVerified": true,
       "usageTrusted": true,
       "effectivePriceAvailable": true,
@@ -855,7 +1064,14 @@
       "webSearchRecentSuccessRate": 1,
       "webSearchObservedLatencyMs": 5342,
       "webSearchLastVerifiedAt": "2026-07-29T17:31:56.218Z",
-      "webSearchFailureReason": null
+      "webSearchFailureReason": null,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx006-plus:gpt-5.4-mini:responses",
@@ -868,7 +1084,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -876,7 +1091,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 400000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx006-plus:gpt-5.5:responses",
@@ -889,7 +1111,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -897,7 +1118,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx006-plus:gpt-5.6-luna:responses",
@@ -918,7 +1146,6 @@
         "medium",
         "high"
       ],
-      "contextWindow": 32768,
       "actualModelVerified": true,
       "usageTrusted": true,
       "effectivePriceAvailable": true,
@@ -926,7 +1153,14 @@
       "health": "healthy",
       "healthReason": "minimal_native_responses_preflight_passed",
       "lastVerifiedAt": "2026-07-29T15:28:39.727Z",
-      "activeInAcuAuto": true
+      "activeInAcuAuto": true,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx006-plus:gpt-5.6-sol:responses",
@@ -939,7 +1173,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -947,7 +1180,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx006-plus:gpt-5.6-terra:responses",
@@ -960,7 +1200,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -968,7 +1207,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx008-plus-dedicated:gpt-5.4-mini:responses",
@@ -981,7 +1227,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -989,7 +1234,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 400000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx008-plus-dedicated:gpt-5.5:responses",
@@ -1002,7 +1254,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1010,7 +1261,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx008-plus-dedicated:gpt-5.6-luna:responses",
@@ -1031,7 +1289,6 @@
         "medium",
         "high"
       ],
-      "contextWindow": 32768,
       "actualModelVerified": true,
       "usageTrusted": true,
       "effectivePriceAvailable": true,
@@ -1039,7 +1296,14 @@
       "health": "healthy",
       "healthReason": "minimal_native_responses_preflight_passed",
       "lastVerifiedAt": "2026-07-29T15:28:52.789Z",
-      "activeInAcuAuto": true
+      "activeInAcuAuto": true,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx008-plus-dedicated:gpt-5.6-sol:responses",
@@ -1052,7 +1316,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1060,7 +1323,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx008-plus-dedicated:gpt-5.6-terra:responses",
@@ -1073,7 +1343,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1081,7 +1350,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx010-plus-fast:gpt-5.4-mini:responses",
@@ -1094,7 +1370,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1102,7 +1377,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 400000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx010-plus-fast:gpt-5.5:responses",
@@ -1115,7 +1397,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1123,7 +1404,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx010-plus-fast:gpt-5.6-luna:responses",
@@ -1136,7 +1424,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1144,7 +1431,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx010-plus-fast:gpt-5.6-sol:responses",
@@ -1157,7 +1451,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1165,7 +1458,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx010-plus-fast:gpt-5.6-terra:responses",
@@ -1178,7 +1478,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1186,7 +1485,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx012-pro:gpt-5.4-mini:responses",
@@ -1199,7 +1505,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1207,7 +1512,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 400000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx012-pro:gpt-5.5:responses",
@@ -1220,7 +1532,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1228,7 +1539,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx012-pro:gpt-5.6-luna:responses",
@@ -1241,7 +1559,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1249,7 +1566,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx012-pro:gpt-5.6-sol:responses",
@@ -1262,7 +1586,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1270,7 +1593,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx012-pro:gpt-5.6-terra:responses",
@@ -1283,7 +1613,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1291,7 +1620,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx014-pro-stable:gpt-5.4-mini:responses",
@@ -1304,7 +1640,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1312,7 +1647,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 400000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx014-pro-stable:gpt-5.5:responses",
@@ -1325,7 +1667,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1333,7 +1674,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx014-pro-stable:gpt-5.6-luna:responses",
@@ -1346,7 +1694,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1354,7 +1701,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx014-pro-stable:gpt-5.6-sol:responses",
@@ -1367,7 +1721,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1375,7 +1728,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx014-pro-stable:gpt-5.6-terra:responses",
@@ -1388,7 +1748,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1396,7 +1755,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx017-pro-first-token:gpt-5.4-mini:responses",
@@ -1409,7 +1775,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1417,7 +1782,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 400000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx017-pro-first-token:gpt-5.5:responses",
@@ -1430,7 +1802,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1438,7 +1809,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx017-pro-first-token:gpt-5.6-luna:responses",
@@ -1451,7 +1829,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1459,7 +1836,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx017-pro-first-token:gpt-5.6-sol:responses",
@@ -1472,7 +1856,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1480,7 +1863,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx017-pro-first-token:gpt-5.6-terra:responses",
@@ -1493,7 +1883,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1501,7 +1890,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx025-pro-premium:gpt-5.4-mini:responses",
@@ -1514,7 +1910,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1522,7 +1917,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 400000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx025-pro-premium:gpt-5.5:responses",
@@ -1535,7 +1937,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1543,7 +1944,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx025-pro-premium:gpt-5.6-luna:responses",
@@ -1556,7 +1964,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1564,7 +1971,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx025-pro-premium:gpt-5.6-sol:responses",
@@ -1577,7 +1991,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1585,7 +1998,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-cx025-pro-premium:gpt-5.6-terra:responses",
@@ -1598,7 +2018,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1606,7 +2025,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-claude-aws-reverse-040:claude-opus-4-8:messages",
@@ -1619,7 +2045,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1627,7 +2052,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-claude-max-090:claude-opus-4-8:messages",
@@ -1640,7 +2072,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1648,7 +2079,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-claude-max-090:claude-sonnet-5:messages",
@@ -1661,7 +2099,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1669,7 +2106,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-claude-antigravity-reverse-040:claude-opus-4-8:messages",
@@ -1682,7 +2126,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1690,7 +2133,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-gemini-openai-030:gemini-2.5-flash:responses",
@@ -1703,7 +2153,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1711,7 +2160,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-gemini-openai-030:gemini-3.5-flash:responses",
@@ -1724,7 +2180,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1732,7 +2187,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-mainstream-cn-claude-030:claude-opus-4-8:messages",
@@ -1745,7 +2207,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1753,7 +2214,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-mainstream-cn-claude-030:deepseek-v4-flash:messages",
@@ -1766,7 +2234,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1774,7 +2241,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-mainstream-cn-claude-030:deepseek-v4-pro:messages",
@@ -1787,7 +2261,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1795,7 +2268,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-mainstream-cn-claude-030:glm-5.1:messages",
@@ -1808,7 +2288,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1816,7 +2295,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-mainstream-cn-claude-030:glm-5.2:messages",
@@ -1829,7 +2315,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1837,7 +2322,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-mainstream-cn-claude-030:kimi-k2.6:messages",
@@ -1850,7 +2342,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1858,7 +2349,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-mainstream-cn-claude-030:kimi-k2.7-code:messages",
@@ -1871,7 +2369,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1879,7 +2376,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-kiro-cache-claude-015:claude-opus-4-8:messages",
@@ -1892,7 +2396,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1900,7 +2403,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-kiro-cache-claude-015:claude-sonnet-5:messages",
@@ -1913,7 +2423,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1921,7 +2430,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-glm-official-claude-030:claude-opus-4-8:messages",
@@ -1934,7 +2450,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1942,7 +2457,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-glm-official-claude-030:glm-5.1:messages",
@@ -1955,7 +2477,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1963,7 +2484,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-glm-official-claude-030:glm-5.2:messages",
@@ -1976,7 +2504,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -1984,7 +2511,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-glm-official-openai-030:glm-5.1:responses",
@@ -1997,7 +2531,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -2005,7 +2538,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-glm-official-openai-030:glm-5.2:responses",
@@ -2018,7 +2558,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -2026,7 +2565,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-glm-official-openai-030:gpt-5.5:responses",
@@ -2039,7 +2585,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -2047,7 +2592,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": 1050000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "unverified_long_context",
+      "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-qwen-official-claude-010:qwen3.7-max:messages",
@@ -2060,7 +2612,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -2068,7 +2619,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-qwen-official-openai-010:qwen3.7-max:responses",
@@ -2081,7 +2639,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -2089,7 +2646,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-grok-006:claude-opus-4-8:responses",
@@ -2102,7 +2666,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -2110,7 +2673,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-grok-006:claude-sonnet-5:responses",
@@ -2123,7 +2693,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -2131,7 +2700,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-deepseek-openai-050:deepseek-v4-flash:responses",
@@ -2144,7 +2720,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -2152,7 +2727,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-deepseek-openai-050:deepseek-v4-pro:responses",
@@ -2165,7 +2747,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -2173,7 +2754,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-deepseek-openai-050:glm-5.1:responses",
@@ -2186,7 +2774,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -2194,7 +2781,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-deepseek-openai-050:glm-5.2:responses",
@@ -2207,7 +2801,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -2215,7 +2808,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-deepseek-openai-050:kimi-k2.6:responses",
@@ -2228,7 +2828,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -2236,7 +2835,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-deepseek-openai-050:kimi-k2.7-code:responses",
@@ -2249,7 +2855,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -2257,7 +2862,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-deepseek-openai-050:qwen3.6-plus:responses",
@@ -2270,7 +2882,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -2278,7 +2889,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-deepseek-openai-050:qwen3.7-max:responses",
@@ -2291,7 +2909,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -2299,7 +2916,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-deepseek-claude-050:deepseek-v4-flash:messages",
@@ -2312,7 +2936,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -2320,7 +2943,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-deepseek-claude-050:deepseek-v4-pro:messages",
@@ -2333,7 +2963,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -2341,7 +2970,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-kiro-cache90-claude-006:claude-opus-4-8:messages",
@@ -2354,7 +2990,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -2362,7 +2997,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-kiro-cache90-claude-006:claude-sonnet-5:messages",
@@ -2375,7 +3017,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -2383,7 +3024,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-kiro-cache70-claude-006:claude-opus-4-8:messages",
@@ -2396,7 +3044,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -2404,7 +3051,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-kiro-cache70-claude-006:claude-sonnet-5:messages",
@@ -2417,7 +3071,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -2425,7 +3078,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-claude-max-unlimited-100:claude-opus-4-8:messages",
@@ -2438,7 +3098,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -2446,7 +3105,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     },
     {
       "executionProfileId": "lucen-claude-max-unlimited-100:claude-sonnet-5:messages",
@@ -2459,7 +3125,6 @@
       "supportedToolTypes": [],
       "thinkingSupport": false,
       "supportedReasoningEfforts": [],
-      "contextWindow": null,
       "actualModelVerified": false,
       "usageTrusted": false,
       "effectivePriceAvailable": true,
@@ -2467,7 +3132,14 @@
       "health": "disabled",
       "healthReason": "directory_only_pending_minimal_protocol_preflight",
       "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "activeInAcuAuto": false,
+      "canonicalAdvertisedContextWindow": null,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 0,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "provider_capped",
+      "contextCapabilitySource": "legacy_profile_declared_hard_cap",
+      "contextLastVerifiedAt": null
     }
   ]
 }

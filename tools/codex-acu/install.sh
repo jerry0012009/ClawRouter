@@ -33,6 +33,7 @@ cat >"$config_tmp" <<EOF
 model = "acu-auto"
 model_provider = "acu-founder-alpha"
 model_reasoning_effort = "medium"
+model_context_window = 1050000
 
 [model_providers.acu-founder-alpha]
 name = "ACU Router Founder Alpha"

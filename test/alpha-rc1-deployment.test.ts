@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { getAcuModel } from "../src/acu/catalog.js";
 import { continuousTierProbabilities } from "../src/acu/math.js";
 import type { AcuJudgeResult } from "../src/acu/types.js";
+import { effectiveContextCeiling } from "../src/alpha/context-admission.js";
 import { routeWithCurrentAcuFormula, type AlphaExecutionProfile } from "../src/alpha/routing.js";
 import type { ProviderEconomicsCatalog } from "../src/alpha/provider-economics.js";
 
@@ -64,7 +65,7 @@ describe("Alpha RC1 deployment profiles", () => {
         expect(catalog?.inputPricePerMillion).toBeTypeOf("number");
         expect(catalog?.outputPricePerMillion).toBeTypeOf("number");
         expect(catalog?.cachedInputPricePerMillion).toBeTypeOf("number");
-        expect(profile.contextWindow).toBeLessThanOrEqual(catalog?.contextWindow ?? 0);
+        expect(effectiveContextCeiling(profile)).toBeLessThanOrEqual(catalog?.contextWindow ?? 0);
         expect(profile.baseUrlEnv).toMatch(/^(?:ACU_CHANNEL_)?(?:CLOSEAI|LUCEN|BLACKAI)_/);
         expect(profile.apiKeyEnv).toMatch(/^(?:ACU_CHANNEL_)?(?:CLOSEAI|LUCEN|BLACKAI).+API_KEY$/);
       }

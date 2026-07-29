@@ -16,8 +16,15 @@ export type RelayResult = {
 function copyResponseHeaders(upstream: Response, response: ServerResponse): void {
   response.statusCode = upstream.status;
   upstream.headers.forEach((value, name) => {
-    if (!isHopByHopHeader(name)) response.setHeader(name, value);
+    if (!isHopByHopHeader(name) && name.toLowerCase() !== "content-encoding") {
+      response.setHeader(name, value);
+    }
   });
+}
+
+function decodedResponseHeaders(upstream: Response): Record<string, string> {
+  return Object.fromEntries([...upstream.headers.entries()].filter(([name]) =>
+    !isHopByHopHeader(name) && name.toLowerCase() !== "content-encoding"));
 }
 
 export async function relayProviderResponse(upstream: Response, response: ServerResponse): Promise<RelayResult> {
@@ -61,7 +68,7 @@ export async function relayProviderResponse(upstream: Response, response: Server
   return {
     body,
     httpStatus: upstream.status,
-    responseHeaders: Object.fromEntries(upstream.headers.entries()),
+    responseHeaders: decodedResponseHeaders(upstream),
     complete,
     clientCancelled,
     visibleOutputBytes,

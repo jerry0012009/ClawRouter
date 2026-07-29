@@ -5,7 +5,7 @@ import { sanitizeHeadersForPersistence, sanitizePayloadForPersistence } from "./
 import type { CircuitState, HealthSnapshot, ProviderErrorClass } from "./channel-health.js";
 
 export type AlphaProtocol = "responses" | "messages" | "chat_completions";
-export type AlphaIdPrefix = "ses" | "task" | "seg" | "evt" | "judge" | "route" | "req" | "att" | "payload" | "usage";
+export type AlphaIdPrefix = "ses" | "task" | "seg" | "evt" | "judge" | "route" | "req" | "att" | "payload" | "usage" | "admission" | "ledger";
 
 export function alphaId(prefix: AlphaIdPrefix): string {
   return `${prefix}_${randomUUID().replaceAll("-", "")}`;
@@ -156,6 +156,14 @@ export type UsageReportRecord = {
   providerCostUsd?: string;
   failedBilledCostUsd?: string;
   finalUserCostUsd: string;
+  nominalProviderCostUsd?: string;
+  providerBalanceChargeUsd?: string;
+  effectiveProviderCashCostCny?: string;
+  judgeCashCostCny?: string;
+  failedAttemptCashCostCny?: string;
+  actualTotalCashCostCny?: string;
+  userChargeCny?: string;
+  counterfactualQualityCeilingCostCny?: string;
   costBreakdown: Record<string, unknown>;
 };
 
@@ -177,6 +185,14 @@ export type PendingUsageReport = {
   providerCostUsd: string;
   failedBilledCostUsd: string;
   finalUserCostUsd: string;
+  nominalProviderCostUsd: string;
+  providerBalanceChargeUsd: string;
+  effectiveProviderCashCostCny: string;
+  judgeCashCostCny: string;
+  failedAttemptCashCostCny: string;
+  actualTotalCashCostCny: string;
+  userChargeCny: string;
+  counterfactualQualityCeilingCostCny?: string;
   costBreakdown: Record<string, unknown>;
   sendAttemptCount: number;
 };
@@ -216,6 +232,40 @@ export type JudgeEvaluationRecord = {
   latencyMs?: number;
   actualCostUsd?: string;
   errorCategory?: string;
+};
+
+export type AdmissionTraceRecord = {
+  admissionTraceId: string;
+  admissionIdempotencyKey: string;
+  newapiUserId: string;
+  logicalRequestId?: string;
+  sessionId: string;
+  taskId: string;
+  segmentId: string;
+  judgeEvaluationId?: string;
+  requestProtocol: AlphaProtocol;
+  requestedModel: string;
+  estimatedInputTokens: number;
+  estimationMethod: string;
+  requestedMaxOutputTokens: number;
+  reservedOutputTokens: number;
+  safetyMarginTokens: number;
+  requiredTotalContextTokens: number;
+  metadata?: Record<string, unknown>;
+};
+
+export type JudgeLedgerRecord = {
+  judgeLedgerEntryId: string;
+  judgeEvaluationId: string;
+  admissionTraceId: string;
+  newapiUserId: string;
+  judgeProvider?: string;
+  judgeModel?: string;
+  promptTokens: bigint;
+  completionTokens: bigint;
+  nominalCostUsd: string;
+  effectiveCashCostCny: string;
+  costSource: string;
 };
 
 export type RouteDecisionRecord = {
@@ -477,6 +527,19 @@ export class AlphaRepository {
     if (result.rowCount !== 1) throw new Error("Logical request metadata update failed or crossed user scope");
   }
 
+  async selectLogicalRequestProfile(
+    logicalRequestId: string,
+    newapiUserId: string,
+    selectedProfileId: string,
+  ): Promise<void> {
+    const result = await this.database.query(
+      `UPDATE acu_logical_requests SET selected_profile_id=$3
+       WHERE logical_request_id=$1 AND newapi_user_id=$2`,
+      [logicalRequestId, newapiUserId, selectedProfileId],
+    );
+    if (result.rowCount !== 1) throw new Error("Logical request profile update failed or crossed user scope");
+  }
+
   /** Admin-only lookup. Callers must enforce independent administrator authentication. */
   async getAdminLogicalRequestTrace(logicalRequestId: string): Promise<Record<string, unknown> | undefined> {
     const result = await this.database.query<{ trace: Record<string, unknown> }>(
@@ -498,6 +561,16 @@ export class AlphaRepository {
          'judge_evaluations',COALESCE((
            SELECT jsonb_agg(to_jsonb(value) ORDER BY value.created_at,value.judge_evaluation_id)
            FROM acu_judge_evaluations value WHERE value.task_id=requested.task_id
+         ),'[]'::jsonb),
+         'admission_traces',COALESCE((
+           SELECT jsonb_agg(to_jsonb(value) ORDER BY value.created_at,value.admission_trace_id)
+           FROM acu_admission_traces value WHERE value.task_id=requested.task_id
+         ),'[]'::jsonb),
+         'judge_ledger',COALESCE((
+           SELECT jsonb_agg(to_jsonb(value) ORDER BY value.created_at,value.judge_ledger_entry_id)
+           FROM acu_judge_ledger_entries value
+           JOIN acu_judge_evaluations judge USING(judge_evaluation_id)
+           WHERE judge.task_id=requested.task_id
          ),'[]'::jsonb),
          'route_decisions',COALESCE((
            SELECT jsonb_agg(to_jsonb(value) ORDER BY value.created_at,value.route_decision_id)
@@ -615,6 +688,64 @@ export class AlphaRepository {
     if (result.rowCount !== 1) throw new Error("Judge payload attachment failed or crossed user scope");
   }
 
+  async saveAdmissionTrace(input: AdmissionTraceRecord): Promise<{ admissionTraceId: string; inserted: boolean }> {
+    const result = await this.database.query<{ admission_trace_id: string }>(
+      `INSERT INTO acu_admission_traces
+       (admission_trace_id,admission_idempotency_key,newapi_user_id,logical_request_id,session_id,task_id,
+        segment_id,judge_evaluation_id,request_protocol,requested_model,status,estimated_input_tokens,
+        estimation_method,requested_max_output_tokens,reserved_output_tokens,safety_margin_tokens,
+        required_total_context_tokens,metadata_json)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'evaluating',$11,$12,$13,$14,$15,$16,$17)
+       ON CONFLICT (admission_idempotency_key) DO NOTHING RETURNING admission_trace_id`,
+      [input.admissionTraceId, input.admissionIdempotencyKey, input.newapiUserId, input.logicalRequestId ?? null,
+        input.sessionId, input.taskId, input.segmentId, input.judgeEvaluationId ?? null, input.requestProtocol,
+        input.requestedModel, input.estimatedInputTokens, input.estimationMethod, input.requestedMaxOutputTokens,
+        input.reservedOutputTokens, input.safetyMarginTokens, input.requiredTotalContextTokens,
+        json(input.metadata)],
+    );
+    if (result.rowCount === 1) return { admissionTraceId: input.admissionTraceId, inserted: true };
+    const existing = await this.database.query<{ admission_trace_id: string }>(
+      "SELECT admission_trace_id FROM acu_admission_traces WHERE admission_idempotency_key=$1",
+      [input.admissionIdempotencyKey],
+    );
+    return { admissionTraceId: existing.rows[0].admission_trace_id, inserted: false };
+  }
+
+  async saveJudgeLedgerEntry(input: JudgeLedgerRecord): Promise<void> {
+    await this.database.query(
+      `INSERT INTO acu_judge_ledger_entries
+       (judge_ledger_entry_id,judge_evaluation_id,admission_trace_id,newapi_user_id,judge_provider,judge_model,
+        prompt_tokens,completion_tokens,nominal_cost_usd,effective_cash_cost_cny,cost_source)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+       ON CONFLICT (judge_evaluation_id) DO NOTHING`,
+      [input.judgeLedgerEntryId, input.judgeEvaluationId, input.admissionTraceId, input.newapiUserId,
+        input.judgeProvider ?? null, input.judgeModel ?? null, input.promptTokens, input.completionTokens,
+        input.nominalCostUsd, input.effectiveCashCostCny, input.costSource],
+    );
+  }
+
+  async completeAdmissionTrace(input: {
+    admissionTraceId: string;
+    status: "admitted" | "rejected";
+    errorType?: string;
+    httpStatus?: number;
+    maximumAvailableContextTokens?: number;
+    candidateContextLimits?: Record<string, number>;
+    exclusionCounts?: Record<string, number>;
+    metadata?: Record<string, unknown>;
+  }): Promise<void> {
+    const result = await this.database.query(
+      `UPDATE acu_admission_traces SET status=$2,error_type=$3,http_status=$4,
+       maximum_available_context_tokens=$5,candidate_context_limits_json=$6,
+       exclusion_counts_json=$7,metadata_json=metadata_json || $8::jsonb,updated_at=now()
+       WHERE admission_trace_id=$1`,
+      [input.admissionTraceId, input.status, input.errorType ?? null, input.httpStatus ?? null,
+        input.maximumAvailableContextTokens ?? null, json(input.candidateContextLimits ?? {}),
+        json(input.exclusionCounts ?? {}), json(input.metadata ?? {})],
+    );
+    if (result.rowCount !== 1) throw new Error("Admission trace completion failed");
+  }
+
   async saveRouteDecision(input: RouteDecisionRecord): Promise<void> {
     await this.database.query(
       `INSERT INTO acu_route_decisions
@@ -695,6 +826,7 @@ export class AlphaRepository {
     usageTrusted?: boolean;
     actualModelVerified?: boolean;
     metadata?: Record<string, unknown>;
+    observedSuccessfulInputTokens?: number;
   }) | undefined> {
     const result = await this.database.query<Record<string, unknown>>(
       "SELECT * FROM acu_provider_model_profile_health WHERE execution_profile_id=$1", [executionProfileId],
@@ -705,6 +837,7 @@ export class AlphaRepository {
       usageTrusted: row.usage_trusted === true,
       actualModelVerified: row.actual_model_verified === true,
       metadata: row.metadata_json as Record<string, unknown> | undefined,
+      observedSuccessfulInputTokens: Number(row.observed_successful_input_tokens ?? 0),
     } : undefined;
   }
 
@@ -783,17 +916,37 @@ export class AlphaRepository {
     protocol: AlphaProtocol;
     usageTrusted: boolean;
     actualModelVerified: boolean;
+    canonicalAdvertisedContextWindow?: number;
+    providerDeclaredContextWindow?: number | null;
+    observedSuccessfulInputTokens?: bigint;
+    providerHardContextCap?: number | null;
+    contextCapabilityStatus?: string;
+    contextCapabilitySource?: string;
+    contextLastVerifiedAt?: Date;
     metadata: Record<string, unknown>;
   }): Promise<void> {
     await this.database.query(
       `INSERT INTO acu_provider_model_profile_health
        (execution_profile_id,channel_id,provider_id,canonical_model_id,protocol,circuit_state,
-        consecutive_failures,recent_success_rate,actual_model_verified,usage_trusted,health_reason,metadata_json,updated_at)
-       VALUES ($1,$2,$3,$4,$5,'healthy',0,1,$6,$7,'web_health_only',$8,now())
+        consecutive_failures,recent_success_rate,actual_model_verified,usage_trusted,health_reason,metadata_json,
+        canonical_advertised_context_window,provider_declared_context_window,observed_successful_input_tokens,
+        provider_hard_context_cap,context_capability_status,context_capability_source,context_last_verified_at,updated_at)
+       VALUES ($1,$2,$3,$4,$5,'healthy',0,1,$6,$7,'web_health_only',$8,$9,$10,$11,$12,$13,$14,$15,now())
        ON CONFLICT (execution_profile_id) DO UPDATE SET
-        metadata_json=acu_provider_model_profile_health.metadata_json || excluded.metadata_json,updated_at=now()`,
+        metadata_json=acu_provider_model_profile_health.metadata_json || excluded.metadata_json,
+        canonical_advertised_context_window=COALESCE(excluded.canonical_advertised_context_window,acu_provider_model_profile_health.canonical_advertised_context_window),
+        provider_declared_context_window=COALESCE(excluded.provider_declared_context_window,acu_provider_model_profile_health.provider_declared_context_window),
+        observed_successful_input_tokens=GREATEST(acu_provider_model_profile_health.observed_successful_input_tokens,excluded.observed_successful_input_tokens),
+        provider_hard_context_cap=COALESCE(excluded.provider_hard_context_cap,acu_provider_model_profile_health.provider_hard_context_cap),
+        context_capability_status=COALESCE(excluded.context_capability_status,acu_provider_model_profile_health.context_capability_status),
+        context_capability_source=COALESCE(excluded.context_capability_source,acu_provider_model_profile_health.context_capability_source),
+        context_last_verified_at=COALESCE(excluded.context_last_verified_at,acu_provider_model_profile_health.context_last_verified_at),updated_at=now()`,
       [input.executionProfileId, input.channelId, input.providerId, input.canonicalModelId,
-        input.protocol, input.actualModelVerified, input.usageTrusted, json(input.metadata)],
+        input.protocol, input.actualModelVerified, input.usageTrusted, json(input.metadata),
+        input.canonicalAdvertisedContextWindow ?? null, input.providerDeclaredContextWindow ?? null,
+        input.observedSuccessfulInputTokens ?? 0n, input.providerHardContextCap ?? null,
+        input.contextCapabilityStatus ?? null, input.contextCapabilitySource ?? null,
+        input.contextLastVerifiedAt ?? null],
     );
   }
 
@@ -835,15 +988,23 @@ export class AlphaRepository {
        (usage_report_id,newapi_user_id,newapi_token_id,newapi_log_id,logical_request_id,
         report_idempotency_key,actual_model,provider,channel,input_tokens,cached_input_tokens,
         output_tokens,reasoning_tokens,judge_cost_usd,provider_cost_usd,failed_billed_cost_usd,
-        final_user_cost_usd,cost_breakdown_json,status,created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,'pending',now())
+        final_user_cost_usd,nominal_provider_cost_usd,provider_balance_charge_usd,
+        effective_provider_cash_cost_cny,judge_cash_cost_cny,failed_attempt_cash_cost_cny,
+        actual_total_cash_cost_cny,user_charge_cny,counterfactual_quality_ceiling_cost_cny,
+        cost_breakdown_json,status,created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,'pending',now())
        ON CONFLICT (report_idempotency_key) DO NOTHING RETURNING usage_report_id`,
       [input.usageReportId, input.newapiUserId, input.newapiTokenId ?? null,
         input.newapiLogId ?? null, input.logicalRequestId, input.reportIdempotencyKey,
         input.actualModel ?? null, input.provider ?? null, input.channel ?? null,
         input.inputTokens ?? 0n, input.cachedInputTokens ?? 0n, input.outputTokens ?? 0n,
         input.reasoningTokens ?? 0n, input.judgeCostUsd ?? "0", input.providerCostUsd ?? "0",
-        input.failedBilledCostUsd ?? "0", input.finalUserCostUsd, json(input.costBreakdown)],
+        input.failedBilledCostUsd ?? "0", input.finalUserCostUsd,
+        input.nominalProviderCostUsd ?? input.providerCostUsd ?? "0",
+        input.providerBalanceChargeUsd ?? "0", input.effectiveProviderCashCostCny ?? "0",
+        input.judgeCashCostCny ?? "0", input.failedAttemptCashCostCny ?? "0",
+        input.actualTotalCashCostCny ?? "0", input.userChargeCny ?? "0",
+        input.counterfactualQualityCeilingCostCny ?? null, json(input.costBreakdown)],
     );
     if (result.rowCount === 1) return { usageReportId: input.usageReportId, inserted: true };
     const existing = await this.database.query<{ usage_report_id: string }>(
@@ -873,6 +1034,14 @@ export class AlphaRepository {
       provider_cost_usd: string;
       failed_billed_cost_usd: string;
       final_user_cost_usd: string;
+      nominal_provider_cost_usd: string;
+      provider_balance_charge_usd: string;
+      effective_provider_cash_cost_cny: string;
+      judge_cash_cost_cny: string;
+      failed_attempt_cash_cost_cny: string;
+      actual_total_cash_cost_cny: string;
+      user_charge_cny: string;
+      counterfactual_quality_ceiling_cost_cny: string | null;
       cost_breakdown_json: Record<string, unknown>;
       send_attempt_count: number;
     }>(
@@ -907,6 +1076,14 @@ export class AlphaRepository {
       providerCostUsd: row.provider_cost_usd,
       failedBilledCostUsd: row.failed_billed_cost_usd,
       finalUserCostUsd: row.final_user_cost_usd,
+      nominalProviderCostUsd: row.nominal_provider_cost_usd,
+      providerBalanceChargeUsd: row.provider_balance_charge_usd,
+      effectiveProviderCashCostCny: row.effective_provider_cash_cost_cny,
+      judgeCashCostCny: row.judge_cash_cost_cny,
+      failedAttemptCashCostCny: row.failed_attempt_cash_cost_cny,
+      actualTotalCashCostCny: row.actual_total_cash_cost_cny,
+      userChargeCny: row.user_charge_cny,
+      counterfactualQualityCeilingCostCny: row.counterfactual_quality_ceiling_cost_cny ?? undefined,
       costBreakdown: row.cost_breakdown_json,
       sendAttemptCount: row.send_attempt_count,
     }));

@@ -6,6 +6,7 @@ import type { CanonicalEnvelope } from "./protocol/types.js";
 import type { NativeProviderAdapter } from "./provider.js";
 import { relayProviderResponse, type RelayResult } from "./stream-relay.js";
 import { verifyTrustedIdentity, type TrustedNewApiIdentity } from "./trusted-identity.js";
+import { AlphaAdmissionError } from "./routing.js";
 
 export type AlphaExecutionResolution = {
   adapter: NativeProviderAdapter;
@@ -83,13 +84,15 @@ function jsonError(
   status: number,
   message: string,
   protocol?: "responses" | "messages",
+  error?: unknown,
 ): void {
   if (response.headersSent || response.destroyed) return;
   response.statusCode = status;
   response.setHeader("content-type", "application/json");
+  const admission = error instanceof AlphaAdmissionError ? error : undefined;
   response.end(JSON.stringify(protocol === "messages"
-    ? { type: "error", error: { type: "api_error", message } }
-    : { error: { type: "acu_gateway_error", message } }));
+    ? { type: "error", error: { type: admission?.errorType ?? "api_error", message, ...admission?.details } }
+    : { error: { type: admission?.errorType ?? "acu_gateway_error", message, ...admission?.details } }));
 }
 
 function executionErrorStatus(error: unknown): number {
@@ -243,7 +246,7 @@ export function createAlphaGatewayServer(options: AlphaGatewayOptions): Server {
         if (response.headersSent && !response.destroyed) response.end();
         else {
           const status = stage === "identity" ? 401 : stage === "protocol" ? 400 : stage === "body" ? 413 : executionErrorStatus(error);
-          jsonError(response, status, error instanceof Error ? error.message : "ACU gateway failure", protocol);
+          jsonError(response, status, error instanceof Error ? error.message : "ACU gateway failure", protocol, error);
         }
       }
     }

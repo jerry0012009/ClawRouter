@@ -47,6 +47,8 @@ export class AlphaDatabase implements SqlExecutor {
     if (path.pathname.endsWith("0001_alpha_p0.sql")) {
       await this.pool.query(await readFile(new URL("../../migrations/acu/0002_provider_channel_health.sql", import.meta.url), "utf8"));
       await this.pool.query(await readFile(new URL("../../migrations/acu/0003_web_intent_source.sql", import.meta.url), "utf8"));
+      await this.pool.query(await readFile(new URL("../../migrations/acu/0004_rc2_context_ledger.sql", import.meta.url), "utf8"));
+      await this.pool.query(await readFile(new URL("../../migrations/acu/0005_rc2_judge_reconciliation.sql", import.meta.url), "utf8"));
     }
   }
 

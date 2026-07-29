@@ -1,3 +1,22 @@
+type AcuRuntimeConfig = {
+    enabled: boolean;
+    judgeModel: string;
+    judgeBaseUrl: string;
+    judgeMode: "non-thinking";
+    promptVersion: string;
+    timeoutMs: number;
+    maxContextTokens: number;
+    maxOutputTokens: number;
+    apiKey?: string;
+    cachePath?: string;
+    allowMock: boolean;
+    shadowMode: boolean;
+    allowForceRefresh: boolean;
+    databasePath: string;
+    judgeEntropyPenalty: number;
+};
+declare function readAcuRuntimeConfig(overrides?: Partial<AcuRuntimeConfig>): AcuRuntimeConfig;
+
 declare const ACU_TIERS: readonly ["low", "mid", "mid_high", "high"];
 type AcuTier = (typeof ACU_TIERS)[number];
 type AcuTierProbabilities = {
@@ -200,13 +219,15 @@ type AcuDecisionInput = {
     requireVisionSupport?: boolean;
     switchCost?: number;
     judgeEntropyPenalty?: number;
+    costSensitivity?: number;
+    fallbackRiskScale?: number;
 };
 declare function estimateCallCost(model: Pick<AcuModelCatalogEntry, "inputPricePerMillion" | "outputPricePerMillion">, inputTokens: number, outputTokens: number): number;
 type ValueCandidate = Pick<AcuModelEstimate, "modelId" | "displayName" | "predictedScore" | "riskAdjustedCost"> & {
     conservativeScore?: number;
 };
 declare function isParetoEfficient(candidate: ValueCandidate, candidates: ValueCandidate[]): boolean;
-declare function selectValueRoute<T extends ValueCandidate>(candidates: T[], targetScore: number): {
+declare function selectValueRoute<T extends ValueCandidate>(candidates: T[], targetScore: number, costSensitivity?: number): {
     selected: T;
     bestScore: T;
     reason: string;
@@ -975,25 +996,6 @@ declare function getSessionId(headers: Record<string, string | string[] | undefi
  * Normalizes whitespace to avoid false negatives from minor formatting diffs.
  */
 declare function hashRequestContent(lastUserContent: string, toolCallNames?: string[]): string;
-
-type AcuRuntimeConfig = {
-    enabled: boolean;
-    judgeModel: string;
-    judgeBaseUrl: string;
-    judgeMode: "non-thinking";
-    promptVersion: string;
-    timeoutMs: number;
-    maxContextTokens: number;
-    maxOutputTokens: number;
-    apiKey?: string;
-    cachePath?: string;
-    allowMock: boolean;
-    shadowMode: boolean;
-    allowForceRefresh: boolean;
-    databasePath: string;
-    judgeEntropyPenalty: number;
-};
-declare function readAcuRuntimeConfig(overrides?: Partial<AcuRuntimeConfig>): AcuRuntimeConfig;
 
 type JudgeRequestResult = {
     result: AcuJudgeResult;

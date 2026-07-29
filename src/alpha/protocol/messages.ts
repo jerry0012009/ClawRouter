@@ -112,6 +112,7 @@ export function normalizeMessagesRequest(
     instructions: raw.system,
     history: continuityHistory,
     tools,
+    requiredToolTypes: tools.length > 0 ? ["function"] : [],
     humanCandidates,
     toolCalls,
     toolResults,

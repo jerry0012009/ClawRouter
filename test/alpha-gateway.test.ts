@@ -35,7 +35,8 @@ function signedHeaders(body: Buffer): Record<string, string> {
     clientVersion: "2.1.220",
     routingPolicy: "all_routing_eligible" as const,
     allowedModelIds: [],
-    routingPolicyVersion: "acu-user-policy-v1-0000000000000000",
+    routingPolicyVersion: "acu-user-policy-v2-0000000000000000",
+    routingPreference: "balanced" as const,
     timestamp: new Date().toISOString(),
     bodySha256: bodySha256(body),
   };

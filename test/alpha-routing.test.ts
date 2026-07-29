@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { recommendModel, selectValueRoute } from "../src/acu/decision.js";
 import type { AcuJudgeResult } from "../src/acu/types.js";
 import {
@@ -182,6 +183,90 @@ describe("Alpha current-formula routing", () => {
       executionProfileId: "closeai:gpt-5.4-mini:responses",
       reasons: ["reasoning_effort:high"],
     });
+  });
+
+  it("hard-filters unsupported hosted tools with an auditable reason", () => {
+    const capabilityProfiles = profiles.map((profile) => ({
+      ...profile,
+      supportedToolTypes: profile.modelId === "gpt-5.5"
+        ? ["function", "hosted_web_search"] as const
+        : ["function"] as const,
+    }));
+    const result = routeWithCurrentAcuFormula({
+      judge,
+      judgeCost: 0,
+      inputTokens: 2_000,
+      expectedOutputTokens: 500,
+      effectiveQualityTarget: 88,
+      profiles: capabilityProfiles,
+      requirements: { ...requirements, requiredToolTypes: ["function", "hosted_web_search"] },
+    });
+    expect(result.selectedProfile.modelId).toBe("gpt-5.5");
+    expect(result.excludedProfiles).toContainEqual({
+      executionProfileId: "closeai:gpt-5.4-mini:responses",
+      reasons: ["tool_type:hosted_web_search"],
+    });
+  });
+
+  it("returns a clear capability error when no profile supports a hosted tool", () => {
+    expect(() => routeWithCurrentAcuFormula({
+      judge,
+      judgeCost: 0,
+      inputTokens: 2_000,
+      expectedOutputTokens: 500,
+      effectiveQualityTarget: 88,
+      profiles,
+      requirements: { ...requirements, requiredToolTypes: ["file_search"] },
+    })).toThrow(/required tool capabilities: file_search/);
+  });
+
+  it("replays economy, balanced and quality across difficulty and token sizes without fixed-model routing", () => {
+    const configured = JSON.parse(readFileSync(
+      new URL("../deploy/alpha/execution-profiles.json", import.meta.url),
+      "utf8",
+    )) as AlphaExecutionProfile[];
+    const responseProfiles = configured.filter((profile) => profile.protocols.includes("responses"));
+    const tokenSizes = [[100, 20], [2_000, 300], [12_000, 1_200], [30_000, 10_000]] as const;
+    const selected = {
+      economy: new Set<string>(),
+      balanced: new Set<string>(),
+      quality: new Set<string>(),
+    };
+    for (const [inputTokens, expectedOutputTokens] of tokenSizes) {
+      for (let difficulty = 0; difficulty <= 100; difficulty += 1) {
+        const replayJudge = { ...judge, difficultyIndex: difficulty, difficultyScore: difficulty };
+        const decisions = (["economy", "balanced", "quality"] as const).map((routingPreference) => (
+          routeWithCurrentAcuFormula({
+            judge: replayJudge,
+            judgeCost: 0.001,
+            inputTokens,
+            expectedOutputTokens,
+            effectiveQualityTarget: 80,
+            routingPreference,
+            profiles: responseProfiles,
+            requirements: {
+              protocol: "responses",
+              requireTools: true,
+              requiredToolTypes: ["function", "local_tool"],
+              requireThinking: true,
+              reasoningEffort: "medium",
+              contextTokens: inputTokens,
+            },
+          })
+        ));
+        decisions.forEach((decision, index) => {
+          selected[(["economy", "balanced", "quality"] as const)[index]].add(decision.selectedProfile.modelId);
+          expect(decision.formulaVersion).toBe("acu-routing-model-v0.2");
+        });
+        const balancedQuality = decisions[1].recommendation.recommended.estimatedQuality;
+        const qualityQuality = decisions[2].recommendation.recommended.estimatedQuality;
+        expect(qualityQuality + 1e-12).toBeGreaterThanOrEqual(balancedQuality);
+      }
+    }
+    expect(selected.economy.has("gpt-5.4-mini")).toBe(true);
+    expect(selected.economy.size).toBeGreaterThan(1);
+    expect(selected.balanced.size).toBeGreaterThan(1);
+    expect(selected.quality.size).toBeGreaterThan(1);
   });
 
   it("resolves explicit models without invoking Judge or substituting a model", () => {

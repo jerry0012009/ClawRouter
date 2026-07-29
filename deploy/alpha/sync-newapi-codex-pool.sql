@@ -12,3 +12,12 @@ SET model_limits_enabled = true,
     model_limits = 'acu-auto'
 WHERE name = 'ACU Founder Codex'
   AND user_id = (SELECT id FROM users WHERE username = 'acu_founder');
+
+-- Founder opts into the new cost-first preference explicitly. Existing users
+-- retain balanced behavior through the application default.
+UPDATE users
+SET setting = (
+  COALESCE(NULLIF(setting, ''), '{}')::jsonb
+  || '{"acu_routing_preference":"economy"}'::jsonb
+)::text
+WHERE username = 'acu_founder';

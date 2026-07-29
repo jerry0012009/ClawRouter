@@ -28,6 +28,28 @@ describe("Responses canonical envelope", () => {
     expect(envelope.reasoningEffort).toBe("medium");
     expect(envelope.raw.reasoning).toEqual({ effort: "medium", summary: "auto" });
     expect(envelope.containsThinking).toBe(true);
+    expect(envelope.requiredToolTypes).toEqual(["function"]);
+  });
+
+  it("distinguishes provider-hosted web search from generic client tools", () => {
+    const envelope = normalizeResponsesRequest({
+      model: "acu-auto",
+      input: "Search the web",
+      tools: [
+        { type: "function", name: "exec_command" },
+        { type: "namespace", name: "multi_agent_v1" },
+        { type: "web_search" },
+        { type: "file_search" },
+        { type: "computer_use_preview" },
+      ],
+    });
+    expect(envelope.requiredToolTypes).toEqual([
+      "function",
+      "local_tool",
+      "hosted_web_search",
+      "file_search",
+      "computer_use",
+    ]);
   });
 
   it("does not treat an update_plan schema declaration as PlanStarted", () => {

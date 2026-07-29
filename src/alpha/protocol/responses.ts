@@ -1,9 +1,26 @@
 import { array, canonicalHash, record, textParts } from "./common.js";
 import type { CanonicalEnvelope, NativeRequestHeaders } from "./types.js";
+import type { ToolCapability } from "../routing.js";
 
 function parseJsonBody(body: unknown): Record<string, unknown> {
   if (typeof body === "string") return record(JSON.parse(body)) ?? {};
   return record(body) ?? {};
+}
+
+function requiredToolTypes(tools: unknown[]): ToolCapability[] {
+  const capabilities = new Set<ToolCapability>();
+  for (const rawTool of tools) {
+    const tool = record(rawTool);
+    const type = typeof tool?.type === "string" ? tool.type.toLowerCase() : "";
+    if (type === "function") capabilities.add("function");
+    else if (type === "custom") capabilities.add("custom");
+    else if (["namespace", "local_shell", "shell", "computer_shell"].includes(type)) capabilities.add("local_tool");
+    else if (type === "web_search" || type.startsWith("web_search_")) capabilities.add("hosted_web_search");
+    else if (type === "file_search") capabilities.add("file_search");
+    else if (type === "computer" || type.startsWith("computer_use")) capabilities.add("computer_use");
+    else if (type) capabilities.add("other_hosted_tool");
+  }
+  return [...capabilities];
 }
 
 export function normalizeResponsesRequest(body: unknown, headers: NativeRequestHeaders = {}): CanonicalEnvelope {
@@ -57,6 +74,7 @@ export function normalizeResponsesRequest(body: unknown, headers: NativeRequestH
     instructions: raw.instructions,
     history: input,
     tools,
+    requiredToolTypes: requiredToolTypes(tools),
     humanCandidates,
     toolCalls,
     toolResults,

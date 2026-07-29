@@ -4194,7 +4194,7 @@ import { createHash as createHash5, randomUUID } from "crypto";
 // src/acu/config.ts
 var ACU_PROMPT_VERSION = "acu-tier-requirement-v3";
 var ACU_DIFFICULTY_METHOD_VERSION = "acu-difficulty-index-v1";
-var ACU_ROUTING_MODEL_VERSION = "acu-routing-model-v0.1";
+var ACU_ROUTING_MODEL_VERSION = "acu-routing-model-v0.2";
 var ACU_DEFAULT_JUDGE_MODEL = "deepseek-v4-flash";
 var ACU_DEFAULT_JUDGE_BASE_URL = "https://api.deepseek.com";
 var ACU_DEFAULT_JUDGE_MODE = "non-thinking";
@@ -6200,13 +6200,13 @@ function estimateCallCost(model, inputTokens, outputTokens) {
   }
   return (Math.max(0, inputTokens) * model.inputPricePerMillion + Math.max(0, outputTokens) * model.outputPricePerMillion) / 1e6;
 }
-function estimateOne(model, difficultyScore2, entropyPenalty, inputTokens, outputTokens, judgeCost, fallbackCallCost, qualityTarget, switchCost) {
+function estimateOne(model, difficultyScore2, entropyPenalty, inputTokens, outputTokens, judgeCost, fallbackCallCost, qualityTarget, switchCost, fallbackRiskScale) {
   const curvePoint = interpolateModelCurve(model, difficultyScore2);
   const quality = curvePoint.estimatedQuality;
   const lower = clamp(quality - model.uncertaintyWidth - entropyPenalty / 100);
   const upper = clamp(quality + model.uncertaintyWidth);
   const callCost = estimateCallCost(model, inputTokens, outputTokens);
-  const expectedFallbackCost = (1 - lower) * (fallbackCallCost + switchCost);
+  const expectedFallbackCost = fallbackRiskScale * (1 - lower) * (fallbackCallCost + switchCost);
   const total = judgeCost + callCost + expectedFallbackCost;
   return {
     modelId: model.modelId,
@@ -6238,12 +6238,13 @@ function estimateOne(model, difficultyScore2, entropyPenalty, inputTokens, outpu
 function isParetoEfficient(candidate, candidates) {
   return !candidates.some((other) => other.modelId !== candidate.modelId && other.predictedScore >= candidate.predictedScore && other.riskAdjustedCost <= candidate.riskAdjustedCost && (other.predictedScore > candidate.predictedScore || other.riskAdjustedCost < candidate.riskAdjustedCost));
 }
-function selectValueRoute(candidates, targetScore) {
+function selectValueRoute(candidates, targetScore, costSensitivity = 1) {
   if (candidates.length === 0) throw new Error("Value routing requires at least one candidate");
   const bestScore = candidates.reduce((best, item) => item.predictedScore > best.predictedScore ? item : best);
   const frontier = candidates.filter((candidate) => isParetoEfficient(candidate, candidates));
   const preference = clamp((targetScore - 60) / 35);
   const qualityWeight = 0.58 + 0.24 * preference;
+  const costWeight = clamp((1 - qualityWeight) * Math.max(0, costSensitivity), 0, 0.9);
   const riskWeight = 0.2 + 0.25 * preference;
   const qualityExponent = 0.8 + 1.2 * preference;
   const finiteCosts = frontier.map((candidate) => Math.max(1e-9, candidate.riskAdjustedCost));
@@ -6256,7 +6257,7 @@ function selectValueRoute(candidates, targetScore) {
     const riskAdjustedScore = candidate.predictedScore - riskWeight * Math.max(0, candidate.predictedScore - conservative);
     const qualityUtility = Math.pow(Math.max(0, riskAdjustedScore) / Math.max(1, targetScore), qualityExponent);
     const costUtility = logRange <= 1e-12 ? 1 : 1 - Math.log(Math.max(1e-9, candidate.riskAdjustedCost) / minCost) / logRange;
-    const valueUtility = qualityUtility * (qualityWeight + (1 - qualityWeight) * costUtility);
+    const valueUtility = qualityUtility * (1 - costWeight + costWeight * costUtility);
     utilities.set(candidate.modelId, { riskAdjustedScore, qualityUtility, costUtility, valueUtility });
   }
   const selected = frontier.reduce((best, item) => utilities.get(item.modelId).valueUtility > utilities.get(best.modelId).valueUtility ? item : best);
@@ -6277,6 +6278,8 @@ function recommendModel(input) {
   const inputTokens = Math.max(1, Math.round(input.inputTokens));
   const outputTokens = Math.max(1, Math.round(input.expectedOutputTokens));
   const switchCost = Math.max(0, input.switchCost ?? ACU_DEFAULT_SWITCH_COST_USD);
+  const costSensitivity = Math.max(0, input.costSensitivity ?? 1);
+  const fallbackRiskScale = Math.max(0, input.fallbackRiskScale ?? 1);
   let models = getRoutingEligibleModels(input.eligibleModelIds);
   if (input.requireToolCallSupport) models = models.filter((model) => model.toolCallSupport);
   if (input.requireVisionSupport) models = models.filter((model) => model.visionSupport);
@@ -6293,7 +6296,8 @@ function recommendModel(input) {
     Math.max(0, input.judgeCost),
     fallbackCallCost,
     qualityTarget,
-    switchCost
+    switchCost,
+    fallbackRiskScale
   ));
   const flagshipEstimate = estimates.find((estimate) => estimate.modelId === flagship.modelId);
   if (!flagshipEstimate) throw new Error("ACU flagship model estimate is missing");
@@ -6301,7 +6305,7 @@ function recommendModel(input) {
     estimate.savingsVsFlagship = flagshipEstimate.expectedTotalCost - estimate.expectedTotalCost;
     estimate.savingsPercentVsFlagship = flagshipEstimate.expectedTotalCost > 0 ? estimate.savingsVsFlagship / flagshipEstimate.expectedTotalCost : 0;
   }
-  const route2 = selectValueRoute(estimates, qualityTarget * 100);
+  const route2 = selectValueRoute(estimates, qualityTarget * 100, costSensitivity);
   const recommended = route2.selected;
   for (const estimate of estimates) {
     const utility = route2.utilities.get(estimate.modelId);

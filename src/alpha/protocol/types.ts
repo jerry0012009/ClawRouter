@@ -1,4 +1,5 @@
 import type { AlphaProtocol } from "../repository.js";
+import type { ToolCapability } from "../routing.js";
 
 export type CanonicalToolCall = {
   id: string;
@@ -36,6 +37,7 @@ export type CanonicalEnvelope = {
   instructions: unknown;
   history: unknown[];
   tools: unknown[];
+  requiredToolTypes: ToolCapability[];
   humanCandidates: CanonicalHumanCandidate[];
   toolCalls: CanonicalToolCall[];
   toolResults: CanonicalToolResult[];

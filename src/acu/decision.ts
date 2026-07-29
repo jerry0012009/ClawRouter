@@ -20,6 +20,8 @@ export type AcuDecisionInput = {
   requireVisionSupport?: boolean;
   switchCost?: number;
   judgeEntropyPenalty?: number;
+  costSensitivity?: number;
+  fallbackRiskScale?: number;
 };
 
 export function estimateCallCost(
@@ -46,13 +48,14 @@ function estimateOne(
   fallbackCallCost: number,
   qualityTarget: number,
   switchCost: number,
+  fallbackRiskScale: number,
 ): AcuModelEstimate {
   const curvePoint = interpolateModelCurve(model, difficultyScore);
   const quality = curvePoint.estimatedQuality;
   const lower = clamp(quality - model.uncertaintyWidth - entropyPenalty / 100);
   const upper = clamp(quality + model.uncertaintyWidth);
   const callCost = estimateCallCost(model, inputTokens, outputTokens);
-  const expectedFallbackCost = (1 - lower) * (fallbackCallCost + switchCost);
+  const expectedFallbackCost = fallbackRiskScale * (1 - lower) * (fallbackCallCost + switchCost);
   const total = judgeCost + callCost + expectedFallbackCost;
   return {
     modelId: model.modelId,
@@ -98,6 +101,7 @@ export function isParetoEfficient(candidate: ValueCandidate, candidates: ValueCa
 export function selectValueRoute<T extends ValueCandidate>(
   candidates: T[],
   targetScore: number,
+  costSensitivity = 1,
 ): {
   selected: T;
   bestScore: T;
@@ -111,6 +115,7 @@ export function selectValueRoute<T extends ValueCandidate>(
   const frontier = candidates.filter((candidate) => isParetoEfficient(candidate, candidates));
   const preference = clamp((targetScore - 60) / 35);
   const qualityWeight = 0.58 + 0.24 * preference;
+  const costWeight = clamp((1 - qualityWeight) * Math.max(0, costSensitivity), 0, 0.9);
   const riskWeight = 0.20 + 0.25 * preference;
   const qualityExponent = 0.8 + 1.2 * preference;
   const finiteCosts = frontier.map((candidate) => Math.max(1e-9, candidate.riskAdjustedCost));
@@ -131,7 +136,7 @@ export function selectValueRoute<T extends ValueCandidate>(
     const costUtility = logRange <= 1e-12
       ? 1
       : 1 - Math.log(Math.max(1e-9, candidate.riskAdjustedCost) / minCost) / logRange;
-    const valueUtility = qualityUtility * (qualityWeight + (1 - qualityWeight) * costUtility);
+    const valueUtility = qualityUtility * ((1 - costWeight) + costWeight * costUtility);
     utilities.set(candidate.modelId, { riskAdjustedScore, qualityUtility, costUtility, valueUtility });
   }
   const selected = frontier.reduce((best, item) => (
@@ -159,6 +164,8 @@ export function recommendModel(input: AcuDecisionInput): AcuRecommendation {
   const inputTokens = Math.max(1, Math.round(input.inputTokens));
   const outputTokens = Math.max(1, Math.round(input.expectedOutputTokens));
   const switchCost = Math.max(0, input.switchCost ?? ACU_DEFAULT_SWITCH_COST_USD);
+  const costSensitivity = Math.max(0, input.costSensitivity ?? 1);
+  const fallbackRiskScale = Math.max(0, input.fallbackRiskScale ?? 1);
   let models = getRoutingEligibleModels(input.eligibleModelIds);
   if (input.requireToolCallSupport) models = models.filter((model) => model.toolCallSupport);
   if (input.requireVisionSupport) models = models.filter((model) => model.visionSupport);
@@ -179,6 +186,7 @@ export function recommendModel(input: AcuDecisionInput): AcuRecommendation {
     fallbackCallCost,
     qualityTarget,
     switchCost,
+    fallbackRiskScale,
   ));
   const flagshipEstimate = estimates.find((estimate) => estimate.modelId === flagship.modelId);
   if (!flagshipEstimate) throw new Error("ACU flagship model estimate is missing");
@@ -188,7 +196,7 @@ export function recommendModel(input: AcuDecisionInput): AcuRecommendation {
       ? estimate.savingsVsFlagship / flagshipEstimate.expectedTotalCost
       : 0;
   }
-  const route = selectValueRoute(estimates, qualityTarget * 100);
+  const route = selectValueRoute(estimates, qualityTarget * 100, costSensitivity);
   const recommended = route.selected;
   for (const estimate of estimates) {
     const utility = route.utilities.get(estimate.modelId);

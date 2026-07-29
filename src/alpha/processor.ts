@@ -59,6 +59,7 @@ export type AlphaResolutionContext = {
   replayed: boolean;
   routeSummary: {
     mode: string;
+    routingPreference: string;
     difficulty?: number;
     candidateCount: number;
     selectedModel: string;
@@ -100,6 +101,7 @@ function numberValue(value: unknown, fallback = 0): number {
 function routeDisplaySummary(
   requestedModel: string,
   selectedModel: string,
+  routingPreference: string,
   judge: AlphaJudgeRun | undefined,
   route: AlphaRouteDecision | undefined,
   storedRoute?: JsonObject,
@@ -117,6 +119,7 @@ function routeDisplaySummary(
     const difficulty = Number(storedJudge?.difficultyIndex);
     return {
       mode: stringValue(storedRoute.mode) ?? requestedModel,
+      routingPreference: stringValue(formulaInputs?.routingPreference) ?? routingPreference,
       difficulty: Number.isFinite(difficulty) ? difficulty : undefined,
       candidateCount: candidates.length,
       selectedModel,
@@ -130,6 +133,7 @@ function routeDisplaySummary(
   if (!route) {
     return {
       mode: "explicit",
+      routingPreference,
       candidateCount: 0,
       selectedModel,
       routeReason: `Explicit model ${requestedModel}; Judge and automatic selection skipped.`,
@@ -141,6 +145,7 @@ function routeDisplaySummary(
   ), undefined as (typeof route.candidateEstimates)[number] | undefined);
   return {
     mode: requestedModel,
+    routingPreference: route.preference,
     difficulty: judge?.judge.difficultyIndex,
     candidateCount: route.candidateEstimates.length,
     selectedModel,
@@ -464,6 +469,7 @@ export class AlphaRequestProcessor {
       const profile = resolveExplicitProfile(envelope.requestedModel, this.options.profiles, {
         protocol: envelope.protocol,
         requireTools: envelope.tools.length > 0,
+        requiredToolTypes: envelope.requiredToolTypes,
         requireThinking: envelope.containsThinking,
         reasoningEffort: envelope.reasoningEffort,
         contextTokens: Math.ceil(rawBytes / 4),
@@ -484,7 +490,9 @@ export class AlphaRequestProcessor {
             requestedModel: envelope.requestedModel,
             judgeCalls: 0,
             reasoningEffort: envelope.reasoningEffort,
+            requiredToolTypes: envelope.requiredToolTypes,
             userRoutingPolicy: identity.routingPolicy,
+            routingPreference: identity.routingPreference,
             userRoutingPolicyVersion: identity.routingPolicyVersion,
           },
           candidateEstimates: [],
@@ -546,10 +554,12 @@ export class AlphaRequestProcessor {
       inputTokens: Math.ceil(rawBytes / 4),
       expectedOutputTokens: this.expectedOutputTokens,
       effectiveQualityTarget: state.effectiveQualityTarget,
+      routingPreference: identity.routingPreference,
       profiles: this.options.profiles,
       requirements: {
         protocol: envelope.protocol,
         requireTools: envelope.tools.length > 0,
+        requiredToolTypes: envelope.requiredToolTypes,
         requireThinking: envelope.containsThinking,
         reasoningEffort: envelope.reasoningEffort,
         contextTokens: Math.ceil(rawBytes / 4),
@@ -650,13 +660,16 @@ export class AlphaRequestProcessor {
       routingModelVersion: route.formulaVersion,
       qualityCurveVersion: QUALITY_CURVE_VERSION,
       priceVersion: PRICE_VERSION,
-      effectiveQualityTarget: state.effectiveQualityTarget,
+      effectiveQualityTarget: route.effectiveQualityTarget,
       formulaInputs: {
         judge: judge.judge,
         judgeCost: judge.costUsd,
         inputTokens: Math.ceil(rawBytes / 4),
         expectedOutputTokens: this.expectedOutputTokens,
         userRoutingPolicy: identity.routingPolicy,
+        routingPreference: identity.routingPreference,
+        routingPreferenceParameters: route.preferenceParameters,
+        baseEffectiveQualityTarget: state.effectiveQualityTarget,
         userRoutingPolicyVersion: identity.routingPolicyVersion,
         allowedModelIds: identity.allowedModelIds,
         configuredProfileCount: this.options.profiles.length,
@@ -672,6 +685,7 @@ export class AlphaRequestProcessor {
         paretoFrontierCandidateCount: route.paretoFrontier.length,
         excludedProfiles: route.excludedProfiles,
         reasoningEffort: envelope.reasoningEffort,
+        requiredToolTypes: envelope.requiredToolTypes,
       },
       candidateEstimates: route.candidateEstimates,
       paretoFrontier: route.paretoFrontier,
@@ -690,6 +704,7 @@ export class AlphaRequestProcessor {
         judgeRun: judge,
         selectedProfile: route.selectedProfile,
         userRoutingPolicyVersion: identity.routingPolicyVersion,
+        routingPreference: identity.routingPreference,
       },
     });
     return { profile: route.selectedProfile, judge, route };
@@ -710,6 +725,7 @@ export class AlphaRequestProcessor {
       && profile.health === "healthy"
       && profile.protocols.includes(envelope.protocol)
       && (!envelope.tools.length || profile.toolCallSupport)
+      && envelope.requiredToolTypes.every((toolType) => profile.supportedToolTypes?.includes(toolType))
       && (!envelope.containsThinking || profile.thinkingSupport)
       && profile.contextWindow >= Math.ceil(rawBytes / 4)
       && this.options.adapters.has(profile.executionProfileId)
@@ -925,6 +941,7 @@ export class AlphaRequestProcessor {
             routeSummary: routeDisplaySummary(
               envelope.requestedModel,
               result.profile.modelId,
+              identity.routingPreference,
               result.judge,
               result.route,
               storedRoute,
@@ -985,6 +1002,7 @@ export class AlphaRequestProcessor {
       routeSummary: routeDisplaySummary(
         envelope.requestedModel,
         result.profile.modelId,
+        identity.routingPreference,
         result.judge,
         result.route,
         storedRoute,
@@ -1083,6 +1101,7 @@ export class AlphaRequestProcessor {
         provider: providerCostUsd,
         usageSource: input.usageSource,
         reasoning_effort: input.context.reasoningEffort,
+        routing_preference: input.context.routeSummary.routingPreference,
         mode: input.context.routeSummary.mode,
         difficulty: input.context.routeSummary.difficulty,
         candidate_count: input.context.routeSummary.candidateCount,

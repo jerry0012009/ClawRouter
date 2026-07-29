@@ -1,9 +1,31 @@
 import { getAcuModel } from "../acu/catalog.js";
+import { ACU_ROUTING_MODEL_VERSION } from "../acu/config.js";
 import { recommendModel } from "../acu/decision.js";
 import type { AcuEvaluation, AcuJudgeResult, AcuModelEstimate } from "../acu/types.js";
 import type { AlphaProtocol } from "./repository.js";
 
 export type ProfileHealth = "healthy" | "degraded" | "cooldown" | "unknown";
+export type RoutingPreference = "economy" | "balanced" | "quality";
+export type ToolCapability =
+  | "function"
+  | "custom"
+  | "local_tool"
+  | "hosted_web_search"
+  | "file_search"
+  | "computer_use"
+  | "other_hosted_tool";
+
+export type RoutingPreferenceParameters = {
+  qualityTargetOffset: number;
+  costSensitivity: number;
+  fallbackRiskScale: number;
+};
+
+export const ROUTING_PREFERENCE_PARAMETERS: Record<RoutingPreference, RoutingPreferenceParameters> = {
+  economy: { qualityTargetOffset: -8, costSensitivity: 2.4, fallbackRiskScale: 0.15 },
+  balanced: { qualityTargetOffset: 0, costSensitivity: 1, fallbackRiskScale: 1 },
+  quality: { qualityTargetOffset: 8, costSensitivity: 0.45, fallbackRiskScale: 1.25 },
+};
 
 export type AlphaExecutionProfile = {
   executionProfileId: string;
@@ -12,6 +34,7 @@ export type AlphaExecutionProfile = {
   channel: string;
   protocols: AlphaProtocol[];
   toolCallSupport: boolean;
+  supportedToolTypes?: ToolCapability[];
   thinkingSupport: boolean;
   supportedReasoningEfforts?: string[];
   contextWindow: number;
@@ -23,6 +46,7 @@ export type AlphaExecutionProfile = {
 export type AlphaRouteRequirements = {
   protocol: AlphaProtocol;
   requireTools: boolean;
+  requiredToolTypes?: ToolCapability[];
   requireThinking: boolean;
   reasoningEffort?: string;
   contextTokens: number;
@@ -35,6 +59,7 @@ export type AlphaRouteInput = {
   inputTokens: number;
   expectedOutputTokens: number;
   effectiveQualityTarget: number;
+  routingPreference?: RoutingPreference;
   profiles: AlphaExecutionProfile[];
   requirements: AlphaRouteRequirements;
   routeDirection?: "any" | "hold_or_upgrade";
@@ -44,8 +69,10 @@ export type AlphaRouteInput = {
 export type ExcludedProfile = { executionProfileId: string; reasons: string[] };
 
 export type AlphaRouteDecision = {
-  formulaVersion: "acu-routing-model-v0.1";
+  formulaVersion: typeof ACU_ROUTING_MODEL_VERSION;
   effectiveQualityTarget: number;
+  preference: RoutingPreference;
+  preferenceParameters: RoutingPreferenceParameters;
   selectedProfile: AlphaExecutionProfile;
   recommendation: ReturnType<typeof recommendModel>;
   candidateEstimates: Array<AcuModelEstimate & { executionProfileIds: string[] }>;
@@ -63,6 +90,9 @@ function exclusionReasons(
   if (!profile.administratorAllowed) reasons.push("administrator_policy");
   if (!profile.protocols.includes(requirements.protocol)) reasons.push("native_protocol");
   if (requirements.requireTools && !profile.toolCallSupport) reasons.push("tool_call_support");
+  for (const toolType of requirements.requiredToolTypes ?? []) {
+    if (!profile.supportedToolTypes?.includes(toolType)) reasons.push(`tool_type:${toolType}`);
+  }
   if (requirements.requireThinking && !profile.thinkingSupport) reasons.push("thinking_support");
   if (requirements.reasoningEffort && profile.supportedReasoningEfforts
     && !profile.supportedReasoningEfforts.includes(requirements.reasoningEffort)) {
@@ -89,22 +119,38 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
     return reasons.length === 0;
   });
   const eligibleModelIds = [...new Set(eligibleProfiles.map((profile) => profile.modelId))];
-  if (eligibleModelIds.length === 0) throw new Error("No compatible Alpha execution profile is available");
+  if (eligibleModelIds.length === 0) {
+    const required = input.requirements.requiredToolTypes ?? [];
+    if (required.length > 0) {
+      throw new Error(`No compatible Alpha execution profile supports required tool capabilities: ${required.join(", ")}`);
+    }
+    throw new Error("No compatible Alpha execution profile is available");
+  }
+  const preference = input.routingPreference ?? "balanced";
+  const preferenceParameters = ROUTING_PREFERENCE_PARAMETERS[preference];
+  const preferenceQualityTarget = Math.max(
+    0,
+    Math.min(100, input.effectiveQualityTarget + preferenceParameters.qualityTargetOffset),
+  );
   const recommendation = recommendModel({
     probabilities: input.judge,
     difficultyScore: input.judge.difficultyIndex,
     inputTokens: input.inputTokens,
     expectedOutputTokens: input.expectedOutputTokens,
     judgeCost: input.judgeCost,
-    qualityTarget: input.effectiveQualityTarget / 100,
+    qualityTarget: preferenceQualityTarget / 100,
+    costSensitivity: preferenceParameters.costSensitivity,
+    fallbackRiskScale: preferenceParameters.fallbackRiskScale,
     eligibleModelIds,
     requireToolCallSupport: input.requirements.requireTools,
   });
   const selectedProfile = eligibleProfiles.find((profile) => profile.modelId === recommendation.recommended.modelId);
   if (!selectedProfile) throw new Error("Selected model has no compatible execution profile");
   return {
-    formulaVersion: "acu-routing-model-v0.1",
-    effectiveQualityTarget: input.effectiveQualityTarget,
+    formulaVersion: ACU_ROUTING_MODEL_VERSION,
+    effectiveQualityTarget: preferenceQualityTarget,
+    preference,
+    preferenceParameters,
     selectedProfile,
     recommendation,
     candidateEstimates: recommendation.estimates.map((estimate) => ({

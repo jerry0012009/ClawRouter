@@ -4,6 +4,7 @@ import { getAcuModel } from "../src/acu/catalog.js";
 import { continuousTierProbabilities } from "../src/acu/math.js";
 import type { AcuJudgeResult } from "../src/acu/types.js";
 import { routeWithCurrentAcuFormula, type AlphaExecutionProfile } from "../src/alpha/routing.js";
+import type { ProviderEconomicsCatalog } from "../src/alpha/provider-economics.js";
 
 type ConfiguredProfile = AlphaExecutionProfile & {
   baseUrlEnv: string;
@@ -13,7 +14,13 @@ type ConfiguredProfile = AlphaExecutionProfile & {
 
 async function profiles(): Promise<ConfiguredProfile[]> {
   const text = await readFile(new URL("../deploy/alpha/execution-profiles.json", import.meta.url), "utf8");
-  return JSON.parse(text) as ConfiguredProfile[];
+  const economics = JSON.parse(await readFile(
+    new URL("../deploy/alpha/provider-economics.json", import.meta.url), "utf8",
+  )) as ProviderEconomicsCatalog;
+  return (JSON.parse(text) as ConfiguredProfile[]).map((profile) => ({
+    ...profile,
+    economics: economics.providers.find((item) => item.providerId === profile.provider),
+  }));
 }
 
 function judgeAt(difficulty: number): AcuJudgeResult {
@@ -42,13 +49,12 @@ function judgeAt(difficulty: number): AcuJudgeResult {
 describe("Alpha RC1 deployment profiles", () => {
   it("contains 4-6 unique preflighted catalog candidates for each native protocol", async () => {
     const configured = await profiles();
-    expect(configured).toHaveLength(11);
+    expect(configured).toHaveLength(18);
     for (const protocol of ["responses", "messages"] as const) {
       const candidates = configured.filter((profile) => profile.protocols.includes(protocol));
       const uniqueModels = new Set(candidates.map((profile) => profile.modelId));
       expect(uniqueModels.size).toBeGreaterThanOrEqual(4);
       expect(uniqueModels.size).toBeLessThanOrEqual(6);
-      expect(uniqueModels.size).toBe(candidates.length);
       for (const profile of candidates) {
         const catalog = getAcuModel(profile.modelId);
         expect(catalog?.routingEligible).toBe(true);
@@ -59,8 +65,8 @@ describe("Alpha RC1 deployment profiles", () => {
         expect(catalog?.outputPricePerMillion).toBeTypeOf("number");
         expect(catalog?.cachedInputPricePerMillion).toBeTypeOf("number");
         expect(profile.contextWindow).toBeLessThanOrEqual(catalog?.contextWindow ?? 0);
-        expect(profile.baseUrlEnv).toMatch(/^CLOSEAI_/);
-        expect(profile.apiKeyEnv).toBe("CLOSEAI_API_KEY");
+        expect(profile.baseUrlEnv).toMatch(/^(CLOSEAI|LUCEN|BLACKAI)_/);
+        expect(profile.apiKeyEnv).toMatch(/^(CLOSEAI|LUCEN|BLACKAI)_API_KEY$/);
       }
     }
   });
@@ -94,8 +100,9 @@ describe("Alpha RC1 deployment profiles", () => {
     expect(hardMessages.selectedProfile.modelId).toBe("claude-opus-4-8");
     expect(simpleResponses.candidateEstimates).toHaveLength(5);
     expect(simpleMessages.candidateEstimates).toHaveLength(6);
-    expect(simpleResponses.excludedProfiles).toHaveLength(6);
-    expect(simpleResponses.excludedProfiles.every((item) => item.reasons.includes("native_protocol"))).toBe(true);
+    expect(simpleResponses.excludedProfiles.some((item) => item.reasons.includes("native_protocol"))).toBe(true);
+    expect(simpleResponses.excludedProfiles.filter((item) => item.reasons.includes("provider_economics")))
+      .toHaveLength(4);
     for (const estimate of [...simpleResponses.candidateEstimates, ...simpleMessages.candidateEstimates]) {
       expect(estimate.predictedScore).toBeTypeOf("number");
       expect(estimate.conservativeScore).toBeTypeOf("number");
@@ -104,7 +111,7 @@ describe("Alpha RC1 deployment profiles", () => {
       expect(estimate.expectedTotalCost).toBeTypeOf("number");
       expect(estimate.paretoEfficient).toBeTypeOf("boolean");
       expect(estimate.valueUtility).toBeTypeOf("number");
-      expect(estimate.executionProfileIds).toHaveLength(1);
+      expect(estimate.executionProfileIds.length).toBeGreaterThanOrEqual(1);
     }
 
     const planning = route("responses", 5, 88);
@@ -139,7 +146,7 @@ describe("Alpha RC1 deployment profiles", () => {
 
     expect(decision.candidateEstimates).toHaveLength(5);
     expect(decision.candidateEstimates.find((item) => item.modelId === duplicate.modelId)?.executionProfileIds)
-      .toHaveLength(2);
+      .toHaveLength(3);
   });
 
   it("applies a custom user allowlist as a hard policy filter without changing the routing formula", async () => {
@@ -163,6 +170,6 @@ describe("Alpha RC1 deployment profiles", () => {
     expect(decision.candidateEstimates.map((estimate) => estimate.modelId).sort())
       .toEqual(["gpt-5.6-luna", "gpt-5.6-sol"]);
     expect(decision.excludedProfiles.filter((profile) => profile.reasons.includes("model_policy")))
-      .toHaveLength(8);
+      .toHaveLength(12);
   });
 });

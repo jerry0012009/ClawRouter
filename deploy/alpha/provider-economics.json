@@ -1,0 +1,60 @@
+{
+  "schemaVersion": "acu-provider-economics-v1",
+  "generatedAt": "2026-07-29T00:00:00Z",
+  "providers": [
+    {
+      "providerId": "lucen",
+      "displayName": "Lucen",
+      "protocol": "openai_responses",
+      "baseUrlEnv": "LUCEN_BASE_URL",
+      "apiKeyEnv": "LUCEN_API_KEY",
+      "balanceCurrency": "USD",
+      "rechargeCashCny": 500,
+      "creditsReceivedUsd": 500,
+      "observedBillingMultiplier": 0.07,
+      "priceSource": "Lucen authenticated /v1/usage nominal token charge; canonical catalog prices",
+      "priceObservedAt": "2026-07-29T00:00:00Z",
+      "health": "healthy",
+      "priority": 10,
+      "enabled": true,
+      "effectiveCostSource": "founder recharge batch CNY 500 for USD 500; current observed group multiplier 0.07",
+      "effectiveCostVersion": "lucen-founder-batch-20260729-v1"
+    },
+    {
+      "providerId": "blackai",
+      "displayName": "BlackAI",
+      "protocol": "openai_responses",
+      "baseUrlEnv": "BLACKAI_BASE_URL",
+      "apiKeyEnv": "BLACKAI_API_KEY",
+      "balanceCurrency": "USD",
+      "rechargeCashCny": null,
+      "creditsReceivedUsd": null,
+      "observedBillingMultiplier": 1,
+      "priceSource": "BlackAI authenticated /v1/usage; exact purchase batch not exposed to API-key authentication",
+      "priceObservedAt": "2026-07-29T00:00:00Z",
+      "health": "blocked",
+      "priority": 20,
+      "enabled": false,
+      "effectiveCostSource": "blocked_pending_exact_purchase_batch; approximate range was not used",
+      "effectiveCostVersion": "blackai-founder-batch-pending-v1"
+    },
+    {
+      "providerId": "closeai",
+      "displayName": "CloseAI",
+      "protocol": "openai_responses",
+      "baseUrlEnv": "CLOSEAI_OPENAI_BASE_URL",
+      "apiKeyEnv": "CLOSEAI_API_KEY",
+      "balanceCurrency": "USD",
+      "rechargeCashCny": 7.2,
+      "creditsReceivedUsd": 1,
+      "observedBillingMultiplier": 1,
+      "priceSource": "deployed versioned ACU catalog acu-catalog-v0.1; account model directory observed 2026-07-29",
+      "priceObservedAt": "2026-07-29T00:00:00Z",
+      "health": "healthy",
+      "priority": 30,
+      "enabled": true,
+      "effectiveCostSource": "deployment operator USD/CNY settlement reference ACU_TEST_USD_TO_CNY=7.2",
+      "effectiveCostVersion": "closeai-deployment-fx-20260729-v1"
+    }
+  ]
+}

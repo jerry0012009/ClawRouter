@@ -23,6 +23,7 @@ export type NativeProviderConfig = {
   apiKey: string;
   authMode: "bearer" | "x-api-key";
   anthropicVersion?: string;
+  stripV1Path?: boolean;
 };
 
 export type NativeProviderRequest = {
@@ -42,7 +43,7 @@ function targetUrl(config: NativeProviderConfig, path: string, query: string): U
   const base = config.baseUrl.endsWith("/") ? config.baseUrl : `${config.baseUrl}/`;
   const baseUrl = new URL(base);
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  const relative = baseUrl.pathname.endsWith("/v1/") && normalizedPath.startsWith("/v1/")
+  const relative = (config.stripV1Path || baseUrl.pathname.endsWith("/v1/")) && normalizedPath.startsWith("/v1/")
     ? normalizedPath.slice("/v1/".length)
     : normalizedPath.slice(1);
   const url = new URL(relative, base);

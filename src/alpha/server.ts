@@ -10,6 +10,7 @@ import { AlphaRequestProcessor } from "./processor.js";
 import { createNativeProviderAdapter, type NativeProviderConfig } from "./provider.js";
 import { AlphaRepository } from "./repository.js";
 import type { AlphaExecutionProfile } from "./routing.js";
+import { readProviderEconomicsCatalog, type ProviderEconomics } from "./provider-economics.js";
 import { UsageOutboxWorker } from "./usage-outbox.js";
 
 type ConfiguredExecutionProfile = AlphaExecutionProfile & {
@@ -18,6 +19,8 @@ type ConfiguredExecutionProfile = AlphaExecutionProfile & {
   apiKeyEnv: string;
   authMode: NativeProviderConfig["authMode"];
   anthropicVersion?: string;
+  stripV1Path?: boolean;
+  economicsProviderId?: string;
 };
 
 export type AlphaServiceConfig = {
@@ -28,6 +31,7 @@ export type AlphaServiceConfig = {
   adminTraceToken: string;
   newApiInternalBaseUrl: string;
   profiles: ConfiguredExecutionProfile[];
+  providerEconomics: ProviderEconomics[];
 };
 
 function requiredEnvironment(name: string): string {
@@ -78,6 +82,7 @@ async function configuredProfiles(): Promise<ConfiguredExecutionProfile[]> {
 }
 
 export async function readAlphaServiceConfig(): Promise<AlphaServiceConfig> {
+  const economicsPath = requiredEnvironment("ACU_PROVIDER_ECONOMICS_FILE");
   return {
     bindAddress: process.env.ACU_BIND_ADDRESS?.trim() || "0.0.0.0",
     port: positivePort(process.env.ACU_PORT),
@@ -86,6 +91,7 @@ export async function readAlphaServiceConfig(): Promise<AlphaServiceConfig> {
     adminTraceToken: requiredEnvironment("ACU_ADMIN_TRACE_TOKEN"),
     newApiInternalBaseUrl: requiredEnvironment("NEW_API_INTERNAL_BASE_URL"),
     profiles: await configuredProfiles(),
+    providerEconomics: (await readProviderEconomicsCatalog(economicsPath)).providers,
   };
 }
 
@@ -109,9 +115,18 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
   const profiles = serviceConfig.profiles.map((profile) => {
     const baseUrl = profile.baseUrl ?? requiredEnvironment(profile.baseUrlEnv!);
     const apiKey = requiredEnvironment(profile.apiKeyEnv);
+    const economics = serviceConfig.providerEconomics.find((item) => (
+      item.providerId === (profile.economicsProviderId ?? profile.provider)
+    ));
+    if (!economics) throw new Error(`No Provider Economics for ${profile.provider}`);
+    if (economics.apiKeyEnv !== profile.apiKeyEnv) {
+      throw new Error(`Provider Economics environment mismatch for ${profile.executionProfileId}`);
+    }
     const safeProfile: AlphaExecutionProfile = {
       executionProfileId: profile.executionProfileId,
       modelId: profile.modelId,
+      providerModelId: profile.providerModelId ?? profile.modelId,
+      actualModelAliases: profile.actualModelAliases,
       provider: profile.provider,
       channel: profile.channel,
       protocols: profile.protocols,
@@ -123,6 +138,10 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
       health: profile.health,
       enabled: profile.enabled,
       administratorAllowed: profile.administratorAllowed,
+      economics,
+      usageTrusted: profile.usageTrusted,
+      recentSuccessRate: profile.recentSuccessRate,
+      observedLatencyMs: profile.observedLatencyMs,
     };
     return {
       profile: safeProfile,
@@ -133,6 +152,7 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
         apiKey,
         authMode: profile.authMode,
         anthropicVersion: profile.anthropicVersion,
+        stripV1Path: profile.stripV1Path,
       }),
     };
   });

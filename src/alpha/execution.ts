@@ -6,6 +6,7 @@ export type ProviderAttemptHandle = {
   attemptIndex: number;
   adapter: NativeProviderAdapter;
   profile: AlphaExecutionProfile;
+  body?: Uint8Array;
 };
 
 export type BufferedProviderFailure = {
@@ -49,7 +50,7 @@ export function createRecoveringProviderAdapter(options: ProviderRecoveryOptions
         const startedAt = Date.now();
         let recoveryProfile: AlphaExecutionProfile | undefined;
         try {
-          const response = await current.adapter.execute(request);
+          const response = await current.adapter.execute({ ...request, body: current.body ?? request.body });
           if (!isRecoverableProviderStatus(response.status)
             || current.attemptIndex >= maxAttempts
             || request.signal.aborted) {

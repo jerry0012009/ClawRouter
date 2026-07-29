@@ -85,6 +85,7 @@ services:
       ACU_ADMIN_TRACE_TOKEN: ${ACU_ADMIN_TRACE_TOKEN:?set ACU_ADMIN_TRACE_TOKEN}
       NEW_API_INTERNAL_BASE_URL: http://new-api:3000
       ACU_EXECUTION_PROFILES_FILE: /app/config/execution-profiles.json
+      ACU_PROVIDER_ECONOMICS_FILE: /app/config/provider-economics.json
       ACU_DEMO_ROUTER_ENABLED: "true"
       ACU_JUDGE_API_KEY: ${ACU_JUDGE_API_KEY:?set ACU_JUDGE_API_KEY}
       ACU_JUDGE_MODEL: ${ACU_JUDGE_MODEL:-deepseek-v4-flash}
@@ -95,8 +96,13 @@ services:
       CLOSEAI_OPENAI_BASE_URL: ${CLOSEAI_OPENAI_BASE_URL:-https://api.openai-proxy.org/v1}
       CLOSEAI_ANTHROPIC_BASE_URL: ${CLOSEAI_ANTHROPIC_BASE_URL:-https://api.openai-proxy.org/anthropic}
       CLOSEAI_API_KEY: ${CLOSEAI_API_KEY:?set CLOSEAI_API_KEY}
+      LUCEN_BASE_URL: ${LUCEN_BASE_URL:-https://lucen.cc}
+      LUCEN_API_KEY: ${LUCEN_API_KEY:?set LUCEN_API_KEY}
+      BLACKAI_BASE_URL: ${BLACKAI_BASE_URL:-https://blackaicoding.com}
+      BLACKAI_API_KEY: ${BLACKAI_API_KEY:?set BLACKAI_API_KEY}
     volumes:
       - ./execution-profiles.json:/app/config/execution-profiles.json:ro
+      - ./provider-economics.json:/app/config/provider-economics.json:ro
       - acu-runtime-data:/var/lib/acu
     expose: ["8403"]
     networks: [alpha-backend]

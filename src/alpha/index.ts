@@ -29,6 +29,14 @@ export type {
 } from "./protocol/types.js";
 export { createAlphaGatewayServer, isPrivateNetworkAddress, type AlphaGatewayOptions } from "./gateway.js";
 export { createNativeProviderAdapter, type NativeProviderConfig } from "./provider.js";
+export {
+  cashCnyPerNominalUsd,
+  providerCostBreakdown,
+  readProviderEconomicsCatalog,
+  validateProviderEconomicsCatalog,
+  type ProviderEconomics,
+  type ProviderEconomicsCatalog,
+} from "./provider-economics.js";
 export { relayProviderResponse, type RelayResult } from "./stream-relay.js";
 export {
   bodySha256,

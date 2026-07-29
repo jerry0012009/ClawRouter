@@ -22,6 +22,12 @@ export type AcuDecisionInput = {
   judgeEntropyPenalty?: number;
   costSensitivity?: number;
   fallbackRiskScale?: number;
+  /** Per-model effective prices used by v0.3. Units may be USD or CNY, but
+   * every override and judge/switch cost in one decision must use one unit. */
+  effectivePrices?: Record<string, {
+    inputPricePerMillion: number;
+    outputPricePerMillion: number;
+  }>;
 };
 
 export function estimateCallCost(
@@ -49,12 +55,13 @@ function estimateOne(
   qualityTarget: number,
   switchCost: number,
   fallbackRiskScale: number,
+  effectivePrice?: { inputPricePerMillion: number; outputPricePerMillion: number },
 ): AcuModelEstimate {
   const curvePoint = interpolateModelCurve(model, difficultyScore);
   const quality = curvePoint.estimatedQuality;
   const lower = clamp(quality - model.uncertaintyWidth - entropyPenalty / 100);
   const upper = clamp(quality + model.uncertaintyWidth);
-  const callCost = estimateCallCost(model, inputTokens, outputTokens);
+  const callCost = estimateCallCost(effectivePrice ?? model, inputTokens, outputTokens);
   const expectedFallbackCost = fallbackRiskScale * (1 - lower) * (fallbackCallCost + switchCost);
   const total = judgeCost + callCost + expectedFallbackCost;
   return {
@@ -175,7 +182,7 @@ export function recommendModel(input: AcuDecisionInput): AcuRecommendation {
     model.abilityAnchor > best.abilityAnchor ? model : best
   ));
   const fallback = flagship;
-  const fallbackCallCost = estimateCallCost(fallback, inputTokens, outputTokens);
+  const fallbackCallCost = estimateCallCost(input.effectivePrices?.[fallback.modelId] ?? fallback, inputTokens, outputTokens);
   const estimates = models.map((model) => estimateOne(
     model,
     difficulty,
@@ -187,6 +194,7 @@ export function recommendModel(input: AcuDecisionInput): AcuRecommendation {
     qualityTarget,
     switchCost,
     fallbackRiskScale,
+    input.effectivePrices?.[model.modelId],
   ));
   const flagshipEstimate = estimates.find((estimate) => estimate.modelId === flagship.modelId);
   if (!flagshipEstimate) throw new Error("ACU flagship model estimate is missing");

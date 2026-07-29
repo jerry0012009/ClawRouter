@@ -4180,7 +4180,7 @@ import { createHash as createHash5, randomUUID } from "crypto";
 // src/acu/config.ts
 var ACU_PROMPT_VERSION = "acu-tier-requirement-v3";
 var ACU_DIFFICULTY_METHOD_VERSION = "acu-difficulty-index-v1";
-var ACU_ROUTING_MODEL_VERSION = "acu-routing-model-v0.2";
+var ACU_ROUTING_MODEL_VERSION = "acu-routing-model-v0.3";
 var ACU_DEFAULT_JUDGE_MODEL = "deepseek-v4-flash";
 var ACU_DEFAULT_JUDGE_BASE_URL = "https://api.deepseek.com";
 var ACU_DEFAULT_JUDGE_MODE = "non-thinking";
@@ -6143,12 +6143,12 @@ function estimateCallCost(model, inputTokens, outputTokens) {
   }
   return (Math.max(0, inputTokens) * model.inputPricePerMillion + Math.max(0, outputTokens) * model.outputPricePerMillion) / 1e6;
 }
-function estimateOne(model, difficultyScore2, entropyPenalty, inputTokens, outputTokens, judgeCost, fallbackCallCost, qualityTarget, switchCost, fallbackRiskScale) {
+function estimateOne(model, difficultyScore2, entropyPenalty, inputTokens, outputTokens, judgeCost, fallbackCallCost, qualityTarget, switchCost, fallbackRiskScale, effectivePrice) {
   const curvePoint = interpolateModelCurve(model, difficultyScore2);
   const quality = curvePoint.estimatedQuality;
   const lower = clamp(quality - model.uncertaintyWidth - entropyPenalty / 100);
   const upper = clamp(quality + model.uncertaintyWidth);
-  const callCost = estimateCallCost(model, inputTokens, outputTokens);
+  const callCost = estimateCallCost(effectivePrice ?? model, inputTokens, outputTokens);
   const expectedFallbackCost = fallbackRiskScale * (1 - lower) * (fallbackCallCost + switchCost);
   const total = judgeCost + callCost + expectedFallbackCost;
   return {
@@ -6229,7 +6229,7 @@ function recommendModel(input) {
   if (models.length === 0) throw new Error("No ACU catalog model is eligible for this request");
   const flagship = models.reduce((best, model) => model.abilityAnchor > best.abilityAnchor ? model : best);
   const fallback = flagship;
-  const fallbackCallCost = estimateCallCost(fallback, inputTokens, outputTokens);
+  const fallbackCallCost = estimateCallCost(input.effectivePrices?.[fallback.modelId] ?? fallback, inputTokens, outputTokens);
   const estimates = models.map((model) => estimateOne(
     model,
     difficulty,
@@ -6240,7 +6240,8 @@ function recommendModel(input) {
     fallbackCallCost,
     qualityTarget,
     switchCost,
-    fallbackRiskScale
+    fallbackRiskScale,
+    input.effectivePrices?.[model.modelId]
   ));
   const flagshipEstimate = estimates.find((estimate) => estimate.modelId === flagship.modelId);
   if (!flagshipEstimate) throw new Error("ACU flagship model estimate is missing");

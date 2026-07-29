@@ -221,6 +221,12 @@ type AcuDecisionInput = {
     judgeEntropyPenalty?: number;
     costSensitivity?: number;
     fallbackRiskScale?: number;
+    /** Per-model effective prices used by v0.3. Units may be USD or CNY, but
+     * every override and judge/switch cost in one decision must use one unit. */
+    effectivePrices?: Record<string, {
+        inputPricePerMillion: number;
+        outputPricePerMillion: number;
+    }>;
 };
 declare function estimateCallCost(model: Pick<AcuModelCatalogEntry, "inputPricePerMillion" | "outputPricePerMillion">, inputTokens: number, outputTokens: number): number;
 type ValueCandidate = Pick<AcuModelEstimate, "modelId" | "displayName" | "predictedScore" | "riskAdjustedCost"> & {

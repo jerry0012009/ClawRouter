@@ -19,6 +19,7 @@ import type { NativeProviderAdapter } from "./provider.js";
 import type { TrustedNewApiIdentity } from "./trusted-identity.js";
 import { parseProviderUsage, sumCost } from "./usage.js";
 import { getAcuModel } from "../acu/catalog.js";
+import { cashCnyPerNominalUsd, providerCostBreakdown } from "./provider-economics.js";
 import {
   createRecoveringProviderAdapter,
   type BufferedProviderFailure,
@@ -65,7 +66,9 @@ export type AlphaResolutionContext = {
     selectedModel: string;
     routeReason: string;
     qualityUpperBoundModel?: string;
-    estimatedCostReductionVsQualityUpperBoundUsd?: number;
+    estimatedCostReductionVsQualityUpperBoundCny?: number;
+    providerSelectionReason?: string;
+    selectedProvider?: string;
   };
 };
 
@@ -98,6 +101,12 @@ function numberValue(value: unknown, fallback = 0): number {
   return Number.isFinite(valueAsNumber) ? valueAsNumber : fallback;
 }
 
+function canonicalActualModel(profile: AlphaExecutionProfile, actualModel: string | undefined): string {
+  if (!actualModel) return profile.modelId;
+  const accepted = new Set([profile.modelId, profile.providerModelId ?? profile.modelId, ...(profile.actualModelAliases ?? [])]);
+  return accepted.has(actualModel) ? profile.modelId : actualModel;
+}
+
 function routeDisplaySummary(
   requestedModel: string,
   selectedModel: string,
@@ -125,9 +134,10 @@ function routeDisplaySummary(
       selectedModel,
       routeReason: (stringValue(storedRoute.route_explanation) ?? "Reused the segment's saved route decision.").slice(0, 240),
       qualityUpperBoundModel: stringValue(qualityUpperBound?.modelId),
-      estimatedCostReductionVsQualityUpperBoundUsd: selected && qualityUpperBound
+      estimatedCostReductionVsQualityUpperBoundCny: selected && qualityUpperBound
         ? Math.max(0, numberValue(qualityUpperBound.expectedTotalCost) - numberValue(selected.expectedTotalCost))
         : undefined,
+      selectedProvider: stringValue(record(storedRoute.selected_profile_json)?.provider),
     };
   }
   if (!route) {
@@ -151,9 +161,11 @@ function routeDisplaySummary(
     selectedModel,
     routeReason: route.recommendation.reason.slice(0, 240),
     qualityUpperBoundModel: qualityUpperBound?.modelId,
-    estimatedCostReductionVsQualityUpperBoundUsd: selected && qualityUpperBound
+    estimatedCostReductionVsQualityUpperBoundCny: selected && qualityUpperBound
       ? Math.max(0, qualityUpperBound.expectedTotalCost - selected.expectedTotalCost)
       : undefined,
+    providerSelectionReason: route.providerSelectionReason,
+    selectedProvider: route.selectedProfile.provider,
   };
 }
 
@@ -548,9 +560,12 @@ export class AlphaRequestProcessor {
       contextHash,
       recentEvaluation: previousJudge,
     });
+    const judgeEconomics = this.options.profiles.find((profile) => profile.provider === judge.provider)?.economics;
+    const effectiveJudgeCostCny = Number(judge.costUsd)
+      * (judgeEconomics ? cashCnyPerNominalUsd(judgeEconomics) : 1);
     const route = routeWithCurrentAcuFormula({
       judge: judge.judge,
-      judgeCost: Number(judge.costUsd),
+      judgeCost: effectiveJudgeCostCny,
       inputTokens: Math.ceil(rawBytes / 4),
       expectedOutputTokens: this.expectedOutputTokens,
       effectiveQualityTarget: state.effectiveQualityTarget,
@@ -664,6 +679,8 @@ export class AlphaRequestProcessor {
       formulaInputs: {
         judge: judge.judge,
         judgeCost: judge.costUsd,
+        effectiveJudgeCostCny,
+        effectiveSwitchCostCny: route.effectiveSwitchCost,
         inputTokens: Math.ceil(rawBytes / 4),
         expectedOutputTokens: this.expectedOutputTokens,
         userRoutingPolicy: identity.routingPolicy,
@@ -684,13 +701,16 @@ export class AlphaRequestProcessor {
         hardFilteredCandidateModelCount: route.candidateEstimates.length,
         paretoFrontierCandidateCount: route.paretoFrontier.length,
         excludedProfiles: route.excludedProfiles,
+        costUnit: "CNY",
+        providerSelectionReason: route.providerSelectionReason,
+        providerCandidateEstimates: route.providerCandidateEstimates,
         reasoningEffort: envelope.reasoningEffort,
         requiredToolTypes: envelope.requiredToolTypes,
       },
       candidateEstimates: route.candidateEstimates,
       paretoFrontier: route.paretoFrontier,
       selectedProfile: { ...route.selectedProfile },
-      routeExplanation: route.recommendation.reason,
+      routeExplanation: `${route.recommendation.reason} ${route.providerSelectionReason}`,
       fallbackSource: judge.status.includes("fallback") ? judge.resultSource : undefined,
     });
     await repository.updateSegmentDecision({
@@ -717,20 +737,32 @@ export class AlphaRequestProcessor {
     rawBytes: number,
   ): AlphaExecutionProfile | undefined {
     if (mode === "explicit") return current;
-    const equivalent = this.options.profiles.find((profile) => (
+    const equivalent = this.options.profiles.filter((profile) => (
       profile.executionProfileId !== current.executionProfileId
       && profile.modelId === current.modelId
       && profile.enabled
       && profile.administratorAllowed
       && profile.health === "healthy"
+      && profile.usageTrusted !== false
+      && (!profile.economics || (profile.economics.enabled && profile.economics.health === "healthy"))
       && profile.protocols.includes(envelope.protocol)
       && (!envelope.tools.length || profile.toolCallSupport)
       && envelope.requiredToolTypes.every((toolType) => profile.supportedToolTypes?.includes(toolType))
       && (!envelope.containsThinking || profile.thinkingSupport)
       && profile.contextWindow >= Math.ceil(rawBytes / 4)
       && this.options.adapters.has(profile.executionProfileId)
-    ));
-    return equivalent ?? current;
+    )).sort((left, right) => {
+      const leftRate = left.economics
+        ? left.economics.observedBillingMultiplier * (left.economics.rechargeCashCny ?? Number.POSITIVE_INFINITY)
+          / (left.economics.creditsReceivedUsd ?? 1)
+        : 1;
+      const rightRate = right.economics
+        ? right.economics.observedBillingMultiplier * (right.economics.rechargeCashCny ?? Number.POSITIVE_INFINITY)
+          / (right.economics.creditsReceivedUsd ?? 1)
+        : 1;
+      return leftRate - rightRate;
+    })[0];
+    return equivalent;
   }
 
   private async recordProviderFailure(input: {
@@ -850,7 +882,12 @@ export class AlphaRequestProcessor {
       contentType: "application/json",
       body: JSON.parse(input.body.toString("utf8")) as unknown,
       isComplete: true,
-      metadata: { requestedModel: input.requestedModel, actualModel: input.profile.modelId },
+      metadata: {
+        requestedModel: input.requestedModel,
+        canonicalModel: input.profile.modelId,
+        providerModel: input.profile.providerModelId ?? input.profile.modelId,
+        selectedProvider: input.profile.provider,
+      },
     });
     if (input.attemptIndex > 1) {
       await repository.insertEvent({
@@ -872,7 +909,7 @@ export class AlphaRequestProcessor {
         },
       });
     }
-    return { attemptId, attemptIndex: input.attemptIndex, adapter, profile: input.profile };
+    return { attemptId, attemptIndex: input.attemptIndex, adapter, profile: input.profile, body: input.body };
   }
 
   async resolveExecution(
@@ -968,7 +1005,9 @@ export class AlphaRequestProcessor {
       });
       await repository.attachRequestPayload(logical.logicalRequestId, identity.newapiUserId, requestPayloadId);
     }
-    const providerBody = mode === "explicit" ? Buffer.from(ingress.rawBody) : rewriteModel(ingress.rawBody, result.profile.modelId);
+    const providerBody = mode === "explicit"
+      ? Buffer.from(ingress.rawBody)
+      : rewriteModel(ingress.rawBody, result.profile.providerModelId ?? result.profile.modelId);
     const initialAttempt = await this.startProviderAttempt({
       identity,
       state,
@@ -1031,6 +1070,9 @@ export class AlphaRequestProcessor {
         });
       },
       startRetry: async (profile, nextAttemptIndex) => {
+        const retryBody = mode === "explicit"
+          ? Buffer.from(ingress.rawBody)
+          : rewriteModel(ingress.rawBody, profile.providerModelId ?? profile.modelId);
         const next = await this.startProviderAttempt({
           identity,
           state,
@@ -1040,7 +1082,7 @@ export class AlphaRequestProcessor {
           profile,
           attemptIndex: nextAttemptIndex,
           retryOwner: "acu",
-          body: providerBody,
+          body: retryBody,
           routeDecisionId,
           judgeEvaluationId,
         });
@@ -1108,8 +1150,38 @@ export class AlphaRequestProcessor {
         selected_model: input.context.routeSummary.selectedModel,
         route_reason: input.context.routeSummary.routeReason,
         quality_upper_bound_model: input.context.routeSummary.qualityUpperBoundModel,
-        estimated_cost_reduction_vs_quality_upper_bound_usd:
-          input.context.routeSummary.estimatedCostReductionVsQualityUpperBoundUsd,
+        estimated_cost_reduction_vs_quality_upper_bound_cny:
+          input.context.routeSummary.estimatedCostReductionVsQualityUpperBoundCny,
+        canonical_model: input.context.selectedProfile.modelId,
+        provider_model: input.context.selectedProfile.providerModelId ?? input.context.selectedProfile.modelId,
+        selected_provider: input.context.routeSummary.selectedProvider ?? input.context.selectedProfile.provider,
+        actual_provider: input.context.selectedProfile.provider,
+        provider_selection_reason: input.context.routeSummary.providerSelectionReason,
+        ...(() => {
+          const economics = input.context.selectedProfile.economics;
+          if (!economics) return {};
+          const actual = providerCostBreakdown(economics, Number(providerCostUsd));
+          const reference = this.options.profiles.find((profile) => (
+            profile.provider === "closeai" && profile.modelId === input.context.selectedProfile.modelId
+            && profile.economics?.enabled
+          ));
+          const referenceCost = reference?.economics
+            ? providerCostBreakdown(reference.economics, Number(providerCostUsd)).effectiveCashCostCny
+            : undefined;
+          return {
+            nominal_provider_cost_usd: actual.nominalProviderCostUsd,
+            provider_balance_charge_usd: actual.providerBalanceChargeUsd,
+            effective_cash_cost_cny: actual.effectiveCashCostCny,
+            effective_cost_source: actual.effectiveCostSource,
+            effective_cost_version: actual.effectiveCostVersion,
+            user_charge: finalCost,
+            reference_provider: reference?.provider,
+            reference_effective_cash_cost_cny: referenceCost,
+            effective_savings_vs_reference_cny: referenceCost === undefined
+              ? undefined
+              : referenceCost - actual.effectiveCashCostCny,
+          };
+        })(),
       },
     });
   }
@@ -1183,7 +1255,7 @@ export class AlphaRequestProcessor {
     await repository.completeAttempt({
       attemptId: context.attemptId,
       status,
-      actualModel: usage.actualModel ?? context.selectedProfile.modelId,
+      actualModel: canonicalActualModel(context.selectedProfile, usage.actualModel),
       providerRequestId,
       errorCategory: success ? undefined : relay.clientCancelled ? "client_cancelled" : "provider_error",
       httpStatus: relay.httpStatus,
@@ -1209,7 +1281,7 @@ export class AlphaRequestProcessor {
     if (success || (context.attemptIndex ?? 1) >= 2 || relay.clientCancelled) {
       await this.createFinalUsageReport({
         context,
-        actualModel: usage.actualModel ?? context.selectedProfile.modelId,
+        actualModel: canonicalActualModel(context.selectedProfile, usage.actualModel),
         inputTokens: usage.inputTokens,
         cachedInputTokens: usage.cachedInputTokens,
         outputTokens: usage.outputTokens,

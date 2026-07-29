@@ -159,6 +159,37 @@ describe("Alpha native protocol gateway", () => {
     expect(upstreamHeaders["x-acu-newapi-user-id"]).toBeUndefined();
   });
 
+  it("supports Providers whose Responses root omits the /v1 prefix", async () => {
+    let upstreamPath = "";
+    const upstreamPort = await listen(createServer((request, response) => {
+      upstreamPath = request.url ?? "";
+      response.setHeader("content-type", "application/json");
+      response.end('{"id":"response-strip-v1","output":[]}');
+    }));
+    const adapter = createNativeProviderAdapter({
+      provider: "lucen",
+      channel: "lucen-openai",
+      baseUrl: `http://127.0.0.1:${upstreamPort}`,
+      apiKey: "provider-test-key",
+      authMode: "bearer",
+      stripV1Path: true,
+    });
+    const gatewayPort = await listen(createAlphaGatewayServer({
+      trustedIdentitySecret: sharedSecret,
+      async resolveExecution(envelope) {
+        return { adapter, requestedModel: envelope.requestedModel, actualModel: envelope.requestedModel, provider: "lucen", channel: "lucen-openai" };
+      },
+    }));
+    const body = Buffer.from('{"model":"gpt-test","input":"hello","stream":false}');
+    const response = await fetch(`http://127.0.0.1:${gatewayPort}/v1/responses?fixture=1`, {
+      method: "POST",
+      headers: signedHeaders(body),
+      body,
+    });
+    expect(response.status).toBe(200);
+    expect(upstreamPath).toBe("/responses?fixture=1");
+  });
+
   it("relays SSE tool events byte-for-byte without aggregation or injection", async () => {
     const expected = [
       "event: response.output_item.added\n",

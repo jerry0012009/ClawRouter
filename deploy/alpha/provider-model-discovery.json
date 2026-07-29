@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "acu-provider-model-discovery-v1",
+  "observedAt": "2026-07-29T00:00:00Z",
+  "curveModelCount": 23,
+  "providers": [
+    {
+      "providerId": "lucen",
+      "directoryEndpoint": "/models",
+      "providerModelAvailable": 21,
+      "curveAvailable": 23,
+      "exactCurveIntersection": 5,
+      "curveModelIds": ["gpt-5.4-mini", "gpt-5.5", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra"],
+      "responsesCandidate": 5,
+      "responsesVerified": ["gpt-5.4-mini", "gpt-5.6-luna", "gpt-5.6-terra"],
+      "preflightFailed": [{"modelId": "gpt-5.6-sol", "stage": "tool_call_completion", "httpStatus": 200}],
+      "notPreflighted": ["gpt-5.5"],
+      "unknownModelCount": 16,
+      "aliasMappings": [{"providerActualModelId": "gpt-5.4-mini-2026-03-17", "canonicalModelId": "gpt-5.4-mini"}]
+    },
+    {
+      "providerId": "blackai",
+      "directoryEndpoint": "/models",
+      "providerModelAvailable": 22,
+      "curveAvailable": 23,
+      "exactCurveIntersection": 5,
+      "curveModelIds": ["gpt-5.4-mini", "gpt-5.5", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra"],
+      "responsesCandidate": 5,
+      "responsesVerified": ["gpt-5.4-mini", "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"],
+      "notPreflighted": ["gpt-5.5"],
+      "unknownModelCount": 17,
+      "aliasMappings": [{"providerActualModelId": "gpt-5.4-mini-2026-03-17", "canonicalModelId": "gpt-5.4-mini"}],
+      "activationBlocker": "Exact Founder purchase batch is not exposed by API-key authentication; approximate 0.14-0.15 CNY/USD range was not used."
+    },
+    {
+      "providerId": "closeai",
+      "directoryEndpoint": "/v1/models",
+      "providerModelAvailable": 136,
+      "curveAvailable": 23,
+      "exactCurveIntersection": 18,
+      "activeResponses": ["gpt-5.4-mini", "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.5", "gpt-5.6-sol"],
+      "responsesCandidate": 5,
+      "unknownModelCount": 118,
+      "aliasMappings": []
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "acu-provider-preflight-observation-v1",
+  "observedAt": "2026-07-29T00:00:00Z",
+  "protocol": "openai_responses",
+  "reasoningEffort": "medium",
+  "tests": [
+    {"provider":"lucen","modelId":"gpt-5.4-mini","statuses":[200,200],"streaming":true,"toolRoundtrip":true,"usageParsed":true,"actualModel":"gpt-5.4-mini-2026-03-17"},
+    {"provider":"lucen","modelId":"gpt-5.6-luna","statuses":[200,200],"streaming":true,"toolRoundtrip":true,"usageParsed":true,"actualModel":"gpt-5.6-luna"},
+    {"provider":"lucen","modelId":"gpt-5.6-terra","statuses":[200,200],"streaming":true,"toolRoundtrip":true,"usageParsed":true,"actualModel":"gpt-5.6-terra"},
+    {"provider":"lucen","modelId":"gpt-5.6-sol","statuses":[200],"streaming":true,"toolRoundtrip":false,"usageParsed":false,"actualModel":null},
+    {"provider":"blackai","modelId":"gpt-5.4-mini","statuses":[200,200],"streaming":true,"toolRoundtrip":true,"usageParsed":true,"actualModel":"gpt-5.4-mini-2026-03-17"},
+    {"provider":"blackai","modelId":"gpt-5.6-luna","statuses":[200,200],"streaming":true,"toolRoundtrip":true,"usageParsed":true,"actualModel":"gpt-5.6-luna"},
+    {"provider":"blackai","modelId":"gpt-5.6-terra","statuses":[200,200],"streaming":true,"toolRoundtrip":true,"usageParsed":true,"actualModel":"gpt-5.6-terra"},
+    {"provider":"blackai","modelId":"gpt-5.6-sol","statuses":[200,200],"streaming":true,"toolRoundtrip":true,"usageParsed":true,"actualModel":"gpt-5.6-sol"}
+  ],
+  "spend": {
+    "lucenNominalBalanceUsd": 0.039536,
+    "lucenProviderBalanceChargeUsd": 0.00237216,
+    "lucenEffectiveCashCostCny": 0.00237216,
+    "blackaiProviderBalanceChargeUsd": 0.0852195,
+    "blackaiEffectiveCashCostCny": null,
+    "blackaiCashCostUpperBoundCnyUsingUncommittedRangeOnly": 0.012782925,
+    "committedKnownCashCostCny": 0.00237216
+  },
+  "limitations": [
+    "BlackAI exact purchase batch was not available through API-key authentication, so no effective cash cost was committed.",
+    "Lucen gpt-5.6-sol returned HTTP 200 streaming bytes but no completed Tool Call fixture; it remains inactive.",
+    "Directory presence alone was not treated as protocol support."
+  ]
+}

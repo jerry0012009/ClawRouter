@@ -256,7 +256,7 @@ describe("Alpha current-formula routing", () => {
         ));
         decisions.forEach((decision, index) => {
           selected[(["economy", "balanced", "quality"] as const)[index]].add(decision.selectedProfile.modelId);
-          expect(decision.formulaVersion).toBe("acu-routing-model-v0.2");
+          expect(decision.formulaVersion).toBe("acu-routing-model-v0.3");
         });
         const balancedQuality = decisions[1].recommendation.recommended.estimatedQuality;
         const qualityQuality = decisions[2].recommendation.recommended.estimatedQuality;

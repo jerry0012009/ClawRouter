@@ -12,6 +12,7 @@ export {
   type SessionRecord,
   type TaskRecord,
   type UsageReportRecord,
+  type PendingUsageReport,
   type JudgeEvaluationRecord,
   type RouteDecisionRecord,
 } from "./repository.js";
@@ -54,6 +55,14 @@ export {
   type AlphaRouteRequirements,
 } from "./routing.js";
 export { calculateProviderCost, parseProviderUsage, sumCost, type AlphaUsage } from "./usage.js";
+export {
+  UsageOutboxWorker,
+  sendUsageFinalize,
+  signUsageFinalizeBody,
+  usageFinalizeBody,
+  type UsageFinalizeClientOptions,
+  type UsageOutboxOptions,
+} from "./usage-outbox.js";
 export {
   createAcuJudgeRunner,
   type AlphaJudgeInput,

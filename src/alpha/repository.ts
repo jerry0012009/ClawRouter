@@ -156,6 +156,28 @@ export type UsageReportRecord = {
   costBreakdown: Record<string, unknown>;
 };
 
+export type PendingUsageReport = {
+  usageReportId: string;
+  logicalRequestId: string;
+  reportIdempotencyKey: string;
+  newapiUserId: string;
+  newapiTokenId?: string;
+  newapiLogId?: string;
+  actualModel?: string;
+  provider?: string;
+  channel?: string;
+  inputTokens: bigint;
+  cachedInputTokens: bigint;
+  outputTokens: bigint;
+  reasoningTokens: bigint;
+  judgeCostUsd: string;
+  providerCostUsd: string;
+  failedBilledCostUsd: string;
+  finalUserCostUsd: string;
+  costBreakdown: Record<string, unknown>;
+  sendAttemptCount: number;
+};
+
 export type JudgeEvaluationRecord = {
   judgeEvaluationId: string;
   newapiUserId: string;
@@ -608,6 +630,86 @@ export class AlphaRepository {
       [input.reportIdempotencyKey],
     );
     return { usageReportId: existing.rows[0].usage_report_id, inserted: false };
+  }
+
+  async claimUsageReports(limit = 10): Promise<PendingUsageReport[]> {
+    const safeLimit = Math.max(1, Math.min(100, Math.trunc(limit)));
+    const result = await this.database.query<{
+      usage_report_id: string;
+      logical_request_id: string;
+      report_idempotency_key: string;
+      newapi_user_id: string;
+      newapi_token_id: string | null;
+      newapi_log_id: string | null;
+      actual_model: string | null;
+      provider: string | null;
+      channel: string | null;
+      input_tokens: string;
+      cached_input_tokens: string;
+      output_tokens: string;
+      reasoning_tokens: string;
+      judge_cost_usd: string;
+      provider_cost_usd: string;
+      failed_billed_cost_usd: string;
+      final_user_cost_usd: string;
+      cost_breakdown_json: Record<string, unknown>;
+      send_attempt_count: number;
+    }>(
+      `WITH candidates AS (
+         SELECT usage_report_id FROM acu_usage_reports
+         WHERE (status IN ('pending','failed') AND (next_send_at IS NULL OR next_send_at <= now()))
+            OR (status='sending' AND next_send_at <= now())
+         ORDER BY created_at LIMIT $1 FOR UPDATE SKIP LOCKED
+       )
+       UPDATE acu_usage_reports AS reports
+       SET status='sending',send_attempt_count=reports.send_attempt_count+1,
+           next_send_at=now()+interval '5 minutes',last_error=NULL
+       FROM candidates WHERE reports.usage_report_id=candidates.usage_report_id
+       RETURNING reports.*`,
+      [safeLimit],
+    );
+    return result.rows.map((row) => ({
+      usageReportId: row.usage_report_id,
+      logicalRequestId: row.logical_request_id,
+      reportIdempotencyKey: row.report_idempotency_key,
+      newapiUserId: row.newapi_user_id,
+      newapiTokenId: row.newapi_token_id ?? undefined,
+      newapiLogId: row.newapi_log_id ?? undefined,
+      actualModel: row.actual_model ?? undefined,
+      provider: row.provider ?? undefined,
+      channel: row.channel ?? undefined,
+      inputTokens: BigInt(row.input_tokens),
+      cachedInputTokens: BigInt(row.cached_input_tokens),
+      outputTokens: BigInt(row.output_tokens),
+      reasoningTokens: BigInt(row.reasoning_tokens),
+      judgeCostUsd: row.judge_cost_usd,
+      providerCostUsd: row.provider_cost_usd,
+      failedBilledCostUsd: row.failed_billed_cost_usd,
+      finalUserCostUsd: row.final_user_cost_usd,
+      costBreakdown: row.cost_breakdown_json,
+      sendAttemptCount: row.send_attempt_count,
+    }));
+  }
+
+  async acknowledgeUsageReport(usageReportId: string): Promise<void> {
+    const result = await this.database.query(
+      `UPDATE acu_usage_reports SET status='acknowledged',sent_at=COALESCE(sent_at,now()),
+       acknowledged_at=now(),next_send_at=NULL,last_error=NULL
+       WHERE usage_report_id=$1 AND status='sending'`,
+      [usageReportId],
+    );
+    if (result.rowCount !== 1) throw new Error("Usage report acknowledgment lost its sending claim");
+  }
+
+  async failUsageReport(usageReportId: string, error: string, retryAfterSeconds: number): Promise<void> {
+    const safeDelay = Math.max(1, Math.min(3600, Math.trunc(retryAfterSeconds)));
+    const result = await this.database.query(
+      `UPDATE acu_usage_reports SET status='failed',last_error=$2,
+       next_send_at=now()+($3::text || ' seconds')::interval
+       WHERE usage_report_id=$1 AND status='sending'`,
+      [usageReportId, error.slice(0, 2_000), safeDelay],
+    );
+    if (result.rowCount !== 1) throw new Error("Usage report failure update lost its sending claim");
   }
 
   async findUserScoped<R extends QueryResultRow>(

@@ -8,7 +8,9 @@ import { createAlphaGatewayServer } from "./gateway.js";
 import { createAcuJudgeRunner } from "./judge-runner.js";
 import { AlphaRequestProcessor } from "./processor.js";
 import { createNativeProviderAdapter, type NativeProviderConfig } from "./provider.js";
+import { AlphaRepository } from "./repository.js";
 import type { AlphaExecutionProfile } from "./routing.js";
+import { UsageOutboxWorker } from "./usage-outbox.js";
 
 type ConfiguredExecutionProfile = AlphaExecutionProfile & {
   baseUrl?: string;
@@ -23,6 +25,7 @@ export type AlphaServiceConfig = {
   port: number;
   databaseUrl: string;
   trustedIdentitySecret: string;
+  newApiInternalBaseUrl: string;
   profiles: ConfiguredExecutionProfile[];
 };
 
@@ -79,6 +82,7 @@ export async function readAlphaServiceConfig(): Promise<AlphaServiceConfig> {
     port: positivePort(process.env.ACU_PORT),
     databaseUrl: requiredEnvironment("ACU_DATABASE_URL"),
     trustedIdentitySecret: requiredEnvironment("ACU_TRUSTED_IDENTITY_SECRET"),
+    newApiInternalBaseUrl: requiredEnvironment("NEW_API_INTERNAL_BASE_URL"),
     profiles: await configuredProfiles(),
   };
 }
@@ -138,6 +142,11 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
     adapters: new Map(profiles.map((item) => [item.profile.executionProfileId, item.adapter])),
     judgeRunner,
   });
+  const usageOutbox = new UsageOutboxWorker({
+    repository: new AlphaRepository(database),
+    baseUrl: serviceConfig.newApiInternalBaseUrl,
+    sharedSecret: serviceConfig.trustedIdentitySecret,
+  });
   const server = createAlphaGatewayServer({
     trustedIdentitySecret: serviceConfig.trustedIdentitySecret,
     models: profiles.map((item) => item.profile.modelId),
@@ -158,10 +167,12 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
   server.listen(serviceConfig.port, serviceConfig.bindAddress, () => {
     console.log(`ACU Router Alpha listening on ${serviceConfig.bindAddress}:${serviceConfig.port}`);
     console.log(`Loaded ${profiles.length} execution profiles`);
+    usageOutbox.start();
   });
   const shutdown = async (signal: string) => {
     console.log(`ACU Router Alpha received ${signal}; shutting down`);
     server.close();
+    await usageOutbox.stop();
     await database.close();
   };
   process.once("SIGTERM", () => { void shutdown("SIGTERM"); });

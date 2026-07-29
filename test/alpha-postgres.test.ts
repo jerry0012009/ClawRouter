@@ -205,6 +205,40 @@ run("Alpha PostgreSQL foundation", () => {
     expect(stored.rows[0].final_user_cost_usd).toBe("0.1234567890");
   });
 
+  it("claims, reclaims after a worker crash, and acknowledges the usage outbox", async () => {
+    const firstClaim = await repository.claimUsageReports(1);
+    expect(firstClaim).toHaveLength(1);
+    expect(firstClaim[0]).toMatchObject({
+      usageReportId: "usage_a_1",
+      reportIdempotencyKey: "usage-idempotency-a",
+      sendAttemptCount: 1,
+    });
+
+    await database.query(
+      "UPDATE acu_usage_reports SET next_send_at=now() WHERE usage_report_id='usage_a_1'",
+    );
+    const restarted = new AlphaDatabase({ connectionString: databaseUrl!, maxConnections: 1 });
+    try {
+      const restartedRepository = new AlphaRepository(restarted);
+      const reclaimed = await restartedRepository.claimUsageReports(1);
+      expect(reclaimed).toHaveLength(1);
+      expect(reclaimed[0].sendAttemptCount).toBe(2);
+      await restartedRepository.failUsageReport("usage_a_1", "temporary finalize failure", 1);
+      expect(await restartedRepository.claimUsageReports(1)).toHaveLength(0);
+      await restarted.query(
+        "UPDATE acu_usage_reports SET next_send_at=now() WHERE usage_report_id='usage_a_1'",
+      );
+      expect(await restartedRepository.claimUsageReports(1)).toHaveLength(1);
+      await restartedRepository.acknowledgeUsageReport("usage_a_1");
+      const state = await restarted.query<{ status: string; send_attempt_count: number }>(
+        "SELECT status,send_attempt_count FROM acu_usage_reports WHERE usage_report_id='usage_a_1'",
+      );
+      expect(state.rows[0]).toEqual({ status: "acknowledged", send_attempt_count: 3 });
+    } finally {
+      await restarted.close();
+    }
+  });
+
   it("restores persisted session and request state through a new pool", async () => {
     const restarted = new AlphaDatabase({ connectionString: databaseUrl!, maxConnections: 1 });
     try {

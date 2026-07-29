@@ -678,6 +678,31 @@ export class AlphaRepository {
     return row ? { ...healthSnapshot(row), usageTrusted: row.usage_trusted === true, actualModelVerified: row.actual_model_verified === true } : undefined;
   }
 
+  async claimHalfOpenProbe(scope: "channel" | "profile", id: string): Promise<boolean> {
+    const table = scope === "channel" ? "acu_channel_health" : "acu_provider_model_profile_health";
+    const column = scope === "channel" ? "channel_id" : "execution_profile_id";
+    const result = await this.database.query(
+      `UPDATE ${table} SET circuit_state='half_open',half_open_probe_in_flight=true,
+       cooldown_until=now()+interval '2 minutes',updated_at=now()
+       WHERE ${column}=$1 AND (
+         (circuit_state='open' AND cooldown_until IS NOT NULL AND cooldown_until<=now()) OR
+         (circuit_state='half_open' AND (half_open_probe_in_flight=false OR cooldown_until<=now()))
+       ) RETURNING ${column}`,
+      [id],
+    );
+    return result.rowCount === 1;
+  }
+
+  async releaseHalfOpenProbe(scope: "channel" | "profile", id: string): Promise<void> {
+    const table = scope === "channel" ? "acu_channel_health" : "acu_provider_model_profile_health";
+    const column = scope === "channel" ? "channel_id" : "execution_profile_id";
+    await this.database.query(
+      `UPDATE ${table} SET half_open_probe_in_flight=false,cooldown_until=NULL,updated_at=now()
+       WHERE ${column}=$1 AND circuit_state='half_open'`,
+      [id],
+    );
+  }
+
   async saveChannelHealth(input: { channelId: string; providerId: string; snapshot: HealthSnapshot }): Promise<void> {
     await this.database.query(
       `INSERT INTO acu_channel_health
@@ -688,7 +713,8 @@ export class AlphaRepository {
         cooldown_until=excluded.cooldown_until,last_attempt_at=excluded.last_attempt_at,last_success_at=excluded.last_success_at,
         last_failure_at=excluded.last_failure_at,consecutive_failures=excluded.consecutive_failures,
         recent_success_rate=excluded.recent_success_rate,first_token_latency_ms=excluded.first_token_latency_ms,
-        total_latency_ms=excluded.total_latency_ms,error_class=excluded.error_class,http_status=excluded.http_status,updated_at=now()`,
+        total_latency_ms=excluded.total_latency_ms,error_class=excluded.error_class,http_status=excluded.http_status,
+        half_open_probe_in_flight=false,updated_at=now()`,
       healthValues(input.channelId, input.providerId, input.snapshot),
     );
   }
@@ -708,7 +734,7 @@ export class AlphaRepository {
         recent_success_rate=excluded.recent_success_rate,first_token_latency_ms=excluded.first_token_latency_ms,
         total_latency_ms=excluded.total_latency_ms,error_class=excluded.error_class,http_status=excluded.http_status,
         actual_model_verified=excluded.actual_model_verified,usage_trusted=excluded.usage_trusted,
-        health_reason=excluded.health_reason,updated_at=now()`,
+        health_reason=excluded.health_reason,half_open_probe_in_flight=false,updated_at=now()`,
       [input.executionProfileId, input.channelId, input.providerId, input.canonicalModelId, input.protocol,
         input.snapshot.state, input.snapshot.cooldownUntil ?? null, input.snapshot.lastAttemptAt ?? null,
         input.snapshot.lastSuccessAt ?? null, input.snapshot.lastFailureAt ?? null,

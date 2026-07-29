@@ -252,6 +252,18 @@ run("Alpha PostgreSQL foundation", () => {
     }
   });
 
+  it("allows exactly one half-open probe and releases the lease", async () => {
+    await database.query(
+      `INSERT INTO acu_channel_health
+       (channel_id,provider_id,circuit_state,cooldown_until,consecutive_failures,recent_success_rate,updated_at)
+       VALUES ('channel_probe_test','provider_test','open',now()-interval '1 second',2,0.5,now())`,
+    );
+    expect(await repository.claimHalfOpenProbe("channel", "channel_probe_test")).toBe(true);
+    expect(await repository.claimHalfOpenProbe("channel", "channel_probe_test")).toBe(false);
+    await repository.releaseHalfOpenProbe("channel", "channel_probe_test");
+    expect(await repository.claimHalfOpenProbe("channel", "channel_probe_test")).toBe(true);
+  });
+
   it("returns the complete logical request chain only through the explicit admin lookup", async () => {
     await repository.saveJudgeEvaluation({
       judgeEvaluationId: "judge_a_1",

@@ -284,23 +284,54 @@ export class AlphaRequestProcessor {
     this.expectedOutputTokens = options.expectedOutputTokens ?? 800;
   }
 
-  private async effectiveProfiles(): Promise<AlphaExecutionProfile[]> {
+  private async effectiveProfiles(): Promise<{ profiles: AlphaExecutionProfile[]; probeClaims: Array<{ scope: "channel" | "profile"; id: string }> }> {
     const repository = new AlphaRepository(this.options.database);
-    return Promise.all(this.options.profiles.map(async (profile) => {
+    const probeClaims: Array<{ scope: "channel" | "profile"; id: string }> = [];
+    const claimedChannels = new Set<string>();
+    const profiles: AlphaExecutionProfile[] = [];
+    for (const profile of this.options.profiles) {
+      const channelId = profile.channelId ?? profile.channel;
       const [channel, runtime] = await Promise.all([
-        repository.channelHealth(profile.channelId ?? profile.channel),
+        repository.channelHealth(channelId),
         repository.profileHealth(profile.executionProfileId),
       ]);
-      const unavailable = [channel?.state, runtime?.state].some((state) => state === "open" || state === "disabled" || state === "half_open");
-      const degraded = [channel?.state, runtime?.state].some((state) => state === "degraded");
-      return {
+      let channelProbe = false;
+      let profileProbe = false;
+      if (channel && (channel.state === "open" || channel.state === "half_open")) {
+        channelProbe = claimedChannels.has(channelId) || await repository.claimHalfOpenProbe("channel", channelId);
+        if (channelProbe && !claimedChannels.has(channelId)) {
+          claimedChannels.add(channelId);
+          probeClaims.push({ scope: "channel", id: channelId });
+        }
+      }
+      if (runtime && (runtime.state === "open" || runtime.state === "half_open")) {
+        profileProbe = await repository.claimHalfOpenProbe("profile", profile.executionProfileId);
+        if (profileProbe) probeClaims.push({ scope: "profile", id: profile.executionProfileId });
+      }
+      const unavailable = channel?.state === "disabled" || runtime?.state === "disabled"
+        || ((channel?.state === "open" || channel?.state === "half_open") && !channelProbe)
+        || ((runtime?.state === "open" || runtime?.state === "half_open") && !profileProbe);
+      const degraded = channelProbe || profileProbe || [channel?.state, runtime?.state].some((state) => state === "degraded");
+      profiles.push({
         ...profile,
         health: unavailable ? "cooldown" as const : degraded ? "degraded" as const : profile.health,
         usageTrusted: runtime?.usageTrusted ?? profile.usageTrusted,
         recentSuccessRate: Math.min(channel?.recentSuccessRate ?? 1, runtime?.recentSuccessRate ?? 1),
         observedLatencyMs: runtime?.totalLatencyMs ?? channel?.totalLatencyMs ?? profile.observedLatencyMs,
-      };
-    }));
+      });
+    }
+    return { profiles, probeClaims };
+  }
+
+  private async releaseUnusedProbeClaims(
+    claims: Array<{ scope: "channel" | "profile"; id: string }>,
+    selected: AlphaExecutionProfile,
+  ): Promise<void> {
+    const repository = new AlphaRepository(this.options.database);
+    const selectedChannel = selected.channelId ?? selected.channel;
+    await Promise.all(claims
+      .filter((claim) => claim.scope === "channel" ? claim.id !== selectedChannel : claim.id !== selected.executionProfileId)
+      .map((claim) => repository.releaseHalfOpenProbe(claim.scope, claim.id)));
   }
 
   private async prepareState(
@@ -500,7 +531,7 @@ export class AlphaRequestProcessor {
     rawBytes: number,
   ): Promise<{ profile: AlphaExecutionProfile; judge?: AlphaJudgeRun; route?: AlphaRouteDecision }> {
     const repository = new AlphaRepository(this.options.database);
-    const effectiveProfiles = await this.effectiveProfiles();
+    const { profiles: effectiveProfiles, probeClaims } = await this.effectiveProfiles();
     if (modeForModel(envelope.requestedModel) === "explicit") {
       const profile = resolveExplicitProfile(envelope.requestedModel, effectiveProfiles, {
         protocol: envelope.protocol,
@@ -548,6 +579,7 @@ export class AlphaRequestProcessor {
           },
         });
       }
+      await this.releaseUnusedProbeClaims(probeClaims, profile);
       return { profile };
     }
 
@@ -560,7 +592,10 @@ export class AlphaRequestProcessor {
       && (identity.routingPolicy !== "custom_allowlist" || identity.allowedModelIds.includes(storedProfile.modelId))
       ? storedProfile
       : undefined;
-    if (!state.decision.runJudge && reused) return { profile: reused };
+    if (!state.decision.runJudge && reused && reused.health !== "cooldown") {
+      await this.releaseUnusedProbeClaims(probeClaims, reused);
+      return { profile: reused };
+    }
 
     const context = buildAlphaJudgeContext(envelope, {
       sessionId: state.sessionId,
@@ -751,6 +786,7 @@ export class AlphaRequestProcessor {
         routingPreference: identity.routingPreference,
       },
     });
+    await this.releaseUnusedProbeClaims(probeClaims, route.selectedProfile);
     return { profile: route.selectedProfile, judge, route };
   }
 

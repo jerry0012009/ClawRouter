@@ -208,6 +208,7 @@ export class AlphaRequestProcessor {
       const repository = new AlphaRepository(client);
       await repository.lockUserState(identity.newapiUserId);
       const info = clientInfo(envelope.protocol, ingress.headers);
+      if (identity.clientVersion && identity.clientVersion !== "unknown") info.version = identity.clientVersion;
       const candidate = clientSessionCandidate(envelope, ingress.headers);
       const candidates = await repository.listSessionCandidates(identity.newapiUserId, envelope.protocol);
       const match = matchSession(sessionRecords(candidates), {

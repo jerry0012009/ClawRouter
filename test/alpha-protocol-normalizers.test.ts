@@ -84,11 +84,52 @@ describe("Messages canonical envelope", () => {
       messages: [{ role: "user", content: "Plan this change" }],
       tools: [{ name: "Read" }, { name: "ExitPlanMode" }],
     }, {}, "2.1.220");
-    expect(plan.planning).toMatchObject({ started: true, fingerprintVersion: "claude-code-2.1-plan-v1" });
+    expect(plan.planning).toMatchObject({ started: true, fingerprintVersion: "claude-code-2.1-plan-v2" });
 
     const unsupportedVersion = normalizeMessagesRequest(plan.raw, {}, "2.2.0");
     const hasWriteTool = normalizeMessagesRequest({ ...plan.raw, tools: [{ name: "ExitPlanMode" }, { name: "Edit" }] }, {}, "2.1.220");
     expect(unsupportedVersion.planning.started).toBe(false);
     expect(hasWriteTool.planning.started).toBe(false);
+  });
+
+  it("recognizes the Claude 2.1 native Plan reminder fingerprint without a declared ExitPlanMode tool", () => {
+    const planReminder = `<system-reminder>
+Plan mode is active. The user indicated that they do not want you to execute yet.
+
+## Plan File Info:
+Write the plan to the configured plan file.
+
+## Plan Workflow
+Inspect before proposing changes.
+</system-reminder>`;
+    const envelope = normalizeMessagesRequest({
+      system: "You are Claude Code.",
+      messages: [{ role: "user", content: [{ type: "text", text: planReminder }] }],
+      tools: ["Read", "TaskCreate", "TaskUpdate", "Write", "Edit"].map((name) => ({ name })),
+    }, {}, "2.1.220");
+    expect(envelope.planning).toMatchObject({
+      started: true,
+      fingerprintVersion: "claude-code-2.1-plan-v2",
+    });
+
+    const afterExit = normalizeMessagesRequest({
+      system: "You are Claude Code.",
+      messages: [{
+        role: "user",
+        content: [{ type: "text", text: `${planReminder}\n## Exited Plan Mode` }],
+      }],
+      tools: ["Read", "TaskCreate", "TaskUpdate", "Write", "Edit"].map((name) => ({ name })),
+    }, {}, "2.1.220");
+    expect(afterExit.planning.started).toBe(false);
+
+    const throughNewAPI = normalizeMessagesRequest({
+      system: "You are Claude Code.",
+      messages: [
+        { role: "user", content: "Plan a change" },
+        { role: "system", content: planReminder },
+      ],
+      tools: ["Read", "TaskCreate", "TaskUpdate", "Write", "Edit"].map((name) => ({ name })),
+    }, {}, "2.1.220");
+    expect(throughNewAPI.planning.started).toBe(true);
   });
 });

@@ -150,7 +150,8 @@ export function createAlphaGatewayServer(options: AlphaGatewayOptions): Server {
       const parsed = JSON.parse(body.toString("utf8")) as unknown;
       const envelope = protocol === "responses"
         ? normalizeResponsesRequest(parsed, request.headers)
-        : normalizeMessagesRequest(parsed, request.headers, request.headers["x-claude-code-version"] as string | undefined);
+        : normalizeMessagesRequest(parsed, request.headers,
+          identity.clientVersion === "unknown" ? undefined : identity.clientVersion);
       stage = "execution";
       const resolution = await options.resolveExecution(envelope, identity, {
         headers: request.headers,

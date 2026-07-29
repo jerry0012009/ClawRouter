@@ -32,6 +32,7 @@ function signedHeaders(body: Buffer): Record<string, string> {
     newapiTokenId: "test-token",
     newapiLogId: "test-log",
     requestId: "test-request",
+    clientVersion: "2.1.220",
     timestamp: new Date().toISOString(),
     bodySha256: bodySha256(body),
   };

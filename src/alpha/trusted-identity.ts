@@ -6,6 +6,7 @@ const INTERNAL_HEADER_NAMES = [
   "x-acu-newapi-token-id",
   "x-acu-newapi-log-id",
   "x-acu-request-id",
+  "x-acu-client-version",
   "x-acu-timestamp",
   "x-acu-body-sha256",
   "x-acu-signature",
@@ -16,6 +17,7 @@ export type TrustedNewApiIdentity = {
   newapiTokenId: string;
   newapiLogId: string;
   requestId: string;
+  clientVersion?: string;
   timestamp: string;
   bodySha256: string;
 };
@@ -44,6 +46,7 @@ export function trustedIdentitySigningPayload(identity: TrustedNewApiIdentity): 
     identity.newapiTokenId,
     identity.newapiLogId,
     identity.requestId,
+    identity.clientVersion ?? "unknown",
     identity.timestamp,
     identity.bodySha256,
   ].join("\n");
@@ -62,6 +65,7 @@ export function trustedIdentityHeaders(
     "x-acu-newapi-token-id": identity.newapiTokenId,
     "x-acu-newapi-log-id": identity.newapiLogId,
     "x-acu-request-id": identity.requestId,
+    "x-acu-client-version": identity.clientVersion ?? "unknown",
     "x-acu-timestamp": identity.timestamp,
     "x-acu-body-sha256": identity.bodySha256,
     "x-acu-signature": signTrustedIdentity(identity, sharedSecret),
@@ -79,10 +83,11 @@ export function verifyTrustedIdentity(
     newapiTokenId: singleHeader(headers, INTERNAL_HEADER_NAMES[1]),
     newapiLogId: singleHeader(headers, INTERNAL_HEADER_NAMES[2]),
     requestId: singleHeader(headers, INTERNAL_HEADER_NAMES[3]),
-    timestamp: singleHeader(headers, INTERNAL_HEADER_NAMES[4]),
-    bodySha256: singleHeader(headers, INTERNAL_HEADER_NAMES[5]),
+    clientVersion: singleHeader(headers, INTERNAL_HEADER_NAMES[4]),
+    timestamp: singleHeader(headers, INTERNAL_HEADER_NAMES[5]),
+    bodySha256: singleHeader(headers, INTERNAL_HEADER_NAMES[6]),
   };
-  const signature = singleHeader(headers, INTERNAL_HEADER_NAMES[6]);
+  const signature = singleHeader(headers, INTERNAL_HEADER_NAMES[7]);
   const timestampMs = Date.parse(identity.timestamp);
   if (!Number.isFinite(timestampMs)) throw new Error("Trusted identity timestamp is invalid");
   const skewMs = Math.abs((options.now ?? new Date()).getTime() - timestampMs);

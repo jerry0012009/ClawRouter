@@ -105,8 +105,11 @@ function planIsComplete(call: CanonicalToolCall): boolean {
   });
 }
 
-function isExecutionTool(name: string): boolean {
-  return /(?:edit|write|patch|apply_patch|test|build|typecheck)/i.test(name);
+function isExecutionTool(call: CanonicalToolCall): boolean {
+  if (/(?:edit|write|patch|apply_patch|test|build|typecheck)/i.test(call.name)) return true;
+  if (call.name !== "exec_command") return false;
+  const command = typeof record(call.input)?.cmd === "string" ? String(record(call.input)?.cmd) : "";
+  return /(?:^|[;&|\n]\s*)(?:apply_patch\b|npm\s+(?:run\s+)?(?:test|build|typecheck)\b|node\s+--test\b)/i.test(command);
 }
 
 export function extractIncrementalEvents(
@@ -156,7 +159,7 @@ export function extractIncrementalEvents(
   }
   if (state.planningActive) {
     const completedPlan = [...calls].reverse().find((call) => call.name === "update_plan" && planIsComplete(call));
-    const executionCall = calls.find((call) => isExecutionTool(call.name));
+    const executionCall = calls.find(isExecutionTool);
     const completionEstablished = completedPlan !== undefined || state.activePlanComplete === true;
     if (completionEstablished && executionCall
       && (!completedPlan || executionCall.sourceIndex >= completedPlan.sourceIndex)) {

@@ -51,6 +51,44 @@ describe("Alpha session continuity", () => {
       previousHistoryLength: 0,
     });
   });
+
+  it("keeps one Claude Plan session when New API updates the role=system plan-file reminder", () => {
+    const planControl = (planFileState: string) => `Plan mode is active.
+## Plan File Info:
+${planFileState}
+## Plan Workflow
+Inspect, write the plan file, then exit plan mode.`;
+    const first = normalizeMessagesRequest({
+      model: "acu-auto",
+      messages: [
+        { role: "user", content: "Plan listOpen" },
+        { role: "system", content: planControl("No plan file exists yet") },
+      ],
+      tools: ["Read", "TaskCreate", "TaskUpdate", "Write"].map((name) => ({ name })),
+    }, {}, "2.1.220");
+    const next = normalizeMessagesRequest({
+      model: "acu-auto",
+      messages: [
+        { role: "user", content: "Plan listOpen" },
+        { role: "system", content: planControl("Plan file now exists") },
+        { role: "assistant", content: [{ type: "tool_use", id: "write-plan", name: "Write", input: {} }] },
+        { role: "user", content: [{ type: "tool_result", tool_use_id: "write-plan", content: "ok" }] },
+      ],
+      tools: ["Read", "TaskCreate", "TaskUpdate", "Write"].map((name) => ({ name })),
+    }, {}, "2.1.220");
+
+    expect(matchSession([{
+      sessionId: "claude-plan-session",
+      newapiUserId: "user-a",
+      protocol: "messages",
+      history: first.history,
+      lastToolCallIds: [],
+    }], { newapiUserId: "user-a", envelope: next })).toMatchObject({
+      sessionId: "claude-plan-session",
+      confidence: "strong",
+      previousHistoryLength: 2,
+    });
+  });
 });
 
 describe("Alpha incremental events", () => {
@@ -107,6 +145,28 @@ describe("Alpha incremental events", () => {
         { type: "function_call", call_id: "plan-done", name: "update_plan", arguments: "{\"plan\":[{\"status\":\"completed\"}]}" },
         { type: "function_call_output", call_id: "plan-done", output: "updated" },
         { type: "function_call", call_id: "edit-1", name: "apply_patch", arguments: "{}" },
+      ],
+    });
+    expect(extractIncrementalEvents(envelope, {
+      previousHistoryLength: 2,
+      planningActive: true,
+      activePlanHash: "completed-plan",
+      activePlanComplete: true,
+    }).map((item) => item.type)).toEqual(["tool_call", "plan_finished"]);
+  });
+
+  it("recognizes Codex 0.145 exec_command apply_patch as the first execution tool", () => {
+    const envelope = normalizeResponsesRequest({
+      model: "acu-auto",
+      input: [
+        { type: "function_call", call_id: "plan-done", name: "update_plan", arguments: "{\"plan\":[{\"status\":\"completed\"}]}" },
+        { type: "function_call_output", call_id: "plan-done", output: "updated" },
+        {
+          type: "function_call",
+          call_id: "edit-through-shell",
+          name: "exec_command",
+          arguments: "{\"cmd\":\"apply_patch <<'PATCH'\\n*** Begin Patch\\n*** End Patch\\nPATCH\"}",
+        },
       ],
     });
     expect(extractIncrementalEvents(envelope, {

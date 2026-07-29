@@ -570,6 +570,54 @@ run("Alpha PostgreSQL request processor", () => {
     expect(recovery.rows[0]).toEqual({ creation_reason: "repeated_failure", phase: "recovery" });
   });
 
+  it("Judges PlanStarted once, reuses through 10 steps, and does not Judge ordinary PlanFinished", async () => {
+    const userId = "user-planning-state";
+    const beforeJudge = judgeCalls;
+    const history: Array<Record<string, unknown>> = [
+      { type: "message", role: "user", content: [{ type: "input_text", text: "Plan and implement the fixture" }] },
+      { type: "function_call", call_id: "plan-start", name: "update_plan", arguments: "{\"plan\":[{\"status\":\"in_progress\"}]}" },
+    ];
+    await send({ model: "acu-auto", input: history, stream: true }, "planning-start", userId);
+    expect(judgeCalls).toBe(beforeJudge + 1);
+
+    for (let index = 0; index < 10; index += 1) {
+      history.push(
+        { type: "function_call", call_id: `planning-read-${index}`, name: "Read", arguments: "{}" },
+        { type: "function_call_output", call_id: `planning-read-${index}`, output: `fixture-${index}` },
+      );
+      await send({ model: "acu-auto", input: history, stream: true }, `planning-step-${index}`, userId);
+      expect(judgeCalls).toBe(beforeJudge + 1);
+    }
+
+    history.push(
+      { type: "function_call", call_id: "plan-complete", name: "update_plan", arguments: "{\"plan\":[{\"status\":\"completed\"}]}" },
+      { type: "function_call_output", call_id: "plan-complete", output: "updated" },
+      { type: "function_call", call_id: "plan-execute", name: "apply_patch", arguments: "{}" },
+    );
+    await send({ model: "acu-auto", input: history, stream: true }, "planning-finished", userId);
+    expect(judgeCalls).toBe(beforeJudge + 1);
+
+    const state = await database.query<{
+      segments: string; judges: string; judge_ids: string[]; overrides: number[]; reasons: string[];
+    }>(
+      `SELECT
+       count(*)::text segments,
+       count(DISTINCT judge_evaluation_id)::text judges,
+       array_agg(judge_evaluation_id ORDER BY created_at) judge_ids,
+       array_agg(temporary_phase_override ORDER BY created_at) overrides,
+       array_agg(creation_reason ORDER BY created_at) reasons
+       FROM acu_segments WHERE newapi_user_id=$1`,
+      [userId],
+    );
+    expect(state.rows[0]).toMatchObject({
+      segments: "2",
+      judges: "1",
+      overrides: [88, 0],
+      reasons: ["task_start", "plan_finished"],
+    });
+    expect(new Set(state.rows[0].judge_ids).size).toBe(1);
+  });
+
   it("backs off a 502 Channel and recovers on the same model without duplicating the Logical Request", async () => {
     const beforeJudge = judgeCalls;
     const body = {

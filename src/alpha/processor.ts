@@ -51,7 +51,6 @@ export type AlphaProcessorOptions = {
   networkAdapters?: Map<string, Array<{ endpoint: string; adapter: NativeProviderAdapter }>>;
   judgeRunner: AlphaJudgeRunner;
   judgeEconomics?: ProviderEconomics;
-  maxUnjudgedModelResponses?: number;
   expectedOutputTokens?: number;
 };
 
@@ -380,11 +379,9 @@ function updatePlanningMetadata(current: JsonObject, events: AlphaDomainEvent[])
 }
 
 export class AlphaRequestProcessor {
-  private readonly maxUnjudged: number;
   private readonly expectedOutputTokens: number;
 
   constructor(private readonly options: AlphaProcessorOptions) {
-    this.maxUnjudged = options.maxUnjudgedModelResponses ?? 16;
     this.expectedOutputTokens = options.expectedOutputTokens ?? 800;
   }
 
@@ -560,7 +557,8 @@ export class AlphaRequestProcessor {
         isNewTask,
         events: insertedEvents,
         segment: currentSegment,
-        maxUnjudgedModelResponses: this.maxUnjudged,
+        routingLeaseExpired: Boolean(segmentRow?.last_activity_at)
+          && new Date(String(segmentRow!.last_activity_at)).getTime() <= Date.now() - 10 * 60 * 1_000,
       });
       const explicitProfile = mode === "explicit"
         ? selectedProfileFromSegment(segmentRow, this.options.profiles)
@@ -579,6 +577,7 @@ export class AlphaRequestProcessor {
       const temporaryOverride = decision.temporaryPhaseOverride;
       const effectiveQualityTarget = Math.max(baseQualityTarget, capabilityFloor, temporaryOverride);
       if (!segmentId || !segmentRow || (decision.createSegment && !isNewTask)) {
+        const previousSegmentRow = segmentRow;
         if (segmentId) await repository.supersedeActiveSegment(taskId, identity.newapiUserId);
         const previousSegmentId = segmentId;
         segmentId = alphaId("seg");
@@ -596,6 +595,23 @@ export class AlphaRequestProcessor {
           metadata: nextMetadata,
         });
         segmentRow = await repository.getSegment(segmentId, identity.newapiUserId);
+        if (decision.reason === "plan_finished" && !decision.runJudge && previousSegmentRow
+          && stringValue(previousSegmentRow.selected_execution_profile_id)) {
+          await repository.updateSegmentDecision({
+            segmentId,
+            newapiUserId: identity.newapiUserId,
+            judgeEvaluationId: stringValue(previousSegmentRow.judge_evaluation_id),
+            routeDecisionId: stringValue(previousSegmentRow.route_decision_id),
+            selectedExecutionProfileId: stringValue(previousSegmentRow.selected_execution_profile_id)!,
+            metadata: {
+              ...metadata(previousSegmentRow),
+              ...nextMetadata,
+              judgeReusedFromSegmentId: previousSegmentId,
+              judgeReuseReason: "plan_finished_without_rejudge_evidence",
+            },
+          });
+          segmentRow = await repository.getSegment(segmentId, identity.newapiUserId);
+        }
       } else {
         await repository.updateSegmentMetadata(segmentId, identity.newapiUserId, nextMetadata);
       }
@@ -858,7 +874,7 @@ export class AlphaRequestProcessor {
       segmentId: state.segmentId,
       rootGoalText: state.rootGoalText,
       phase: state.decision.phase,
-      trigger: state.decision.runJudge ? state.decision.reason : "safety_refresh",
+      trigger: state.decision.reason,
       recentEvents: state.events,
       acceptedModelResponsesSinceJudge: state.segment.acceptedModelResponsesSinceJudge,
       taskBaseQualityTarget: state.taskBaseQualityTarget,
@@ -876,7 +892,7 @@ export class AlphaRequestProcessor {
     const judge = await this.options.judgeRunner.run({
       messages: context.messages,
       tools: context.tools,
-      trigger: state.decision.runJudge ? state.decision.reason : "safety_refresh",
+      trigger: state.decision.reason,
       contextHash,
       recentEvaluation: previousJudge,
       webIntentFallbackInput,
@@ -1811,13 +1827,36 @@ export class AlphaRequestProcessor {
       ? providerCostBreakdown(economics, Number(providerCostUsd))
       : {
           nominalProviderCostUsd: Number(providerCostUsd),
-          providerBalanceChargeUsd: Number(providerCostUsd),
+          providerBalanceCharge: Number(providerCostUsd),
+          providerBalanceCurrency: "USD-denominated credits" as const,
+          providerCreditCashCostCny: 1,
           effectiveCashCostCny: Number(providerCostUsd),
           effectiveCostSource: "missing_provider_economics",
           effectiveCostVersion: "missing_provider_economics",
         };
+    const failedAttempts = await this.options.database.query<{
+      provider: string;
+      channel: string | null;
+      actual_cost_usd: string;
+    }>(
+      `SELECT provider,channel,actual_cost_usd FROM acu_attempts
+       WHERE logical_request_id=$1 AND attempt_kind='provider' AND status='error'
+         AND provider_billed=true AND actual_cost_usd>0`,
+      [input.context.logicalRequestId],
+    );
+    const failedBilledCostUsd = failedAttempts.rows
+      .reduce((total, attempt) => total + Number(attempt.actual_cost_usd), 0);
+    const failedAttemptCashCostCny = failedAttempts.rows.reduce((total, attempt) => {
+      const attemptProfile = this.options.profiles.find((profile) => (
+        profile.provider === attempt.provider
+        && (profile.channel === attempt.channel || profile.channelId === attempt.channel)
+      ));
+      const attemptEconomics = attemptProfile?.economics ?? economics;
+      return total + (attemptEconomics
+        ? providerCostBreakdown(attemptEconomics, Number(attempt.actual_cost_usd)).effectiveCashCostCny
+        : Number(attempt.actual_cost_usd));
+    }, 0);
     const judgeCashCostCny = Number(input.context.judgeCashCostCny);
-    const failedAttemptCashCostCny = 0;
     const actualTotalCashCostCny = providerCash.effectiveCashCostCny + judgeCashCostCny + failedAttemptCashCostCny;
     const counterfactualQualityCeilingCostCny = input.context.routeSummary.counterfactualQualityCeilingCostCny;
     await new AlphaRepository(this.options.database).createUsageReport({
@@ -1836,10 +1875,12 @@ export class AlphaRequestProcessor {
       reasoningTokens: input.reasoningTokens,
       judgeCostUsd: input.context.judgeCostUsd,
       providerCostUsd,
-      failedBilledCostUsd: "0.0000000000",
+      failedBilledCostUsd: failedBilledCostUsd.toFixed(10),
       finalUserCostUsd: "0.0000000000",
       nominalProviderCostUsd: providerCash.nominalProviderCostUsd.toFixed(10),
-      providerBalanceChargeUsd: providerCash.providerBalanceChargeUsd.toFixed(10),
+      providerBalanceCharge: providerCash.providerBalanceCharge.toFixed(10),
+      providerBalanceCurrency: providerCash.providerBalanceCurrency,
+      providerCreditCashCostCny: providerCash.providerCreditCashCostCny.toFixed(10),
       effectiveProviderCashCostCny: providerCash.effectiveCashCostCny.toFixed(10),
       judgeCashCostCny: judgeCashCostCny.toFixed(10),
       failedAttemptCashCostCny: failedAttemptCashCostCny.toFixed(10),
@@ -1850,10 +1891,13 @@ export class AlphaRequestProcessor {
         billing_version: "founder-alpha-actual-cash-v2",
         judge_nominal_cost_usd: input.context.judgeCostUsd,
         nominal_provider_cost_usd: providerCash.nominalProviderCostUsd,
-        provider_balance_charge_usd: providerCash.providerBalanceChargeUsd,
+        provider_balance_charge: providerCash.providerBalanceCharge,
+        provider_balance_currency: providerCash.providerBalanceCurrency,
+        provider_credit_cash_cost_cny: providerCash.providerCreditCashCostCny,
         effective_provider_cash_cost_cny: providerCash.effectiveCashCostCny,
         judge_cash_cost_cny: judgeCashCostCny,
         failed_attempt_cash_cost_cny: failedAttemptCashCostCny,
+        failed_attempt_nominal_cost_usd: failedBilledCostUsd,
         actual_total_cash_cost_cny: actualTotalCashCostCny,
         user_charge_cny: actualTotalCashCostCny,
         counterfactual_quality_ceiling_cost_cny: counterfactualQualityCeilingCostCny,
@@ -1908,7 +1952,9 @@ export class AlphaRequestProcessor {
             : undefined;
           return {
             nominal_provider_cost_usd: actual.nominalProviderCostUsd,
-            provider_balance_charge_usd: actual.providerBalanceChargeUsd,
+            provider_balance_charge: actual.providerBalanceCharge,
+            provider_balance_currency: actual.providerBalanceCurrency,
+            provider_credit_cash_cost_cny: actual.providerCreditCashCostCny,
             effective_cash_cost_cny: actual.effectiveCashCostCny,
             effective_cost_source: actual.effectiveCostSource,
             effective_cost_version: actual.effectiveCostVersion,
@@ -1948,7 +1994,9 @@ export class AlphaRequestProcessor {
       failedBilledCostUsd: "0.0000000000",
       finalUserCostUsd: "0.0000000000",
       nominalProviderCostUsd: "0.0000000000",
-      providerBalanceChargeUsd: "0.0000000000",
+      providerBalanceCharge: "0.0000000000",
+      providerBalanceCurrency: "USD-denominated credits",
+      providerCreditCashCostCny: "0.0000000000",
       effectiveProviderCashCostCny: "0.0000000000",
       judgeCashCostCny,
       failedAttemptCashCostCny: "0.0000000000",

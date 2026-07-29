@@ -28,7 +28,7 @@ Judge 不回答“最新一句 Prompt 难不难”，而回答：
 
 ### 2.3 不每请求 Judge，也不允许无限不 Judge
 
-普通 Tool 循环复用当前 Evaluation。事件 Trigger、重复失败和陈旧预算共同提供有界兜底。
+普通 Tool 循环复用当前 Evaluation。语义事件、重复失败和 10 分钟 Routing Lease共同提供有界兜底，不按固定 Step / Response 数刷新。
 
 ### 2.4 显式模型跳过 Judge
 
@@ -91,13 +91,13 @@ temporary_phase_override = 88
 
 ### 5.4 PlanFinished
 
-PlanFinished 创建 Execution Segment并重新 Judge。完成后的 Plan 可暴露实际文件范围、验证负担、上下文需求和硬能力要求。
+PlanFinished 创建 Execution Segment并撤销 Planning 临时锚点。普通阶段切换复用已有 Judge Evaluation；只有完成事件同时提供新目标、范围扩大、新约束、Replanning 或高置信度能力阻塞证据时重新 Judge。
 
 动作：
 
 - 撤销 Planning 88 锚点；
-- Judge 读取完成后的 Plan、Task、当前 Profile 和执行要求；
-- 重新计算 Execution Segment 的质量偏好与 Route；
+- 复用 Evaluation 时仍可用恢复后的质量目标重新计算 Route；
+- 有 Rejudge Evidence 时 Judge 读取完成后的 Plan、Task、当前 Profile 和执行要求；
 - 同一 PlanFinished 重放只产生一次 Evaluation。
 
 ### 5.5 重复核心失败
@@ -111,23 +111,9 @@ PlanFinished 创建 Execution Segment并重新 Judge。完成后的 Plan 可暴�
 
 第一次失败只记录 Evidence。触发后创建 `capability_recovery` Segment，Route 只允许保持或升级。
 
-### 5.6 Judge 陈旧预算
+### 5.6 Routing Lease
 
-```text
-accepted_model_responses_since_judge >= max_unjudged_model_responses
-→ safety_refresh Segment
-→ 重新 Judge
-```
-
-P0 默认：
-
-```text
-max_unjudged_model_responses = 16
-```
-
-只统计被接受的逻辑 Model Response，不统计 Provider Attempt、Retry、SSE Event 或历史重发。该值可配置并可按客户端策略覆盖。
-
-16 是 Alpha 的统一默认值，避免 Claude Code 等长任务过于频繁 Judge；真实流量后依据平均任务长度、Judge 成本和漏触发率校准。
+不得按每 N Step 或每 N Response 周期性运行 Judge。普通连续 Step 复用；10 分钟 Routing Lease 到期后，在下一次可处理请求边界创建 Segment并 Judge。
 
 ## 6. P0 不触发 Judge
 
@@ -152,7 +138,6 @@ new_task
 > plan_started
 > plan_finished
 > repeated_failure
-> safety_refresh
 > compatibility_recovery
 > no_trigger
 ```
@@ -256,7 +241,7 @@ Judge 实际成本按 1.0 倍计入总成本。同一逻辑 Evaluation 的网络
 
 P1：10 分钟 Routing Lease、上下文增长 Trigger、低比例 Shadow Judge、OpenClaw / Hermes 侦察、更复杂进展判断和 Judge 健康切换。
 
-未来 Learned Trigger Model 用于提高兼容性和召回率，但不能取代新 Task、HumanMessage、PlanStarted、PlanFinished、重复失败和陈旧预算等确定性安全触发器。
+未来 Learned Trigger Model 用于提高兼容性和召回率，但不能取代新 Task、HumanMessage、PlanStarted、带 Rejudge Evidence 的 PlanFinished、重复失败和 Routing Lease 等确定性安全触发器。
 
 ## 15. P0 验收
 
@@ -265,9 +250,9 @@ P1：10 分钟 Routing Lease、上下文增长 Trigger、低比例 Shadow Judge�
 3. Tool 循环不重复 Judge；
 4. Claude ToolResult 不误判 HumanMessage；
 5. “继续”读取完整上下文并 Judge；
-6. PlanStarted 与 PlanFinished 分别 Judge；
+6. PlanStarted Judge；普通 PlanFinished 复用，带 Rejudge Evidence 时重新 Judge；
 7. 重复核心失败第二次无进展 Judge；
-8. 连续 16 个 accepted Model Response 触发 safety refresh；
+8. 连续 20 个普通 Tool Step 不因固定次数重新 Judge；
 9. Provider 503 与 Retry 不 Judge；
 10. 88 作为连续公式偏好锚点而非硬阈值；
 11. 非法 Judge 输出进入 Fallback；

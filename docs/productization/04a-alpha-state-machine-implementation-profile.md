@@ -87,27 +87,10 @@ P0 不是每个请求都 Judge，也不是只有用户发消息才 Judge。必�
 1. 新自动路由 Task；
 2. 所有高置信度 HumanMessage；
 3. PlanStarted；
-4. PlanFinished；
+4. PlanFinished 且存在新目标、范围扩大、新约束、Replanning 或能力阻塞；
 5. 相同核心 Failure Signature 第二次出现且中间无明确进展；
-6. Segment 的 Judge 陈旧预算耗尽。
 
-### Judge 陈旧预算
-
-```text
-accepted_model_responses_since_judge >= max_unjudged_model_responses
-→ safety_refresh Segment
-→ 重新 Judge
-```
-
-P0 默认：
-
-```text
-max_unjudged_model_responses = 16
-```
-
-该值可配置。只统计被接受的逻辑 Model Response，不统计 HTTP Attempt、Retry、SSE Event 或历史重发。
-
-16 是 Codex / Claude Code 与未知 Agent 的统一 Alpha 默认值。它不是“未知客户端专属阈值”，但可按客户端策略覆盖。真实流量后根据平均任务长度、Judge 成本和漏触发率校准。
+生产状态机默认禁用固定 Response / Step 次数刷新。普通 Tool Result、Function Output、连续 Step 和 Goal 自动继续复用当前 Evaluation；10 分钟 Routing Lease 保留。
 
 ### 重复失败
 
@@ -125,7 +108,7 @@ temporary_phase_override = 88
 
 PlanFinished：Claude 实际 `ExitPlanMode`；Codex 为 Plan 必要项完成后首次实际 Edit / Write / Patch / Test / Build，且无 Plan 重建。
 
-PlanFinished 创建 Execution Segment、撤销 88、重新 Judge，并按完成后的 Plan 重新运行连续价值公式。
+PlanFinished 创建 Execution Segment、撤销 88。普通完成复用已有 Judge Evaluation，并允许按恢复后的质量目标重新运行连续价值公式；只有存在新目标、范围扩大、新约束、Replanning 或能力阻塞证据才重新 Judge。
 
 ## 8. P0 路由语义
 
@@ -166,9 +149,9 @@ Shadow Judge 不改变线上 Route、不向用户计费。
 3. 普通 Tool 循环复用 Segment；
 4. Claude ToolResult 不误判 HumanMessage；
 5. “继续”读取完整 Task并 Judge；
-6. PlanStarted 与 PlanFinished 分别 Judge；
+6. PlanStarted Judge；普通 PlanFinished 复用，带 Rejudge Evidence 的 PlanFinished 才 Judge；
 7. 相同核心错误第二次无进展 Judge；
-8. 连续 16 个被接受 Model Response 且无其他 Trigger 时 safety refresh；
+8. 连续 20 个普通 Tool Step 不因固定次数重新 Judge；
 9. 88 仅作为连续公式偏好锚点；
 10. Retry 只增加 Attempt；
 11. Streaming、Thinking、Tool ID 不被改写；

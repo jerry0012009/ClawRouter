@@ -119,7 +119,6 @@ Task 内共享同一 Judge Evaluation、质量偏好快照和默认 Execution Pr
 - `planning_start`；
 - `planning_end`；
 - `capability_recovery`；
-- `safety_refresh`；
 - `lease_expired` / `resume`；
 - `availability_recovery`；
 - `compatibility_recovery`。
@@ -144,7 +143,7 @@ Codex 实际 `update_plan` 或 Claude 版本化 Plan-only 指纹。创建 Planni
 
 ### PlanFinished
 
-Claude 实际 `ExitPlanMode`；Codex 为 Plan 必要项完成后首次实际 Edit / Write / Patch / Test / Build，且无 Plan 重建。创建 Execution Segment、撤销 Planning 锚点并重新 Judge。
+Claude 实际 `ExitPlanMode`；Codex 为 Plan 必要项完成后首次实际 Edit / Write / Patch / Test / Build，且无 Plan 重建。创建新的 Execution Segment并撤销 Planning 锚点。普通阶段切换复用已有 Judge Evaluation；只有同时存在新目标、范围扩大、新约束、Replanning 或高置信度能力阻塞证据时才重新 Judge。
 
 ### ExecutionFailure
 
@@ -154,9 +153,9 @@ Claude 实际 `ExitPlanMode`；Codex 为 Plan 必要项完成后首次实际 Edi
 
 ProviderError 只增加失败 Attempt和可用性恢复，不改变任务难度。RetryAttempt 不创建新的逻辑对象。
 
-### Safety Refresh
+### 周期刷新
 
-当一个 Segment 自上次 Judge 后已接受的逻辑 Model Response 达到配置预算时，创建 `safety_refresh` Segment并重新 Judge，防止未知 Agent 长期复用陈旧 Evaluation。
+生产状态机不按固定 Step 或 Response 数周期性运行 Judge。连续 Step 复用当前 Segment 的 Evaluation；10 分钟 Routing Lease 继续提供基于时间和新请求边界的陈旧性控制。
 
 ## 9. Judge 触发矩阵
 
@@ -165,9 +164,9 @@ ProviderError 只增加失败 Attempt和可用性恢复，不改变任务难度�
 | 新自动路由 Task | 是 | 是 |
 | 高置信度 HumanMessage | 是 | 是 |
 | PlanStarted | 是 | 是 |
-| PlanFinished | 是 | 是 |
+| PlanFinished（普通阶段切换） | 否，复用 | 是 |
+| PlanFinished（有 Rejudge Evidence） | 是 | 是 |
 | 相同核心失败第二次且无进展 | 是 | 是 |
-| Judge 陈旧预算耗尽 | 是 | 是 |
 | 普通 ToolCall / ToolResult | 否 | 否 |
 | ProviderError / Retry | 否 | 否 |
 | 硬兼容变化 | 否 | 必要时是 |
@@ -209,9 +208,9 @@ effective_quality_target = max(
 2. 历史重发是否只识别新增 Step / Event？
 3. 多层 Retry 是否只增加 Attempt？
 4. “继续”是否读取完整 Task并重新 Judge？
-5. PlanStarted 与 PlanFinished 是否分别形成 Judge 边界？
+5. PlanStarted 是否 Judge，普通 PlanFinished 是否复用，有 Rejudge Evidence 时是否重新 Judge？
 6. 相同核心失败第二次无进展是否触发重评估？
 7. Provider 503 是否不改变 Difficulty？
 8. Session 是否不因固定时间失效？
 9. 88 是否作为公式偏好锚点，而不是硬达标线？
-10. 长自治任务是否由陈旧预算保证有界重评估？
+10. 长自治任务是否只由语义事件与 10 分钟 Routing Lease 触发重评估？

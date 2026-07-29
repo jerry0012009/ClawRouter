@@ -47,6 +47,7 @@ services:
       - ../../migrations/acu/0003_web_intent_source.sql:/migration/0003_web_intent_source.sql:ro
       - ../../migrations/acu/0004_rc2_context_ledger.sql:/migration/0004_rc2_context_ledger.sql:ro
       - ../../migrations/acu/0005_rc2_judge_reconciliation.sql:/migration/0005_rc2_judge_reconciliation.sql:ro
+      - ../../migrations/acu/0006_rc21_cost_semantics.sql:/migration/0006_rc21_cost_semantics.sql:ro
     networks: [alpha-backend]
     command:
       - /bin/sh
@@ -59,6 +60,7 @@ services:
         psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0003_web_intent_source.sql
         psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0004_rc2_context_ledger.sql
         psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0005_rc2_judge_reconciliation.sql
+        psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0006_rc21_cost_semantics.sql
 
   newapi-codex-pool-sync:
     image: postgres:16-alpine

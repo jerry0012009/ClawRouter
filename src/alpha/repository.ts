@@ -157,7 +157,9 @@ export type UsageReportRecord = {
   failedBilledCostUsd?: string;
   finalUserCostUsd: string;
   nominalProviderCostUsd?: string;
-  providerBalanceChargeUsd?: string;
+  providerBalanceCharge?: string;
+  providerBalanceCurrency?: string;
+  providerCreditCashCostCny?: string;
   effectiveProviderCashCostCny?: string;
   judgeCashCostCny?: string;
   failedAttemptCashCostCny?: string;
@@ -186,7 +188,9 @@ export type PendingUsageReport = {
   failedBilledCostUsd: string;
   finalUserCostUsd: string;
   nominalProviderCostUsd: string;
-  providerBalanceChargeUsd: string;
+  providerBalanceCharge: string;
+  providerBalanceCurrency: string;
+  providerCreditCashCostCny: string;
   effectiveProviderCashCostCny: string;
   judgeCashCostCny: string;
   failedAttemptCashCostCny: string;
@@ -989,10 +993,11 @@ export class AlphaRepository {
         report_idempotency_key,actual_model,provider,channel,input_tokens,cached_input_tokens,
         output_tokens,reasoning_tokens,judge_cost_usd,provider_cost_usd,failed_billed_cost_usd,
         final_user_cost_usd,nominal_provider_cost_usd,provider_balance_charge_usd,
+        provider_balance_charge,provider_balance_currency,provider_credit_cash_cost_cny,
         effective_provider_cash_cost_cny,judge_cash_cost_cny,failed_attempt_cash_cost_cny,
         actual_total_cash_cost_cny,user_charge_cny,counterfactual_quality_ceiling_cost_cny,
         cost_breakdown_json,status,created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,'pending',now())
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,'pending',now())
        ON CONFLICT (report_idempotency_key) DO NOTHING RETURNING usage_report_id`,
       [input.usageReportId, input.newapiUserId, input.newapiTokenId ?? null,
         input.newapiLogId ?? null, input.logicalRequestId, input.reportIdempotencyKey,
@@ -1001,7 +1006,9 @@ export class AlphaRepository {
         input.reasoningTokens ?? 0n, input.judgeCostUsd ?? "0", input.providerCostUsd ?? "0",
         input.failedBilledCostUsd ?? "0", input.finalUserCostUsd,
         input.nominalProviderCostUsd ?? input.providerCostUsd ?? "0",
-        input.providerBalanceChargeUsd ?? "0", input.effectiveProviderCashCostCny ?? "0",
+        input.providerBalanceCharge ?? "0", input.providerBalanceCharge ?? "0",
+        input.providerBalanceCurrency ?? "USD-denominated credits", input.providerCreditCashCostCny ?? "0",
+        input.effectiveProviderCashCostCny ?? "0",
         input.judgeCashCostCny ?? "0", input.failedAttemptCashCostCny ?? "0",
         input.actualTotalCashCostCny ?? "0", input.userChargeCny ?? "0",
         input.counterfactualQualityCeilingCostCny ?? null, json(input.costBreakdown)],
@@ -1036,6 +1043,9 @@ export class AlphaRepository {
       final_user_cost_usd: string;
       nominal_provider_cost_usd: string;
       provider_balance_charge_usd: string;
+      provider_balance_charge: string;
+      provider_balance_currency: string;
+      provider_credit_cash_cost_cny: string;
       effective_provider_cash_cost_cny: string;
       judge_cash_cost_cny: string;
       failed_attempt_cash_cost_cny: string;
@@ -1077,7 +1087,9 @@ export class AlphaRepository {
       failedBilledCostUsd: row.failed_billed_cost_usd,
       finalUserCostUsd: row.final_user_cost_usd,
       nominalProviderCostUsd: row.nominal_provider_cost_usd,
-      providerBalanceChargeUsd: row.provider_balance_charge_usd,
+      providerBalanceCharge: row.provider_balance_charge,
+      providerBalanceCurrency: row.provider_balance_currency,
+      providerCreditCashCostCny: row.provider_credit_cash_cost_cny,
       effectiveProviderCashCostCny: row.effective_provider_cash_cost_cny,
       judgeCashCostCny: row.judge_cash_cost_cny,
       failedAttemptCashCostCny: row.failed_attempt_cash_cost_cny,

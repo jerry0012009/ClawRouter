@@ -8,7 +8,7 @@ export type TriggerReason =
   | "plan_started"
   | "plan_finished"
   | "repeated_failure"
-  | "safety_refresh"
+  | "lease_expired"
   | "reuse_route";
 
 export type FailureCounter = {
@@ -31,7 +31,7 @@ export type TriggerInput = {
   isNewTask: boolean;
   events: AlphaDomainEvent[];
   segment?: SegmentState;
-  maxUnjudgedModelResponses?: number;
+  routingLeaseExpired?: boolean;
 };
 
 export type TriggerDecision = {
@@ -88,25 +88,26 @@ function decision(reason: TriggerReason, overrides: Partial<TriggerDecision> = {
 
 export function decideTrigger(input: TriggerInput): TriggerDecision {
   if (input.mode === "explicit") return decision("explicit_model", { createSegment: input.isNewTask });
-  if (input.events.some((item) => item.type === "plan_finished")) {
-    return decision("plan_finished", { phase: "execution" });
-  }
   if (input.events.some((item) => item.type === "plan_started")) {
     return decision("plan_started", { phase: "planning", temporaryPhaseOverride: 88 });
   }
   if (input.isNewTask) return decision("new_task");
-  if (input.events.some((item) => (
+  const hasHumanRejudgeEvidence = input.events.some((item) => (
     item.type === "user_rejected"
     || (item.type === "human_message" && item.evidenceStrength === "high")
-  ))) {
+  ));
+  if (hasHumanRejudgeEvidence) {
     return decision("human_message");
   }
   const counters = applyFailureEvidence(input.segment?.failureCounters ?? {}, input.events);
   if (Object.values(counters).some((counter) => counter.count >= 2 && !counter.progressSinceLast)) {
     return decision("repeated_failure", { phase: "recovery", routeDirection: "hold_or_upgrade" });
   }
-  if ((input.segment?.acceptedModelResponsesSinceJudge ?? 0) >= (input.maxUnjudgedModelResponses ?? 16)) {
-    return decision("safety_refresh", { phase: input.segment?.phase ?? "execution" });
+  if (input.routingLeaseExpired) {
+    return decision("lease_expired", { phase: input.segment?.phase ?? "execution" });
+  }
+  if (input.events.some((item) => item.type === "plan_finished")) {
+    return decision("plan_finished", { runJudge: false, createSegment: true, phase: "execution" });
   }
   return decision("reuse_route", {
     phase: input.segment?.phase ?? "execution",

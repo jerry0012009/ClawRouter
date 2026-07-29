@@ -8,7 +8,7 @@ export type ProviderEconomics = {
   protocol: string;
   baseUrlEnv: string;
   apiKeyEnv: string;
-  balanceCurrency: "USD";
+  balanceCurrency: "USD-denominated credits";
   rechargeCashCny: number | null;
   creditsReceivedUsd: number | null;
   observedBillingMultiplier: number;
@@ -66,9 +66,16 @@ export function cashCnyPerNominalUsd(provider: ProviderEconomics): number {
   return provider.observedBillingMultiplier * provider.rechargeCashCny / provider.creditsReceivedUsd;
 }
 
+export function providerCreditCashCostCny(provider: ProviderEconomics): number {
+  if (provider.rechargeCashCny === null || provider.creditsReceivedUsd === null) return Number.POSITIVE_INFINITY;
+  return provider.rechargeCashCny / provider.creditsReceivedUsd;
+}
+
 export function providerCostBreakdown(provider: ProviderEconomics, nominalProviderCostUsd: number): {
   nominalProviderCostUsd: number;
-  providerBalanceChargeUsd: number;
+  providerBalanceCharge: number;
+  providerBalanceCurrency: "USD-denominated credits";
+  providerCreditCashCostCny: number;
   effectiveCashCostCny: number;
   effectiveCostStatus: "verified" | "estimated";
   effectiveCostSource: string;
@@ -77,7 +84,9 @@ export function providerCostBreakdown(provider: ProviderEconomics, nominalProvid
   const nominal = Math.max(0, nominalProviderCostUsd);
   return {
     nominalProviderCostUsd: nominal,
-    providerBalanceChargeUsd: nominal * provider.observedBillingMultiplier,
+    providerBalanceCharge: nominal * provider.observedBillingMultiplier,
+    providerBalanceCurrency: provider.balanceCurrency,
+    providerCreditCashCostCny: providerCreditCashCostCny(provider),
     effectiveCashCostCny: nominal * cashCnyPerNominalUsd(provider),
     effectiveCostStatus: provider.effectiveCostStatus,
     effectiveCostSource: provider.effectiveCostSource,

@@ -291,7 +291,7 @@ Judge 故障时的管理员安全候选组也可以设置独立安全档，但�
 
 PlanStarted：T 至少为 88，运行 Planning Judge和连续价值公式。
 
-PlanFinished：撤销 88，读取完成后的 Plan重新 Judge，得到新的 Difficulty 与能力分布，再使用新的 T 运行同一公式。Execution Profile 可保持、升级或下降；重复能力失败 recovery 仍只允许保持或升级。
+PlanFinished：撤销 88。普通完成复用已有 Difficulty 与能力分布，并允许使用恢复后的 T 重跑同一公式；只有新目标、范围扩大、新约束、Replanning 或能力阻塞证据才重新 Judge。Execution Profile 可保持、升级或下降；重复能力失败 recovery 仍只允许保持或升级。
 
 ## 12. Segment Route 锁定
 
@@ -308,7 +308,7 @@ Segment 创建时保存：
 
 普通 Step 复用当前 Profile。
 
-新 Segment 边界包括 HumanMessage、PlanStarted、PlanFinished、重复失败、safety refresh、compatibility / availability recovery，以及 P1 Lease / Resume。
+新 Segment 边界包括 HumanMessage、PlanStarted、PlanFinished、重复失败、compatibility / availability recovery，以及 Lease / Resume。不得按固定 Step 或 Response 数创建周期刷新 Segment。
 
 ## 13. Judge 失败时的安全 Profile
 
@@ -403,7 +403,7 @@ created_at
 3. 当前质量曲线、风险成本、Pareto 与 `valueUtility`；
 4. T=80 / 88 等参数作为连续偏好锚点；
 5. Segment Route 锁定；
-6. PlanFinished Judge 后重选 Profile；
+6. PlanFinished 复用 Evaluation 或基于明确 Evidence Judge 后重选 Profile；
 7. Judge 故障安全性价比 Profile；
 8. New API Retry = 0；
 9. ACU Attempt 预算 = 2；

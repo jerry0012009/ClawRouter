@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { cashCnyPerNominalUsd, providerCostBreakdown, validateProviderEconomicsCatalog } from "../src/alpha/provider-economics.js";
+import { cashCnyPerNominalUsd, providerCostBreakdown, providerCreditCashCostCny, validateProviderEconomicsCatalog } from "../src/alpha/provider-economics.js";
 import { routeWithCurrentAcuFormula, type AlphaExecutionProfile } from "../src/alpha/routing.js";
 import type { AcuJudgeResult } from "../src/acu/types.js";
 
@@ -29,12 +29,17 @@ function profile(provider: "lucen" | "closeai", economics: typeof lucen): AlphaE
 }
 
 describe("Provider Economics and v0.3 Provider selection", () => {
-  it("separates nominal, provider-balance, and cash costs", () => {
-    expect(providerCostBreakdown(healthyLucen, 1)).toMatchObject({
-      nominalProviderCostUsd: 1,
-      providerBalanceChargeUsd: 0.07,
-      effectiveCashCostCny: 0.07,
+  it("separates nominal USD, Provider Credits, and cash CNY", () => {
+    const lucenCost = providerCostBreakdown(healthyLucen, 0.139364);
+    expect(lucenCost).toMatchObject({
+      nominalProviderCostUsd: 0.139364,
+      providerBalanceCurrency: "USD-denominated credits",
+      providerCreditCashCostCny: 1,
     });
+    expect(lucenCost.providerBalanceCharge).toBeCloseTo(0.00836184, 10);
+    expect(lucenCost.effectiveCashCostCny).toBeCloseTo(0.00836184, 10);
+    expect(providerCreditCashCostCny(catalog.providers.find((item) => item.providerId === "blackai")!)).toBe(0.15);
+    expect(providerCreditCashCostCny(closeai)).toBe(7.2);
   });
 
   it("converts Judge nominal USD with the configured CloseAI cash settlement", () => {

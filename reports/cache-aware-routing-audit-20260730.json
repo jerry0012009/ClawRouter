@@ -1,0 +1,111 @@
+{
+  "schema_version": "acu-cache-aware-routing-audit-v1",
+  "audit_date": "2026-07-30",
+  "mode": "offline_replay_only",
+  "production_routing_formula_changed": false,
+  "source": {
+    "acu_database": "read_only aggregate queries",
+    "founder_audit": "reports/founder-session-audit-20260730.json",
+    "catalog": "src/acu/catalog/model-catalog.json"
+  },
+  "formula": "uncached_input * input_price + cached_read * cached_input_price + estimated_cache_write * cache_write_price + output * output_price + judge_cost + expected_fallback_cost + cache_break_cost",
+  "assumptions": {
+    "all_costs": "CNY cash",
+    "estimated_cache_write_tokens": 0,
+    "estimated_cache_write_reason": "The sampled OpenAI-compatible Usage records expose cached reads but no separately billed cache-write quantity.",
+    "expected_fallback_cost_cny": 0,
+    "expected_fallback_reason": "No billed fallback attempt occurred in the sampled successful paths.",
+    "same_execution_profile": "use observed session hit ratio",
+    "same_model_same_channel": "high affinity",
+    "same_model_different_channel": "low affinity because evidence is unavailable",
+    "different_provider": 0,
+    "different_model": 0
+  },
+  "sessions": [
+    {
+      "label": "Founder chuxin Session",
+      "session_id": "ses_0548592665134f41925f27b6e33aa6ed",
+      "requests": 21,
+      "segments": 7,
+      "actual_input_tokens": 402886,
+      "cached_input_tokens": 351360,
+      "uncached_input_tokens": 51526,
+      "cache_hit_ratio": 0.8721095799,
+      "current_profile": "lucen-cx006-value-dynamic:gpt-5.6-luna:responses",
+      "segment_model_switches": 0,
+      "segment_channel_switches": 0,
+      "judge_cash_cost_cny": 0.06932412,
+      "current_production_formula_estimated_cost_cny": 0.09665916,
+      "cache_aware_assumed_cost_cny": 0.07768572,
+      "cash_cost_difference_cny": -0.01897344,
+      "cash_cost_reduction_percent": 19.6292208623,
+      "selection_changed": false,
+      "changed_segments": [],
+      "reason": "The same Luna/Lucen execution profile is retained across all successful segments and has strong observed cache affinity."
+    },
+    {
+      "label": "RC2 411,967 Token long-context request",
+      "session_id": "ses_3acd5c5e5dd14cb0ac51ce4d950bc7ed",
+      "logical_request_id": "req_5b0c27c84ae3439d982dac5f28c627c8",
+      "requests": 1,
+      "segments": 1,
+      "actual_input_tokens": 411967,
+      "cached_input_tokens": 0,
+      "uncached_input_tokens": 411967,
+      "cache_hit_ratio": 0,
+      "current_profile": "lucen-cx006-value-dynamic:gpt-5.4-mini:responses",
+      "segment_model_switches": 0,
+      "segment_channel_switches": 0,
+      "judge_cash_cost_cny": 0.00712152,
+      "current_production_formula_estimated_cost_cny": 0.025662465,
+      "cache_aware_assumed_cost_cny": 0.025662465,
+      "cash_cost_difference_cny": 0,
+      "cash_cost_reduction_percent": 0,
+      "selection_changed": false,
+      "changed_segments": [],
+      "reason": "The request had no cached input, so the cache-aware term is identical to the production estimate."
+    },
+    {
+      "label": "Existing 13-request multi-Step Session",
+      "session_id": "ses_3562253910a94a92bf708c409c2802dc",
+      "requests": 13,
+      "segments": 2,
+      "actual_input_tokens": 200770,
+      "cached_input_tokens": 170125,
+      "uncached_input_tokens": 30645,
+      "cache_hit_ratio": 0.8473626538,
+      "profiles": [
+        "closeai-gpt-5.6-terra-responses-strong",
+        "closeai-gpt-5.6-sol-responses-recovery"
+      ],
+      "segment_model_switches": 1,
+      "segment_channel_switches": 0,
+      "judge_cash_cost_cny": 0.01616328,
+      "current_production_formula_estimated_cost_cny": 7.53026328,
+      "cache_aware_assumed_cost_cny": 2.01821328,
+      "cash_cost_difference_cny": -5.51205,
+      "cash_cost_reduction_percent": 73.1986358915,
+      "selection_changed": false,
+      "changed_segments": [],
+      "reason": "The Planning segment's first Sol request was a cache miss and the next 11 requests established a 90%+ read hit pattern. Cache-aware pricing lowers the magnitude but does not reverse the existing quality-driven selection."
+    }
+  ],
+  "aggregate": {
+    "sample_sessions": 3,
+    "sample_requests": 35,
+    "sample_segments": 10,
+    "selection_changes": 0,
+    "changed_segments": 0
+  },
+  "routing_v0_4_readiness": {
+    "recommendation": "not_yet",
+    "enough_data": false,
+    "reasons": [
+      "Only three targeted sessions were replayed and one is a single-request context test.",
+      "Provider Usage does not expose a separately billed cache-write quantity.",
+      "Cross-channel cache affinity has no controlled evidence.",
+      "Expected fallback and cache-break costs are not yet calibrated from enough billed attempts.",
+      "The sample produced no model-selection reversal to validate decision-boundary behavior."
+    ]
+  }
+}

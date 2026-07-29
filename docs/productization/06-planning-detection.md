@@ -25,16 +25,16 @@ temporary_phase_override = 88
 
 88 是路由公式的质量偏好锚点。它会提高质量权重、风险权重和质量效用曲线的陡峭程度，但不是“预测分低于 88 就淘汰”的硬线。
 
-Planning 结束后撤销该锚点，并通过 PlanFinished Judge 评估 Execution Segment。
+Planning 结束后撤销该锚点。普通 PlanFinished 复用已有 Evaluation；带 Rejudge Evidence 时才由 Judge 重新评估 Execution Segment。
 
-### 2.3 Planning 产生两个 Judge 边界
+### 2.3 Planning Start 与 Finish 的 Judge 边界
 
 ```text
 Execution / Recovery
 → PlanStarted
 → Planning Segment + Judge
 → PlanFinished
-→ Execution Segment + Judge
+→ Execution Segment + 复用 Evaluation（有 Rejudge Evidence 时 Judge）
 ```
 
 PlanUpdated 不反复创建 Segment，也不反复 Judge。
@@ -63,7 +63,7 @@ OpenClaw、Hermes 和其他 Agent 尚未完成 Planning 侦察，不得复用 Co
 
 ### PlanFinished
 
-高置信度完成并转入执行：结束 Planning Segment、创建 Execution Segment、清除 88、重新 Judge，并重新运行连续价值公式。
+高置信度完成并转入执行：结束 Planning Segment、创建 Execution Segment、清除 88并复用已有 Evaluation；可重新运行连续价值公式。只有新目标、范围扩大、新约束、Replanning 或能力阻塞才重新 Judge。
 
 PlanFinished 必须幂等，历史重发不得重复 Event 或 Judge。
 
@@ -104,7 +104,7 @@ Plan 必要项全部完成
 
 ### 6.2 PlanFinished
 
-强信号是实际调用 `ExitPlanMode`。动作：创建 PlanFinished、Execution Segment、撤销 88 并重新 Judge。
+强信号是实际调用 `ExitPlanMode`。动作：创建 PlanFinished、Execution Segment、撤销 88；普通完成复用 Judge，带 Rejudge Evidence 时重新 Judge。
 
 Edit / Write / Patch Tool 恢复并实际调用，只作为执行确认，不替代 `ExitPlanMode`。
 
@@ -137,7 +137,7 @@ fixture_ids
 
 P0 保存 `plan_id`、`task_id`、客户端、版本、Signal Family、状态、Revision、协议中真实可见的 Plan Items、Plan Hash 和时间字段。ACU 不自行生成或改写 Plan。
 
-## 9. PlanFinished Judge
+## 9. PlanFinished Evaluation
 
 上下文必须包含 Task 根目标、完成后的 Plan、原生上下文、Planning 阶段进展、当前 Profile、质量偏好参数和执行硬要求。
 
@@ -159,7 +159,7 @@ P0 优先避免假阳性。假阴性由 HumanMessage、重复失败、16-respons
 4. Codex 组合信号只生成一次 PlanFinished；
 5. Claude Plan-only 指纹触发 PlanStarted；
 6. 实际 `ExitPlanMode` 触发 PlanFinished；
-7. PlanFinished 创建 Execution Segment并重新 Judge；
+7. PlanFinished 创建 Execution Segment；普通完成复用，带 Rejudge Evidence 时重新 Judge；
 8. 88 仅作为连续公式偏好锚点；
 9. 历史重放不重复事件；
 10. 未识别 Planning 不阻断请求。

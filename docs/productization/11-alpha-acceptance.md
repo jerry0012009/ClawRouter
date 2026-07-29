@@ -100,9 +100,8 @@ OpenRouter 当前受合法账户政策 403 阻塞。五日工程验收允许其�
 1. 新 Task；
 2. 高置信度 HumanMessage，包括“继续”；
 3. PlanStarted；
-4. PlanFinished；
+4. 带新目标、范围扩大、新约束、Replanning 或能力阻塞证据的 PlanFinished；
 5. 相同核心执行失败第二次出现且无进展；
-6. 连续 16 个 accepted Model Response 的 safety refresh。
 
 必须证明以下事件不 Judge：
 
@@ -131,7 +130,7 @@ Plan 必要项完成
 + 首次实际 Edit / Write / Patch / Test / Build
 + 无 Plan 重建
 → PlanFinished
-→ Execution Judge
+→ Execution Segment + 复用 Evaluation（有 Rejudge Evidence 时 Judge）
 ```
 
 Claude Code：
@@ -150,7 +149,7 @@ Claude Code：
 
 - 88 是连续价值公式偏好锚点，不是候选硬阈值；
 - PlanUpdated 不重复 Judge；
-- PlanFinished 撤销 88 并根据完成后的 Plan 重新 Judge；
+- PlanFinished 撤销 88；普通完成复用 Evaluation，带 Rejudge Evidence 时重新 Judge；
 - 历史重发不重复产生 Planning Event。
 
 ## 7. Gate D：路由公式

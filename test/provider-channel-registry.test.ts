@@ -30,7 +30,7 @@ describe("Provider Channel Registry", () => {
       protocol: "openai_responses",
       baseUrlEnv: "LUCEN_BASE_URL",
       apiKeyEnv: "LUCEN_API_KEY",
-      balanceCurrency: "USD",
+      balanceCurrency: "USD-denominated credits",
       rechargeCashCny: 500,
       creditsReceivedUsd: 500,
       observedBillingMultiplier: 0.07,

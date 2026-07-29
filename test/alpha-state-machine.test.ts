@@ -281,11 +281,47 @@ describe("Alpha Judge triggers", () => {
       .toMatchObject({ runJudge: false, reason: "reuse_route" });
   });
 
-  it("refreshes after 16 accepted logical responses but ignores non-accepted attempts", () => {
+  it("does not periodically Judge after 20 accepted ordinary responses", () => {
     let current = segment();
-    for (let index = 0; index < 16; index += 1) current = incrementAcceptedResponse(current, true);
+    for (let index = 0; index < 20; index += 1) current = incrementAcceptedResponse(current, true);
     current = incrementAcceptedResponse(current, false);
     expect(decideTrigger({ mode: "acu-auto", isNewTask: false, events: [], segment: current }))
-      .toMatchObject({ runJudge: true, reason: "safety_refresh" });
+      .toMatchObject({ runJudge: false, reason: "reuse_route" });
+  });
+
+  it("retains the 10-minute Routing Lease rejudge trigger", () => {
+    expect(decideTrigger({
+      mode: "acu-auto",
+      isNewTask: false,
+      events: [],
+      segment: segment(),
+      routingLeaseExpired: true,
+    })).toMatchObject({ runJudge: true, createSegment: true, reason: "lease_expired" });
+  });
+
+  it("creates an Execution Segment without Judge for ordinary PlanFinished", () => {
+    const finished = { type: "plan_finished" as const, hash: "plan-finished", evidenceStrength: "high" as const, metadata: {} };
+    expect(decideTrigger({ mode: "acu-auto", isNewTask: false, events: [finished], segment: segment({ planningActive: true }) }))
+      .toMatchObject({ runJudge: false, createSegment: true, reason: "plan_finished", phase: "execution", temporaryPhaseOverride: 0 });
+  });
+
+  it("Judges once at PlanStarted and reuses it through 10 Planning steps", () => {
+    const started = { type: "plan_started" as const, hash: "plan-started-once", evidenceStrength: "high" as const, metadata: {} };
+    expect(decideTrigger({ mode: "acu-auto", isNewTask: false, events: [started], segment: segment() }).runJudge).toBe(true);
+    const planning = segment({ phase: "planning", planningActive: true });
+    for (let index = 0; index < 10; index += 1) {
+      const toolStep = { type: "tool_result" as const, hash: `planning-tool-${index}`, evidenceStrength: "high" as const, metadata: { isError: false } };
+      expect(decideTrigger({ mode: "acu-auto", isNewTask: false, events: [toolStep], segment: planning }))
+        .toMatchObject({ runJudge: false, reason: "reuse_route", temporaryPhaseOverride: 88 });
+    }
+  });
+
+  it("rejudges PlanFinished when it carries a high-confidence new human constraint", () => {
+    const events = [
+      { type: "plan_finished" as const, hash: "plan-finished-constraint", evidenceStrength: "high" as const, metadata: {} },
+      { type: "human_message" as const, hash: "new-constraint", evidenceStrength: "high" as const, metadata: {} },
+    ];
+    expect(decideTrigger({ mode: "acu-auto", isNewTask: false, events, segment: segment({ planningActive: true }) }))
+      .toMatchObject({ runJudge: true, createSegment: true, reason: "human_message" });
   });
 });

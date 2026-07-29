@@ -199,8 +199,8 @@ metadata_json                       JSONB NOT NULL DEFAULT '{}'
 约束：
 
 - 同一 Task 最多一个 `active` Segment；
-- P0 默认 `max_unjudged_model_responses = 16`；
-- 每个被接受的逻辑 Model Response 递增一次；
+- `accepted_responses_since_judge` 仅保留为审计计数，不触发固定次数 Judge；
+- 每个被接受的逻辑 Model Response 最多递增一次；
 - Retry、Provider Attempt、SSE Event 和历史重发不递增；
 - Judge 成功或 Fallback Evaluation 形成新 Segment 时归零；
 - 88 只保存为连续价值公式偏好锚点，不代表候选预测分硬阈值。
@@ -693,8 +693,8 @@ P1：
 1. 同一 HumanMessage 重放不重复 Event、Judge 或 Route；
 2. 不同用户相同 Prompt 不会关联到同一 Session；
 3. 同一 Task 任一时刻最多一个活动 Segment；
-4. 16 个 accepted Model Response 计数准确，Retry 不计数；
-5. PlanStarted / PlanFinished 各自形成独立 Evaluation 与 Segment；
+4. 20 个连续 accepted Model Response 不触发固定次数 Judge，Retry 不计数；
+5. PlanStarted 形成独立 Evaluation 与 Segment；普通 PlanFinished 形成新 Segment并复用 Evaluation；
 6. 88 保存在公式参数快照中，不作为候选硬过滤；
 7. 当前 `src/acu/decision.ts` 候选估计和 `valueUtility` 可完整重放；
 8. 每个 Provider Attempt 独立保存 Usage、成本和错误；

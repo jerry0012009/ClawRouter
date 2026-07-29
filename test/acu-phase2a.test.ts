@@ -79,7 +79,7 @@ describe("Phase 2A constrained tier model", () => {
     expect(computeDifficultyIndex.toString()).not.toContain("Math.random");
   });
 
-  it("freezes six continuous-factor few-shots in the v3 prompt", () => {
+  it("freezes six continuous-factor few-shots in the v4 prompt", () => {
     const prompt = buildJudgeSystemPrompt();
     expect(prompt).toContain("ACU");
     expect(prompt).toContain("difficulty_score_raw");
@@ -268,7 +268,7 @@ describe("Phase 2A Judge transport", () => {
     const directory = await mkdtemp(join(tmpdir(), "acu-judge-test-"));
     temporaryDirectories.push(directory);
     const legacyCachePath = join(directory, "acu-judge-cache-v2.json");
-    const cachePath = join(directory, "acu-judge-cache-v3.json");
+    const cachePath = join(directory, "acu-judge-cache-v4.json");
     const legacyContents = '{"schemaVersion":"acu-judge-cache-v2","entries":{"audit":"preserved"}}\n';
     await writeFile(legacyCachePath, legacyContents);
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
@@ -282,6 +282,10 @@ describe("Phase 2A Judge transport", () => {
         confidence: 0.82,
         signals: ["tool_state", "multi_step"],
         explanation: "需整合工具状态并继续多步执行。",
+        webIntent: "not_required",
+        webIntentConfidence: 0.96,
+        webIntentReason: "The task is local code repair.",
+        webIntentEvidence: ["local_or_code_context"],
       }) } }],
       usage: { prompt_tokens: 1_000, completion_tokens: 90 },
     }), { status: 200, headers: { "Content-Type": "application/json" } }));
@@ -305,7 +309,7 @@ describe("Phase 2A Judge transport", () => {
     });
     expect(JSON.stringify(body)).not.toContain("recommend");
     const cache = await readFile(cachePath, "utf8");
-    expect(JSON.parse(cache)).toMatchObject({ schemaVersion: "acu-judge-cache-v3" });
+    expect(JSON.parse(cache)).toMatchObject({ schemaVersion: "acu-judge-cache-v4" });
     expect(cache).not.toContain("Inspect the failing tests");
     expect(cache).not.toContain("secret");
     expect(await readFile(legacyCachePath, "utf8")).toBe(legacyContents);

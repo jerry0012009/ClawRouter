@@ -53,6 +53,10 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
             confidence: 0.88,
             signals: ["bounded_change"],
             explanation: "任务边界明确，主要是一次局部修改。",
+            webIntent: "not_required",
+            webIntentConfidence: 0.96,
+            webIntentReason: "The current task is a bounded local change.",
+            webIntentEvidence: ["local_or_code_context"],
           });
         response.writeHead(200, { "Content-Type": "application/json" });
         response.end(JSON.stringify({
@@ -373,7 +377,7 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
         "difficulty_score_raw", "difficulty_index", "reasoning_depth", "task_scope", "constraint_density",
         "tool_dependency", "verification_burden", "context_burden", "difficulty_method_version",
       ]));
-      const row = database.prepare("SELECT * FROM routing_requests WHERE prompt_version='acu-tier-requirement-v3' LIMIT 1").get();
+      const row = database.prepare("SELECT * FROM routing_requests WHERE prompt_version='acu-tier-requirement-v4' LIMIT 1").get();
       expect(row.difficulty_index).toBe(row.difficulty_score);
       expect(row.difficulty_method_version).toBe("acu-difficulty-index-v1");
     } finally { database.close(); }

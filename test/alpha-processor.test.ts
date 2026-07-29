@@ -36,6 +36,10 @@ const judgeResult: AcuJudgeResult = {
   difficultyScore: 60.8,
   signals: ["test_fixture"],
   explanation: "fixture",
+  webIntent: "not_required",
+  webIntentConfidence: 0.97,
+  webIntentReason: "The fixture represents a local coding task.",
+  webIntentEvidence: ["local_or_code_context"],
 };
 
 function signedHeaders(
@@ -220,10 +224,20 @@ run("Alpha PostgreSQL request processor", () => {
     const judgeRunner: AlphaJudgeRunner = {
       async run(input) {
         judgeCalls += 1;
+        const visible = JSON.stringify(input.messages);
+        const required = visible.includes("再查一下最新官方文档") || visible.includes("Use web search for the current UTC date");
         return {
-          judge: judgeResult,
-          status: "rules_fallback",
-          resultSource: "rules_strategy",
+          judge: {
+            ...judgeResult,
+            webIntent: required ? "required" : "not_required",
+            webIntentConfidence: 0.97,
+            webIntentReason: required
+              ? "The current user input explicitly requires current Web information."
+              : "The current Routing Segment is a local coding task.",
+            webIntentEvidence: required ? ["explicit_web_action"] : ["local_or_code_context"],
+          },
+          status: "live",
+          resultSource: "upstream_live",
           model: "test-judge",
           provider: "test",
           promptVersion: "test-prompt-v1",
@@ -236,6 +250,15 @@ run("Alpha PostgreSQL request processor", () => {
           latencyMs: 1,
           costUsd: "0.0010000000",
           entropy: 0.5,
+          webIntentDecision: {
+            intent: required ? "required" : "not_required",
+            confidence: 0.97,
+            reason: required
+              ? "The current user input explicitly requires current Web information."
+              : "The current Routing Segment is a local coding task.",
+            evidence: required ? ["explicit_web_action"] : ["local_or_code_context"],
+            source: "judge",
+          },
         };
       },
     };
@@ -373,10 +396,18 @@ run("Alpha PostgreSQL request processor", () => {
     ];
     await send({ model: "acu-auto", input: history, stream: true }, "request-2");
     expect(judgeCalls).toBe(1);
-    const counts = await database.query<{ segments: string; judges: string }>(
-      "SELECT (SELECT count(*) FROM acu_segments) segments,(SELECT count(*) FROM acu_judge_evaluations) judges",
+    const counts = await database.query<{ segments: string; judges: string; segment_web_intent: string; segment_web_source: string }>(
+      `SELECT (SELECT count(*) FROM acu_segments) segments,
+       (SELECT count(*) FROM acu_judge_evaluations) judges,
+       (SELECT metadata_json->>'webIntent' FROM acu_segments WHERE status='active') segment_web_intent,
+       (SELECT metadata_json->>'webIntentSource' FROM acu_segments WHERE status='active') segment_web_source`,
     );
-    expect(counts.rows[0]).toEqual({ segments: "1", judges: "1" });
+    expect(counts.rows[0]).toEqual({
+      segments: "1",
+      judges: "1",
+      segment_web_intent: "not_required",
+      segment_web_source: "judge",
+    });
   });
 
   it("creates a new Segment and Judges the human message '继续' with full history", async () => {
@@ -420,6 +451,76 @@ run("Alpha PostgreSQL request processor", () => {
        (SELECT mode FROM acu_route_decisions WHERE newapi_user_id='user-explicit' LIMIT 1) route_mode`,
     );
     expect(result.rows[0]).toEqual({ judge_count: "0", route_mode: "explicit" });
+  });
+
+  it("creates a new judged Segment when the user later explicitly requests current official docs", async () => {
+    const userId = "user-web-rejudge";
+    const initial = [{ type: "message", role: "user", content: [{ type: "input_text", text: "修改 currentUser 函数" }] }];
+    const beforeJudge = judgeCalls;
+    const instructions = `<permissions instructions>\n\`sandbox_mode\` is \`workspace-write\`\n</permissions instructions>\n<environment_context><cwd>${process.cwd()}</cwd></environment_context>`;
+    await send({ model: "acu-auto", instructions, input: initial, stream: true }, "web-rejudge-1", userId);
+    await send({
+      model: "acu-auto",
+      instructions,
+      input: [
+        ...initial,
+        { type: "function_call", call_id: "call-local", name: "exec_command", arguments: "{\"cmd\":\"check.sh\"}" },
+        { type: "function_call_output", call_id: "call-local", output: "ok" },
+        { type: "message", role: "user", content: [{ type: "input_text", text: "再查一下最新官方文档" }] },
+      ],
+      tools: [{ type: "web_search" }],
+      stream: true,
+      test_web_success: true,
+    }, "web-rejudge-2", userId);
+    expect(judgeCalls).toBe(beforeJudge + 2);
+    const result = await database.query<{
+      intents: string[];
+      sources: string[];
+      judge_intents: string[];
+      route_intents: string[];
+    }>(
+      `SELECT
+       (SELECT array_agg(metadata_json->>'webIntent' ORDER BY created_at) FROM acu_segments WHERE newapi_user_id=$1) intents,
+       (SELECT array_agg(metadata_json->>'webIntentSource' ORDER BY created_at) FROM acu_segments WHERE newapi_user_id=$1) sources,
+       (SELECT array_agg(web_intent ORDER BY created_at) FROM acu_judge_evaluations WHERE newapi_user_id=$1) judge_intents,
+       (SELECT array_agg(formula_inputs_json->>'webIntent' ORDER BY created_at) FROM acu_route_decisions WHERE newapi_user_id=$1) route_intents`,
+      [userId],
+    );
+    expect(result.rows[0]).toEqual({
+      intents: ["not_required", "required"],
+      sources: ["judge", "judge"],
+      judge_intents: ["not_required", "required"],
+      route_intents: ["not_required", "required"],
+    });
+  });
+
+  it("marks an old Segment without Web fields as legacy_heuristic without another Judge", async () => {
+    const userId = "user-web-legacy";
+    const initial = [{ type: "message", role: "user", content: [{ type: "input_text", text: "更新 latestVersion 变量" }] }];
+    const beforeJudge = judgeCalls;
+    await send({ model: "acu-auto", input: initial, stream: true }, "web-legacy-1", userId);
+    await database.query(
+      `UPDATE acu_segments SET metadata_json=metadata_json
+       - 'webIntent' - 'webIntentConfidence' - 'webIntentReason' - 'webIntentEvidence' - 'webIntentSource'
+       WHERE newapi_user_id=$1`,
+      [userId],
+    );
+    await send({
+      model: "acu-auto",
+      input: [
+        ...initial,
+        { type: "function_call", call_id: "call-legacy", name: "exec_command", arguments: "{\"cmd\":\"pwd\"}" },
+        { type: "function_call_output", call_id: "call-legacy", output: "workspace" },
+      ],
+      stream: true,
+    }, "web-legacy-2", userId);
+    expect(judgeCalls).toBe(beforeJudge + 1);
+    const result = await database.query<{ intent: string; source: string }>(
+      `SELECT metadata_json->>'webIntent' intent,metadata_json->>'webIntentSource' source
+       FROM acu_segments WHERE newapi_user_id=$1`,
+      [userId],
+    );
+    expect(result.rows[0]).toEqual({ intent: "not_required", source: "legacy_heuristic" });
   });
 
   it("persists the first failure and Judges only the second identical failure without progress", async () => {

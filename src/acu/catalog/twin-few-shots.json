@@ -1,5 +1,5 @@
 {
-  "promptVersion": "acu-tier-requirement-v3",
+  "promptVersion": "acu-tier-requirement-v4",
   "examples": [
     {
       "exampleId": "simple-rewrite-1",

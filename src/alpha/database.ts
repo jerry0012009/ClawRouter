@@ -46,6 +46,7 @@ export class AlphaDatabase implements SqlExecutor {
     await this.pool.query(await readFile(path, "utf8"));
     if (path.pathname.endsWith("0001_alpha_p0.sql")) {
       await this.pool.query(await readFile(new URL("../../migrations/acu/0002_provider_channel_health.sql", import.meta.url), "utf8"));
+      await this.pool.query(await readFile(new URL("../../migrations/acu/0003_web_intent_source.sql", import.meta.url), "utf8"));
     }
   }
 

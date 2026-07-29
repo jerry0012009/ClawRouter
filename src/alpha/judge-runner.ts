@@ -4,7 +4,9 @@ import { rulesFallbackJudge } from "../acu/strategy.js";
 import type { AcuRuntimeConfig } from "../acu/config.js";
 import type { AcuJudgeResult, AcuVisibleMessage } from "../acu/types.js";
 import type { RoutingDecision } from "../router/types.js";
+import type { WebIntentDecision } from "./protocol/types.js";
 import type { TriggerReason } from "./state-machine.js";
+import { classifyWebIntentFallback, type WebIntentFallbackInput, withWebIntentSource } from "./web-intent.js";
 
 export type AlphaJudgeRun = {
   judge: AcuJudgeResult;
@@ -23,6 +25,7 @@ export type AlphaJudgeRun = {
   costUsd: string;
   entropy: number;
   errorCategory?: string;
+  webIntentDecision: WebIntentDecision;
 };
 
 export type AlphaJudgeInput = {
@@ -31,6 +34,7 @@ export type AlphaJudgeInput = {
   trigger: TriggerReason;
   contextHash: string;
   recentEvaluation?: AlphaJudgeRun;
+  webIntentFallbackInput: WebIntentFallbackInput;
 };
 
 export type AlphaJudgeRunner = {
@@ -71,8 +75,19 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
           latencyMs: result.latencyMs,
           costUsd: result.cost.toFixed(10),
           entropy: normalizedEntropy(result.result),
+          webIntentDecision: {
+            intent: result.result.webIntent!,
+            confidence: result.result.webIntentConfidence!,
+            reason: result.result.webIntentReason!,
+            evidence: result.result.webIntentEvidence!,
+            source: "judge",
+          },
         };
       } catch (error) {
+        const fallback = withWebIntentSource(
+          classifyWebIntentFallback(input.webIntentFallbackInput),
+          "heuristic_fallback",
+        );
         if (input.recentEvaluation && canReuseRecent(input.trigger)) {
           return {
             ...input.recentEvaluation,
@@ -81,6 +96,7 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
             costUsd: "0.0000000000",
             latencyMs: 0,
             errorCategory: error instanceof Error ? error.message.slice(0, 160) : "judge_error",
+            webIntentDecision: fallback,
           };
         }
         const judge = rulesFallbackJudge(options.rulesDecision);
@@ -101,6 +117,7 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
           costUsd: "0.0000000000",
           entropy: normalizedEntropy(judge),
           errorCategory: error instanceof Error ? error.message.slice(0, 160) : "judge_error",
+          webIntentDecision: fallback,
         };
       }
     },

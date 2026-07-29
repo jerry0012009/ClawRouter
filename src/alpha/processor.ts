@@ -1,6 +1,6 @@
 import type { IncomingHttpHeaders } from "node:http";
 import { canonicalHash, record } from "./protocol/common.js";
-import type { CanonicalEnvelope } from "./protocol/types.js";
+import type { CanonicalEnvelope, WebIntentDecision } from "./protocol/types.js";
 import { AlphaDatabase } from "./database.js";
 import { applyFailureEvidence, decideTrigger, type AlphaMode, type SegmentState, type TriggerDecision } from "./state-machine.js";
 import { extractIncrementalEvents, type AlphaDomainEvent } from "./events.js";
@@ -28,6 +28,12 @@ import {
 } from "./execution.js";
 import { applyAttemptOutcome, classifyAttemptOutcome, type AttemptOutcome, type HealthSnapshot } from "./channel-health.js";
 import { verifyWritableWorkspace } from "./workspace-gate.js";
+import {
+  classifyWebIntentFallback,
+  isWebIntent,
+  isWebIntentSource,
+  withWebIntentSource,
+} from "./web-intent.js";
 
 const POLICY_VERSION = "alpha-p0-policy-v1";
 const QUALITY_CURVE_VERSION = "acu-catalog-v0.1";
@@ -65,6 +71,10 @@ export type AlphaResolutionContext = {
   replayed: boolean;
   clientDeclaredWebTool: boolean;
   webIntent: CanonicalEnvelope["webIntent"];
+  webIntentConfidence: number;
+  webIntentReason: string;
+  webIntentEvidence: string[];
+  webIntentSource: NonNullable<CanonicalEnvelope["webIntentSource"]>;
   webActuallyInvoked: boolean;
   webSearchEventStatus: string[];
   webToolPruned: boolean;
@@ -116,6 +126,39 @@ function numberValue(value: unknown, fallback = 0): number {
 function optionalNumber(value: unknown): number | undefined {
   const valueAsNumber = Number(value);
   return value === null || value === undefined || !Number.isFinite(valueAsNumber) ? undefined : valueAsNumber;
+}
+
+function webIntentFromMetadata(value: JsonObject): WebIntentDecision | undefined {
+  if (!isWebIntent(value.webIntent) || !isWebIntentSource(value.webIntentSource)) return undefined;
+  const confidence = Number(value.webIntentConfidence);
+  if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1) return undefined;
+  if (typeof value.webIntentReason !== "string" || !Array.isArray(value.webIntentEvidence)
+    || value.webIntentEvidence.some((item) => typeof item !== "string")) return undefined;
+  return {
+    intent: value.webIntent,
+    confidence,
+    reason: value.webIntentReason,
+    evidence: value.webIntentEvidence as string[],
+    source: value.webIntentSource,
+  };
+}
+
+function applyWebIntent(envelope: CanonicalEnvelope, decision: WebIntentDecision): void {
+  envelope.webIntent = decision.intent;
+  envelope.webIntentConfidence = decision.confidence;
+  envelope.webIntentReason = decision.reason;
+  envelope.webIntentEvidence = decision.evidence;
+  envelope.webIntentSource = decision.source;
+}
+
+function webIntentMetadata(decision: WebIntentDecision): JsonObject {
+  return {
+    webIntent: decision.intent,
+    webIntentConfidence: decision.confidence,
+    webIntentReason: decision.reason,
+    webIntentEvidence: decision.evidence,
+    webIntentSource: decision.source,
+  };
 }
 
 function canonicalActualModel(profile: AlphaExecutionProfile, actualModel: string | undefined): string {
@@ -591,7 +634,18 @@ export class AlphaRequestProcessor {
   ): Promise<{ profile: AlphaExecutionProfile; judge?: AlphaJudgeRun; route?: AlphaRouteDecision }> {
     const repository = new AlphaRepository(this.options.database);
     const { profiles: effectiveProfiles, probeClaims } = await this.effectiveProfiles();
+    const storedSegment = await repository.getSegment(state.segmentId, identity.newapiUserId);
+    const storedSegmentMetadata = metadata(storedSegment);
+    const storedWebIntent = state.decision.runJudge ? undefined : webIntentFromMetadata(storedSegmentMetadata);
+    if (storedWebIntent) applyWebIntent(envelope, storedWebIntent);
     if (modeForModel(envelope.requestedModel) === "explicit") {
+      const webIntentDecision = storedWebIntent ?? withWebIntentSource(classifyWebIntentFallback({
+        recentUserInputs: envelope.humanCandidates
+          .filter((candidate) => candidate.confidence === "high")
+          .map((candidate) => candidate.text),
+        rootGoalText: state.rootGoalText,
+      }), state.decision.createSegment ? "heuristic_fallback" : "legacy_heuristic");
+      applyWebIntent(envelope, webIntentDecision);
       const profile = resolveExplicitProfile(envelope.requestedModel, effectiveProfiles, {
         protocol: envelope.protocol,
         requireTools: envelope.requiredToolTypes.length > 0,
@@ -619,6 +673,7 @@ export class AlphaRequestProcessor {
             judgeCalls: 0,
             reasoningEffort: envelope.reasoningEffort,
             requiredToolTypes: envelope.requiredToolTypes,
+            ...webIntentMetadata(webIntentDecision),
             userRoutingPolicy: identity.routingPolicy,
             routingPreference: identity.routingPreference,
             userRoutingPolicyVersion: identity.routingPolicyVersion,
@@ -635,16 +690,21 @@ export class AlphaRequestProcessor {
           selectedExecutionProfileId: profile.executionProfileId,
           metadata: {
             ...state.stateMetadata,
+            ...webIntentMetadata(webIntentDecision),
             selectedProfile: profile,
             userRoutingPolicyVersion: identity.routingPolicyVersion,
           },
+        });
+      } else if (!storedWebIntent) {
+        await repository.updateSegmentMetadata(state.segmentId, identity.newapiUserId, {
+          ...storedSegmentMetadata,
+          ...webIntentMetadata(webIntentDecision),
         });
       }
       await this.releaseUnusedProbeClaims(probeClaims, profile);
       return { profile };
     }
 
-    const storedSegment = await repository.getSegment(state.segmentId, identity.newapiUserId);
     const storedProfile = selectedProfileFromSegment(storedSegment, effectiveProfiles);
     const policyVersionMatches = metadata(storedSegment).userRoutingPolicyVersion === identity.routingPolicyVersion;
     const reused = storedProfile
@@ -654,6 +714,19 @@ export class AlphaRequestProcessor {
       ? storedProfile
       : undefined;
     if (!state.decision.runJudge && reused && reused.health !== "cooldown") {
+      if (!storedWebIntent) {
+        const legacyWebIntent = withWebIntentSource(classifyWebIntentFallback({
+          recentUserInputs: envelope.humanCandidates
+            .filter((candidate) => candidate.confidence === "high")
+            .map((candidate) => candidate.text),
+          rootGoalText: state.rootGoalText,
+        }), "legacy_heuristic");
+        applyWebIntent(envelope, legacyWebIntent);
+        await repository.updateSegmentMetadata(state.segmentId, identity.newapiUserId, {
+          ...storedSegmentMetadata,
+          ...webIntentMetadata(legacyWebIntent),
+        });
+      }
       await this.releaseUnusedProbeClaims(probeClaims, reused);
       return { profile: reused };
     }
@@ -672,14 +745,22 @@ export class AlphaRequestProcessor {
       temporaryPhaseOverride: state.decision.temporaryPhaseOverride,
     });
     const contextHash = canonicalHash(context.envelope);
-    const previousJudge = record(metadata(storedSegment).judgeRun) as AlphaJudgeRun | undefined;
+    const previousJudge = record(storedSegmentMetadata.judgeRun) as AlphaJudgeRun | undefined;
+    const webIntentFallbackInput = {
+      recentUserInputs: envelope.humanCandidates
+        .filter((candidate) => candidate.confidence === "high")
+        .map((candidate) => candidate.text),
+      rootGoalText: state.rootGoalText,
+    };
     const judge = await this.options.judgeRunner.run({
       messages: context.messages,
       tools: context.tools,
       trigger: state.decision.runJudge ? state.decision.reason : "safety_refresh",
       contextHash,
       recentEvaluation: previousJudge,
+      webIntentFallbackInput,
     });
+    applyWebIntent(envelope, judge.webIntentDecision);
     const judgeEconomics = effectiveProfiles.find((profile) => profile.provider === judge.provider)?.economics;
     const effectiveJudgeCostCny = Number(judge.costUsd)
       * (judgeEconomics ? cashCnyPerNominalUsd(judgeEconomics) : 1);
@@ -747,6 +828,11 @@ export class AlphaRequestProcessor {
       judgeEntropy: judge.entropy,
       evidenceTags: judge.judge.signals,
       explanation: judge.judge.explanation,
+      webIntent: judge.webIntentDecision.intent,
+      webIntentConfidence: judge.webIntentDecision.confidence,
+      webIntentReason: judge.webIntentDecision.reason,
+      webIntentEvidence: judge.webIntentDecision.evidence,
+      webIntentSource: judge.webIntentDecision.source,
       promptTokens: BigInt(judge.promptTokens),
       completionTokens: BigInt(judge.completionTokens),
       latencyMs: judge.latencyMs,
@@ -829,7 +915,7 @@ export class AlphaRequestProcessor {
         reasoningEffort: envelope.reasoningEffort,
         requiredToolTypes: envelope.requiredToolTypes,
         clientDeclaredWebTool: envelope.clientDeclaredWebTool,
-        webIntent: envelope.webIntent,
+        ...webIntentMetadata(judge.webIntentDecision),
       },
       candidateEstimates: route.candidateEstimates,
       paretoFrontier: route.paretoFrontier,
@@ -845,6 +931,7 @@ export class AlphaRequestProcessor {
       selectedExecutionProfileId: route.selectedProfile.executionProfileId,
       metadata: {
         ...state.stateMetadata,
+        ...webIntentMetadata(judge.webIntentDecision),
         judgeRun: judge,
         selectedProfile: route.selectedProfile,
         userRoutingPolicyVersion: identity.routingPolicyVersion,
@@ -1070,6 +1157,7 @@ export class AlphaRequestProcessor {
       metadata: {
         clientDeclaredWebTool: input.envelope.clientDeclaredWebTool,
         webIntent: input.envelope.webIntent,
+        webIntentSource: input.envelope.webIntentSource,
         providerRequestDeclaresWebTool: bodyDeclaresHostedWebTool(input.body),
         webProfileVerified: input.profile.webSearchExecutionVerified === true,
       },
@@ -1093,6 +1181,7 @@ export class AlphaRequestProcessor {
         networkEndpoint: endpoint.endpoint,
         clientDeclaredWebTool: input.envelope.clientDeclaredWebTool,
         webIntent: input.envelope.webIntent,
+        webIntentSource: input.envelope.webIntentSource,
         providerRequestDeclaresWebTool: bodyDeclaresHostedWebTool(input.body),
         webProfileVerified: input.profile.webSearchExecutionVerified === true,
       },
@@ -1164,6 +1253,10 @@ export class AlphaRequestProcessor {
         reasoningEffort: envelope.reasoningEffort,
         clientDeclaredWebTool: envelope.clientDeclaredWebTool,
         webIntent: envelope.webIntent,
+        webIntentConfidence: envelope.webIntentConfidence,
+        webIntentReason: envelope.webIntentReason,
+        webIntentEvidence: envelope.webIntentEvidence,
+        webIntentSource: envelope.webIntentSource,
         webActuallyInvoked: false,
       },
     });
@@ -1193,6 +1286,10 @@ export class AlphaRequestProcessor {
             replayed: true,
             clientDeclaredWebTool: envelope.clientDeclaredWebTool,
             webIntent: envelope.webIntent,
+            webIntentConfidence: envelope.webIntentConfidence,
+            webIntentReason: envelope.webIntentReason,
+            webIntentEvidence: envelope.webIntentEvidence,
+            webIntentSource: envelope.webIntentSource!,
             webActuallyInvoked: false,
             webSearchEventStatus: [],
             webToolPruned: false,
@@ -1270,6 +1367,10 @@ export class AlphaRequestProcessor {
       replayed: false,
       clientDeclaredWebTool: envelope.clientDeclaredWebTool,
       webIntent: envelope.webIntent,
+      webIntentConfidence: envelope.webIntentConfidence,
+      webIntentReason: envelope.webIntentReason,
+      webIntentEvidence: envelope.webIntentEvidence,
+      webIntentSource: envelope.webIntentSource!,
       webActuallyInvoked: false,
       webSearchEventStatus: [],
       webToolPruned: prepared.webToolPruned,
@@ -1437,6 +1538,10 @@ export class AlphaRequestProcessor {
           : undefined,
         client_declared_web_tool: input.context.clientDeclaredWebTool,
         web_intent: input.context.webIntent,
+        web_intent_confidence: input.context.webIntentConfidence,
+        web_intent_reason: input.context.webIntentReason,
+        web_intent_evidence: input.context.webIntentEvidence,
+        web_intent_source: input.context.webIntentSource,
         web_actually_invoked: input.context.webActuallyInvoked,
         web_search_event_status: input.context.webSearchEventStatus,
         web_profile_verified: input.context.selectedProfile.webSearchExecutionVerified === true,

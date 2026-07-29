@@ -30,7 +30,7 @@ type CacheRecord = {
   usageStatus: "reported" | "usage_missing";
 };
 
-type CacheFile = { schemaVersion: "acu-judge-cache-v3"; entries: Record<string, CacheRecord> };
+type CacheFile = { schemaVersion: "acu-judge-cache-v4"; entries: Record<string, CacheRecord> };
 
 export type JudgeRequestResult = {
   result: AcuJudgeResult;
@@ -160,18 +160,29 @@ export function buildJudgeSystemPrompt(): string {
     "上下文：",
     example.context,
     `最低充分档位解释：${example.minimumSufficientTier}；${example.explanation}`,
-    `期望输出：${stableJson(example.expected)}`,
+    `期望输出：${stableJson({
+      ...example.expected,
+      webIntent: "not_required",
+      webIntentConfidence: 0.95,
+      webIntentReason: "The visible task can be completed from provided or local context.",
+      webIntentEvidence: ["provided_or_local_context"],
+    })}`,
   ].join("\n")).join("\n\n---\n\n");
   return [
     "你是 ACU 任务能力需求分类器。判断当前完整、可见 API 上下文中，完成下一次模型响应所需的最低充分能力。",
     "不得回答原任务，不得推荐具体模型，不得根据模型品牌判断，不得输出代码或思维过程。",
-    '只输出严格 JSON：{"difficulty_score_raw":0,"factors":{"reasoning_depth":0,"task_scope":0,"constraint_density":0,"tool_dependency":0,"verification_burden":0,"context_burden":0},"p_low":0,"p_mid":0,"p_mid_high":0,"p_high":0,"confidence":0,"signals":[],"explanation":""}',
+    '只输出严格 JSON：{"difficulty_score_raw":0,"factors":{"reasoning_depth":0,"task_scope":0,"constraint_density":0,"tool_dependency":0,"verification_burden":0,"context_burden":0},"p_low":0,"p_mid":0,"p_mid_high":0,"p_high":0,"confidence":0,"signals":[],"explanation":"","webIntent":"likely","webIntentConfidence":0,"webIntentReason":"","webIntentEvidence":[]}',
     "difficulty_score_raw是0到100的原始总体判断；六个factors均为0到10、允许一位小数。后端会确定性计算最终难度指数，不要自行输出最终指数。",
     "reasoning_depth衡量推理链长度和抽象程度；task_scope衡量步骤、文件、模块、实体和目标范围；constraint_density衡量格式、事实、风格、业务和质量约束及其相互影响。",
     "tool_dependency衡量工具调用、代码执行、检索、多轮Agent行为和环境状态依赖；verification_burden越难通过JSON、测试或明确答案验证则越高；context_burden衡量上下文长度、分散程度和历史依赖。",
     "不要为了简洁默认使用5的倍数。请分别判断各能力需求因子，总难度由后端计算；只有真实判断恰好落在整数或5的倍数时才可输出该值。",
     "概率表达分类不确定性；除极其明确外不要机械输出单档100%，相邻档存在合理可能时应给软概率。原始总分与主要档位应大体一致，但不要求等于概率期望。",
     "四档概率必须在0到1且总和为1；signals最多5个；explanation不超过80个中文字符。",
+    "在同一次判断中输出 Web Intent。required 表示完成当前真实目标必须取得实时或外部 Web 信息；likely 表示可能有帮助但不能作为硬条件；not_required 表示当前 Segment 可完全依赖本地工作区、已给上下文和普通工具完成。",
+    "Web 判断必须综合当前真实用户目标、最近用户输入、Task/Goal、Plan、Routing Segment 状态和确定性 Web 线索。客户端声明 Web Tool 只表示能力可用，不能直接判为 required。",
+    "单独出现 current、latest、today、当前、最新、今天不得判为 required。代码标识符、变量名、文件名、本地日志、Git 分支和本地测试内容中的这些词应判为 not_required。",
+    "例如：‘修改 currentUser 函数’、‘更新 latestVersion 变量’、‘查看今天生成的本地日志’均为 not_required；‘查询今天 BTC 价格’、‘搜索最新 Codex 官方文档’为 required。",
+    "webIntentConfidence 必须在0到1；webIntentReason不超过120个字符；webIntentEvidence最多8项，只列可审计的简短证据标签。",
     "以下示例只包含当时可见上下文，不含未来消息：",
     examples,
   ].join("\n\n");
@@ -255,6 +266,20 @@ export function parseJudgeResult(text: string): AcuJudgeResult {
   if (typeof parsed.explanation !== "string" || Array.from(parsed.explanation).length > 80) {
     throw new Error("Judge explanation must be a string no longer than 80 characters");
   }
+  if (!["required", "likely", "not_required"].includes(String(parsed.webIntent))) {
+    throw new Error("Judge webIntent must be required, likely, or not_required");
+  }
+  const webIntentConfidence = Number(parsed.webIntentConfidence);
+  if (!Number.isFinite(webIntentConfidence) || webIntentConfidence < 0 || webIntentConfidence > 1) {
+    throw new Error("Judge webIntentConfidence must be finite and in [0, 1]");
+  }
+  if (typeof parsed.webIntentReason !== "string" || Array.from(parsed.webIntentReason).length > 120) {
+    throw new Error("Judge webIntentReason must be a string no longer than 120 characters");
+  }
+  if (!Array.isArray(parsed.webIntentEvidence) || parsed.webIntentEvidence.length > 8
+    || parsed.webIntentEvidence.some((item) => typeof item !== "string")) {
+    throw new Error("Judge webIntentEvidence must contain at most eight strings");
+  }
   return {
     ...probabilities,
     difficultyScoreRaw,
@@ -265,24 +290,28 @@ export function parseJudgeResult(text: string): AcuJudgeResult {
     difficultyScore: difficultyIndex,
     signals: parsed.signals as string[],
     explanation: parsed.explanation,
+    webIntent: parsed.webIntent as AcuJudgeResult["webIntent"],
+    webIntentConfidence,
+    webIntentReason: parsed.webIntentReason,
+    webIntentEvidence: parsed.webIntentEvidence as string[],
   };
 }
 
 function cachePath(config: AcuRuntimeConfig): string {
-  if (config.cachePath && config.promptVersion === "acu-tier-requirement-v3") {
-    return config.cachePath.replace(/v2(?=\.json$)/, "v3");
+  if (config.cachePath && config.promptVersion === "acu-tier-requirement-v4") {
+    return config.cachePath.replace(/v[23](?=\.json$)/, "v4");
   }
-  return config.cachePath || join(homedir(), ".claw-router", "acu-judge-cache-v3.json");
+  return config.cachePath || join(homedir(), ".claw-router", "acu-judge-cache-v4.json");
 }
 
 function readCache(path: string): CacheFile {
-  if (!existsSync(path)) return { schemaVersion: "acu-judge-cache-v3", entries: {} };
+  if (!existsSync(path)) return { schemaVersion: "acu-judge-cache-v4", entries: {} };
   try {
     const parsed = JSON.parse(readFileSync(path, "utf8")) as CacheFile;
-    if (parsed.schemaVersion !== "acu-judge-cache-v3" || !parsed.entries) throw new Error("wrong schema");
+    if (parsed.schemaVersion !== "acu-judge-cache-v4" || !parsed.entries) throw new Error("wrong schema");
     return parsed;
   } catch {
-    return { schemaVersion: "acu-judge-cache-v3", entries: {} };
+    return { schemaVersion: "acu-judge-cache-v4", entries: {} };
   }
 }
 

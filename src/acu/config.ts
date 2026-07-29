@@ -1,4 +1,4 @@
-export const ACU_PROMPT_VERSION = "acu-tier-requirement-v3";
+export const ACU_PROMPT_VERSION = "acu-tier-requirement-v4";
 export const ACU_DIFFICULTY_METHOD_VERSION = "acu-difficulty-index-v1" as const;
 export const ACU_ROUTING_MODEL_VERSION = "acu-routing-model-v0.3";
 export const ACU_DEFAULT_JUDGE_MODEL = "deepseek-v4-flash";

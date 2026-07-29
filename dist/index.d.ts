@@ -44,6 +44,10 @@ type AcuJudgeResult = AcuTierProbabilities & {
     difficultyScore: number;
     signals: string[];
     explanation: string;
+    webIntent?: "required" | "likely" | "not_required";
+    webIntentConfidence?: number;
+    webIntentReason?: string;
+    webIntentEvidence?: string[];
 };
 type AcuJudgeStatus = "live" | "cache_hit" | "rules_fallback" | "live_error";
 type AcuJudgeResultSource = "upstream_live" | "disk_cache" | "rules_strategy";

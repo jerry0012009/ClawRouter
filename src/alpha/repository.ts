@@ -206,6 +206,11 @@ export type JudgeEvaluationRecord = {
   judgeEntropy?: number;
   evidenceTags: unknown[];
   explanation?: string;
+  webIntent?: string;
+  webIntentConfidence?: number;
+  webIntentReason?: string;
+  webIntentEvidence?: unknown[];
+  webIntentSource?: string;
   promptTokens?: bigint;
   completionTokens?: bigint;
   latencyMs?: number;
@@ -570,10 +575,11 @@ export class AlphaRepository {
         judge_status,judge_result_source,judge_model,judge_provider,prompt_version,policy_version,
         difficulty_method_version,context_hash,context_token_estimate,context_truncated,
         difficulty_score_raw,difficulty_index,factors_json,probabilities_json,confidence,judge_entropy,
-        evidence_tags_json,explanation,prompt_tokens,completion_tokens,latency_ms,actual_cost_usd,
+        evidence_tags_json,explanation,web_intent,web_intent_confidence,web_intent_reason,
+        web_intent_evidence_json,web_intent_source,prompt_tokens,completion_tokens,latency_ms,actual_cost_usd,
         error_category,created_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
-        $21,$22,$23,$24,$25,$26,$27,$28,$29,now())
+        $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,now())
        ON CONFLICT (judge_idempotency_key) DO NOTHING RETURNING judge_evaluation_id`,
       [input.judgeEvaluationId, input.newapiUserId, input.taskId, input.segmentId,
         input.triggerEventId ?? null, input.judgeIdempotencyKey, input.judgeStatus,
@@ -582,8 +588,10 @@ export class AlphaRepository {
         input.contextTokenEstimate ?? null, input.contextTruncated, input.difficultyScoreRaw ?? null,
         input.difficultyIndex ?? null, json(input.factors), json(input.probabilities),
         input.confidence ?? null, input.judgeEntropy ?? null, json(input.evidenceTags),
-        input.explanation ?? null, input.promptTokens ?? null, input.completionTokens ?? null,
-        input.latencyMs ?? null, input.actualCostUsd ?? "0", input.errorCategory ?? null],
+        input.explanation ?? null, input.webIntent ?? null, input.webIntentConfidence ?? null,
+        input.webIntentReason ?? null, json(input.webIntentEvidence ?? []), input.webIntentSource ?? null,
+        input.promptTokens ?? null, input.completionTokens ?? null, input.latencyMs ?? null,
+        input.actualCostUsd ?? "0", input.errorCategory ?? null],
     );
     if (result.rowCount === 1) return { judgeEvaluationId: input.judgeEvaluationId, inserted: true };
     const existing = await this.database.query<{ judge_evaluation_id: string }>(

@@ -31,6 +31,15 @@ export type PlanningSignals = {
 };
 
 export type WebIntent = "required" | "likely" | "not_required";
+export type WebIntentSource = "judge" | "heuristic_fallback" | "legacy_heuristic";
+
+export type WebIntentDecision = {
+  intent: WebIntent;
+  confidence: number;
+  reason: string;
+  evidence: string[];
+  source: WebIntentSource;
+};
 
 export type CanonicalEnvelope = {
   protocol: AlphaProtocol;
@@ -42,6 +51,10 @@ export type CanonicalEnvelope = {
   requiredToolTypes: ToolCapability[];
   clientDeclaredWebTool: boolean;
   webIntent: WebIntent;
+  webIntentConfidence: number;
+  webIntentReason: string;
+  webIntentEvidence: string[];
+  webIntentSource?: WebIntentSource;
   webActuallyInvoked: boolean;
   humanCandidates: CanonicalHumanCandidate[];
   toolCalls: CanonicalToolCall[];

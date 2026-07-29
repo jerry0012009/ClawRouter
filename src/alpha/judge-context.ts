@@ -1,6 +1,7 @@
 import type { AcuVisibleMessage } from "../acu/types.js";
 import type { CanonicalEnvelope } from "./protocol/types.js";
 import type { TriggerReason } from "./state-machine.js";
+import { extractWebIntentEvidence } from "./web-intent.js";
 
 export type AlphaJudgeStateContext = {
   sessionId: string;
@@ -26,6 +27,7 @@ export type AlphaJudgeContextEnvelope = {
   nativeInstructions: unknown;
   nativeHistory: unknown[];
   nativeTools: unknown[];
+  deterministicWebIntentEvidence: string[];
   state: AlphaJudgeStateContext;
 };
 
@@ -39,6 +41,7 @@ export function buildAlphaJudgeContext(
     nativeInstructions: envelope.instructions,
     nativeHistory: envelope.history,
     nativeTools: envelope.tools,
+    deterministicWebIntentEvidence: extractWebIntentEvidence(envelope, state.rootGoalText),
     state,
   };
   return {

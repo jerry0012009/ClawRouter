@@ -29,6 +29,10 @@ export type AcuJudgeResult = AcuTierProbabilities & {
   difficultyScore: number;
   signals: string[];
   explanation: string;
+  webIntent?: "required" | "likely" | "not_required";
+  webIntentConfidence?: number;
+  webIntentReason?: string;
+  webIntentEvidence?: string[];
 };
 
 export type AcuJudgeStatus = "live" | "cache_hit" | "rules_fallback" | "live_error";

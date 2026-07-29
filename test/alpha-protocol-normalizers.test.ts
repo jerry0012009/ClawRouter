@@ -50,29 +50,33 @@ describe("Responses canonical envelope", () => {
       "computer_use",
     ]);
     expect(envelope.clientDeclaredWebTool).toBe(true);
-    expect(envelope.webIntent).toBe("likely");
+    expect(envelope.webIntentReason).toBe("Pending Routing Segment Judge evaluation.");
+    expect(envelope.webIntentSource).toBeUndefined();
     expect(envelope.webActuallyInvoked).toBe(false);
   });
 
-  it("classifies explicit current-information requests as requiring Web", () => {
+  it("does not classify current-information requests before the Routing Segment Judge", () => {
     const envelope = normalizeResponsesRequest({
       model: "acu-auto",
       input: "What is the latest stable release today?",
       tools: [{ type: "web_search" }],
     });
     expect(envelope.clientDeclaredWebTool).toBe(true);
-    expect(envelope.webIntent).toBe("required");
+    expect(envelope.webIntent).toBe("likely");
+    expect(envelope.webIntentConfidence).toBe(0);
+    expect(envelope.webIntentSource).toBeUndefined();
     expect(envelope.requiredToolTypes).toEqual([]);
   });
 
-  it("does not confuse the current workspace with current information", () => {
+  it("does not run the legacy Regex for current workspace wording", () => {
     const envelope = normalizeResponsesRequest({
       model: "acu-auto",
       input: "Modify the current file and run check.sh",
       tools: [{ type: "web_search" }],
     });
     expect(envelope.clientDeclaredWebTool).toBe(true);
-    expect(envelope.webIntent).toBe("not_required");
+    expect(envelope.webIntent).toBe("likely");
+    expect(envelope.webIntentSource).toBeUndefined();
   });
 
   it("does not treat an update_plan schema declaration as PlanStarted", () => {

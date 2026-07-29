@@ -1,5 +1,5 @@
 import { array, canonicalHash, record, textParts } from "./common.js";
-import type { CanonicalEnvelope, NativeRequestHeaders, WebIntent } from "./types.js";
+import type { CanonicalEnvelope, NativeRequestHeaders } from "./types.js";
 import type { ToolCapability } from "../routing.js";
 
 function parseJsonBody(body: unknown): Record<string, unknown> {
@@ -26,20 +26,6 @@ function requiredToolTypes(tools: unknown[]): ToolCapability[] {
 function isHostedWebTool(value: unknown): boolean {
   const type = String(record(value)?.type ?? "").toLowerCase();
   return type === "web_search" || type.startsWith("web_search_");
-}
-
-function classifyWebIntent(value: string): WebIntent {
-  const text = value.toLowerCase();
-  const explicitTime = /\b(latest|today|tonight|right now|real[- ]?time|live|as of)\b|实时|最新|今天|今日/.test(text);
-  const currentInformation = /\bcurrent(?:ly)?\b.{0,40}\b(date|time|weather|news|price|stock|version|release|status|information)\b/.test(text)
-    || /(?:当前|现在).{0,20}(?:日期|时间|天气|新闻|价格|行情|版本|发布|状态|信息)/.test(text);
-  if (explicitTime || currentInformation) {
-    return "required";
-  }
-  if (/\b(search|browse|look up|online|on the web|internet|news|weather|price|stock|release notes?)\b|搜索|联网|网上|网页|新闻|天气|价格|行情/.test(text)) {
-    return "likely";
-  }
-  return "not_required";
 }
 
 export function normalizeResponsesRequest(body: unknown, headers: NativeRequestHeaders = {}): CanonicalEnvelope {
@@ -86,7 +72,6 @@ export function normalizeResponsesRequest(body: unknown, headers: NativeRequestH
     }
   });
   const clientDeclaredWebTool = tools.some(isHostedWebTool);
-  const webIntent = classifyWebIntent(humanCandidates.map((item) => item.text).join("\n"));
 
   return {
     protocol: "responses",
@@ -97,7 +82,10 @@ export function normalizeResponsesRequest(body: unknown, headers: NativeRequestH
     tools,
     requiredToolTypes: requiredToolTypes(tools),
     clientDeclaredWebTool,
-    webIntent,
+    webIntent: "likely",
+    webIntentConfidence: 0,
+    webIntentReason: "Pending Routing Segment Judge evaluation.",
+    webIntentEvidence: [],
     webActuallyInvoked: false,
     humanCandidates,
     toolCalls,

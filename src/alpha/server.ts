@@ -13,7 +13,7 @@ import type { AlphaExecutionProfile } from "./routing.js";
 import { readProviderEconomicsCatalog, type ProviderEconomics } from "./provider-economics.js";
 import { UsageOutboxWorker } from "./usage-outbox.js";
 
-type ConfiguredExecutionProfile = AlphaExecutionProfile & {
+export type ConfiguredExecutionProfile = AlphaExecutionProfile & {
   baseUrl?: string;
   baseUrlEnv?: string;
   apiKeyEnv: string;
@@ -27,6 +27,22 @@ type ConfiguredExecutionProfile = AlphaExecutionProfile & {
   observedBillingMultiplier?: number;
   effectiveCostStatus?: "verified" | "estimated" | "missing";
 };
+
+export function economicsForExecutionProfile(
+  economics: ProviderEconomics,
+  profile: Pick<ConfiguredExecutionProfile, "apiKeyEnv" | "channelId" | "effectiveCostStatus" | "observedBillingMultiplier">,
+): ProviderEconomics {
+  return {
+    ...economics,
+    apiKeyEnv: profile.apiKeyEnv,
+    observedBillingMultiplier: profile.observedBillingMultiplier ?? economics.observedBillingMultiplier,
+    enabled: profile.effectiveCostStatus === "missing" ? false : economics.enabled,
+    // A registered Channel owns its runtime circuit independently. The
+    // legacy provider-level health only applies to profiles that have not
+    // yet migrated to the Channel Registry.
+    health: profile.channelId ? "healthy" : economics.health,
+  };
+}
 
 export type AlphaServiceConfig = {
   bindAddress: string;
@@ -127,12 +143,7 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
     if (!profile.channelId && economics.apiKeyEnv !== profile.apiKeyEnv) {
       throw new Error(`Provider Economics environment mismatch for ${profile.executionProfileId}`);
     }
-    const channelEconomics: ProviderEconomics = {
-      ...economics,
-      apiKeyEnv: profile.apiKeyEnv,
-      observedBillingMultiplier: profile.observedBillingMultiplier ?? economics.observedBillingMultiplier,
-      enabled: profile.effectiveCostStatus === "missing" ? false : economics.enabled,
-    };
+    const channelEconomics = economicsForExecutionProfile(economics, profile);
     const safeProfile: AlphaExecutionProfile = {
       executionProfileId: profile.executionProfileId,
       modelId: profile.modelId,

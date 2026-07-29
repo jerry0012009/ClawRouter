@@ -1,5 +1,8 @@
 BEGIN;
 
+DROP VIEW IF EXISTS acu_provider_health;
+DROP TABLE IF EXISTS acu_provider_model_profile_health;
+DROP TABLE IF EXISTS acu_channel_health;
 DROP TABLE IF EXISTS acu_usage_reports;
 ALTER TABLE IF EXISTS acu_logical_requests DROP CONSTRAINT IF EXISTS fk_acu_accepted_attempt;
 ALTER TABLE IF EXISTS acu_logical_requests DROP CONSTRAINT IF EXISTS fk_acu_response_payload;

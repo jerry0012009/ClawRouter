@@ -21,6 +21,11 @@ type ConfiguredExecutionProfile = AlphaExecutionProfile & {
   anthropicVersion?: string;
   stripV1Path?: boolean;
   economicsProviderId?: string;
+  networkFallbackBaseUrlEnvs?: string[];
+  channelId?: string;
+  routingGroupName?: string;
+  observedBillingMultiplier?: number;
+  effectiveCostStatus?: "verified" | "estimated" | "missing";
 };
 
 export type AlphaServiceConfig = {
@@ -119,9 +124,15 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
       item.providerId === (profile.economicsProviderId ?? profile.provider)
     ));
     if (!economics) throw new Error(`No Provider Economics for ${profile.provider}`);
-    if (economics.apiKeyEnv !== profile.apiKeyEnv) {
+    if (!profile.channelId && economics.apiKeyEnv !== profile.apiKeyEnv) {
       throw new Error(`Provider Economics environment mismatch for ${profile.executionProfileId}`);
     }
+    const channelEconomics: ProviderEconomics = {
+      ...economics,
+      apiKeyEnv: profile.apiKeyEnv,
+      observedBillingMultiplier: profile.observedBillingMultiplier ?? economics.observedBillingMultiplier,
+      enabled: profile.effectiveCostStatus === "missing" ? false : economics.enabled,
+    };
     const safeProfile: AlphaExecutionProfile = {
       executionProfileId: profile.executionProfileId,
       modelId: profile.modelId,
@@ -129,6 +140,9 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
       actualModelAliases: profile.actualModelAliases,
       provider: profile.provider,
       channel: profile.channel,
+      channelId: profile.channelId ?? profile.channel,
+      routingGroupName: profile.routingGroupName,
+      effectiveCostStatus: profile.effectiveCostStatus,
       protocols: profile.protocols,
       toolCallSupport: profile.toolCallSupport,
       supportedToolTypes: profile.supportedToolTypes,
@@ -138,22 +152,31 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
       health: profile.health,
       enabled: profile.enabled,
       administratorAllowed: profile.administratorAllowed,
-      economics,
+      economics: channelEconomics,
       usageTrusted: profile.usageTrusted,
       recentSuccessRate: profile.recentSuccessRate,
       observedLatencyMs: profile.observedLatencyMs,
     };
-    return {
-      profile: safeProfile,
+    const endpoints = [{ endpoint: new URL(baseUrl).host, baseUrl }, ...(profile.networkFallbackBaseUrlEnvs ?? []).map((name) => {
+      const fallbackBaseUrl = requiredEnvironment(name);
+      return { endpoint: new URL(fallbackBaseUrl).host, baseUrl: fallbackBaseUrl };
+    })];
+    const adapters = endpoints.map((endpoint) => ({
+      endpoint: endpoint.endpoint,
       adapter: createNativeProviderAdapter({
         provider: profile.provider,
         channel: profile.channel,
-        baseUrl,
+        baseUrl: endpoint.baseUrl,
         apiKey,
         authMode: profile.authMode,
         anthropicVersion: profile.anthropicVersion,
         stripV1Path: profile.stripV1Path,
       }),
+    }));
+    return {
+      profile: safeProfile,
+      adapter: adapters[0].adapter,
+      adapters,
     };
   });
   const judgeRunner = createAcuJudgeRunner({
@@ -164,6 +187,7 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
     database,
     profiles: profiles.map((item) => item.profile),
     adapters: new Map(profiles.map((item) => [item.profile.executionProfileId, item.adapter])),
+    networkAdapters: new Map(profiles.map((item) => [item.profile.executionProfileId, item.adapters])),
     judgeRunner,
   });
   const repository = new AlphaRepository(database);

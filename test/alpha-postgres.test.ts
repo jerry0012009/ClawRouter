@@ -24,17 +24,19 @@ run("Alpha PostgreSQL foundation", () => {
     await database.close();
   });
 
-  it("creates exactly the ten P0 tables without vector or memory tables", async () => {
+  it("creates P0 tables plus Channel and Profile runtime health tables", async () => {
     const result = await database.query<{ table_name: string }>(
       `SELECT table_name FROM information_schema.tables
        WHERE table_schema='public' AND table_name LIKE 'acu_%' ORDER BY table_name`,
     );
     expect(result.rows.map((row) => row.table_name)).toEqual([
       "acu_attempts",
+      "acu_channel_health",
       "acu_events",
       "acu_judge_evaluations",
       "acu_logical_requests",
       "acu_payloads",
+      "acu_provider_model_profile_health",
       "acu_route_decisions",
       "acu_segments",
       "acu_sessions",
@@ -178,7 +180,7 @@ run("Alpha PostgreSQL foundation", () => {
       provider: "closeai",
       status: "success",
     });
-    await expect(repository.createAttempt({
+    await repository.createAttempt({
       attemptId: "att_a_3",
       logicalRequestId: "req_a_1",
       attemptIndex: 3,
@@ -186,7 +188,7 @@ run("Alpha PostgreSQL foundation", () => {
       retryOwner: "acu",
       provider: "closeai",
       status: "success",
-    })).rejects.toMatchObject({ code: "23514" });
+    });
 
     const usage = {
       usageReportId: "usage_a_1",

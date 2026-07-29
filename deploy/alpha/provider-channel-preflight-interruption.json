@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "acu-provider-channel-preflight-interruption-v1",
+  "capturedAt": "2026-07-29T15:26:30Z",
+  "status": "interrupted",
+  "reason": "controlled_upstream_timeout",
+  "resultPersisted": false,
+  "possibleChannel": "blackai-codex-mix-low",
+  "cashCostStatus": "pending_provider_billing_reconciliation",
+  "rerunPolicy": "do_not_repeat_this_channel_without_billing_reconciliation"
+}

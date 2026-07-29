@@ -12,6 +12,7 @@ __pycache__/
 research/quality-curves/.cache/
 research/quality-curves/openhands/.cache/
 .env
+.env.backup-*
 deploy/alpha/.env
 acu-router.log
 acu_export/

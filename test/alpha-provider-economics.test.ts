@@ -46,7 +46,7 @@ describe("Provider Economics and v0.3 Provider selection", () => {
     expect(decision.candidateEstimates).toHaveLength(1);
     expect(decision.candidateEstimates[0].executionProfileIds).toHaveLength(2);
     expect(decision.selectedProfile.provider).toBe("lucen");
-    expect(decision.providerSelectionReason).toContain("lucen/gpt-5.4-mini");
+    expect(decision.providerSelectionReason).toContain("lucen/lucen-primary/gpt-5.4-mini");
   });
 
   it("does not select an untrusted cheaper Provider", () => {

@@ -1,0 +1,1174 @@
+{
+  "schemaVersion": "acu-provider-channel-registry-v1",
+  "generatedAt": "2026-07-29T15:34:49.552Z",
+  "channels": [
+    {
+      "channelId": "blackai-codex-mix-low",
+      "providerId": "blackai",
+      "providerAccountId": "founder-blackai-account",
+      "displayName": "BlackAI / codex混合渠道--低价1x",
+      "routingGroupName": "codex混合渠道--低价1x",
+      "routingGroupSlug": "codex_mix_low",
+      "protocolCandidates": [
+        "responses"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_BLACKAI_CODEX_MIX_LOW_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_BLACKAI_CODEX_MIX_LOW_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [
+        "ACU_CHANNEL_BLACKAI_CODEX_MIX_LOW_FALLBACK_1_BASE_URL",
+        "ACU_CHANNEL_BLACKAI_CODEX_MIX_LOW_FALLBACK_2_BASE_URL"
+      ],
+      "rechargeCashRatioCnyPerCreditUsd": null,
+      "effectiveCostStatus": "missing",
+      "effectiveCostSource": "Exact BlackAI purchase batch is not available in machine-readable configuration",
+      "observedBillingMultiplier": 1,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "blackai-pro-1-4",
+      "providerId": "blackai",
+      "providerAccountId": "founder-blackai-account",
+      "displayName": "BlackAI / 纯pro渠道1.4x",
+      "routingGroupName": "纯pro渠道1.4x",
+      "routingGroupSlug": "pro_1_4",
+      "protocolCandidates": [
+        "responses"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_BLACKAI_PRO_1_4_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_BLACKAI_PRO_1_4_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [
+        "ACU_CHANNEL_BLACKAI_PRO_1_4_FALLBACK_1_BASE_URL",
+        "ACU_CHANNEL_BLACKAI_PRO_1_4_FALLBACK_2_BASE_URL"
+      ],
+      "rechargeCashRatioCnyPerCreditUsd": null,
+      "effectiveCostStatus": "missing",
+      "effectiveCostSource": "Exact BlackAI purchase batch is not available in machine-readable configuration",
+      "observedBillingMultiplier": 1.4,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "blackai-claude-reverse",
+      "providerId": "blackai",
+      "providerAccountId": "founder-blackai-account",
+      "displayName": "BlackAI / claude-code逆向1x",
+      "routingGroupName": "claude-code逆向1x",
+      "routingGroupSlug": "claude_reverse",
+      "protocolCandidates": [
+        "messages"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_BLACKAI_CLAUDE_REVERSE_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_BLACKAI_CLAUDE_REVERSE_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [
+        "ACU_CHANNEL_BLACKAI_CLAUDE_REVERSE_FALLBACK_1_BASE_URL",
+        "ACU_CHANNEL_BLACKAI_CLAUDE_REVERSE_FALLBACK_2_BASE_URL"
+      ],
+      "rechargeCashRatioCnyPerCreditUsd": null,
+      "effectiveCostStatus": "missing",
+      "effectiveCostSource": "Exact BlackAI purchase batch is not available in machine-readable configuration",
+      "observedBillingMultiplier": 1,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "blackai-grok",
+      "providerId": "blackai",
+      "providerAccountId": "founder-blackai-account",
+      "displayName": "BlackAI / grok 1x",
+      "routingGroupName": "grok 1x",
+      "routingGroupSlug": "grok",
+      "protocolCandidates": [
+        "responses"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_BLACKAI_GROK_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_BLACKAI_GROK_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [
+        "ACU_CHANNEL_BLACKAI_GROK_FALLBACK_1_BASE_URL",
+        "ACU_CHANNEL_BLACKAI_GROK_FALLBACK_2_BASE_URL"
+      ],
+      "rechargeCashRatioCnyPerCreditUsd": null,
+      "effectiveCostStatus": "missing",
+      "effectiveCostSource": "Exact BlackAI purchase batch is not available in machine-readable configuration",
+      "observedBillingMultiplier": 1,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "blackai-image",
+      "providerId": "blackai",
+      "providerAccountId": "founder-blackai-account",
+      "displayName": "BlackAI / 生图 1.4x",
+      "routingGroupName": "生图 1.4x",
+      "routingGroupSlug": "image",
+      "protocolCandidates": [
+        "images"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_BLACKAI_IMAGE_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_BLACKAI_IMAGE_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [
+        "ACU_CHANNEL_BLACKAI_IMAGE_FALLBACK_1_BASE_URL",
+        "ACU_CHANNEL_BLACKAI_IMAGE_FALLBACK_2_BASE_URL"
+      ],
+      "rechargeCashRatioCnyPerCreditUsd": null,
+      "effectiveCostStatus": "missing",
+      "effectiveCostSource": "Exact BlackAI purchase batch is not available in machine-readable configuration",
+      "observedBillingMultiplier": 1.4,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "blackai-codex-mix-pro-fallback",
+      "providerId": "blackai",
+      "providerAccountId": "founder-blackai-account",
+      "displayName": "BlackAI / codex混合渠道_现在暂时pro兜底，其他渠道挂了 1x",
+      "routingGroupName": "codex混合渠道_现在暂时pro兜底，其他渠道挂了 1x",
+      "routingGroupSlug": "codex_mix_pro_fallback",
+      "protocolCandidates": [
+        "responses"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_BLACKAI_CODEX_MIX_PRO_FALLBACK_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_BLACKAI_CODEX_MIX_PRO_FALLBACK_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [
+        "ACU_CHANNEL_BLACKAI_CODEX_MIX_PRO_FALLBACK_FALLBACK_1_BASE_URL",
+        "ACU_CHANNEL_BLACKAI_CODEX_MIX_PRO_FALLBACK_FALLBACK_2_BASE_URL"
+      ],
+      "rechargeCashRatioCnyPerCreditUsd": null,
+      "effectiveCostStatus": "missing",
+      "effectiveCostSource": "Exact BlackAI purchase batch is not available in machine-readable configuration",
+      "observedBillingMultiplier": 1,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-cn-image-010",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / 国产只能生图-3毛一张 0.1x",
+      "routingGroupName": "国产只能生图-3毛一张 0.1x",
+      "routingGroupSlug": "cn_image_010",
+      "protocolCandidates": [
+        "images"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_CN_IMAGE_010_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_CN_IMAGE_010_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.1,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-cn-models-k3-015",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / 国模-非官方-有k3-0.15x",
+      "routingGroupName": "国模-非官方-有k3-0.15x",
+      "routingGroupSlug": "cn_models_k3_015",
+      "protocolCandidates": [
+        "responses"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_CN_MODELS_K3_015_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_CN_MODELS_K3_015_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.15,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-grok-020",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / 稳定grok-020-0.2x",
+      "routingGroupName": "稳定grok-020-0.2x",
+      "routingGroupSlug": "grok_020",
+      "protocolCandidates": [
+        "responses"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_GROK_020_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_GROK_020_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.2,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-image-003",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / 只能api生图分组-3分一张-0.03x",
+      "routingGroupName": "只能api生图分组-3分一张-0.03x",
+      "routingGroupSlug": "image_003",
+      "protocolCandidates": [
+        "images"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_IMAGE_003_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_IMAGE_003_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.03,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-image-006",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / 只能api生图分组-6分一张-0.06x",
+      "routingGroupName": "只能api生图分组-6分一张-0.06x",
+      "routingGroupSlug": "image_006",
+      "protocolCandidates": [
+        "images"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_IMAGE_006_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_IMAGE_006_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.06,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-image-008",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / 只能api生图分组-高质量-8分一张-0.08x",
+      "routingGroupName": "只能api生图分组-高质量-8分一张-0.08x",
+      "routingGroupSlug": "image_008",
+      "protocolCandidates": [
+        "images"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_IMAGE_008_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_IMAGE_008_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.08,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-claude-clone-020",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / cc-高仿山寨0.2",
+      "routingGroupName": "cc-高仿山寨0.2",
+      "routingGroupSlug": "claude_clone_020",
+      "protocolCandidates": [
+        "messages"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_CLAUDE_CLONE_020_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_CLAUDE_CLONE_020_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": null,
+      "multiplierStatus": "unknown",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-claude-cursor-reverse-030",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / cc-cursur-逆向-0.3x",
+      "routingGroupName": "cc-cursur-逆向-0.3x",
+      "routingGroupSlug": "claude_cursor_reverse_030",
+      "protocolCandidates": [
+        "messages"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_CLAUDE_CURSOR_REVERSE_030_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_CLAUDE_CURSOR_REVERSE_030_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.3,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-cx003-low",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / cx003-低价",
+      "routingGroupName": "cx003-低价",
+      "routingGroupSlug": "cx003_low",
+      "protocolCandidates": [
+        "responses"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_CX003_LOW_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_CX003_LOW_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": null,
+      "multiplierStatus": "unknown",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-cx004-low-dedicated",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / cx004-低价独立线路-0.04x",
+      "routingGroupName": "cx004-低价独立线路-0.04x",
+      "routingGroupSlug": "cx004_low_dedicated",
+      "protocolCandidates": [
+        "responses"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_CX004_LOW_DEDICATED_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_CX004_LOW_DEDICATED_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.04,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-cx006-value-dynamic",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / cx006-性价比-动态调价-0.06x",
+      "routingGroupName": "cx006-性价比-动态调价-0.06x",
+      "routingGroupSlug": "cx006_value_dynamic",
+      "protocolCandidates": [
+        "responses"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_CX006_VALUE_DYNAMIC_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_CX006_VALUE_DYNAMIC_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.06,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "active",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-cx006-plus",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / cx-006-plus-0.06x",
+      "routingGroupName": "cx-006-plus-0.06x",
+      "routingGroupSlug": "cx006_plus",
+      "protocolCandidates": [
+        "responses"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_CX006_PLUS_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_CX006_PLUS_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.06,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "active",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-cx008-plus-dedicated",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / cx008-plus-独立线路-0.08x",
+      "routingGroupName": "cx008-plus-独立线路-0.08x",
+      "routingGroupSlug": "cx008_plus_dedicated",
+      "protocolCandidates": [
+        "responses"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_CX008_PLUS_DEDICATED_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_CX008_PLUS_DEDICATED_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.08,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "active",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-cx010-plus-fast",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / cx010-plus-极速-0.1x",
+      "routingGroupName": "cx010-plus-极速-0.1x",
+      "routingGroupSlug": "cx010_plus_fast",
+      "protocolCandidates": [
+        "responses"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_CX010_PLUS_FAST_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_CX010_PLUS_FAST_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.1,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-cx012-pro",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / cx012-pro-0.12x",
+      "routingGroupName": "cx012-pro-0.12x",
+      "routingGroupSlug": "cx012_pro",
+      "protocolCandidates": [
+        "responses"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_CX012_PRO_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_CX012_PRO_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.12,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-cx014-pro-stable",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / cx014-pro-保不断-0.14x",
+      "routingGroupName": "cx014-pro-保不断-0.14x",
+      "routingGroupSlug": "cx014_pro_stable",
+      "protocolCandidates": [
+        "responses"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_CX014_PRO_STABLE_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_CX014_PRO_STABLE_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.14,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-cx017-pro-first-token",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / cx017-pro-保首字,不断-0.17x",
+      "routingGroupName": "cx017-pro-保首字,不断-0.17x",
+      "routingGroupSlug": "cx017_pro_first_token",
+      "protocolCandidates": [
+        "responses"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_CX017_PRO_FIRST_TOKEN_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_CX017_PRO_FIRST_TOKEN_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.17,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-cx025-pro-premium",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / cx025-pro-尊享-0.25x",
+      "routingGroupName": "cx025-pro-尊享-0.25x",
+      "routingGroupSlug": "cx025_pro_premium",
+      "protocolCandidates": [
+        "responses"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_CX025_PRO_PREMIUM_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_CX025_PRO_PREMIUM_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.25,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-gemini-image-008",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / gemini生图-1/4k-0.08x",
+      "routingGroupName": "gemini生图-1/4k-0.08x",
+      "routingGroupSlug": "gemini_image_008",
+      "protocolCandidates": [
+        "images"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_GEMINI_IMAGE_008_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_GEMINI_IMAGE_008_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.08,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-gemini-image-007",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / gemeni生图1k/2k-0.07x",
+      "routingGroupName": "gemeni生图1k/2k-0.07x",
+      "routingGroupSlug": "gemini_image_007",
+      "protocolCandidates": [
+        "images"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_GEMINI_IMAGE_007_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_GEMINI_IMAGE_007_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.07,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-claude-aws-reverse-040",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / no.11-cc-aws逆向-0.4",
+      "routingGroupName": "no.11-cc-aws逆向-0.4",
+      "routingGroupSlug": "claude_aws_reverse_040",
+      "protocolCandidates": [
+        "messages"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_CLAUDE_AWS_REVERSE_040_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_CLAUDE_AWS_REVERSE_040_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.4,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-claude-max-090",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / no.12-ccmax-0.9",
+      "routingGroupName": "no.12-ccmax-0.9",
+      "routingGroupSlug": "claude_max_090",
+      "protocolCandidates": [
+        "messages"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_CLAUDE_MAX_090_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_CLAUDE_MAX_090_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.9,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-claude-antigravity-reverse-040",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / no.13-cc-anti反重力逆向-0.4",
+      "routingGroupName": "no.13-cc-anti反重力逆向-0.4",
+      "routingGroupSlug": "claude_antigravity_reverse_040",
+      "protocolCandidates": [
+        "messages"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_CLAUDE_ANTIGRAVITY_REVERSE_040_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_CLAUDE_ANTIGRAVITY_REVERSE_040_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.4,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-gemini-openai-030",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / gemini-低道德-0.3x-openai协议",
+      "routingGroupName": "gemini-低道德-0.3x-openai协议",
+      "routingGroupSlug": "gemini_openai_030",
+      "protocolCandidates": [
+        "responses"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_GEMINI_OPENAI_030_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_GEMINI_OPENAI_030_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.3,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-mainstream-cn-claude-030",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / no.15-主流国产-cc协议-0.3x",
+      "routingGroupName": "no.15-主流国产-cc协议-0.3x",
+      "routingGroupSlug": "mainstream_cn_claude_030",
+      "protocolCandidates": [
+        "messages"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_MAINSTREAM_CN_CLAUDE_030_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_MAINSTREAM_CN_CLAUDE_030_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.3,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-grok-openai-006",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / grok-openai协议-0.06",
+      "routingGroupName": "grok-openai协议-0.06",
+      "routingGroupSlug": "grok_openai_006",
+      "protocolCandidates": [
+        "responses"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_GROK_OPENAI_006_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_GROK_OPENAI_006_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.06,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-kiro-cache-claude-015",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / kiro高缓存-玄学-cc协议-0.15x",
+      "routingGroupName": "kiro高缓存-玄学-cc协议-0.15x",
+      "routingGroupSlug": "kiro_cache_claude_015",
+      "protocolCandidates": [
+        "messages"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_KIRO_CACHE_CLAUDE_015_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_KIRO_CACHE_CLAUDE_015_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.15,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-glm-official-claude-030",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / glm官方key专线-cc协议-0.3",
+      "routingGroupName": "glm官方key专线-cc协议-0.3",
+      "routingGroupSlug": "glm_official_claude_030",
+      "protocolCandidates": [
+        "messages"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_GLM_OFFICIAL_CLAUDE_030_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_GLM_OFFICIAL_CLAUDE_030_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.3,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-glm-official-openai-030",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / glm官方key-openai协议-0.3x",
+      "routingGroupName": "glm官方key-openai协议-0.3x",
+      "routingGroupSlug": "glm_official_openai_030",
+      "protocolCandidates": [
+        "responses"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_GLM_OFFICIAL_OPENAI_030_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_GLM_OFFICIAL_OPENAI_030_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.3,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-qwen-official-claude-010",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / qwen官方key专线-cc协议-0.1x",
+      "routingGroupName": "qwen官方key专线-cc协议-0.1x",
+      "routingGroupSlug": "qwen_official_claude_010",
+      "protocolCandidates": [
+        "messages"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_QWEN_OFFICIAL_CLAUDE_010_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_QWEN_OFFICIAL_CLAUDE_010_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.1,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-qwen-official-openai-010",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / qwen官方key-openai协议-0.1x",
+      "routingGroupName": "qwen官方key-openai协议-0.1x",
+      "routingGroupSlug": "qwen_official_openai_010",
+      "protocolCandidates": [
+        "responses"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_QWEN_OFFICIAL_OPENAI_010_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_QWEN_OFFICIAL_OPENAI_010_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.1,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-grok-006",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / grok-0.06",
+      "routingGroupName": "grok-0.06",
+      "routingGroupSlug": "grok_006",
+      "protocolCandidates": [
+        "responses"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_GROK_006_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_GROK_006_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.06,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-deepseek-openai-050",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / deepseek-openai协议-0.5",
+      "routingGroupName": "deepseek-openai协议-0.5",
+      "routingGroupSlug": "deepseek_openai_050",
+      "protocolCandidates": [
+        "responses"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_DEEPSEEK_OPENAI_050_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_DEEPSEEK_OPENAI_050_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.5,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-deepseek-claude-050",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / deepseek-cc协议-0.5",
+      "routingGroupName": "deepseek-cc协议-0.5",
+      "routingGroupSlug": "deepseek_claude_050",
+      "protocolCandidates": [
+        "messages"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_DEEPSEEK_CLAUDE_050_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_DEEPSEEK_CLAUDE_050_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.5,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-kimi-k3-claude-040",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / kimi-k3专线-cc协议-0.4",
+      "routingGroupName": "kimi-k3专线-cc协议-0.4",
+      "routingGroupSlug": "kimi_k3_claude_040",
+      "protocolCandidates": [
+        "messages"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_KIMI_K3_CLAUDE_040_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_KIMI_K3_CLAUDE_040_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.4,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-kimi-k3-openai-040",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / kimi-k3-openai协议-0.4x",
+      "routingGroupName": "kimi-k3-openai协议-0.4x",
+      "routingGroupSlug": "kimi_k3_openai_040",
+      "protocolCandidates": [
+        "responses"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_KIMI_K3_OPENAI_040_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_KIMI_K3_OPENAI_040_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.4,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-kiro-cache90-claude-006",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / cc协议-kiro缓存90%-0.06x",
+      "routingGroupName": "cc协议-kiro缓存90%-0.06x",
+      "routingGroupSlug": "kiro_cache90_claude_006",
+      "protocolCandidates": [
+        "messages"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_KIRO_CACHE90_CLAUDE_006_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_KIRO_CACHE90_CLAUDE_006_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.06,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-kiro-cache70-claude-006",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / cc协议-kiro-70%缓存-0.06",
+      "routingGroupName": "cc协议-kiro-70%缓存-0.06",
+      "routingGroupSlug": "kiro_cache70_claude_006",
+      "protocolCandidates": [
+        "messages"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_KIRO_CACHE70_CLAUDE_006_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_KIRO_CACHE70_CLAUDE_006_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.06,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-claude-max-unlimited-100",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / ccmax-不限-检测双100-1x",
+      "routingGroupName": "ccmax-不限-检测双100-1x",
+      "routingGroupSlug": "claude_max_unlimited_100",
+      "protocolCandidates": [
+        "messages"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_CLAUDE_MAX_UNLIMITED_100_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_CLAUDE_MAX_UNLIMITED_100_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 1,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    },
+    {
+      "channelId": "lucen-gemini-reverse-native-030",
+      "providerId": "lucen",
+      "providerAccountId": "founder-lucen-account",
+      "displayName": "Lucen / gemini逆向-gemini协议-0.3",
+      "routingGroupName": "gemini逆向-gemini协议-0.3",
+      "routingGroupSlug": "gemini_reverse_native_030",
+      "protocolCandidates": [
+        "gemini_native"
+      ],
+      "apiKeyEnv": "ACU_CHANNEL_LUCEN_GEMINI_REVERSE_NATIVE_030_API_KEY",
+      "primaryBaseUrlEnv": "ACU_CHANNEL_LUCEN_GEMINI_REVERSE_NATIVE_030_BASE_URL",
+      "networkFallbackBaseUrlEnvs": [],
+      "rechargeCashRatioCnyPerCreditUsd": 1,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
+      "observedBillingMultiplier": 0.3,
+      "multiplierStatus": "observed",
+      "enabled": true,
+      "discoveryStatus": "success",
+      "activationStatus": "inactive",
+      "notes": [
+        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+      ]
+    }
+  ]
+}

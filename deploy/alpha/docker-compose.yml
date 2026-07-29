@@ -43,16 +43,16 @@ services:
       PGPASSWORD: ${POSTGRES_ACU_PASSWORD:?set POSTGRES_ACU_PASSWORD}
     volumes:
       - ../../migrations/acu/0001_alpha_p0.sql:/migration/0001_alpha_p0.sql:ro
+      - ../../migrations/acu/0002_provider_channel_health.sql:/migration/0002_provider_channel_health.sql:ro
     networks: [alpha-backend]
     command:
       - /bin/sh
       - -ec
       - |
-        if [ "$$(psql -h postgres-acu -U acu_alpha -d acu_alpha -tAc "SELECT to_regclass('public.acu_sessions')")" = "acu_sessions" ]; then
-          echo "ACU migration already applied"
-        else
+        if [ "$$(psql -h postgres-acu -U acu_alpha -d acu_alpha -tAc "SELECT to_regclass('public.acu_sessions')")" != "acu_sessions" ]; then
           psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0001_alpha_p0.sql
         fi
+        psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0002_provider_channel_health.sql
 
   newapi-codex-pool-sync:
     image: postgres:16-alpine
@@ -96,13 +96,13 @@ services:
       CLOSEAI_OPENAI_BASE_URL: ${CLOSEAI_OPENAI_BASE_URL:-https://api.openai-proxy.org/v1}
       CLOSEAI_ANTHROPIC_BASE_URL: ${CLOSEAI_ANTHROPIC_BASE_URL:-https://api.openai-proxy.org/anthropic}
       CLOSEAI_API_KEY: ${CLOSEAI_API_KEY:?set CLOSEAI_API_KEY}
-      LUCEN_BASE_URL: ${LUCEN_BASE_URL:-https://lucen.cc}
-      LUCEN_API_KEY: ${LUCEN_API_KEY:?set LUCEN_API_KEY}
-      BLACKAI_BASE_URL: ${BLACKAI_BASE_URL:-https://blackaicoding.com}
-      BLACKAI_API_KEY: ${BLACKAI_API_KEY:?set BLACKAI_API_KEY}
+    env_file:
+      - ../../.env
     volumes:
       - ./execution-profiles.json:/app/config/execution-profiles.json:ro
       - ./provider-economics.json:/app/config/provider-economics.json:ro
+      - ./provider-channels.json:/app/config/provider-channels.json:ro
+      - ./provider-model-profiles.json:/app/config/provider-model-profiles.json:ro
       - acu-runtime-data:/var/lib/acu
     expose: ["8403"]
     networks: [alpha-backend]

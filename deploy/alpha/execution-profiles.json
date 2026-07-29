@@ -1,175 +1,135 @@
 [
   {
-    "executionProfileId": "lucen-gpt-5.4-mini-responses-economy",
-    "modelId": "gpt-5.4-mini",
-    "providerModelId": "gpt-5.4-mini",
-    "actualModelAliases": ["gpt-5.4-mini-2026-03-17"],
-    "provider": "lucen",
-    "channel": "lucen-openai-primary",
-    "protocols": ["responses"],
-    "toolCallSupport": true,
-    "supportedToolTypes": ["function", "custom", "local_tool"],
-    "thinkingSupport": true,
-    "supportedReasoningEfforts": ["low", "medium", "high"],
-    "contextWindow": 32768,
-    "health": "healthy",
-    "enabled": true,
-    "administratorAllowed": true,
-    "usageTrusted": true,
-    "recentSuccessRate": 1,
-    "observedLatencyMs": 1800,
-    "baseUrlEnv": "LUCEN_BASE_URL",
-    "apiKeyEnv": "LUCEN_API_KEY",
-    "authMode": "bearer",
-    "stripV1Path": true
-  },
-  {
-    "executionProfileId": "lucen-gpt-5.6-luna-responses-value",
+    "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.6-luna:responses",
     "modelId": "gpt-5.6-luna",
     "providerModelId": "gpt-5.6-luna",
     "provider": "lucen",
-    "channel": "lucen-openai-primary",
-    "protocols": ["responses"],
+    "channel": "lucen-cx006-value-dynamic",
+    "channelId": "lucen-cx006-value-dynamic",
+    "routingGroupName": "cx006-性价比-动态调价-0.06x",
+    "protocols": [
+      "responses"
+    ],
     "toolCallSupport": true,
-    "supportedToolTypes": ["function", "custom", "local_tool", "hosted_web_search"],
+    "supportedToolTypes": [
+      "function",
+      "custom",
+      "local_tool",
+      "hosted_web_search"
+    ],
     "thinkingSupport": true,
-    "supportedReasoningEfforts": ["low", "medium", "high"],
+    "supportedReasoningEfforts": [
+      "low",
+      "medium",
+      "high"
+    ],
     "contextWindow": 32768,
     "health": "healthy",
     "enabled": true,
     "administratorAllowed": true,
     "usageTrusted": true,
     "recentSuccessRate": 1,
-    "observedLatencyMs": 1400,
-    "baseUrlEnv": "LUCEN_BASE_URL",
-    "apiKeyEnv": "LUCEN_API_KEY",
+    "baseUrlEnv": "ACU_CHANNEL_LUCEN_CX006_VALUE_DYNAMIC_BASE_URL",
+    "networkFallbackBaseUrlEnvs": [],
+    "apiKeyEnv": "ACU_CHANNEL_LUCEN_CX006_VALUE_DYNAMIC_API_KEY",
     "authMode": "bearer",
-    "stripV1Path": true
+    "stripV1Path": true,
+    "economicsProviderId": "lucen",
+    "observedBillingMultiplier": 0.06,
+    "effectiveCostStatus": "estimated"
   },
   {
-    "executionProfileId": "lucen-gpt-5.6-terra-responses-strong",
-    "modelId": "gpt-5.6-terra",
-    "providerModelId": "gpt-5.6-terra",
-    "provider": "lucen",
-    "channel": "lucen-openai-primary",
-    "protocols": ["responses"],
-    "toolCallSupport": true,
-    "supportedToolTypes": ["function", "custom", "local_tool"],
-    "thinkingSupport": true,
-    "supportedReasoningEfforts": ["low", "medium", "high"],
-    "contextWindow": 32768,
-    "health": "healthy",
-    "enabled": true,
-    "administratorAllowed": true,
-    "usageTrusted": true,
-    "recentSuccessRate": 1,
-    "observedLatencyMs": 1500,
-    "baseUrlEnv": "LUCEN_BASE_URL",
-    "apiKeyEnv": "LUCEN_API_KEY",
-    "authMode": "bearer",
-    "stripV1Path": true
-  },
-  {
-    "executionProfileId": "blackai-gpt-5.4-mini-responses-economy",
-    "modelId": "gpt-5.4-mini",
-    "providerModelId": "gpt-5.4-mini",
-    "actualModelAliases": ["gpt-5.4-mini-2026-03-17"],
-    "provider": "blackai",
-    "channel": "blackai-openai-primary",
-    "protocols": ["responses"],
-    "toolCallSupport": true,
-    "supportedToolTypes": ["function", "custom", "local_tool"],
-    "thinkingSupport": true,
-    "supportedReasoningEfforts": ["low", "medium", "high"],
-    "contextWindow": 32768,
-    "health": "healthy",
-    "enabled": true,
-    "administratorAllowed": true,
-    "usageTrusted": true,
-    "recentSuccessRate": 1,
-    "observedLatencyMs": 1500,
-    "baseUrlEnv": "BLACKAI_BASE_URL",
-    "apiKeyEnv": "BLACKAI_API_KEY",
-    "authMode": "bearer",
-    "stripV1Path": true
-  },
-  {
-    "executionProfileId": "blackai-gpt-5.6-luna-responses-value",
+    "executionProfileId": "lucen-cx006-plus:gpt-5.6-luna:responses",
     "modelId": "gpt-5.6-luna",
     "providerModelId": "gpt-5.6-luna",
-    "provider": "blackai",
-    "channel": "blackai-openai-primary",
-    "protocols": ["responses"],
+    "provider": "lucen",
+    "channel": "lucen-cx006-plus",
+    "channelId": "lucen-cx006-plus",
+    "routingGroupName": "cx-006-plus-0.06x",
+    "protocols": [
+      "responses"
+    ],
     "toolCallSupport": true,
-    "supportedToolTypes": ["function", "custom", "local_tool"],
+    "supportedToolTypes": [
+      "function",
+      "custom",
+      "local_tool",
+      "hosted_web_search"
+    ],
     "thinkingSupport": true,
-    "supportedReasoningEfforts": ["low", "medium", "high"],
+    "supportedReasoningEfforts": [
+      "low",
+      "medium",
+      "high"
+    ],
     "contextWindow": 32768,
     "health": "healthy",
     "enabled": true,
     "administratorAllowed": true,
     "usageTrusted": true,
     "recentSuccessRate": 1,
-    "observedLatencyMs": 1500,
-    "baseUrlEnv": "BLACKAI_BASE_URL",
-    "apiKeyEnv": "BLACKAI_API_KEY",
+    "baseUrlEnv": "ACU_CHANNEL_LUCEN_CX006_PLUS_BASE_URL",
+    "networkFallbackBaseUrlEnvs": [],
+    "apiKeyEnv": "ACU_CHANNEL_LUCEN_CX006_PLUS_API_KEY",
     "authMode": "bearer",
-    "stripV1Path": true
+    "stripV1Path": true,
+    "economicsProviderId": "lucen",
+    "observedBillingMultiplier": 0.06,
+    "effectiveCostStatus": "estimated"
   },
   {
-    "executionProfileId": "blackai-gpt-5.6-terra-responses-strong",
-    "modelId": "gpt-5.6-terra",
-    "providerModelId": "gpt-5.6-terra",
-    "provider": "blackai",
-    "channel": "blackai-openai-primary",
-    "protocols": ["responses"],
+    "executionProfileId": "lucen-cx008-plus-dedicated:gpt-5.6-luna:responses",
+    "modelId": "gpt-5.6-luna",
+    "providerModelId": "gpt-5.6-luna",
+    "provider": "lucen",
+    "channel": "lucen-cx008-plus-dedicated",
+    "channelId": "lucen-cx008-plus-dedicated",
+    "routingGroupName": "cx008-plus-独立线路-0.08x",
+    "protocols": [
+      "responses"
+    ],
     "toolCallSupport": true,
-    "supportedToolTypes": ["function", "custom", "local_tool"],
+    "supportedToolTypes": [
+      "function",
+      "custom",
+      "local_tool",
+      "hosted_web_search"
+    ],
     "thinkingSupport": true,
-    "supportedReasoningEfforts": ["low", "medium", "high"],
+    "supportedReasoningEfforts": [
+      "low",
+      "medium",
+      "high"
+    ],
     "contextWindow": 32768,
     "health": "healthy",
     "enabled": true,
     "administratorAllowed": true,
     "usageTrusted": true,
     "recentSuccessRate": 1,
-    "observedLatencyMs": 1500,
-    "baseUrlEnv": "BLACKAI_BASE_URL",
-    "apiKeyEnv": "BLACKAI_API_KEY",
+    "baseUrlEnv": "ACU_CHANNEL_LUCEN_CX008_PLUS_DEDICATED_BASE_URL",
+    "networkFallbackBaseUrlEnvs": [],
+    "apiKeyEnv": "ACU_CHANNEL_LUCEN_CX008_PLUS_DEDICATED_API_KEY",
     "authMode": "bearer",
-    "stripV1Path": true
-  },
-  {
-    "executionProfileId": "blackai-gpt-5.6-sol-responses-recovery",
-    "modelId": "gpt-5.6-sol",
-    "providerModelId": "gpt-5.6-sol",
-    "provider": "blackai",
-    "channel": "blackai-openai-primary",
-    "protocols": ["responses"],
-    "toolCallSupport": true,
-    "supportedToolTypes": ["function", "custom", "local_tool"],
-    "thinkingSupport": true,
-    "supportedReasoningEfforts": ["low", "medium", "high"],
-    "contextWindow": 32768,
-    "health": "healthy",
-    "enabled": true,
-    "administratorAllowed": true,
-    "usageTrusted": true,
-    "recentSuccessRate": 1,
-    "observedLatencyMs": 1500,
-    "baseUrlEnv": "BLACKAI_BASE_URL",
-    "apiKeyEnv": "BLACKAI_API_KEY",
-    "authMode": "bearer",
-    "stripV1Path": true
+    "stripV1Path": true,
+    "economicsProviderId": "lucen",
+    "observedBillingMultiplier": 0.08,
+    "effectiveCostStatus": "estimated"
   },
   {
     "executionProfileId": "closeai-gpt-5.4-mini-responses-economy",
     "modelId": "gpt-5.4-mini",
     "provider": "closeai",
     "channel": "closeai-openai-primary",
-    "protocols": ["responses"],
+    "protocols": [
+      "responses"
+    ],
     "toolCallSupport": true,
-    "supportedToolTypes": ["function", "custom", "local_tool"],
+    "supportedToolTypes": [
+      "function",
+      "custom",
+      "local_tool"
+    ],
     "thinkingSupport": true,
     "contextWindow": 32768,
     "health": "healthy",
@@ -184,9 +144,16 @@
     "modelId": "gpt-5.6-luna",
     "provider": "closeai",
     "channel": "closeai-openai-primary",
-    "protocols": ["responses"],
+    "protocols": [
+      "responses"
+    ],
     "toolCallSupport": true,
-    "supportedToolTypes": ["function", "custom", "local_tool", "hosted_web_search"],
+    "supportedToolTypes": [
+      "function",
+      "custom",
+      "local_tool",
+      "hosted_web_search"
+    ],
     "thinkingSupport": true,
     "contextWindow": 32768,
     "health": "healthy",
@@ -201,9 +168,15 @@
     "modelId": "gpt-5.6-terra",
     "provider": "closeai",
     "channel": "closeai-openai-primary",
-    "protocols": ["responses"],
+    "protocols": [
+      "responses"
+    ],
     "toolCallSupport": true,
-    "supportedToolTypes": ["function", "custom", "local_tool"],
+    "supportedToolTypes": [
+      "function",
+      "custom",
+      "local_tool"
+    ],
     "thinkingSupport": true,
     "contextWindow": 32768,
     "health": "healthy",
@@ -218,9 +191,15 @@
     "modelId": "gpt-5.5",
     "provider": "closeai",
     "channel": "closeai-openai-primary",
-    "protocols": ["responses"],
+    "protocols": [
+      "responses"
+    ],
     "toolCallSupport": true,
-    "supportedToolTypes": ["function", "custom", "local_tool"],
+    "supportedToolTypes": [
+      "function",
+      "custom",
+      "local_tool"
+    ],
     "thinkingSupport": true,
     "contextWindow": 32768,
     "health": "healthy",
@@ -235,9 +214,15 @@
     "modelId": "gpt-5.6-sol",
     "provider": "closeai",
     "channel": "closeai-openai-primary",
-    "protocols": ["responses"],
+    "protocols": [
+      "responses"
+    ],
     "toolCallSupport": true,
-    "supportedToolTypes": ["function", "custom", "local_tool"],
+    "supportedToolTypes": [
+      "function",
+      "custom",
+      "local_tool"
+    ],
     "thinkingSupport": true,
     "contextWindow": 32768,
     "health": "healthy",
@@ -252,9 +237,13 @@
     "modelId": "gpt-5.4-mini",
     "provider": "closeai",
     "channel": "closeai-anthropic-primary",
-    "protocols": ["messages"],
+    "protocols": [
+      "messages"
+    ],
     "toolCallSupport": true,
-    "supportedToolTypes": ["function"],
+    "supportedToolTypes": [
+      "function"
+    ],
     "thinkingSupport": true,
     "contextWindow": 32768,
     "health": "healthy",
@@ -270,9 +259,13 @@
     "modelId": "gpt-5.6-luna",
     "provider": "closeai",
     "channel": "closeai-anthropic-primary",
-    "protocols": ["messages"],
+    "protocols": [
+      "messages"
+    ],
     "toolCallSupport": true,
-    "supportedToolTypes": ["function"],
+    "supportedToolTypes": [
+      "function"
+    ],
     "thinkingSupport": true,
     "contextWindow": 32768,
     "health": "healthy",
@@ -288,9 +281,13 @@
     "modelId": "gpt-5.6-terra",
     "provider": "closeai",
     "channel": "closeai-anthropic-primary",
-    "protocols": ["messages"],
+    "protocols": [
+      "messages"
+    ],
     "toolCallSupport": true,
-    "supportedToolTypes": ["function"],
+    "supportedToolTypes": [
+      "function"
+    ],
     "thinkingSupport": true,
     "contextWindow": 32768,
     "health": "healthy",
@@ -306,9 +303,13 @@
     "modelId": "claude-sonnet-5",
     "provider": "closeai",
     "channel": "closeai-anthropic-primary",
-    "protocols": ["messages"],
+    "protocols": [
+      "messages"
+    ],
     "toolCallSupport": true,
-    "supportedToolTypes": ["function"],
+    "supportedToolTypes": [
+      "function"
+    ],
     "thinkingSupport": true,
     "contextWindow": 65536,
     "health": "healthy",
@@ -324,9 +325,13 @@
     "modelId": "claude-opus-4-8",
     "provider": "closeai",
     "channel": "closeai-anthropic-primary",
-    "protocols": ["messages"],
+    "protocols": [
+      "messages"
+    ],
     "toolCallSupport": true,
-    "supportedToolTypes": ["function"],
+    "supportedToolTypes": [
+      "function"
+    ],
     "thinkingSupport": true,
     "contextWindow": 65536,
     "health": "healthy",
@@ -342,9 +347,13 @@
     "modelId": "gpt-5.5",
     "provider": "closeai",
     "channel": "closeai-anthropic-primary",
-    "protocols": ["messages"],
+    "protocols": [
+      "messages"
+    ],
     "toolCallSupport": true,
-    "supportedToolTypes": ["function"],
+    "supportedToolTypes": [
+      "function"
+    ],
     "thinkingSupport": true,
     "contextWindow": 32768,
     "health": "healthy",

@@ -24,7 +24,9 @@ import {
   createRecoveringProviderAdapter,
   type BufferedProviderFailure,
   type ProviderAttemptHandle,
+  type ProviderRecoveryTarget,
 } from "./execution.js";
+import { applyAttemptOutcome, classifyAttemptOutcome, type AttemptOutcome, type HealthSnapshot } from "./channel-health.js";
 
 const POLICY_VERSION = "alpha-p0-policy-v1";
 const QUALITY_CURVE_VERSION = "acu-catalog-v0.1";
@@ -36,6 +38,7 @@ export type AlphaProcessorOptions = {
   database: AlphaDatabase;
   profiles: AlphaExecutionProfile[];
   adapters: Map<string, NativeProviderAdapter>;
+  networkAdapters?: Map<string, Array<{ endpoint: string; adapter: NativeProviderAdapter }>>;
   judgeRunner: AlphaJudgeRunner;
   maxUnjudgedModelResponses?: number;
   expectedOutputTokens?: number;
@@ -55,6 +58,7 @@ export type AlphaResolutionContext = {
   protocol: AlphaProtocol;
   reasoningEffort?: string;
   selectedProfile: AlphaExecutionProfile;
+  networkEndpoint?: string;
   judgeCostUsd: string;
   requestBytes: number;
   replayed: boolean;
@@ -280,6 +284,25 @@ export class AlphaRequestProcessor {
     this.expectedOutputTokens = options.expectedOutputTokens ?? 800;
   }
 
+  private async effectiveProfiles(): Promise<AlphaExecutionProfile[]> {
+    const repository = new AlphaRepository(this.options.database);
+    return Promise.all(this.options.profiles.map(async (profile) => {
+      const [channel, runtime] = await Promise.all([
+        repository.channelHealth(profile.channelId ?? profile.channel),
+        repository.profileHealth(profile.executionProfileId),
+      ]);
+      const unavailable = [channel?.state, runtime?.state].some((state) => state === "open" || state === "disabled" || state === "half_open");
+      const degraded = [channel?.state, runtime?.state].some((state) => state === "degraded");
+      return {
+        ...profile,
+        health: unavailable ? "cooldown" as const : degraded ? "degraded" as const : profile.health,
+        usageTrusted: runtime?.usageTrusted ?? profile.usageTrusted,
+        recentSuccessRate: Math.min(channel?.recentSuccessRate ?? 1, runtime?.recentSuccessRate ?? 1),
+        observedLatencyMs: runtime?.totalLatencyMs ?? channel?.totalLatencyMs ?? profile.observedLatencyMs,
+      };
+    }));
+  }
+
   private async prepareState(
     envelope: CanonicalEnvelope,
     identity: TrustedNewApiIdentity,
@@ -477,8 +500,9 @@ export class AlphaRequestProcessor {
     rawBytes: number,
   ): Promise<{ profile: AlphaExecutionProfile; judge?: AlphaJudgeRun; route?: AlphaRouteDecision }> {
     const repository = new AlphaRepository(this.options.database);
+    const effectiveProfiles = await this.effectiveProfiles();
     if (modeForModel(envelope.requestedModel) === "explicit") {
-      const profile = resolveExplicitProfile(envelope.requestedModel, this.options.profiles, {
+      const profile = resolveExplicitProfile(envelope.requestedModel, effectiveProfiles, {
         protocol: envelope.protocol,
         requireTools: envelope.tools.length > 0,
         requiredToolTypes: envelope.requiredToolTypes,
@@ -528,7 +552,7 @@ export class AlphaRequestProcessor {
     }
 
     const storedSegment = await repository.getSegment(state.segmentId, identity.newapiUserId);
-    const storedProfile = selectedProfileFromSegment(storedSegment, this.options.profiles);
+    const storedProfile = selectedProfileFromSegment(storedSegment, effectiveProfiles);
     const policyVersionMatches = metadata(storedSegment).userRoutingPolicyVersion === identity.routingPolicyVersion;
     const reused = storedProfile
       && policyVersionMatches
@@ -560,7 +584,7 @@ export class AlphaRequestProcessor {
       contextHash,
       recentEvaluation: previousJudge,
     });
-    const judgeEconomics = this.options.profiles.find((profile) => profile.provider === judge.provider)?.economics;
+    const judgeEconomics = effectiveProfiles.find((profile) => profile.provider === judge.provider)?.economics;
     const effectiveJudgeCostCny = Number(judge.costUsd)
       * (judgeEconomics ? cashCnyPerNominalUsd(judgeEconomics) : 1);
     const route = routeWithCurrentAcuFormula({
@@ -570,7 +594,7 @@ export class AlphaRequestProcessor {
       expectedOutputTokens: this.expectedOutputTokens,
       effectiveQualityTarget: state.effectiveQualityTarget,
       routingPreference: identity.routingPreference,
-      profiles: this.options.profiles,
+      profiles: effectiveProfiles,
       requirements: {
         protocol: envelope.protocol,
         requireTools: envelope.tools.length > 0,
@@ -689,10 +713,10 @@ export class AlphaRequestProcessor {
         baseEffectiveQualityTarget: state.effectiveQualityTarget,
         userRoutingPolicyVersion: identity.routingPolicyVersion,
         allowedModelIds: identity.allowedModelIds,
-        configuredProfileCount: this.options.profiles.length,
-        protocolProfileCount: this.options.profiles.filter((profile) => profile.protocols.includes(envelope.protocol)).length,
+        configuredProfileCount: effectiveProfiles.length,
+        protocolProfileCount: effectiveProfiles.filter((profile) => profile.protocols.includes(envelope.protocol)).length,
         initialCandidateModelCount: new Set(
-          this.options.profiles
+          effectiveProfiles
             .filter((profile) => profile.protocols.includes(envelope.protocol))
             .map((profile) => profile.modelId),
         ).size,
@@ -735,10 +759,11 @@ export class AlphaRequestProcessor {
     envelope: CanonicalEnvelope,
     mode: AlphaMode,
     rawBytes: number,
+    excludedProfileIds: Set<string> = new Set(),
   ): AlphaExecutionProfile | undefined {
-    if (mode === "explicit") return current;
     const equivalent = this.options.profiles.filter((profile) => (
       profile.executionProfileId !== current.executionProfileId
+      && !excludedProfileIds.has(profile.executionProfileId)
       && profile.modelId === current.modelId
       && profile.enabled
       && profile.administratorAllowed
@@ -763,6 +788,40 @@ export class AlphaRequestProcessor {
       return leftRate - rightRate;
     })[0];
     return equivalent;
+  }
+
+  private endpoints(profile: AlphaExecutionProfile): Array<{ endpoint: string; adapter: NativeProviderAdapter }> {
+    const configured = this.options.networkAdapters?.get(profile.executionProfileId);
+    if (configured?.length) return configured;
+    const adapter = this.options.adapters.get(profile.executionProfileId);
+    return adapter ? [{ endpoint: "primary", adapter }] : [];
+  }
+
+  private async recordRuntimeHealth(profile: AlphaExecutionProfile, protocol: AlphaProtocol, outcome: AttemptOutcome): Promise<void> {
+    const repository = new AlphaRepository(this.options.database);
+    const channelId = profile.channelId ?? profile.channel;
+    const classified = classifyAttemptOutcome(outcome, (await repository.channelHealth(channelId))?.consecutiveFailures ?? 0);
+    const initial = (): HealthSnapshot => ({ state: "healthy", consecutiveFailures: 0, recentSuccessRate: 1 });
+    if (classified.scope === "channel" || outcome.success || outcome.clientCancelled) {
+      const current = await repository.channelHealth(channelId) ?? initial();
+      await repository.saveChannelHealth({ channelId, providerId: profile.provider,
+        snapshot: applyAttemptOutcome(current, outcome) });
+    }
+    if (classified.scope === "profile" || outcome.success || outcome.clientCancelled) {
+      const current = await repository.profileHealth(profile.executionProfileId) ?? initial();
+      const snapshot = applyAttemptOutcome(current, outcome);
+      await repository.saveProfileHealth({
+        executionProfileId: profile.executionProfileId,
+        channelId,
+        providerId: profile.provider,
+        canonicalModelId: profile.modelId,
+        protocol,
+        snapshot,
+        usageTrusted: classified.usageTrusted && profile.usageTrusted !== false,
+        actualModelVerified: !outcome.actualModelMismatch,
+        healthReason: classified.errorClass,
+      });
+    }
   }
 
   private async recordProviderFailure(input: {
@@ -817,6 +876,13 @@ export class AlphaRequestProcessor {
       latencyMs: input.latencyMs,
       metadata: { error: input.error instanceof Error ? input.error.message : undefined },
     });
+    await this.recordRuntimeHealth(input.attempt.profile, input.protocol, {
+      success: false,
+      httpStatus: input.response?.status,
+      errorMessage: input.error instanceof Error ? input.error.message : input.response?.body.toString("utf8", 0, 512),
+      retryAfterSeconds: input.response?.headers["retry-after"] ? Number(input.response.headers["retry-after"]) : undefined,
+      totalLatencyMs: input.latencyMs,
+    });
     await repository.insertEvent({
       eventId: alphaId("evt"),
       sessionId: input.state.sessionId,
@@ -847,11 +913,13 @@ export class AlphaRequestProcessor {
     attemptIndex: number;
     retryOwner: "acu" | "client";
     body: Buffer;
+    networkEndpointIndex?: number;
     routeDecisionId?: string;
     judgeEvaluationId?: string;
   }): Promise<ProviderAttemptHandle> {
-    const adapter = this.options.adapters.get(input.profile.executionProfileId);
-    if (!adapter) throw new Error(`No Provider adapter for ${input.profile.executionProfileId}`);
+    const endpointIndex = input.networkEndpointIndex ?? 0;
+    const endpoint = this.endpoints(input.profile)[endpointIndex];
+    if (!endpoint) throw new Error(`No Provider adapter endpoint ${endpointIndex} for ${input.profile.executionProfileId}`);
     const repository = new AlphaRepository(this.options.database);
     const attemptId = alphaId("att");
     const catalogModel = getAcuModel(input.profile.modelId);
@@ -865,6 +933,8 @@ export class AlphaRequestProcessor {
       judgeEvaluationId: input.judgeEvaluationId,
       provider: input.profile.provider,
       channel: input.profile.channel,
+      channelId: input.profile.channelId ?? input.profile.channel,
+      networkEndpoint: endpoint.endpoint,
       executionProfileId: input.profile.executionProfileId,
       requestedModel: input.requestedModel,
       actualModel: input.profile.modelId,
@@ -887,6 +957,8 @@ export class AlphaRequestProcessor {
         canonicalModel: input.profile.modelId,
         providerModel: input.profile.providerModelId ?? input.profile.modelId,
         selectedProvider: input.profile.provider,
+        channelId: input.profile.channelId ?? input.profile.channel,
+        networkEndpoint: endpoint.endpoint,
       },
     });
     if (input.attemptIndex > 1) {
@@ -909,7 +981,8 @@ export class AlphaRequestProcessor {
         },
       });
     }
-    return { attemptId, attemptIndex: input.attemptIndex, adapter, profile: input.profile, body: input.body };
+    return { attemptId, attemptIndex: input.attemptIndex, adapter: endpoint.adapter, profile: input.profile,
+      body: input.body, networkEndpointIndex: endpointIndex, networkEndpoint: endpoint.endpoint };
   }
 
   async resolveExecution(
@@ -988,7 +1061,10 @@ export class AlphaRequestProcessor {
       }
     }
     const attemptIndex = await repository.nextProviderAttemptIndex(logical.logicalRequestId);
-    if (attemptIndex > 2) throw new Error("Provider Attempt budget exhausted for logical request");
+    const maxProviderAttempts = Math.max(2, Math.min(8,
+      this.options.profiles.filter((profile) => profile.modelId === result.profile.modelId).length
+      + this.endpoints(result.profile).length - 1));
+    if (attemptIndex > maxProviderAttempts) throw new Error("Provider Attempt budget exhausted for logical request");
     let requestPayloadId: string | undefined;
     if (logical.inserted) {
       requestPayloadId = alphaId("payload");
@@ -1035,6 +1111,7 @@ export class AlphaRequestProcessor {
       protocol: envelope.protocol,
       reasoningEffort: envelope.reasoningEffort,
       selectedProfile: result.profile,
+      networkEndpoint: initialAttempt.networkEndpoint,
       judgeCostUsd: result.judge?.costUsd ?? "0.0000000000",
       requestBytes: ingress.rawBody.byteLength,
       replayed: false,
@@ -1049,13 +1126,20 @@ export class AlphaRequestProcessor {
     };
     const adapter = createRecoveringProviderAdapter({
       initial: initialAttempt,
-      maxAttempts: 2,
-      selectRecoveryProfile: (profile) => this.recoveryProfile(
-        profile,
-        envelope,
-        mode,
-        ingress.rawBody.byteLength,
-      ),
+      maxAttempts: maxProviderAttempts,
+      selectRecoveryTarget: (() => {
+        const attemptedProfiles = new Set([result.profile.executionProfileId]);
+        return (current): ProviderRecoveryTarget | undefined => {
+          const nextEndpoint = (current.networkEndpointIndex ?? 0) + 1;
+          if (nextEndpoint < this.endpoints(current.profile).length) {
+            return { profile: current.profile, networkEndpointIndex: nextEndpoint, reason: "network_endpoint_fallback" };
+          }
+          const profile = this.recoveryProfile(current.profile, envelope, mode, ingress.rawBody.byteLength, attemptedProfiles);
+          if (!profile) return undefined;
+          attemptedProfiles.add(profile.executionProfileId);
+          return { profile, networkEndpointIndex: 0, reason: "same_model_channel_fallback" };
+        };
+      })(),
       recordFailedAttempt: async ({ attempt, response, error, latencyMs }) => {
         await this.recordProviderFailure({
           identity,
@@ -1069,7 +1153,7 @@ export class AlphaRequestProcessor {
           latencyMs,
         });
       },
-      startRetry: async (profile, nextAttemptIndex) => {
+      startRetry: async (profile, nextAttemptIndex, target) => {
         const retryBody = mode === "explicit"
           ? Buffer.from(ingress.rawBody)
           : rewriteModel(ingress.rawBody, profile.providerModelId ?? profile.modelId);
@@ -1083,18 +1167,25 @@ export class AlphaRequestProcessor {
           attemptIndex: nextAttemptIndex,
           retryOwner: "acu",
           body: retryBody,
+          networkEndpointIndex: target?.networkEndpointIndex,
           routeDecisionId,
           judgeEvaluationId,
         });
         resolutionContext.attemptId = next.attemptId;
         resolutionContext.attemptIndex = next.attemptIndex;
         resolutionContext.selectedProfile = next.profile;
+        resolutionContext.networkEndpoint = next.networkEndpoint;
+        resolutionContext.routeSummary.providerSelectionReason = [
+          resolutionContext.routeSummary.providerSelectionReason,
+          `${target?.reason ?? "same_model_channel_fallback"}:${next.profile.channel}:${next.networkEndpoint ?? "primary"}`,
+        ].filter(Boolean).join("; ");
         return next;
       },
       onSelected(attempt) {
         resolutionContext.attemptId = attempt.attemptId;
         resolutionContext.attemptIndex = attempt.attemptIndex;
         resolutionContext.selectedProfile = attempt.profile;
+        resolutionContext.networkEndpoint = attempt.networkEndpoint;
       },
     });
     return {
@@ -1156,7 +1247,18 @@ export class AlphaRequestProcessor {
         provider_model: input.context.selectedProfile.providerModelId ?? input.context.selectedProfile.modelId,
         selected_provider: input.context.routeSummary.selectedProvider ?? input.context.selectedProfile.provider,
         actual_provider: input.context.selectedProfile.provider,
+        routing_group: input.context.selectedProfile.routingGroupName,
+        channel_id: input.context.selectedProfile.channelId ?? input.context.selectedProfile.channel,
+        network_endpoint: input.context.networkEndpoint,
+        circuit_state: input.context.selectedProfile.health,
+        recent_success_rate: input.context.selectedProfile.recentSuccessRate,
+        effective_cost_status: input.context.selectedProfile.effectiveCostStatus,
+        billing_multiplier: input.context.selectedProfile.economics?.observedBillingMultiplier,
         provider_selection_reason: input.context.routeSummary.providerSelectionReason,
+        model_selection_reason: input.context.routeSummary.routeReason,
+        fallback_chain: input.context.routeSummary.providerSelectionReason?.includes("fallback")
+          ? input.context.routeSummary.providerSelectionReason
+          : undefined,
         ...(() => {
           const economics = input.context.selectedProfile.economics;
           if (!economics) return {};
@@ -1203,6 +1305,11 @@ export class AlphaRequestProcessor {
         newapiUserId: context.newapiUserId,
         status: trace.status,
         errorCategory: trace.status === "cancelled" ? "client_cancelled" : "provider_error",
+      });
+      await this.recordRuntimeHealth(context.selectedProfile, context.protocol, {
+        success: false,
+        clientCancelled: trace.status === "cancelled",
+        errorMessage: trace.error instanceof Error ? trace.error.message : "provider execution failed",
       });
       await this.createFinalUsageReport({
         context,
@@ -1268,6 +1375,14 @@ export class AlphaRequestProcessor {
       providerBilled: success ? true : undefined,
       visibleOutputBytes: relay.visibleOutputBytes,
       metadata: { complete: relay.complete, clientCancelled: relay.clientCancelled },
+    });
+    const canonicalModel = canonicalActualModel(context.selectedProfile, usage.actualModel);
+    await this.recordRuntimeHealth(context.selectedProfile, context.protocol, {
+      success,
+      clientCancelled: relay.clientCancelled,
+      httpStatus: relay.httpStatus,
+      actualModelMismatch: Boolean(usage.actualModel && canonicalModel !== context.selectedProfile.modelId),
+      usageTrusted: success ? usage.usageSource === "provider_usage" : undefined,
     });
     await repository.completeLogicalRequest({
       logicalRequestId: context.logicalRequestId,

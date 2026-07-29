@@ -6,7 +6,15 @@ export type ProviderAttemptHandle = {
   attemptIndex: number;
   adapter: NativeProviderAdapter;
   profile: AlphaExecutionProfile;
+  networkEndpointIndex?: number;
+  networkEndpoint?: string;
   body?: Uint8Array;
+};
+
+export type ProviderRecoveryTarget = {
+  profile: AlphaExecutionProfile;
+  networkEndpointIndex?: number;
+  reason: "network_endpoint_fallback" | "same_model_channel_fallback";
 };
 
 export type BufferedProviderFailure = {
@@ -18,8 +26,9 @@ export type BufferedProviderFailure = {
 export type ProviderRecoveryOptions = {
   initial: ProviderAttemptHandle;
   maxAttempts?: number;
-  selectRecoveryProfile(current: AlphaExecutionProfile): AlphaExecutionProfile | undefined;
-  startRetry(profile: AlphaExecutionProfile, attemptIndex: number): Promise<ProviderAttemptHandle>;
+  selectRecoveryProfile?(current: AlphaExecutionProfile): AlphaExecutionProfile | undefined;
+  selectRecoveryTarget?(current: ProviderAttemptHandle, failure?: BufferedProviderFailure, error?: unknown): ProviderRecoveryTarget | undefined;
+  startRetry(profile: AlphaExecutionProfile, attemptIndex: number, target?: ProviderRecoveryTarget): Promise<ProviderAttemptHandle>;
   recordFailedAttempt(input: {
     attempt: ProviderAttemptHandle;
     latencyMs: number;
@@ -42,13 +51,17 @@ async function bufferFailure(response: Response): Promise<BufferedProviderFailur
 }
 
 export function createRecoveringProviderAdapter(options: ProviderRecoveryOptions): NativeProviderAdapter {
+  const legacyTarget = (profile: AlphaExecutionProfile): ProviderRecoveryTarget | undefined => {
+    const recovery = options.selectRecoveryProfile?.(profile);
+    return recovery ? { profile: recovery, reason: "same_model_channel_fallback" } : undefined;
+  };
   return {
     async execute(request: NativeProviderRequest): Promise<Response> {
       const maxAttempts = options.maxAttempts ?? 2;
       let current = options.initial;
       while (true) {
         const startedAt = Date.now();
-        let recoveryProfile: AlphaExecutionProfile | undefined;
+        let recoveryTarget: ProviderRecoveryTarget | undefined;
         try {
           const response = await current.adapter.execute({ ...request, body: current.body ?? request.body });
           if (!isRecoverableProviderStatus(response.status)
@@ -57,12 +70,12 @@ export function createRecoveringProviderAdapter(options: ProviderRecoveryOptions
             options.onSelected?.(current);
             return response;
           }
-          recoveryProfile = options.selectRecoveryProfile(current.profile);
-          if (!recoveryProfile) {
-            options.onSelected?.(current);
-            return response;
-          }
           const failure = await bufferFailure(response);
+          recoveryTarget = options.selectRecoveryTarget?.(current, failure) ?? legacyTarget(current.profile);
+          if (!recoveryTarget) {
+            options.onSelected?.(current);
+            return new Response(new Uint8Array(failure.body), { status: failure.status, headers: failure.headers });
+          }
           await options.recordFailedAttempt({
             attempt: current,
             latencyMs: Date.now() - startedAt,
@@ -70,15 +83,15 @@ export function createRecoveringProviderAdapter(options: ProviderRecoveryOptions
           });
         } catch (error) {
           if (request.signal.aborted || current.attemptIndex >= maxAttempts) throw error;
-          recoveryProfile = options.selectRecoveryProfile(current.profile);
-          if (!recoveryProfile) throw error;
+          recoveryTarget = options.selectRecoveryTarget?.(current, undefined, error) ?? legacyTarget(current.profile);
+          if (!recoveryTarget) throw error;
           await options.recordFailedAttempt({
             attempt: current,
             latencyMs: Date.now() - startedAt,
             error,
           });
         }
-        current = await options.startRetry(recoveryProfile, current.attemptIndex + 1);
+        current = await options.startRetry(recoveryTarget.profile, current.attemptIndex + 1, recoveryTarget);
       }
     },
   };

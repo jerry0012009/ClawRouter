@@ -5,7 +5,7 @@ import type { AcuEvaluation, AcuJudgeResult, AcuModelEstimate } from "../acu/typ
 import type { AlphaProtocol } from "./repository.js";
 import { cashCnyPerNominalUsd, type ProviderEconomics } from "./provider-economics.js";
 
-export type ProfileHealth = "healthy" | "degraded" | "cooldown" | "unknown";
+export type ProfileHealth = "healthy" | "degraded" | "cooldown" | "open" | "half_open" | "disabled" | "unknown";
 export type RoutingPreference = "economy" | "balanced" | "quality";
 export type ToolCapability =
   | "function"
@@ -35,6 +35,9 @@ export type AlphaExecutionProfile = {
   actualModelAliases?: string[];
   provider: string;
   channel: string;
+  channelId?: string;
+  routingGroupName?: string;
+  effectiveCostStatus?: "verified" | "estimated" | "missing";
   protocols: AlphaProtocol[];
   toolCallSupport: boolean;
   supportedToolTypes?: ToolCapability[];
@@ -86,12 +89,15 @@ export type AlphaRouteDecision = {
   providerCandidateEstimates: Array<{
     executionProfileId: string;
     provider: string;
+    channelId: string;
+    routingGroupName?: string;
     providerModelId: string;
     effectiveCashCost: number;
     providerSelectionScore: number;
     health: ProfileHealth;
     recentSuccessRate: number;
     usageTrusted: boolean;
+    effectiveCostStatus: "verified" | "estimated" | "missing";
     observedLatencyMs?: number;
     selected: boolean;
   }>;
@@ -161,7 +167,8 @@ function exclusionReasons(
     reasons.push(`reasoning_effort:${requirements.reasoningEffort}`);
   }
   if (profile.contextWindow < requirements.contextTokens) reasons.push("context_window");
-  if (profile.health === "cooldown") reasons.push("health_cooldown");
+  if (["cooldown", "open", "disabled"].includes(profile.health)) reasons.push(`health_${profile.health}`);
+  if (profile.health === "half_open") reasons.push("health_half_open_probe_required");
   if (profile.economics && (!profile.economics.enabled || profile.economics.health === "blocked")) reasons.push("provider_economics");
   if (profile.economics?.health === "cooldown") reasons.push("provider_cooldown");
   if (profile.usageTrusted === false) reasons.push("usage_untrusted");
@@ -233,26 +240,30 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
     .map((profile) => ({
       executionProfileId: profile.executionProfileId,
       provider: profile.provider,
+      channelId: profile.channelId ?? profile.channel,
+      routingGroupName: profile.routingGroupName,
       providerModelId: profile.providerModelId ?? profile.modelId,
       effectiveCashCost: profileEstimatedCashCost(profile, input.inputTokens, input.expectedOutputTokens),
       providerSelectionScore: providerSelectionScore(profile, input.inputTokens, input.expectedOutputTokens),
       health: profile.health,
       recentSuccessRate: profile.recentSuccessRate ?? 1,
       usageTrusted: profile.usageTrusted !== false,
+      effectiveCostStatus: profile.effectiveCostStatus ?? "verified",
       observedLatencyMs: profile.observedLatencyMs,
       selected: profile.executionProfileId === selectedProfile.executionProfileId,
     })).sort((left, right) => left.providerSelectionScore - right.providerSelectionScore);
   const selectedProviderEstimate = providerCandidateEstimates[0];
   const nextProviderEstimate = providerCandidateEstimates[1];
   const providerSelectionReason = [
-    `Selected ${selectedProfile.provider}/${selectedProfile.providerModelId ?? selectedProfile.modelId}`,
+    `Selected ${selectedProfile.provider}/${selectedProfile.channelId ?? selectedProfile.channel}/${selectedProfile.providerModelId ?? selectedProfile.modelId}`,
     `for canonical model ${selectedProfile.modelId}`,
     `using effective cash cost, health=${selectedProfile.health}`,
     `success_rate=${(selectedProfile.recentSuccessRate ?? 1).toFixed(3)}`,
     `usage_trusted=${selectedProfile.usageTrusted !== false}`,
+    `effective_cost_status=${selectedProfile.effectiveCostStatus ?? "verified"}`,
     `latency_ms=${selectedProfile.observedLatencyMs ?? "unknown"}`,
     `effective_cash_estimate=${selectedProviderEstimate.effectiveCashCost.toFixed(8)}`,
-    nextProviderEstimate ? `next_provider=${nextProviderEstimate.provider}:${nextProviderEstimate.effectiveCashCost.toFixed(8)}` : "next_provider=none",
+    nextProviderEstimate ? `next_channel=${nextProviderEstimate.channelId}:${nextProviderEstimate.effectiveCashCost.toFixed(8)}` : "next_channel=none",
   ].join("; ");
   return {
     formulaVersion: ACU_ROUTING_MODEL_VERSION,

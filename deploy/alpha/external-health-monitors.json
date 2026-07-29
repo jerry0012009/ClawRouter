@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "acu-external-health-monitor-v1",
+  "observedAt": "2026-07-29T15:24:00Z",
+  "monitors": [
+    {
+      "providerId": "lucen",
+      "pageUrl": "https://lucen.cc/monitor",
+      "jsonEndpoint": "https://lucen.cc/api/v1/channel-monitors",
+      "status": "external_monitor_unavailable",
+      "reason": "A stable JSON endpoint exists, but it requires an interactive Lucen user session; an independently scoped Channel API Key returned HTTP 401. ACU is not authorized to reuse browser cookies.",
+      "refreshIntervalSeconds": null,
+      "ttlSeconds": 300,
+      "routingGroupMapping": "not_enabled",
+      "routingEffect": "none; local account request outcomes remain authoritative"
+    }
+  ]
+}

@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { QueryResultRow } from "pg";
 import type { SqlExecutor } from "./database.js";
 import { sanitizeHeadersForPersistence, sanitizePayloadForPersistence } from "./secrets.js";
+import type { CircuitState, HealthSnapshot, ProviderErrorClass } from "./channel-health.js";
 
 export type AlphaProtocol = "responses" | "messages" | "chat_completions";
 export type AlphaIdPrefix = "ses" | "task" | "seg" | "evt" | "judge" | "route" | "req" | "att" | "payload" | "usage";
@@ -124,6 +125,8 @@ export type AttemptRecord = {
   requestedModel?: string;
   actualModel?: string;
   channel?: string;
+  channelId?: string;
+  networkEndpoint?: string;
   providerRequestId?: string;
   errorCategory?: string;
   httpStatus?: number;
@@ -231,6 +234,32 @@ export type RouteDecisionRecord = {
 
 function json(value: unknown): string {
   return JSON.stringify(sanitizePayloadForPersistence(value ?? {}));
+}
+
+function dateValue(value: unknown): Date | undefined {
+  return value instanceof Date ? value : typeof value === "string" ? new Date(value) : undefined;
+}
+
+function healthSnapshot(row: Record<string, unknown>): HealthSnapshot {
+  return {
+    state: row.circuit_state as CircuitState,
+    consecutiveFailures: Number(row.consecutive_failures ?? 0),
+    recentSuccessRate: Number(row.recent_success_rate ?? 1),
+    cooldownUntil: dateValue(row.cooldown_until),
+    lastAttemptAt: dateValue(row.last_attempt_at),
+    lastSuccessAt: dateValue(row.last_success_at),
+    lastFailureAt: dateValue(row.last_failure_at),
+    firstTokenLatencyMs: row.first_token_latency_ms === null ? undefined : Number(row.first_token_latency_ms),
+    totalLatencyMs: row.total_latency_ms === null ? undefined : Number(row.total_latency_ms),
+    errorClass: row.error_class as ProviderErrorClass | undefined,
+    httpStatus: row.http_status === null ? undefined : Number(row.http_status),
+  };
+}
+
+function healthValues(channelId: string, providerId: string, value: HealthSnapshot): unknown[] {
+  return [channelId, providerId, value.state, value.cooldownUntil ?? null, value.lastAttemptAt ?? null,
+    value.lastSuccessAt ?? null, value.lastFailureAt ?? null, value.consecutiveFailures, value.recentSuccessRate,
+    value.firstTokenLatencyMs ?? null, value.totalLatencyMs ?? null, value.errorClass ?? null, value.httpStatus ?? null];
 }
 
 export class AlphaRepository {
@@ -620,15 +649,73 @@ export class AlphaRepository {
        (attempt_id,logical_request_id,attempt_index,attempt_kind,retry_owner,route_decision_id,
         judge_evaluation_id,execution_profile_id,requested_model,actual_model,provider,channel,
         provider_request_id,status,error_category,http_status,usage_source,actual_cost_usd,
-        input_price_per_million,output_price_per_million,provider_billed,started_at,metadata_json)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,now(),$22)`,
+        input_price_per_million,output_price_per_million,provider_billed,started_at,metadata_json,
+        channel_id,network_endpoint)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,now(),$22,$23,$24)`,
       [input.attemptId, input.logicalRequestId, input.attemptIndex, input.attemptKind,
         input.retryOwner, input.routeDecisionId ?? null, input.judgeEvaluationId ?? null,
         input.executionProfileId ?? null, input.requestedModel ?? null, input.actualModel ?? null,
         input.provider, input.channel ?? null, input.providerRequestId ?? null, input.status,
         input.errorCategory ?? null, input.httpStatus ?? null, input.usageSource ?? null,
         input.actualCostUsd ?? "0", input.inputPricePerMillion ?? null,
-        input.outputPricePerMillion ?? null, input.providerBilled ?? null, json(input.metadata)],
+        input.outputPricePerMillion ?? null, input.providerBilled ?? null,
+        json(input.metadata), input.channelId ?? input.channel ?? null, input.networkEndpoint ?? null],
+    );
+  }
+
+  async channelHealth(channelId: string): Promise<HealthSnapshot | undefined> {
+    const result = await this.database.query<Record<string, unknown>>(
+      "SELECT * FROM acu_channel_health WHERE channel_id=$1", [channelId],
+    );
+    return result.rows[0] ? healthSnapshot(result.rows[0]) : undefined;
+  }
+
+  async profileHealth(executionProfileId: string): Promise<(HealthSnapshot & { usageTrusted?: boolean; actualModelVerified?: boolean }) | undefined> {
+    const result = await this.database.query<Record<string, unknown>>(
+      "SELECT * FROM acu_provider_model_profile_health WHERE execution_profile_id=$1", [executionProfileId],
+    );
+    const row = result.rows[0];
+    return row ? { ...healthSnapshot(row), usageTrusted: row.usage_trusted === true, actualModelVerified: row.actual_model_verified === true } : undefined;
+  }
+
+  async saveChannelHealth(input: { channelId: string; providerId: string; snapshot: HealthSnapshot }): Promise<void> {
+    await this.database.query(
+      `INSERT INTO acu_channel_health
+       (channel_id,provider_id,circuit_state,cooldown_until,last_attempt_at,last_success_at,last_failure_at,
+        consecutive_failures,recent_success_rate,first_token_latency_ms,total_latency_ms,error_class,http_status,updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,now())
+       ON CONFLICT (channel_id) DO UPDATE SET provider_id=excluded.provider_id,circuit_state=excluded.circuit_state,
+        cooldown_until=excluded.cooldown_until,last_attempt_at=excluded.last_attempt_at,last_success_at=excluded.last_success_at,
+        last_failure_at=excluded.last_failure_at,consecutive_failures=excluded.consecutive_failures,
+        recent_success_rate=excluded.recent_success_rate,first_token_latency_ms=excluded.first_token_latency_ms,
+        total_latency_ms=excluded.total_latency_ms,error_class=excluded.error_class,http_status=excluded.http_status,updated_at=now()`,
+      healthValues(input.channelId, input.providerId, input.snapshot),
+    );
+  }
+
+  async saveProfileHealth(input: { executionProfileId: string; channelId: string; providerId: string;
+    canonicalModelId: string; protocol: AlphaProtocol; snapshot: HealthSnapshot; usageTrusted: boolean;
+    actualModelVerified: boolean; healthReason?: string }): Promise<void> {
+    await this.database.query(
+      `INSERT INTO acu_provider_model_profile_health
+       (execution_profile_id,channel_id,provider_id,canonical_model_id,protocol,circuit_state,cooldown_until,
+        last_attempt_at,last_success_at,last_failure_at,consecutive_failures,recent_success_rate,
+        first_token_latency_ms,total_latency_ms,error_class,http_status,actual_model_verified,usage_trusted,health_reason,updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,now())
+       ON CONFLICT (execution_profile_id) DO UPDATE SET circuit_state=excluded.circuit_state,
+        cooldown_until=excluded.cooldown_until,last_attempt_at=excluded.last_attempt_at,last_success_at=excluded.last_success_at,
+        last_failure_at=excluded.last_failure_at,consecutive_failures=excluded.consecutive_failures,
+        recent_success_rate=excluded.recent_success_rate,first_token_latency_ms=excluded.first_token_latency_ms,
+        total_latency_ms=excluded.total_latency_ms,error_class=excluded.error_class,http_status=excluded.http_status,
+        actual_model_verified=excluded.actual_model_verified,usage_trusted=excluded.usage_trusted,
+        health_reason=excluded.health_reason,updated_at=now()`,
+      [input.executionProfileId, input.channelId, input.providerId, input.canonicalModelId, input.protocol,
+        input.snapshot.state, input.snapshot.cooldownUntil ?? null, input.snapshot.lastAttemptAt ?? null,
+        input.snapshot.lastSuccessAt ?? null, input.snapshot.lastFailureAt ?? null,
+        input.snapshot.consecutiveFailures, input.snapshot.recentSuccessRate,
+        input.snapshot.firstTokenLatencyMs ?? null, input.snapshot.totalLatencyMs ?? null,
+        input.snapshot.errorClass ?? null, input.snapshot.httpStatus ?? null,
+        input.actualModelVerified, input.usageTrusted, input.healthReason ?? null],
     );
   }
 

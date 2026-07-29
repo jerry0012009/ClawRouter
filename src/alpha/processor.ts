@@ -56,6 +56,15 @@ export type AlphaResolutionContext = {
   judgeCostUsd: string;
   requestBytes: number;
   replayed: boolean;
+  routeSummary: {
+    mode: string;
+    difficulty?: number;
+    candidateCount: number;
+    selectedModel: string;
+    routeReason: string;
+    qualityUpperBoundModel?: string;
+    estimatedCostReductionVsQualityUpperBoundUsd?: number;
+  };
 };
 
 type PreparedState = {
@@ -85,6 +94,61 @@ function stringValue(value: unknown): string | undefined {
 function numberValue(value: unknown, fallback = 0): number {
   const valueAsNumber = Number(value);
   return Number.isFinite(valueAsNumber) ? valueAsNumber : fallback;
+}
+
+function routeDisplaySummary(
+  requestedModel: string,
+  selectedModel: string,
+  judge: AlphaJudgeRun | undefined,
+  route: AlphaRouteDecision | undefined,
+  storedRoute?: JsonObject,
+): AlphaResolutionContext["routeSummary"] {
+  if (!route && modeForModel(requestedModel) !== "explicit" && storedRoute) {
+    const candidates = Array.isArray(storedRoute.candidate_estimates_json)
+      ? storedRoute.candidate_estimates_json.map(record).filter((item): item is JsonObject => Boolean(item))
+      : [];
+    const selected = candidates.find((candidate) => candidate.modelId === selectedModel);
+    const qualityUpperBound = candidates.reduce<JsonObject | undefined>((best, candidate) => (
+      !best || numberValue(candidate.conservativeScore) > numberValue(best.conservativeScore) ? candidate : best
+    ), undefined);
+    const formulaInputs = record(storedRoute.formula_inputs_json);
+    const storedJudge = record(formulaInputs?.judge);
+    const difficulty = Number(storedJudge?.difficultyIndex);
+    return {
+      mode: stringValue(storedRoute.mode) ?? requestedModel,
+      difficulty: Number.isFinite(difficulty) ? difficulty : undefined,
+      candidateCount: candidates.length,
+      selectedModel,
+      routeReason: (stringValue(storedRoute.route_explanation) ?? "Reused the segment's saved route decision.").slice(0, 240),
+      qualityUpperBoundModel: stringValue(qualityUpperBound?.modelId),
+      estimatedCostReductionVsQualityUpperBoundUsd: selected && qualityUpperBound
+        ? Math.max(0, numberValue(qualityUpperBound.expectedTotalCost) - numberValue(selected.expectedTotalCost))
+        : undefined,
+    };
+  }
+  if (!route) {
+    return {
+      mode: "explicit",
+      candidateCount: 0,
+      selectedModel,
+      routeReason: `Explicit model ${requestedModel}; Judge and automatic selection skipped.`,
+    };
+  }
+  const selected = route.candidateEstimates.find((candidate) => candidate.modelId === selectedModel);
+  const qualityUpperBound = route.candidateEstimates.reduce((best, candidate) => (
+    !best || candidate.conservativeScore > best.conservativeScore ? candidate : best
+  ), undefined as (typeof route.candidateEstimates)[number] | undefined);
+  return {
+    mode: requestedModel,
+    difficulty: judge?.judge.difficultyIndex,
+    candidateCount: route.candidateEstimates.length,
+    selectedModel,
+    routeReason: route.recommendation.reason.slice(0, 240),
+    qualityUpperBoundModel: qualityUpperBound?.modelId,
+    estimatedCostReductionVsQualityUpperBoundUsd: selected && qualityUpperBound
+      ? Math.max(0, qualityUpperBound.expectedTotalCost - selected.expectedTotalCost)
+      : undefined,
+  };
 }
 
 function clientInfo(protocol: AlphaProtocol, headers: IncomingHttpHeaders): { name: string; version?: string } {
@@ -802,6 +866,9 @@ export class AlphaRequestProcessor {
     const executionSegment = await repository.getSegment(state.segmentId, identity.newapiUserId);
     const routeDecisionId = stringValue(executionSegment?.route_decision_id);
     const judgeEvaluationId = stringValue(executionSegment?.judge_evaluation_id);
+    const storedRoute = routeDecisionId
+      ? await repository.getRouteDecision(routeDecisionId, identity.newapiUserId)
+      : undefined;
     const ingressIdempotencyKey = sha256([
       identity.newapiUserId,
       state.sessionId,
@@ -849,6 +916,13 @@ export class AlphaRequestProcessor {
             judgeCostUsd: result.judge?.costUsd ?? "0.0000000000",
             requestBytes: ingress.rawBody.byteLength,
             replayed: true,
+            routeSummary: routeDisplaySummary(
+              envelope.requestedModel,
+              result.profile.modelId,
+              result.judge,
+              result.route,
+              storedRoute,
+            ),
           } satisfies AlphaResolutionContext,
         };
       }
@@ -901,6 +975,13 @@ export class AlphaRequestProcessor {
       judgeCostUsd: result.judge?.costUsd ?? "0.0000000000",
       requestBytes: ingress.rawBody.byteLength,
       replayed: false,
+      routeSummary: routeDisplaySummary(
+        envelope.requestedModel,
+        result.profile.modelId,
+        result.judge,
+        result.route,
+        storedRoute,
+      ),
     };
     const adapter = createRecoveringProviderAdapter({
       initial: initialAttempt,
@@ -994,6 +1075,14 @@ export class AlphaRequestProcessor {
         judge: input.context.judgeCostUsd,
         provider: providerCostUsd,
         usageSource: input.usageSource,
+        mode: input.context.routeSummary.mode,
+        difficulty: input.context.routeSummary.difficulty,
+        candidate_count: input.context.routeSummary.candidateCount,
+        selected_model: input.context.routeSummary.selectedModel,
+        route_reason: input.context.routeSummary.routeReason,
+        quality_upper_bound_model: input.context.routeSummary.qualityUpperBoundModel,
+        estimated_cost_reduction_vs_quality_upper_bound_usd:
+          input.context.routeSummary.estimatedCostReductionVsQualityUpperBoundUsd,
       },
     });
   }

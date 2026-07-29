@@ -1,0 +1,47 @@
+import { chmod, mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { spawnSync } from "node:child_process";
+import { describe, expect, it } from "vitest";
+
+describe("codex-acu isolated launcher", () => {
+  it("installs into an independent CODEX_HOME and leaves native Codex state untouched", async () => {
+    const root = await mkdtemp(join(tmpdir(), "codex-acu-test-"));
+    const fakeBin = join(root, "fake-bin");
+    const installBin = join(root, "install-bin");
+    const acuHome = join(root, "acu-home");
+    const nativeHome = join(root, "native-home");
+    await Promise.all([fakeBin, nativeHome].map((path) => mkdir(path, { recursive: true })));
+    await writeFile(join(nativeHome, "config.toml"), "model = \"native\"\n");
+    const fakeCodex = join(fakeBin, "codex");
+    await writeFile(fakeCodex, "#!/bin/sh\nprintf '%s\\n' \"$CODEX_HOME\"\n");
+    await chmod(fakeCodex, 0o755);
+    const env = { ...process.env, PATH: `${fakeBin}:${process.env.PATH ?? ""}` };
+    const install = spawnSync(resolve("tools/codex-acu/install.sh"), [
+      "--base-url", "https://acu.example.test/v1",
+      "--bin-dir", installBin,
+      "--acu-home", acuHome,
+    ], { env, encoding: "utf8" });
+    expect(install.status).toBe(0);
+    const config = await readFile(join(acuHome, "config.toml"), "utf8");
+    expect(config).toContain('model = "acu-auto"');
+    expect(config).toContain('base_url = "https://acu.example.test/v1"');
+    expect(config).toContain('env_key = "ACU_API_KEY"');
+    expect(config).not.toContain("test-only-key");
+    const launch = spawnSync(join(installBin, "codex-acu"), ["doctor"], {
+      env: { ...env, ACU_API_KEY: "test-only-key", CODEX_ACU_HOME: acuHome },
+      encoding: "utf8",
+    });
+    expect(launch.status).toBe(0);
+    expect(launch.stdout.trim()).toBe(acuHome);
+    expect(await readFile(join(nativeHome, "config.toml"), "utf8")).toBe('model = "native"\n');
+
+    const uninstall = spawnSync(resolve("tools/codex-acu/uninstall.sh"), [], {
+      env: { ...env, CODEX_ACU_HOME: acuHome, CODEX_ACU_BIN_DIR: installBin },
+      encoding: "utf8",
+    });
+    expect(uninstall.status).toBe(0);
+    await expect(stat(join(installBin, "codex-acu"))).rejects.toMatchObject({ code: "ENOENT" });
+    expect(await readFile(join(acuHome, "config.toml"), "utf8")).toBe(config);
+  });
+});

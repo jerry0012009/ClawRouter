@@ -1,0 +1,15 @@
+#!/usr/bin/env sh
+set -eu
+
+acu_home=${CODEX_ACU_HOME:-${XDG_DATA_HOME:-${HOME}/.local/share}/codex-acu}
+if [ ! -d "$acu_home" ] || [ ! -f "$acu_home/config.toml" ]; then
+  echo "codex-acu is not configured; run tools/codex-acu/install.sh first" >&2
+  exit 1
+fi
+if [ -z "${ACU_API_KEY:-}" ]; then
+  echo "ACU_API_KEY is required in the current shell; it is never stored by codex-acu" >&2
+  exit 1
+fi
+
+export CODEX_HOME="$acu_home"
+exec codex "$@"

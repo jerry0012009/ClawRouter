@@ -1,0 +1,217 @@
+import { createServer, request as httpRequest, type Server } from "node:http";
+import { once } from "node:events";
+import { afterEach, describe, expect, it } from "vitest";
+import { createAlphaGatewayServer, type AlphaGatewayTrace } from "../src/alpha/gateway.js";
+import { createNativeProviderAdapter } from "../src/alpha/provider.js";
+import { bodySha256, trustedIdentityHeaders } from "../src/alpha/trusted-identity.js";
+
+const sharedSecret = "alpha-test-shared-secret-not-production";
+const servers: Server[] = [];
+
+async function listen(server: Server): Promise<number> {
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  servers.push(server);
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("Missing test server port");
+  return address.port;
+}
+
+async function close(server: Server): Promise<void> {
+  server.close();
+  await once(server, "close");
+}
+
+function signedHeaders(body: Buffer): Record<string, string> {
+  const identity = {
+    newapiUserId: "test-user",
+    newapiTokenId: "test-token",
+    newapiLogId: "test-log",
+    requestId: "test-request",
+    timestamp: new Date().toISOString(),
+    bodySha256: bodySha256(body),
+  };
+  return { ...trustedIdentityHeaders(identity, sharedSecret), "content-type": "application/json" };
+}
+
+afterEach(async () => {
+  await Promise.all(servers.splice(0).map(close));
+});
+
+describe("Alpha native protocol gateway", () => {
+  it("forwards an explicit Responses request body unchanged and replaces credentials", async () => {
+    let upstreamBody = Buffer.alloc(0);
+    let upstreamHeaders: Record<string, string | string[] | undefined> = {};
+    const upstreamPort = await listen(createServer(async (request, response) => {
+      const chunks: Buffer[] = [];
+      for await (const chunk of request) chunks.push(Buffer.from(chunk));
+      upstreamBody = Buffer.concat(chunks);
+      upstreamHeaders = request.headers;
+      response.setHeader("content-type", "application/json");
+      response.end('{"id":"response-1","output":[]}');
+    }));
+    const adapter = createNativeProviderAdapter({
+      provider: "closeai",
+      channel: "closeai-openai",
+      baseUrl: `http://127.0.0.1:${upstreamPort}/v1`,
+      apiKey: "provider-test-key",
+      authMode: "bearer",
+    });
+    const gatewayPort = await listen(createAlphaGatewayServer({
+      trustedIdentitySecret: sharedSecret,
+      async resolveExecution(envelope) {
+        return { adapter, requestedModel: envelope.requestedModel, actualModel: envelope.requestedModel, provider: "closeai", channel: "closeai-openai" };
+      },
+    }));
+    const body = Buffer.from('{"model":"gpt-test","input":"hello","stream":false}');
+    const response = await fetch(`http://127.0.0.1:${gatewayPort}/v1/responses`, {
+      method: "POST",
+      headers: { ...signedHeaders(body), authorization: "Bearer client-secret" },
+      body,
+    });
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('{"id":"response-1","output":[]}');
+    expect(upstreamBody.equals(body)).toBe(true);
+    expect(upstreamHeaders.authorization).toBe("Bearer provider-test-key");
+    expect(upstreamHeaders["x-acu-newapi-user-id"]).toBeUndefined();
+  });
+
+  it("relays SSE tool events byte-for-byte without aggregation or injection", async () => {
+    const expected = [
+      "event: response.output_item.added\n",
+      "data: {\"type\":\"response.output_item.added\",\"item\":{\"type\":\"function_call\",\"call_id\":\"call-1\"}}\n\n",
+      "event: response.function_call_arguments.delta\n",
+      "data: {\"type\":\"response.function_call_arguments.delta\",\"delta\":\"{\\\"cmd\\\":\\\"pwd\\\"}\"}\n\n",
+      "event: response.completed\n",
+      "data: {\"type\":\"response.completed\"}\n\n",
+    ].join("");
+    const upstreamPort = await listen(createServer((_request, response) => {
+      response.setHeader("content-type", "text/event-stream");
+      response.flushHeaders();
+      for (const part of expected.split(/(?=event:)/).filter(Boolean)) response.write(part);
+      response.end();
+    }));
+    const adapter = createNativeProviderAdapter({
+      provider: "test",
+      channel: "test",
+      baseUrl: `http://127.0.0.1:${upstreamPort}`,
+      apiKey: "test-key",
+      authMode: "bearer",
+    });
+    const traces: AlphaGatewayTrace[] = [];
+    const gatewayPort = await listen(createAlphaGatewayServer({
+      trustedIdentitySecret: sharedSecret,
+      async resolveExecution(envelope) {
+        return { adapter, requestedModel: envelope.requestedModel, actualModel: envelope.requestedModel, provider: "test", channel: "test" };
+      },
+      onTrace(trace) { traces.push({ ...trace }); },
+    }));
+    const body = Buffer.from('{"model":"gpt-test","input":"use shell","stream":true}');
+    const response = await fetch(`http://127.0.0.1:${gatewayPort}/v1/responses`, {
+      method: "POST",
+      headers: signedHeaders(body),
+      body,
+    });
+    expect(await response.text()).toBe(expected);
+    expect(traces.at(-1)).toMatchObject({ status: "completed", response: { complete: true } });
+    expect(traces.at(-1)?.response?.body.toString()).toBe(expected);
+  });
+
+  it("preserves Messages tool_use and thinking signature bytes", async () => {
+    const expected = "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"content_block\":{\"type\":\"thinking\",\"signature\":\"sig-1\"}}\n\n"
+      + "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"content_block\":{\"type\":\"tool_use\",\"id\":\"tool-1\"}}\n\n";
+    let path = "";
+    const upstreamPort = await listen(createServer((request, response) => {
+      path = request.url ?? "";
+      response.setHeader("content-type", "text/event-stream");
+      response.end(expected);
+    }));
+    const adapter = createNativeProviderAdapter({
+      provider: "closeai",
+      channel: "closeai-anthropic",
+      baseUrl: `http://127.0.0.1:${upstreamPort}/anthropic`,
+      apiKey: "test-key",
+      authMode: "x-api-key",
+      anthropicVersion: "2023-06-01",
+    });
+    const gatewayPort = await listen(createAlphaGatewayServer({
+      trustedIdentitySecret: sharedSecret,
+      async resolveExecution(envelope) {
+        return { adapter, requestedModel: envelope.requestedModel, actualModel: envelope.requestedModel, provider: "closeai", channel: "closeai-anthropic" };
+      },
+    }));
+    const body = Buffer.from('{"model":"claude-test","messages":[{"role":"user","content":"hello"}],"stream":true}');
+    const response = await fetch(`http://127.0.0.1:${gatewayPort}/v1/messages?beta=true`, {
+      method: "POST",
+      headers: signedHeaders(body),
+      body,
+    });
+    expect(await response.text()).toBe(expected);
+    expect(path).toBe("/anthropic/v1/messages?beta=true");
+  });
+
+  it("fails closed on a forged identity before reaching Provider", async () => {
+    let upstreamCalls = 0;
+    const upstreamPort = await listen(createServer((_request, response) => {
+      upstreamCalls += 1;
+      response.end("unexpected");
+    }));
+    const adapter = createNativeProviderAdapter({
+      provider: "test",
+      channel: "test",
+      baseUrl: `http://127.0.0.1:${upstreamPort}`,
+      apiKey: "test-key",
+      authMode: "bearer",
+    });
+    const gatewayPort = await listen(createAlphaGatewayServer({
+      trustedIdentitySecret: sharedSecret,
+      async resolveExecution(envelope) {
+        return { adapter, requestedModel: envelope.requestedModel, actualModel: envelope.requestedModel, provider: "test", channel: "test" };
+      },
+    }));
+    const body = Buffer.from('{"model":"gpt-test","input":"hello"}');
+    const headers = signedHeaders(body);
+    headers["x-acu-newapi-user-id"] = "forged-user";
+    const response = await fetch(`http://127.0.0.1:${gatewayPort}/v1/responses`, { method: "POST", headers, body });
+    expect(response.status).toBe(502);
+    expect(upstreamCalls).toBe(0);
+  });
+
+  it("aborts the Provider stream after client cancellation", async () => {
+    let upstreamClosedResolve: (() => void) | undefined;
+    const upstreamClosed = new Promise<void>((resolve) => { upstreamClosedResolve = resolve; });
+    const upstreamPort = await listen(createServer((request, response) => {
+      request.once("close", () => upstreamClosedResolve?.());
+      response.setHeader("content-type", "text/event-stream");
+      response.flushHeaders();
+      response.write("event: message\ndata: first\n\n");
+      const timer = setInterval(() => response.write("event: message\ndata: more\n\n"), 10);
+      response.once("close", () => clearInterval(timer));
+    }));
+    const adapter = createNativeProviderAdapter({
+      provider: "test",
+      channel: "test",
+      baseUrl: `http://127.0.0.1:${upstreamPort}`,
+      apiKey: "test-key",
+      authMode: "bearer",
+    });
+    const gatewayPort = await listen(createAlphaGatewayServer({
+      trustedIdentitySecret: sharedSecret,
+      async resolveExecution(envelope) {
+        return { adapter, requestedModel: envelope.requestedModel, actualModel: envelope.requestedModel, provider: "test", channel: "test" };
+      },
+    }));
+    const body = Buffer.from('{"model":"gpt-test","input":"hello","stream":true}');
+    const client = httpRequest({
+      host: "127.0.0.1",
+      port: gatewayPort,
+      path: "/v1/responses",
+      method: "POST",
+      headers: { ...signedHeaders(body), "content-length": body.length },
+    });
+    client.on("response", (response) => response.once("data", () => response.destroy()));
+    client.end(body);
+    await upstreamClosed;
+    expect(true).toBe(true);
+  });
+});

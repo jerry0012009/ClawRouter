@@ -12,6 +12,7 @@
       "curveModelIds": ["gpt-5.4-mini", "gpt-5.5", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra"],
       "responsesCandidate": 5,
       "responsesVerified": ["gpt-5.4-mini", "gpt-5.6-luna", "gpt-5.6-terra"],
+      "hostedWebSearchVerified": ["gpt-5.6-luna"],
       "preflightFailed": [{"modelId": "gpt-5.6-sol", "stage": "tool_call_completion", "httpStatus": 200}],
       "notPreflighted": ["gpt-5.5"],
       "unknownModelCount": 16,

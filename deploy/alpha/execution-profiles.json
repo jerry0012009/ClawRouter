@@ -31,7 +31,7 @@
     "channel": "lucen-openai-primary",
     "protocols": ["responses"],
     "toolCallSupport": true,
-    "supportedToolTypes": ["function", "custom", "local_tool"],
+    "supportedToolTypes": ["function", "custom", "local_tool", "hosted_web_search"],
     "thinkingSupport": true,
     "supportedReasoningEfforts": ["low", "medium", "high"],
     "contextWindow": 32768,

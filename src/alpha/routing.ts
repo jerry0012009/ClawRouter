@@ -3,6 +3,7 @@ import { ACU_DEFAULT_SWITCH_COST_USD, ACU_ROUTING_MODEL_VERSION } from "../acu/c
 import { recommendModel } from "../acu/decision.js";
 import type { AcuEvaluation, AcuJudgeResult, AcuModelEstimate } from "../acu/types.js";
 import type { AlphaProtocol } from "./repository.js";
+import type { WebIntent } from "./protocol/types.js";
 import { cashCnyPerNominalUsd, type ProviderEconomics } from "./provider-economics.js";
 
 export type ProfileHealth = "healthy" | "degraded" | "cooldown" | "open" | "half_open" | "disabled" | "unknown";
@@ -51,6 +52,14 @@ export type AlphaExecutionProfile = {
   usageTrusted?: boolean;
   recentSuccessRate?: number;
   observedLatencyMs?: number;
+  webToolDeclarationAccepted?: boolean;
+  webSearchExecutionVerified?: boolean;
+  webSearchStreamingVerified?: boolean;
+  webSearchResultVerified?: boolean;
+  webSearchRecentSuccessRate?: number;
+  webSearchObservedLatencyMs?: number;
+  webSearchLastVerifiedAt?: string;
+  webSearchFailureReason?: string;
 };
 
 export type AlphaRouteRequirements = {
@@ -61,6 +70,8 @@ export type AlphaRouteRequirements = {
   reasoningEffort?: string;
   contextTokens: number;
   allowedModelIds?: string[];
+  clientDeclaredWebTool?: boolean;
+  webIntent?: WebIntent;
 };
 
 export type AlphaRouteInput = {
@@ -148,6 +159,22 @@ function providerSelectionScore(profile: AlphaExecutionProfile, inputTokens: num
   return base * healthFactor * latencyFactor / successRate;
 }
 
+function webReliabilityFactor(profile: AlphaExecutionProfile, requirements: AlphaRouteRequirements): number {
+  if (requirements.webIntent === "likely" && profile.webSearchExecutionVerified) return 0.98;
+  if (requirements.webIntent === "not_required" && requirements.clientDeclaredWebTool
+    && profile.webToolDeclarationAccepted) return 0.99;
+  return 1;
+}
+
+function effectiveProviderSelectionScore(
+  profile: AlphaExecutionProfile,
+  requirements: AlphaRouteRequirements,
+  inputTokens: number,
+  outputTokens: number,
+): number {
+  return providerSelectionScore(profile, inputTokens, outputTokens) * webReliabilityFactor(profile, requirements);
+}
+
 function exclusionReasons(
   profile: AlphaExecutionProfile,
   requirements: AlphaRouteRequirements,
@@ -160,6 +187,9 @@ function exclusionReasons(
   if (requirements.requireTools && !profile.toolCallSupport) reasons.push("tool_call_support");
   for (const toolType of requirements.requiredToolTypes ?? []) {
     if (!profile.supportedToolTypes?.includes(toolType)) reasons.push(`tool_type:${toolType}`);
+  }
+  if (requirements.webIntent === "required" && !profile.webSearchExecutionVerified) {
+    reasons.push("web_search_execution_unverified");
   }
   if (requirements.requireThinking && !profile.thinkingSupport) reasons.push("thinking_support");
   if (requirements.reasoningEffort && profile.supportedReasoningEfforts
@@ -192,6 +222,9 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
   });
   const eligibleModelIds = [...new Set(eligibleProfiles.map((profile) => profile.modelId))];
   if (eligibleModelIds.length === 0) {
+    if (input.requirements.webIntent === "required") {
+      throw new Error("No healthy Alpha execution profile has verified Web Search execution capability");
+    }
     const required = input.requirements.requiredToolTypes ?? [];
     if (required.length > 0) {
       throw new Error(`No compatible Alpha execution profile supports required tool capabilities: ${required.join(", ")}`);
@@ -207,8 +240,8 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
   const bestProfileByModel = new Map<string, AlphaExecutionProfile>();
   for (const profile of eligibleProfiles) {
     const current = bestProfileByModel.get(profile.modelId);
-    if (!current || providerSelectionScore(profile, input.inputTokens, input.expectedOutputTokens)
-      < providerSelectionScore(current, input.inputTokens, input.expectedOutputTokens)) {
+    if (!current || effectiveProviderSelectionScore(profile, input.requirements, input.inputTokens, input.expectedOutputTokens)
+      < effectiveProviderSelectionScore(current, input.requirements, input.inputTokens, input.expectedOutputTokens)) {
       bestProfileByModel.set(profile.modelId, profile);
     }
   }
@@ -244,7 +277,12 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
       routingGroupName: profile.routingGroupName,
       providerModelId: profile.providerModelId ?? profile.modelId,
       effectiveCashCost: profileEstimatedCashCost(profile, input.inputTokens, input.expectedOutputTokens),
-      providerSelectionScore: providerSelectionScore(profile, input.inputTokens, input.expectedOutputTokens),
+      providerSelectionScore: effectiveProviderSelectionScore(
+        profile,
+        input.requirements,
+        input.inputTokens,
+        input.expectedOutputTokens,
+      ),
       health: profile.health,
       recentSuccessRate: profile.recentSuccessRate ?? 1,
       usageTrusted: profile.usageTrusted !== false,

@@ -8,6 +8,7 @@ Install after the Founder HTTPS host is available:
 tools/codex-acu/install.sh --base-url https://<FOUNDER_ACU_HOST>/v1
 codex-acu credentials set
 codex-acu doctor
+codex-acu workspace /path/to/disposable/repository
 codex-acu -C /path/to/disposable/repository
 ```
 
@@ -36,4 +37,7 @@ codex-acu credentials status
 codex-acu credentials set
 codex-acu credentials clear
 codex-acu doctor
+codex-acu workspace [path]
 ```
+
+Before every normal launch, the wrapper verifies that the selected workspace is owned by the current user, writable, accepts a create/delete probe, and is a Git work tree. It then forces Codex sandbox mode to `workspace-write`. A failed workspace gate exits locally before any ACU or Provider request.

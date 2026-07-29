@@ -36,6 +36,7 @@ run("Alpha PostgreSQL foundation", () => {
       "acu_judge_evaluations",
       "acu_logical_requests",
       "acu_payloads",
+      "acu_provider_health",
       "acu_provider_model_profile_health",
       "acu_route_decisions",
       "acu_segments",
@@ -321,7 +322,7 @@ run("Alpha PostgreSQL foundation", () => {
     expect(trace?.route_decisions).toEqual(expect.arrayContaining([
       expect.objectContaining({ route_decision_id: "route_a_1" }),
     ]));
-    expect(trace?.attempts).toHaveLength(2);
+    expect(trace?.attempts).toHaveLength(3);
     expect(trace?.payloads).toEqual(expect.arrayContaining([
       expect.objectContaining({ payload_id: "payload_a_1" }),
     ]));

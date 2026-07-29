@@ -101,8 +101,11 @@ describe("Alpha RC1 deployment profiles", () => {
     expect(simpleResponses.candidateEstimates).toHaveLength(5);
     expect(simpleMessages.candidateEstimates).toHaveLength(6);
     expect(simpleResponses.excludedProfiles.some((item) => item.reasons.includes("native_protocol"))).toBe(true);
+    const unavailableEconomicsProfiles = configured.filter((profile) => (
+      profile.economics && (!profile.economics.enabled || profile.economics.health !== "healthy")
+    ));
     expect(simpleResponses.excludedProfiles.filter((item) => item.reasons.includes("provider_cooldown")))
-      .toHaveLength(configured.filter((profile) => profile.provider === "lucen").length);
+      .toHaveLength(unavailableEconomicsProfiles.length);
     for (const estimate of [...simpleResponses.candidateEstimates, ...simpleMessages.candidateEstimates]) {
       expect(estimate.predictedScore).toBeTypeOf("number");
       expect(estimate.conservativeScore).toBeTypeOf("number");
@@ -146,8 +149,9 @@ describe("Alpha RC1 deployment profiles", () => {
     });
 
     expect(decision.candidateEstimates).toHaveLength(5);
+    const existingProfileCount = responseProfiles.filter((profile) => profile.modelId === duplicate.modelId).length;
     expect(decision.candidateEstimates.find((item) => item.modelId === duplicate.modelId)?.executionProfileIds)
-      .toHaveLength(2);
+      .toHaveLength(existingProfileCount + 1);
   });
 
   it("applies a custom user allowlist as a hard policy filter without changing the routing formula", async () => {

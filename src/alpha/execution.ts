@@ -28,6 +28,7 @@ export type ProviderRecoveryOptions = {
   maxAttempts?: number;
   selectRecoveryProfile?(current: AlphaExecutionProfile): AlphaExecutionProfile | undefined;
   selectRecoveryTarget?(current: ProviderAttemptHandle, failure?: BufferedProviderFailure, error?: unknown): ProviderRecoveryTarget | undefined;
+  isRecoverableResponse?(response: Response, attempt: ProviderAttemptHandle): boolean;
   startRetry(profile: AlphaExecutionProfile, attemptIndex: number, target?: ProviderRecoveryTarget): Promise<ProviderAttemptHandle>;
   recordFailedAttempt(input: {
     attempt: ProviderAttemptHandle;
@@ -64,7 +65,9 @@ export function createRecoveringProviderAdapter(options: ProviderRecoveryOptions
         let recoveryTarget: ProviderRecoveryTarget | undefined;
         try {
           const response = await current.adapter.execute({ ...request, body: current.body ?? request.body });
-          if (!isRecoverableProviderStatus(response.status)
+          const recoverable = isRecoverableProviderStatus(response.status)
+            || options.isRecoverableResponse?.(response, current) === true;
+          if (!recoverable
             || current.attemptIndex >= maxAttempts
             || request.signal.aborted) {
             options.onSelected?.(current);

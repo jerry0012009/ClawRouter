@@ -1,0 +1,143 @@
+{
+  "schemaVersion": "acu-web-profile-preflight-v1",
+  "capturedAt": "2026-07-29T17:32:30.537Z",
+  "runId": "founder-continuous-web-alpha-20260729-v1",
+  "concurrency": 1,
+  "selectedProfileCount": 8,
+  "budgetCny": 0.8,
+  "actualEstimatedCashCostCny": 0.033621761,
+  "observations": [
+    {
+      "runId": "founder-continuous-web-alpha-20260729-v1",
+      "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.6-luna:responses",
+      "provider": "lucen",
+      "channel": "lucen-cx006-value-dynamic",
+      "model": "gpt-5.6-luna",
+      "status": "passed",
+      "testA": "declaration_accepted",
+      "testB": "web_search_verified",
+      "eventTypes": [
+        "response.web_search_call.in_progress",
+        "response.web_search_call.searching",
+        "response.web_search_call.completed"
+      ],
+      "usage": {
+        "input": 17757,
+        "cached": 7296,
+        "output": 41
+      },
+      "nominalProviderCostUsd": 0.0114366,
+      "effectiveCashCostCny": 0.000686196
+    },
+    {
+      "runId": "founder-continuous-web-alpha-20260729-v1",
+      "executionProfileId": "blackai-codex-mix-low:gpt-5.6-luna:responses",
+      "provider": "blackai",
+      "channel": "blackai-codex-mix-low",
+      "model": "gpt-5.6-luna",
+      "status": "failed",
+      "primaryReason": "web_search_output_item_missing",
+      "testBExecuted": true,
+      "effectiveCashCostCny": 0.0017148899999999997
+    },
+    {
+      "runId": "founder-continuous-web-alpha-20260729-v1",
+      "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.4-mini:responses",
+      "provider": "lucen",
+      "channel": "lucen-cx006-value-dynamic",
+      "model": "gpt-5.4-mini",
+      "status": "passed",
+      "testA": "declaration_accepted",
+      "testB": "web_search_verified",
+      "eventTypes": [
+        "response.web_search_call.in_progress",
+        "response.web_search_call.searching",
+        "response.web_search_call.completed"
+      ],
+      "usage": {
+        "input": 15407,
+        "cached": 13578,
+        "output": 172
+      },
+      "nominalProviderCostUsd": 0.0072375,
+      "effectiveCashCostCny": 0.00043424999999999996
+    },
+    {
+      "runId": "founder-continuous-web-alpha-20260729-v1",
+      "executionProfileId": "closeai-gpt-5.4-mini-responses-economy",
+      "provider": "closeai",
+      "channel": "closeai-openai-primary",
+      "model": "gpt-5.4-mini",
+      "status": "failed",
+      "primaryReason": "missing_response_completed",
+      "testBExecuted": true,
+      "effectiveCashCostCny": 0.003432
+    },
+    {
+      "runId": "founder-continuous-web-alpha-20260729-v1",
+      "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.6-terra:responses",
+      "provider": "lucen",
+      "channel": "lucen-cx006-value-dynamic",
+      "model": "gpt-5.6-terra",
+      "status": "passed",
+      "testA": "declaration_accepted",
+      "testB": "web_search_verified",
+      "eventTypes": [
+        "response.web_search_call.in_progress",
+        "response.web_search_call.searching",
+        "response.web_search_call.completed"
+      ],
+      "usage": {
+        "input": 17757,
+        "cached": 8320,
+        "output": 41
+      },
+      "nominalProviderCostUsd": 0.0262875,
+      "effectiveCashCostCny": 0.0015772499999999999
+    },
+    {
+      "runId": "founder-continuous-web-alpha-20260729-v1",
+      "executionProfileId": "blackai-codex-mix-low:gpt-5.6-terra:responses",
+      "provider": "blackai",
+      "channel": "blackai-codex-mix-low",
+      "model": "gpt-5.6-terra",
+      "status": "failed",
+      "primaryReason": "web_search_output_item_missing",
+      "testBExecuted": true,
+      "effectiveCashCostCny": 0.002559225
+    },
+    {
+      "runId": "founder-continuous-web-alpha-20260729-v1",
+      "executionProfileId": "blackai-codex-mix-low:gpt-5.6-sol:responses",
+      "provider": "blackai",
+      "channel": "blackai-codex-mix-low",
+      "model": "gpt-5.6-sol",
+      "status": "failed",
+      "primaryReason": "web_search_output_item_missing",
+      "testBExecuted": true,
+      "effectiveCashCostCny": 0.00857445
+    },
+    {
+      "runId": "founder-continuous-web-alpha-20260729-v1",
+      "executionProfileId": "closeai-gpt-5.6-terra-responses-strong",
+      "provider": "closeai",
+      "channel": "closeai-openai-primary",
+      "model": "gpt-5.6-terra",
+      "status": "passed",
+      "testA": "declaration_accepted",
+      "testB": "web_search_verified",
+      "eventTypes": [
+        "response.web_search_call.in_progress",
+        "response.web_search_call.searching",
+        "response.web_search_call.completed"
+      ],
+      "usage": {
+        "input": 8711,
+        "cached": 3584,
+        "output": 62
+      },
+      "nominalProviderCostUsd": 0.0146435,
+      "effectiveCashCostCny": 0.0146435
+    }
+  ]
+}

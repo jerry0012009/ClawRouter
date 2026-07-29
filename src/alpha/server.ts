@@ -167,6 +167,14 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
       usageTrusted: profile.usageTrusted,
       recentSuccessRate: profile.recentSuccessRate,
       observedLatencyMs: profile.observedLatencyMs,
+      webToolDeclarationAccepted: profile.webToolDeclarationAccepted,
+      webSearchExecutionVerified: profile.webSearchExecutionVerified,
+      webSearchStreamingVerified: profile.webSearchStreamingVerified,
+      webSearchResultVerified: profile.webSearchResultVerified,
+      webSearchRecentSuccessRate: profile.webSearchRecentSuccessRate,
+      webSearchObservedLatencyMs: profile.webSearchObservedLatencyMs,
+      webSearchLastVerifiedAt: profile.webSearchLastVerifiedAt,
+      webSearchFailureReason: profile.webSearchFailureReason,
     };
     const endpoints = [{ endpoint: new URL(baseUrl).host, baseUrl }, ...(profile.networkFallbackBaseUrlEnvs ?? []).map((name) => {
       const fallbackBaseUrl = requiredEnvironment(name);

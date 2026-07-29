@@ -14,8 +14,7 @@
     "supportedToolTypes": [
       "function",
       "custom",
-      "local_tool",
-      "hosted_web_search"
+      "local_tool"
     ],
     "thinkingSupport": true,
     "supportedReasoningEfforts": [
@@ -39,7 +38,12 @@
     "stripV1Path": true,
     "economicsProviderId": "blackai",
     "observedBillingMultiplier": 1,
-    "effectiveCostStatus": "estimated"
+    "effectiveCostStatus": "estimated",
+    "webToolDeclarationAccepted": true,
+    "webSearchExecutionVerified": false,
+    "webSearchStreamingVerified": false,
+    "webSearchResultVerified": false,
+    "webSearchFailureReason": "web_search_output_item_missing"
   },
   {
     "executionProfileId": "blackai-codex-mix-low:gpt-5.6-sol:responses",
@@ -80,7 +84,12 @@
     "stripV1Path": true,
     "economicsProviderId": "blackai",
     "observedBillingMultiplier": 1,
-    "effectiveCostStatus": "estimated"
+    "effectiveCostStatus": "estimated",
+    "webToolDeclarationAccepted": true,
+    "webSearchExecutionVerified": false,
+    "webSearchStreamingVerified": false,
+    "webSearchResultVerified": false,
+    "webSearchFailureReason": "web_search_output_item_missing"
   },
   {
     "executionProfileId": "blackai-codex-mix-low:gpt-5.6-terra:responses",
@@ -121,7 +130,12 @@
     "stripV1Path": true,
     "economicsProviderId": "blackai",
     "observedBillingMultiplier": 1,
-    "effectiveCostStatus": "estimated"
+    "effectiveCostStatus": "estimated",
+    "webToolDeclarationAccepted": true,
+    "webSearchExecutionVerified": false,
+    "webSearchStreamingVerified": false,
+    "webSearchResultVerified": false,
+    "webSearchFailureReason": "web_search_output_item_missing"
   },
   {
     "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.4-mini:responses",
@@ -162,7 +176,15 @@
     "stripV1Path": true,
     "economicsProviderId": "lucen",
     "observedBillingMultiplier": 0.06,
-    "effectiveCostStatus": "estimated"
+    "effectiveCostStatus": "estimated",
+    "webToolDeclarationAccepted": true,
+    "webSearchExecutionVerified": true,
+    "webSearchStreamingVerified": true,
+    "webSearchResultVerified": true,
+    "webSearchRecentSuccessRate": 1,
+    "webSearchObservedLatencyMs": 28817,
+    "webSearchLastVerifiedAt": "2026-07-29T17:31:45.066Z",
+    "webSearchFailureReason": null
   },
   {
     "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.6-luna:responses",
@@ -179,8 +201,7 @@
     "supportedToolTypes": [
       "function",
       "custom",
-      "local_tool",
-      "hosted_web_search"
+      "local_tool"
     ],
     "thinkingSupport": true,
     "supportedReasoningEfforts": [
@@ -201,7 +222,15 @@
     "stripV1Path": true,
     "economicsProviderId": "lucen",
     "observedBillingMultiplier": 0.06,
-    "effectiveCostStatus": "estimated"
+    "effectiveCostStatus": "estimated",
+    "webToolDeclarationAccepted": true,
+    "webSearchExecutionVerified": true,
+    "webSearchStreamingVerified": true,
+    "webSearchResultVerified": true,
+    "webSearchRecentSuccessRate": 1,
+    "webSearchObservedLatencyMs": 5241,
+    "webSearchLastVerifiedAt": "2026-07-29T17:30:59.989Z",
+    "webSearchFailureReason": null
   },
   {
     "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.6-terra:responses",
@@ -239,7 +268,15 @@
     "stripV1Path": true,
     "economicsProviderId": "lucen",
     "observedBillingMultiplier": 0.06,
-    "effectiveCostStatus": "estimated"
+    "effectiveCostStatus": "estimated",
+    "webToolDeclarationAccepted": true,
+    "webSearchExecutionVerified": true,
+    "webSearchStreamingVerified": true,
+    "webSearchResultVerified": true,
+    "webSearchRecentSuccessRate": 1,
+    "webSearchObservedLatencyMs": 5342,
+    "webSearchLastVerifiedAt": "2026-07-29T17:31:56.218Z",
+    "webSearchFailureReason": null
   },
   {
     "executionProfileId": "lucen-cx006-plus:gpt-5.6-luna:responses",
@@ -256,8 +293,7 @@
     "supportedToolTypes": [
       "function",
       "custom",
-      "local_tool",
-      "hosted_web_search"
+      "local_tool"
     ],
     "thinkingSupport": true,
     "supportedReasoningEfforts": [
@@ -295,8 +331,7 @@
     "supportedToolTypes": [
       "function",
       "custom",
-      "local_tool",
-      "hosted_web_search"
+      "local_tool"
     ],
     "thinkingSupport": true,
     "supportedReasoningEfforts": [
@@ -341,7 +376,12 @@
     "baseUrlEnv": "CLOSEAI_OPENAI_BASE_URL",
     "apiKeyEnv": "CLOSEAI_API_KEY",
     "authMode": "bearer",
-    "effectiveCostStatus": "verified"
+    "effectiveCostStatus": "verified",
+    "webToolDeclarationAccepted": true,
+    "webSearchExecutionVerified": false,
+    "webSearchStreamingVerified": false,
+    "webSearchResultVerified": false,
+    "webSearchFailureReason": "missing_response_completed"
   },
   {
     "executionProfileId": "closeai-gpt-5.6-luna-responses-value",
@@ -355,8 +395,7 @@
     "supportedToolTypes": [
       "function",
       "custom",
-      "local_tool",
-      "hosted_web_search"
+      "local_tool"
     ],
     "thinkingSupport": true,
     "contextWindow": 32768,
@@ -390,7 +429,15 @@
     "baseUrlEnv": "CLOSEAI_OPENAI_BASE_URL",
     "apiKeyEnv": "CLOSEAI_API_KEY",
     "authMode": "bearer",
-    "effectiveCostStatus": "verified"
+    "effectiveCostStatus": "verified",
+    "webToolDeclarationAccepted": true,
+    "webSearchExecutionVerified": true,
+    "webSearchStreamingVerified": true,
+    "webSearchResultVerified": true,
+    "webSearchRecentSuccessRate": 1,
+    "webSearchObservedLatencyMs": 3041,
+    "webSearchLastVerifiedAt": "2026-07-29T17:32:30.527Z",
+    "webSearchFailureReason": null
   },
   {
     "executionProfileId": "closeai-gpt-5.5-responses-frontier",

@@ -10,6 +10,9 @@ async function main(): Promise<void> {
   const profiles = await readProviderModelProfiles(resolve("deploy/alpha/provider-model-profiles.json"));
   const retained = existing.filter((item) => item.provider === "closeai").map((item) => ({
     ...item,
+    supportedToolTypes: Array.isArray(item.supportedToolTypes)
+      ? item.supportedToolTypes.filter((value) => value !== "hosted_web_search")
+      : item.supportedToolTypes,
     effectiveCostStatus: item.effectiveCostStatus ?? "verified",
   }));
   const promoted = profiles.profiles.filter((item) => item.activeInAcuAuto).map((profile) => {
@@ -25,7 +28,7 @@ async function main(): Promise<void> {
       routingGroupName: channel.routingGroupName,
       protocols: [profile.protocol],
       toolCallSupport: profile.toolCallSupport,
-      supportedToolTypes: profile.supportedToolTypes,
+      supportedToolTypes: profile.supportedToolTypes.filter((value) => value !== "hosted_web_search"),
       thinkingSupport: profile.thinkingSupport,
       supportedReasoningEfforts: profile.supportedReasoningEfforts,
       contextWindow: profile.contextWindow,
@@ -42,6 +45,14 @@ async function main(): Promise<void> {
       economicsProviderId: channel.providerId,
       observedBillingMultiplier: channel.observedBillingMultiplier,
       effectiveCostStatus: channel.effectiveCostStatus,
+      webToolDeclarationAccepted: profile.webToolDeclarationAccepted,
+      webSearchExecutionVerified: profile.webSearchExecutionVerified,
+      webSearchStreamingVerified: profile.webSearchStreamingVerified,
+      webSearchResultVerified: profile.webSearchResultVerified,
+      webSearchRecentSuccessRate: profile.webSearchRecentSuccessRate,
+      webSearchObservedLatencyMs: profile.webSearchObservedLatencyMs,
+      webSearchLastVerifiedAt: profile.webSearchLastVerifiedAt,
+      webSearchFailureReason: profile.webSearchFailureReason,
     };
   });
   await writeFile(path, `${JSON.stringify([...promoted, ...retained], null, 2)}\n`);

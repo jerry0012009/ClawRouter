@@ -51,6 +51,14 @@ export type ProviderModelProfile = {
   health: "healthy" | "degraded" | "open" | "half_open" | "disabled";
   healthReason: string;
   lastVerifiedAt: string | null;
+  webToolDeclarationAccepted?: boolean;
+  webSearchExecutionVerified?: boolean;
+  webSearchStreamingVerified?: boolean;
+  webSearchResultVerified?: boolean;
+  webSearchRecentSuccessRate?: number;
+  webSearchObservedLatencyMs?: number | null;
+  webSearchLastVerifiedAt?: string | null;
+  webSearchFailureReason?: string | null;
   activeInAcuAuto: boolean;
 };
 

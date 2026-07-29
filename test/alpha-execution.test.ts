@@ -97,6 +97,33 @@ describe("Alpha Provider attempt recovery", () => {
     expect(selected).toEqual([2]);
   });
 
+  it("allows a Web-specific pre-stream error to use the configured recovery path", async () => {
+    let calls = 0;
+    const handles = (attemptIndex: number): ProviderAttemptHandle => ({
+      attemptId: `attempt-${attemptIndex}`,
+      attemptIndex,
+      profile,
+      adapter: {
+        async execute() {
+          calls += 1;
+          return calls === 1
+            ? new Response('{"error":"web search unavailable"}', { status: 422 })
+            : new Response("success", { status: 200 });
+        },
+      },
+    });
+    const adapter = createRecoveringProviderAdapter({
+      initial: handles(1),
+      isRecoverableResponse: (response) => response.status === 422,
+      selectRecoveryProfile: () => profile,
+      async startRetry(_profile, attemptIndex) { return handles(attemptIndex); },
+      async recordFailedAttempt() {},
+    });
+
+    expect(await (await adapter.execute(request())).text()).toBe("success");
+    expect(calls).toBe(2);
+  });
+
   it("honors the configured Provider Attempt budget", async () => {
     let calls = 0;
     const adapterFor = (attemptIndex: number): ProviderAttemptHandle => ({

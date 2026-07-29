@@ -30,6 +30,8 @@ export type PlanningSignals = {
   evidence: string[];
 };
 
+export type WebIntent = "required" | "likely" | "not_required";
+
 export type CanonicalEnvelope = {
   protocol: AlphaProtocol;
   requestedModel: string;
@@ -38,6 +40,9 @@ export type CanonicalEnvelope = {
   history: unknown[];
   tools: unknown[];
   requiredToolTypes: ToolCapability[];
+  clientDeclaredWebTool: boolean;
+  webIntent: WebIntent;
+  webActuallyInvoked: boolean;
   humanCandidates: CanonicalHumanCandidate[];
   toolCalls: CanonicalToolCall[];
   toolResults: CanonicalToolResult[];

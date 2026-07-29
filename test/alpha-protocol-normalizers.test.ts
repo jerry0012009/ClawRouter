@@ -46,10 +46,33 @@ describe("Responses canonical envelope", () => {
     expect(envelope.requiredToolTypes).toEqual([
       "function",
       "local_tool",
-      "hosted_web_search",
       "file_search",
       "computer_use",
     ]);
+    expect(envelope.clientDeclaredWebTool).toBe(true);
+    expect(envelope.webIntent).toBe("likely");
+    expect(envelope.webActuallyInvoked).toBe(false);
+  });
+
+  it("classifies explicit current-information requests as requiring Web", () => {
+    const envelope = normalizeResponsesRequest({
+      model: "acu-auto",
+      input: "What is the latest stable release today?",
+      tools: [{ type: "web_search" }],
+    });
+    expect(envelope.clientDeclaredWebTool).toBe(true);
+    expect(envelope.webIntent).toBe("required");
+    expect(envelope.requiredToolTypes).toEqual([]);
+  });
+
+  it("does not confuse the current workspace with current information", () => {
+    const envelope = normalizeResponsesRequest({
+      model: "acu-auto",
+      input: "Modify the current file and run check.sh",
+      tools: [{ type: "web_search" }],
+    });
+    expect(envelope.clientDeclaredWebTool).toBe(true);
+    expect(envelope.webIntent).toBe("not_required");
   });
 
   it("does not treat an update_plan schema declaration as PlanStarted", () => {

@@ -1,5 +1,6 @@
 import type { ServerResponse } from "node:http";
 import { isHopByHopHeader } from "./provider.js";
+import { inspectWebSearchEvidence, WebSearchStreamObserver, type WebSearchEvidence } from "./web-search.js";
 
 export type RelayResult = {
   body: Buffer;
@@ -9,6 +10,7 @@ export type RelayResult = {
   clientCancelled: boolean;
   visibleOutputBytes: number;
   responseStarted: boolean;
+  webSearch: WebSearchEvidence;
 };
 
 function copyResponseHeaders(upstream: Response, response: ServerResponse): void {
@@ -25,6 +27,10 @@ export async function relayProviderResponse(upstream: Response, response: Server
   let visibleOutputBytes = 0;
   let complete = true;
   let clientCancelled = false;
+  const contentType = upstream.headers.get("content-type") ?? "application/octet-stream";
+  const webObserver = contentType.toLowerCase().includes("text/event-stream")
+    ? new WebSearchStreamObserver()
+    : undefined;
   if (upstream.body) {
     const reader = upstream.body.getReader();
     try {
@@ -33,6 +39,7 @@ export async function relayProviderResponse(upstream: Response, response: Server
         if (item.done) break;
         const chunk = Buffer.from(item.value);
         chunks.push(chunk);
+        webObserver?.observe(chunk);
         visibleOutputBytes += chunk.length;
         if (response.destroyed || !response.write(chunk)) {
           if (response.destroyed) {
@@ -50,13 +57,15 @@ export async function relayProviderResponse(upstream: Response, response: Server
       if (!clientCancelled) throw error;
     }
   }
+  const body = Buffer.concat(chunks);
   return {
-    body: Buffer.concat(chunks),
+    body,
     httpStatus: upstream.status,
     responseHeaders: Object.fromEntries(upstream.headers.entries()),
     complete,
     clientCancelled,
     visibleOutputBytes,
     responseStarted: response.headersSent,
+    webSearch: webObserver?.evidence() ?? inspectWebSearchEvidence(body, contentType),
   };
 }

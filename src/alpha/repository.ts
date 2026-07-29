@@ -459,6 +459,19 @@ export class AlphaRepository {
     return this.findUserScoped("acu_logical_requests", "logical_request_id", logicalRequestId, newapiUserId);
   }
 
+  async updateLogicalRequestMetadata(
+    logicalRequestId: string,
+    newapiUserId: string,
+    value: Record<string, unknown>,
+  ): Promise<void> {
+    const result = await this.database.query(
+      `UPDATE acu_logical_requests SET metadata_json=metadata_json || $3::jsonb
+       WHERE logical_request_id=$1 AND newapi_user_id=$2`,
+      [logicalRequestId, newapiUserId, json(value)],
+    );
+    if (result.rowCount !== 1) throw new Error("Logical request metadata update failed or crossed user scope");
+  }
+
   /** Admin-only lookup. Callers must enforce independent administrator authentication. */
   async getAdminLogicalRequestTrace(logicalRequestId: string): Promise<Record<string, unknown> | undefined> {
     const result = await this.database.query<{ trace: Record<string, unknown> }>(
@@ -670,12 +683,21 @@ export class AlphaRepository {
     return result.rows[0] ? healthSnapshot(result.rows[0]) : undefined;
   }
 
-  async profileHealth(executionProfileId: string): Promise<(HealthSnapshot & { usageTrusted?: boolean; actualModelVerified?: boolean }) | undefined> {
+  async profileHealth(executionProfileId: string): Promise<(HealthSnapshot & {
+    usageTrusted?: boolean;
+    actualModelVerified?: boolean;
+    metadata?: Record<string, unknown>;
+  }) | undefined> {
     const result = await this.database.query<Record<string, unknown>>(
       "SELECT * FROM acu_provider_model_profile_health WHERE execution_profile_id=$1", [executionProfileId],
     );
     const row = result.rows[0];
-    return row ? { ...healthSnapshot(row), usageTrusted: row.usage_trusted === true, actualModelVerified: row.actual_model_verified === true } : undefined;
+    return row ? {
+      ...healthSnapshot(row),
+      usageTrusted: row.usage_trusted === true,
+      actualModelVerified: row.actual_model_verified === true,
+      metadata: row.metadata_json as Record<string, unknown> | undefined,
+    } : undefined;
   }
 
   async claimHalfOpenProbe(scope: "channel" | "profile", id: string): Promise<boolean> {
@@ -742,6 +764,28 @@ export class AlphaRepository {
         input.snapshot.firstTokenLatencyMs ?? null, input.snapshot.totalLatencyMs ?? null,
         input.snapshot.errorClass ?? null, input.snapshot.httpStatus ?? null,
         input.actualModelVerified, input.usageTrusted, input.healthReason ?? null],
+    );
+  }
+
+  async saveProfileWebHealth(input: {
+    executionProfileId: string;
+    channelId: string;
+    providerId: string;
+    canonicalModelId: string;
+    protocol: AlphaProtocol;
+    usageTrusted: boolean;
+    actualModelVerified: boolean;
+    metadata: Record<string, unknown>;
+  }): Promise<void> {
+    await this.database.query(
+      `INSERT INTO acu_provider_model_profile_health
+       (execution_profile_id,channel_id,provider_id,canonical_model_id,protocol,circuit_state,
+        consecutive_failures,recent_success_rate,actual_model_verified,usage_trusted,health_reason,metadata_json,updated_at)
+       VALUES ($1,$2,$3,$4,$5,'healthy',0,1,$6,$7,'web_health_only',$8,now())
+       ON CONFLICT (execution_profile_id) DO UPDATE SET
+        metadata_json=acu_provider_model_profile_health.metadata_json || excluded.metadata_json,updated_at=now()`,
+      [input.executionProfileId, input.channelId, input.providerId, input.canonicalModelId,
+        input.protocol, input.actualModelVerified, input.usageTrusted, json(input.metadata)],
     );
   }
 

@@ -146,6 +146,71 @@ describe("Alpha current-formula routing", () => {
     expect(result.selectedProfile).toBeDefined();
   });
 
+  it("does not hard-filter ordinary Coding because the client declared Web Search", () => {
+    const webProfiles = profiles.map((profile, index) => ({
+      ...profile,
+      webToolDeclarationAccepted: index === 0,
+      webSearchExecutionVerified: index === 0,
+    }));
+    const result = routeWithCurrentAcuFormula({
+      judge,
+      judgeCost: 0,
+      inputTokens: 2_000,
+      expectedOutputTokens: 500,
+      effectiveQualityTarget: 70,
+      profiles: webProfiles,
+      requirements: {
+        ...requirements,
+        requireTools: false,
+        clientDeclaredWebTool: true,
+        webIntent: "not_required",
+      },
+    });
+    expect(result.candidateEstimates).toHaveLength(2);
+  });
+
+  it("allows only execution-verified Web Profiles when Web is required", () => {
+    const verified = { ...profiles[0], webSearchExecutionVerified: true };
+    const unverified = { ...profiles[1], webSearchExecutionVerified: false };
+    const result = routeWithCurrentAcuFormula({
+      judge,
+      judgeCost: 0,
+      inputTokens: 2_000,
+      expectedOutputTokens: 500,
+      effectiveQualityTarget: 70,
+      profiles: [verified, unverified],
+      requirements: { ...requirements, requireTools: false, webIntent: "required" },
+    });
+    expect(result.candidateEstimates.map((item) => item.modelId)).toEqual([verified.modelId]);
+    expect(result.excludedProfiles).toContainEqual({
+      executionProfileId: unverified.executionProfileId,
+      reasons: ["web_search_execution_unverified"],
+    });
+  });
+
+  it("keeps at least three production Coding candidates when Codex declares Web without Web intent", () => {
+    const configured = JSON.parse(readFileSync(new URL("../deploy/alpha/execution-profiles.json", import.meta.url), "utf8")) as AlphaExecutionProfile[];
+    const result = routeWithCurrentAcuFormula({
+      judge,
+      judgeCost: 0,
+      inputTokens: 2_000,
+      expectedOutputTokens: 500,
+      effectiveQualityTarget: 70,
+      routingPreference: "economy",
+      profiles: configured,
+      requirements: {
+        protocol: "responses",
+        requireTools: true,
+        requiredToolTypes: ["function", "local_tool"],
+        requireThinking: false,
+        contextTokens: 10_000,
+        clientDeclaredWebTool: true,
+        webIntent: "not_required",
+      },
+    });
+    expect(result.candidateEstimates.length).toBeGreaterThanOrEqual(3);
+  });
+
   it("prevents downgrade during capability recovery", () => {
     const result = routeWithCurrentAcuFormula({
       judge,

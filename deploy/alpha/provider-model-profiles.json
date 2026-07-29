@@ -1,6 +1,6 @@
 {
   "schemaVersion": "acu-provider-model-profile-registry-v1",
-  "generatedAt": "2026-07-29T16:39:29.252Z",
+  "generatedAt": "2026-07-29T17:32:30.527Z",
   "profiles": [
     {
       "executionProfileId": "blackai-codex-mix-low:gpt-5.4-mini:responses",
@@ -56,8 +56,7 @@
       "supportedToolTypes": [
         "function",
         "custom",
-        "local_tool",
-        "hosted_web_search"
+        "local_tool"
       ],
       "thinkingSupport": true,
       "supportedReasoningEfforts": [
@@ -73,7 +72,12 @@
       "health": "healthy",
       "healthReason": "minimal_native_responses_preflight_passed; founder_cost_estimate_admitted",
       "lastVerifiedAt": "2026-07-29T15:27:52.000Z",
-      "activeInAcuAuto": true
+      "activeInAcuAuto": true,
+      "webToolDeclarationAccepted": true,
+      "webSearchExecutionVerified": false,
+      "webSearchStreamingVerified": false,
+      "webSearchResultVerified": false,
+      "webSearchFailureReason": "web_search_output_item_missing"
     },
     {
       "executionProfileId": "blackai-codex-mix-low:gpt-5.6-sol:responses",
@@ -102,7 +106,12 @@
       "health": "healthy",
       "healthReason": "minimal_native_responses_preflight_passed",
       "lastVerifiedAt": "2026-07-29T16:39:20.045Z",
-      "activeInAcuAuto": true
+      "activeInAcuAuto": true,
+      "webToolDeclarationAccepted": true,
+      "webSearchExecutionVerified": false,
+      "webSearchStreamingVerified": false,
+      "webSearchResultVerified": false,
+      "webSearchFailureReason": "web_search_output_item_missing"
     },
     {
       "executionProfileId": "blackai-codex-mix-low:gpt-5.6-terra:responses",
@@ -131,7 +140,12 @@
       "health": "healthy",
       "healthReason": "minimal_native_responses_preflight_passed",
       "lastVerifiedAt": "2026-07-29T16:39:14.209Z",
-      "activeInAcuAuto": true
+      "activeInAcuAuto": true,
+      "webToolDeclarationAccepted": true,
+      "webSearchExecutionVerified": false,
+      "webSearchStreamingVerified": false,
+      "webSearchResultVerified": false,
+      "webSearchFailureReason": "web_search_output_item_missing"
     },
     {
       "executionProfileId": "blackai-pro-1-4:gpt-5.4-mini:responses",
@@ -333,8 +347,7 @@
       "supportedToolTypes": [
         "function",
         "custom",
-        "local_tool",
-        "hosted_web_search"
+        "local_tool"
       ],
       "thinkingSupport": true,
       "supportedReasoningEfforts": [
@@ -718,7 +731,15 @@
       "health": "healthy",
       "healthReason": "minimal_native_responses_preflight_passed",
       "lastVerifiedAt": "2026-07-29T16:39:24.348Z",
-      "activeInAcuAuto": true
+      "activeInAcuAuto": true,
+      "webToolDeclarationAccepted": true,
+      "webSearchExecutionVerified": true,
+      "webSearchStreamingVerified": true,
+      "webSearchResultVerified": true,
+      "webSearchRecentSuccessRate": 1,
+      "webSearchObservedLatencyMs": 28817,
+      "webSearchLastVerifiedAt": "2026-07-29T17:31:45.066Z",
+      "webSearchFailureReason": null
     },
     {
       "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.5:responses",
@@ -752,8 +773,7 @@
       "supportedToolTypes": [
         "function",
         "custom",
-        "local_tool",
-        "hosted_web_search"
+        "local_tool"
       ],
       "thinkingSupport": true,
       "supportedReasoningEfforts": [
@@ -769,7 +789,15 @@
       "health": "healthy",
       "healthReason": "minimal_native_responses_preflight_passed",
       "lastVerifiedAt": "2026-07-29T15:28:24.028Z",
-      "activeInAcuAuto": true
+      "activeInAcuAuto": true,
+      "webToolDeclarationAccepted": true,
+      "webSearchExecutionVerified": true,
+      "webSearchStreamingVerified": true,
+      "webSearchResultVerified": true,
+      "webSearchRecentSuccessRate": 1,
+      "webSearchObservedLatencyMs": 5241,
+      "webSearchLastVerifiedAt": "2026-07-29T17:30:59.989Z",
+      "webSearchFailureReason": null
     },
     {
       "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.6-sol:responses",
@@ -819,7 +847,15 @@
       "health": "healthy",
       "healthReason": "minimal_native_responses_preflight_passed",
       "lastVerifiedAt": "2026-07-29T16:39:29.252Z",
-      "activeInAcuAuto": true
+      "activeInAcuAuto": true,
+      "webToolDeclarationAccepted": true,
+      "webSearchExecutionVerified": true,
+      "webSearchStreamingVerified": true,
+      "webSearchResultVerified": true,
+      "webSearchRecentSuccessRate": 1,
+      "webSearchObservedLatencyMs": 5342,
+      "webSearchLastVerifiedAt": "2026-07-29T17:31:56.218Z",
+      "webSearchFailureReason": null
     },
     {
       "executionProfileId": "lucen-cx006-plus:gpt-5.4-mini:responses",
@@ -874,8 +910,7 @@
       "supportedToolTypes": [
         "function",
         "custom",
-        "local_tool",
-        "hosted_web_search"
+        "local_tool"
       ],
       "thinkingSupport": true,
       "supportedReasoningEfforts": [
@@ -988,8 +1023,7 @@
       "supportedToolTypes": [
         "function",
         "custom",
-        "local_tool",
-        "hosted_web_search"
+        "local_tool"
       ],
       "thinkingSupport": true,
       "supportedReasoningEfforts": [

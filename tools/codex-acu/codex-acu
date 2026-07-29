@@ -1,6 +1,35 @@
 #!/usr/bin/env sh
 set -eu
 
+workspace_gate() {
+  workspace_dir=$1
+  workspace_dir=$(CDPATH= cd -- "$workspace_dir" 2>/dev/null && pwd) || {
+    echo "codex-acu workspace gate: directory does not exist: $1" >&2
+    exit 3
+  }
+  test "$(stat -c '%u' "$workspace_dir")" = "$(id -u)" || {
+    echo "codex-acu workspace gate: current user does not own $workspace_dir" >&2
+    exit 3
+  }
+  test -w "$workspace_dir" || {
+    echo "codex-acu workspace gate: directory is not writable: $workspace_dir" >&2
+    exit 3
+  }
+  probe="$workspace_dir/.codex-acu-write-probe.$$"
+  (umask 077; : > "$probe") 2>/dev/null || {
+    echo "codex-acu workspace gate: probe file could not be created" >&2
+    exit 3
+  }
+  rm -f "$probe" || {
+    echo "codex-acu workspace gate: probe file could not be removed" >&2
+    exit 3
+  }
+  git -C "$workspace_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
+    echo "codex-acu workspace gate: directory is not a Git repository" >&2
+    exit 3
+  }
+}
+
 acu_home=${CODEX_ACU_HOME:-${XDG_DATA_HOME:-${HOME}/.local/share}/codex-acu}
 credential_file="$acu_home/credentials"
 if [ ! -d "$acu_home" ] || [ ! -f "$acu_home/config.toml" ]; then
@@ -10,6 +39,11 @@ fi
 case "${1:-}" in
   --version|-V) exec codex --version ;;
   home) printf '%s\n' "$acu_home"; exit 0 ;;
+  workspace)
+    workspace_gate "${2:-$PWD}"
+    echo "workspace: writable Git repository (${2:-$PWD})"
+    exit 0
+    ;;
   credentials)
     case "${2:-status}" in
       status)
@@ -75,12 +109,27 @@ case "$ACU_API_KEY" in sk-?*) ;; *) echo "invalid ACU credential" >&2; exit 1 ;;
 
 export CODEX_HOME="$acu_home"
 export ACU_API_KEY
+workspace_dir=$PWD
+expect_workspace_dir=no
 for argument in "$@"; do
+  if [ "$expect_workspace_dir" = yes ]; then
+    workspace_dir=$argument
+    expect_workspace_dir=no
+    continue
+  fi
   case "$argument" in
+    -C|--cd) expect_workspace_dir=yes ;;
+    -C=*|--cd=*) workspace_dir=${argument#*=} ;;
     -m|--model|--model=*|model=*|model_provider=*)
       echo "codex-acu fixes model=acu-auto and provider=acu-founder-alpha; explicit model overrides are not allowed" >&2
       exit 2
       ;;
+    -s|--sandbox|--sandbox=*)
+      echo "codex-acu fixes sandbox=workspace-write; sandbox overrides are not allowed" >&2
+      exit 2
+      ;;
   esac
 done
-exec codex -m acu-auto -c 'model_provider="acu-founder-alpha"' -c 'model_reasoning_effort="medium"' "$@"
+test "$expect_workspace_dir" = no || { echo "codex-acu: -C/--cd requires a directory" >&2; exit 2; }
+workspace_gate "$workspace_dir"
+exec codex -m acu-auto -c 'model_provider="acu-founder-alpha"' -c 'model_reasoning_effort="medium"' --sandbox workspace-write "$@"

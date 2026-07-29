@@ -141,6 +141,20 @@ run("Alpha PostgreSQL request processor", () => {
         "event: response.created",
         `data: ${JSON.stringify({ type: "response.created", response: { id: responseId, model: requestBody.model } })}`,
         "",
+        ...(requestBody.test_web_success === true ? [
+          "event: response.web_search_call.in_progress",
+          `data: ${JSON.stringify({ type: "response.web_search_call.in_progress" })}`,
+          "",
+          "event: response.web_search_call.searching",
+          `data: ${JSON.stringify({ type: "response.web_search_call.searching" })}`,
+          "",
+          "event: response.web_search_call.completed",
+          `data: ${JSON.stringify({
+            type: "response.web_search_call.completed",
+            item: { type: "web_search_call", status: "completed" },
+          })}`,
+          "",
+        ] : []),
         "event: response.output_text.delta",
         `data: ${JSON.stringify({ type: "response.output_text.delta", delta: "ok" })}`,
         "",
@@ -150,6 +164,9 @@ run("Alpha PostgreSQL request processor", () => {
           response: {
             id: responseId,
             model: requestBody.model,
+            output: requestBody.test_web_success === true
+              ? [{ type: "web_search_call", status: "completed" }, { type: "message", content: [] }]
+              : [{ type: "message", content: [] }],
             usage: {
               input_tokens: 100,
               input_tokens_details: { cached_tokens: 20 },
@@ -183,6 +200,10 @@ run("Alpha PostgreSQL request processor", () => {
       health: "healthy",
       enabled: true,
       administratorAllowed: true,
+      webToolDeclarationAccepted: true,
+      webSearchExecutionVerified: true,
+      webSearchStreamingVerified: true,
+      webSearchResultVerified: true,
     };
     const adapter = createNativeProviderAdapter({
       provider: profile.provider,
@@ -503,6 +524,75 @@ run("Alpha PostgreSQL request processor", () => {
     const retriedBodies = upstreamBodies.filter((item) => item.test_case === "retry-once");
     expect(retriedBodies).toHaveLength(2);
     expect(retriedBodies[0]).toEqual(retriedBodies[1]);
+  });
+
+  it("keeps a Web-specific 422 out of normal Profile health and falls back within the same model", async () => {
+    await database.query("DELETE FROM acu_channel_health WHERE channel_id IN ('test-channel','test-recovery-channel')");
+    await database.query(
+      "DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id IN ('test:gpt-5.4-mini:responses','test:gpt-5.4-mini:recovery')",
+    );
+    const body = {
+      model: "acu-auto",
+      input: "Use web search for the current UTC date",
+      tools: [{ type: "web_search" }],
+      stream: true,
+      test_case: "web-retry-once",
+      test_failures_before_success: 1,
+      test_failure_status: 422,
+      test_web_success: true,
+    };
+    await send(body, "web-retry-1", "user-web-retry");
+    const result = await database.query<{
+      logical_requests: string;
+      channels: string[];
+      first_circuit: string;
+      first_web_rate: number;
+      logical_metadata: Record<string, unknown>;
+    }>(
+      `SELECT
+       (SELECT count(*) FROM acu_logical_requests WHERE newapi_user_id='user-web-retry') logical_requests,
+       (SELECT array_agg(channel ORDER BY attempt_index) FROM acu_attempts
+        WHERE logical_request_id=(SELECT logical_request_id FROM acu_logical_requests WHERE newapi_user_id='user-web-retry')) channels,
+       (SELECT circuit_state FROM acu_provider_model_profile_health WHERE execution_profile_id='test:gpt-5.4-mini:responses') first_circuit,
+       (SELECT (metadata_json->>'webSearchRecentSuccessRate')::double precision
+        FROM acu_provider_model_profile_health WHERE execution_profile_id='test:gpt-5.4-mini:responses') first_web_rate,
+       (SELECT metadata_json FROM acu_logical_requests WHERE newapi_user_id='user-web-retry') logical_metadata`,
+    );
+    expect(result.rows[0].logical_requests).toBe("1");
+    expect(result.rows[0].channels).toEqual(["test-channel", "test-recovery-channel"]);
+    expect(result.rows[0].first_circuit).toBe("healthy");
+    expect(result.rows[0].first_web_rate).toBeLessThan(1);
+    expect(result.rows[0].logical_metadata).toMatchObject({
+      webActuallyInvoked: true,
+      webSearchEventStatus: ["in_progress", "searching", "completed"],
+      webFallbackChain: [
+        "test-channel:primary",
+        "test-recovery-channel:primary",
+      ],
+    });
+  });
+
+  it("rejects a file modification before Judge or Provider when the workspace is read-only", async () => {
+    const beforeJudge = judgeCalls;
+    const beforeProvider = upstreamBodies.length;
+    const body = Buffer.from(JSON.stringify({
+      model: "acu-auto",
+      input: [
+        { type: "message", role: "developer", content: [{ type: "input_text", text: "<permissions instructions>\n`sandbox_mode` is `read-only`\n</permissions instructions>" }] },
+        { type: "message", role: "user", content: [{ type: "input_text", text: `<environment_context><cwd>${process.cwd()}</cwd></environment_context>` }] },
+        { type: "message", role: "user", content: [{ type: "input_text", text: "Modify one file and run check.sh" }] },
+      ],
+      stream: true,
+    }));
+    const response = await fetch(`http://127.0.0.1:${gatewayPort}/v1/responses`, {
+      method: "POST",
+      headers: signedHeaders(body, "workspace-read-only", "user-workspace", "codex"),
+      body,
+    });
+    expect(response.status).toBe(422);
+    expect(await response.text()).toContain("Codex sandbox must be workspace-write");
+    expect(judgeCalls).toBe(beforeJudge);
+    expect(upstreamBodies.length).toBe(beforeProvider);
   });
 
   it("keeps Claude tool_result in role=user separate from a HumanMessage and preserves native SSE", async () => {

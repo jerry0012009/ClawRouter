@@ -92,6 +92,11 @@ function jsonError(
     : { error: { type: "acu_gateway_error", message } }));
 }
 
+function executionErrorStatus(error: unknown): number {
+  const status = Number((error as { statusCode?: unknown } | undefined)?.statusCode);
+  return Number.isInteger(status) && status >= 400 && status <= 599 ? status : 502;
+}
+
 function pathProtocol(pathname: string): "responses" | "messages" | undefined {
   if (pathname === "/v1/responses") return "responses";
   if (pathname === "/v1/messages") return "messages";
@@ -237,7 +242,7 @@ export function createAlphaGatewayServer(options: AlphaGatewayOptions): Server {
       if (!abortController.signal.aborted) {
         if (response.headersSent && !response.destroyed) response.end();
         else {
-          const status = stage === "identity" ? 401 : stage === "protocol" ? 400 : stage === "body" ? 413 : 502;
+          const status = stage === "identity" ? 401 : stage === "protocol" ? 400 : stage === "body" ? 413 : executionErrorStatus(error);
           jsonError(response, status, error instanceof Error ? error.message : "ACU gateway failure", protocol);
         }
       }

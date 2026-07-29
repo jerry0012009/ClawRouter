@@ -27,6 +27,7 @@ import {
   type ProviderRecoveryTarget,
 } from "./execution.js";
 import { applyAttemptOutcome, classifyAttemptOutcome, type AttemptOutcome, type HealthSnapshot } from "./channel-health.js";
+import { verifyWritableWorkspace } from "./workspace-gate.js";
 
 const POLICY_VERSION = "alpha-p0-policy-v1";
 const QUALITY_CURVE_VERSION = "acu-catalog-v0.1";
@@ -62,6 +63,13 @@ export type AlphaResolutionContext = {
   judgeCostUsd: string;
   requestBytes: number;
   replayed: boolean;
+  clientDeclaredWebTool: boolean;
+  webIntent: CanonicalEnvelope["webIntent"];
+  webActuallyInvoked: boolean;
+  webSearchEventStatus: string[];
+  webToolPruned: boolean;
+  webToolPruneReason?: string;
+  webFallbackChain: string[];
   routeSummary: {
     mode: string;
     routingPreference: string;
@@ -103,6 +111,11 @@ function stringValue(value: unknown): string | undefined {
 function numberValue(value: unknown, fallback = 0): number {
   const valueAsNumber = Number(value);
   return Number.isFinite(valueAsNumber) ? valueAsNumber : fallback;
+}
+
+function optionalNumber(value: unknown): number | undefined {
+  const valueAsNumber = Number(value);
+  return value === null || value === undefined || !Number.isFinite(valueAsNumber) ? undefined : valueAsNumber;
 }
 
 function canonicalActualModel(profile: AlphaExecutionProfile, actualModel: string | undefined): string {
@@ -232,9 +245,47 @@ function selectedProfileFromSegment(
   return id ? profiles.find((profile) => profile.executionProfileId === id) : undefined;
 }
 
-function rewriteModel(rawBody: Uint8Array, model: string): Buffer {
+function isHostedWebTool(value: unknown): boolean {
+  const type = String(record(value)?.type ?? "").toLowerCase();
+  return type === "web_search" || type.startsWith("web_search_");
+}
+
+function bodyDeclaresHostedWebTool(body: Uint8Array): boolean {
+  try {
+    const parsed = JSON.parse(Buffer.from(body).toString("utf8")) as JsonObject;
+    return Array.isArray(parsed.tools) && parsed.tools.some(isHostedWebTool);
+  } catch {
+    return false;
+  }
+}
+
+function isWebSearchProviderError(response: { status: number }, webIntent: CanonicalEnvelope["webIntent"]): boolean {
+  return webIntent !== "not_required" && [400, 409, 422].includes(response.status);
+}
+
+export function prepareProviderBody(
+  rawBody: Uint8Array,
+  model: string,
+  envelope: CanonicalEnvelope,
+  profile: AlphaExecutionProfile,
+): { body: Buffer; webToolPruned: boolean; pruneReason?: string } {
   const parsed = JSON.parse(Buffer.from(rawBody).toString("utf8")) as JsonObject;
-  return Buffer.from(JSON.stringify({ ...parsed, model }));
+  let webToolPruned = false;
+  if (envelope.clientDeclaredWebTool && envelope.webIntent !== "required"
+    && profile.webToolDeclarationAccepted !== true && Array.isArray(parsed.tools)) {
+    const tools = parsed.tools.filter((tool) => !isHostedWebTool(tool));
+    webToolPruned = tools.length !== parsed.tools.length;
+    parsed.tools = tools;
+  }
+  const providerModel = typeof parsed.model === "string" ? parsed.model : "";
+  if (!webToolPruned && providerModel === model) {
+    return { body: Buffer.from(rawBody), webToolPruned: false };
+  }
+  return {
+    body: Buffer.from(JSON.stringify({ ...parsed, model })),
+    webToolPruned,
+    pruneReason: webToolPruned ? "hosted_web_tool_not_required_and_profile_declaration_unverified" : undefined,
+  };
 }
 
 function responseContentType(headers: Record<string, string>): string {
@@ -318,6 +369,14 @@ export class AlphaRequestProcessor {
         usageTrusted: runtime?.usageTrusted ?? profile.usageTrusted,
         recentSuccessRate: Math.min(channel?.recentSuccessRate ?? 1, runtime?.recentSuccessRate ?? 1),
         observedLatencyMs: runtime?.totalLatencyMs ?? channel?.totalLatencyMs ?? profile.observedLatencyMs,
+        webSearchRecentSuccessRate: optionalNumber(runtime?.metadata?.webSearchRecentSuccessRate)
+          ?? profile.webSearchRecentSuccessRate,
+        webSearchObservedLatencyMs: optionalNumber(runtime?.metadata?.webSearchObservedLatencyMs)
+          ?? profile.webSearchObservedLatencyMs,
+        webSearchLastVerifiedAt: stringValue(runtime?.metadata?.webSearchLastVerifiedAt)
+          || profile.webSearchLastVerifiedAt,
+        webSearchFailureReason: stringValue(runtime?.metadata?.webSearchFailureReason)
+          || profile.webSearchFailureReason,
       });
     }
     return { profiles, probeClaims };
@@ -535,11 +594,13 @@ export class AlphaRequestProcessor {
     if (modeForModel(envelope.requestedModel) === "explicit") {
       const profile = resolveExplicitProfile(envelope.requestedModel, effectiveProfiles, {
         protocol: envelope.protocol,
-        requireTools: envelope.tools.length > 0,
+        requireTools: envelope.requiredToolTypes.length > 0,
         requiredToolTypes: envelope.requiredToolTypes,
         requireThinking: envelope.containsThinking,
         reasoningEffort: envelope.reasoningEffort,
         contextTokens: Math.ceil(rawBytes / 4),
+        clientDeclaredWebTool: envelope.clientDeclaredWebTool,
+        webIntent: envelope.webIntent,
       });
       if (state.decision.createSegment || !state.segment.segmentId) {
         const routeDecisionId = alphaId("route");
@@ -632,7 +693,7 @@ export class AlphaRequestProcessor {
       profiles: effectiveProfiles,
       requirements: {
         protocol: envelope.protocol,
-        requireTools: envelope.tools.length > 0,
+        requireTools: envelope.requiredToolTypes.length > 0,
         requiredToolTypes: envelope.requiredToolTypes,
         requireThinking: envelope.containsThinking,
         reasoningEffort: envelope.reasoningEffort,
@@ -642,6 +703,8 @@ export class AlphaRequestProcessor {
           : identity.routingPolicy === "custom_allowlist"
             ? identity.allowedModelIds
             : [],
+        clientDeclaredWebTool: envelope.clientDeclaredWebTool,
+        webIntent: envelope.webIntent,
       },
       routeDirection: state.decision.routeDirection,
       currentProfile: reused,
@@ -765,6 +828,8 @@ export class AlphaRequestProcessor {
         providerCandidateEstimates: route.providerCandidateEstimates,
         reasoningEffort: envelope.reasoningEffort,
         requiredToolTypes: envelope.requiredToolTypes,
+        clientDeclaredWebTool: envelope.clientDeclaredWebTool,
+        webIntent: envelope.webIntent,
       },
       candidateEstimates: route.candidateEstimates,
       paretoFrontier: route.paretoFrontier,
@@ -807,8 +872,9 @@ export class AlphaRequestProcessor {
       && profile.usageTrusted !== false
       && (!profile.economics || (profile.economics.enabled && profile.economics.health === "healthy"))
       && profile.protocols.includes(envelope.protocol)
-      && (!envelope.tools.length || profile.toolCallSupport)
+      && (!envelope.requiredToolTypes.length || profile.toolCallSupport)
       && envelope.requiredToolTypes.every((toolType) => profile.supportedToolTypes?.includes(toolType))
+      && (envelope.webIntent !== "required" || profile.webSearchExecutionVerified === true)
       && (!envelope.containsThinking || profile.thinkingSupport)
       && profile.contextWindow >= Math.ceil(rawBytes / 4)
       && this.options.adapters.has(profile.executionProfileId)
@@ -870,6 +936,7 @@ export class AlphaRequestProcessor {
     response?: BufferedProviderFailure;
     error?: unknown;
     latencyMs: number;
+    webFailure?: boolean;
   }): Promise<void> {
     const repository = new AlphaRepository(this.options.database);
     const contentType = input.response ? responseContentType(input.response.headers) : undefined;
@@ -901,7 +968,7 @@ export class AlphaRequestProcessor {
       actualModel: usage?.actualModel ?? input.attempt.profile.modelId,
       providerRequestId: input.response?.headers["x-request-id"]
         ?? input.response?.headers["request-id"],
-      errorCategory: "provider_error",
+      errorCategory: input.webFailure ? "web_search_failed" : "provider_error",
       httpStatus: input.response?.status,
       inputTokens: usage?.inputTokens,
       cachedInputTokens: usage?.cachedInputTokens,
@@ -910,15 +977,38 @@ export class AlphaRequestProcessor {
       usageSource: usage?.usageSource,
       actualCostUsd: "0.0000000000",
       latencyMs: input.latencyMs,
-      metadata: { error: input.error instanceof Error ? input.error.message : undefined },
+      metadata: {
+        error: input.error instanceof Error ? input.error.message : undefined,
+        webFailure: input.webFailure === true,
+      },
     });
-    await this.recordRuntimeHealth(input.attempt.profile, input.protocol, {
-      success: false,
-      httpStatus: input.response?.status,
-      errorMessage: input.error instanceof Error ? input.error.message : input.response?.body.toString("utf8", 0, 512),
-      retryAfterSeconds: input.response?.headers["retry-after"] ? Number(input.response.headers["retry-after"]) : undefined,
-      totalLatencyMs: input.latencyMs,
-    });
+    if (input.webFailure) {
+      const runtime = await repository.profileHealth(input.attempt.profile.executionProfileId);
+      const previousRate = optionalNumber(runtime?.metadata?.webSearchRecentSuccessRate)
+        ?? input.attempt.profile.webSearchRecentSuccessRate
+        ?? 1;
+      await repository.saveProfileWebHealth({
+        executionProfileId: input.attempt.profile.executionProfileId,
+        channelId: input.attempt.profile.channelId ?? input.attempt.profile.channel,
+        providerId: input.attempt.profile.provider,
+        canonicalModelId: input.attempt.profile.modelId,
+        protocol: input.protocol,
+        usageTrusted: input.attempt.profile.usageTrusted !== false,
+        actualModelVerified: true,
+        metadata: {
+          webSearchRecentSuccessRate: (previousRate * 4) / 5,
+          webSearchFailureReason: "web_search_provider_error",
+        },
+      });
+    } else {
+      await this.recordRuntimeHealth(input.attempt.profile, input.protocol, {
+        success: false,
+        httpStatus: input.response?.status,
+        errorMessage: input.error instanceof Error ? input.error.message : input.response?.body.toString("utf8", 0, 512),
+        retryAfterSeconds: input.response?.headers["retry-after"] ? Number(input.response.headers["retry-after"]) : undefined,
+        totalLatencyMs: input.latencyMs,
+      });
+    }
     await repository.insertEvent({
       eventId: alphaId("evt"),
       sessionId: input.state.sessionId,
@@ -977,6 +1067,12 @@ export class AlphaRequestProcessor {
       status: "started",
       inputPricePerMillion: catalogModel?.inputPricePerMillion?.toString(),
       outputPricePerMillion: catalogModel?.outputPricePerMillion?.toString(),
+      metadata: {
+        clientDeclaredWebTool: input.envelope.clientDeclaredWebTool,
+        webIntent: input.envelope.webIntent,
+        providerRequestDeclaresWebTool: bodyDeclaresHostedWebTool(input.body),
+        webProfileVerified: input.profile.webSearchExecutionVerified === true,
+      },
     });
     await repository.savePayload({
       payloadId: alphaId("payload"),
@@ -995,6 +1091,10 @@ export class AlphaRequestProcessor {
         selectedProvider: input.profile.provider,
         channelId: input.profile.channelId ?? input.profile.channel,
         networkEndpoint: endpoint.endpoint,
+        clientDeclaredWebTool: input.envelope.clientDeclaredWebTool,
+        webIntent: input.envelope.webIntent,
+        providerRequestDeclaresWebTool: bodyDeclaresHostedWebTool(input.body),
+        webProfileVerified: input.profile.webSearchExecutionVerified === true,
       },
     });
     if (input.attemptIndex > 1) {
@@ -1026,6 +1126,7 @@ export class AlphaRequestProcessor {
     identity: TrustedNewApiIdentity,
     ingress: AlphaIngressContext,
   ): Promise<AlphaExecutionResolution> {
+    await verifyWritableWorkspace(envelope);
     const mode = modeForModel(envelope.requestedModel);
     const state = await this.prepareState(envelope, identity, ingress, mode);
     const result = await this.judgeAndRoute(envelope, identity, state, ingress.rawBody.byteLength);
@@ -1058,7 +1159,13 @@ export class AlphaRequestProcessor {
       selectedProfileId: result.profile.executionProfileId,
       streaming: envelope.stream,
       hadTools: envelope.tools.length > 0,
-      metadata: { requestId: identity.requestId, reasoningEffort: envelope.reasoningEffort },
+      metadata: {
+        requestId: identity.requestId,
+        reasoningEffort: envelope.reasoningEffort,
+        clientDeclaredWebTool: envelope.clientDeclaredWebTool,
+        webIntent: envelope.webIntent,
+        webActuallyInvoked: false,
+      },
     });
     const logicalRow = await repository.getLogicalRequest(logical.logicalRequestId, identity.newapiUserId);
     if (!logical.inserted && logicalRow?.status === "completed" && stringValue(logicalRow.response_payload_id)) {
@@ -1084,6 +1191,12 @@ export class AlphaRequestProcessor {
             judgeCostUsd: result.judge?.costUsd ?? "0.0000000000",
             requestBytes: ingress.rawBody.byteLength,
             replayed: true,
+            clientDeclaredWebTool: envelope.clientDeclaredWebTool,
+            webIntent: envelope.webIntent,
+            webActuallyInvoked: false,
+            webSearchEventStatus: [],
+            webToolPruned: false,
+            webFallbackChain: [],
             routeSummary: routeDisplaySummary(
               envelope.requestedModel,
               result.profile.modelId,
@@ -1117,9 +1230,13 @@ export class AlphaRequestProcessor {
       });
       await repository.attachRequestPayload(logical.logicalRequestId, identity.newapiUserId, requestPayloadId);
     }
-    const providerBody = mode === "explicit"
-      ? Buffer.from(ingress.rawBody)
-      : rewriteModel(ingress.rawBody, result.profile.providerModelId ?? result.profile.modelId);
+    const prepared = prepareProviderBody(
+      ingress.rawBody,
+      mode === "explicit" ? envelope.requestedModel : result.profile.providerModelId ?? result.profile.modelId,
+      envelope,
+      result.profile,
+    );
+    const providerBody = prepared.body;
     const initialAttempt = await this.startProviderAttempt({
       identity,
       state,
@@ -1151,6 +1268,13 @@ export class AlphaRequestProcessor {
       judgeCostUsd: result.judge?.costUsd ?? "0.0000000000",
       requestBytes: ingress.rawBody.byteLength,
       replayed: false,
+      clientDeclaredWebTool: envelope.clientDeclaredWebTool,
+      webIntent: envelope.webIntent,
+      webActuallyInvoked: false,
+      webSearchEventStatus: [],
+      webToolPruned: prepared.webToolPruned,
+      webToolPruneReason: prepared.pruneReason,
+      webFallbackChain: [],
       routeSummary: routeDisplaySummary(
         envelope.requestedModel,
         result.profile.modelId,
@@ -1163,6 +1287,7 @@ export class AlphaRequestProcessor {
     const adapter = createRecoveringProviderAdapter({
       initial: initialAttempt,
       maxAttempts: maxProviderAttempts,
+      isRecoverableResponse: (response) => isWebSearchProviderError(response, envelope.webIntent),
       selectRecoveryTarget: (() => {
         const attemptedProfiles = new Set([result.profile.executionProfileId]);
         return (current): ProviderRecoveryTarget | undefined => {
@@ -1187,12 +1312,17 @@ export class AlphaRequestProcessor {
           response,
           error,
           latencyMs,
+          webFailure: Boolean(response && isWebSearchProviderError(response, envelope.webIntent)),
         });
       },
       startRetry: async (profile, nextAttemptIndex, target) => {
-        const retryBody = mode === "explicit"
-          ? Buffer.from(ingress.rawBody)
-          : rewriteModel(ingress.rawBody, profile.providerModelId ?? profile.modelId);
+        const retryPrepared = prepareProviderBody(
+          ingress.rawBody,
+          mode === "explicit" ? envelope.requestedModel : profile.providerModelId ?? profile.modelId,
+          envelope,
+          profile,
+        );
+        const retryBody = retryPrepared.body;
         const next = await this.startProviderAttempt({
           identity,
           state,
@@ -1211,6 +1341,16 @@ export class AlphaRequestProcessor {
         resolutionContext.attemptIndex = next.attemptIndex;
         resolutionContext.selectedProfile = next.profile;
         resolutionContext.networkEndpoint = next.networkEndpoint;
+        resolutionContext.webToolPruned = retryPrepared.webToolPruned;
+        resolutionContext.webToolPruneReason = retryPrepared.pruneReason;
+        if (envelope.webIntent !== "not_required") {
+          if (resolutionContext.webFallbackChain.length === 0) {
+            resolutionContext.webFallbackChain.push(
+              `${result.profile.channel}:${initialAttempt.networkEndpoint ?? "primary"}`,
+            );
+          }
+          resolutionContext.webFallbackChain.push(`${next.profile.channel}:${next.networkEndpoint ?? "primary"}`);
+        }
         resolutionContext.routeSummary.providerSelectionReason = [
           resolutionContext.routeSummary.providerSelectionReason,
           `${target?.reason ?? "same_model_channel_fallback"}:${next.profile.channel}:${next.networkEndpoint ?? "primary"}`,
@@ -1295,6 +1435,14 @@ export class AlphaRequestProcessor {
         fallback_chain: input.context.routeSummary.providerSelectionReason?.includes("fallback")
           ? input.context.routeSummary.providerSelectionReason
           : undefined,
+        client_declared_web_tool: input.context.clientDeclaredWebTool,
+        web_intent: input.context.webIntent,
+        web_actually_invoked: input.context.webActuallyInvoked,
+        web_search_event_status: input.context.webSearchEventStatus,
+        web_profile_verified: input.context.selectedProfile.webSearchExecutionVerified === true,
+        web_fallback_chain: input.context.webFallbackChain,
+        web_tool_pruned: input.context.webToolPruned,
+        web_tool_prune_reason: input.context.webToolPruneReason,
         ...(() => {
           const economics = input.context.selectedProfile.economics;
           if (!economics) return {};
@@ -1362,8 +1510,36 @@ export class AlphaRequestProcessor {
       requestedModel: context.selectedProfile.modelId,
       requestBytes: context.requestBytes,
     });
-    const success = relay.httpStatus >= 200 && relay.httpStatus < 300 && relay.complete;
+    context.webActuallyInvoked = relay.webSearch.actuallyInvoked;
+    trace.envelope.webActuallyInvoked = relay.webSearch.actuallyInvoked;
+    context.webSearchEventStatus = relay.webSearch.eventStatus;
+    const webSucceeded = relay.webSearch.actuallyInvoked
+      && relay.webSearch.executionCompleted
+      && relay.webSearch.resultVerified;
+    const webRequiredFailure = context.webIntent === "required" && !webSucceeded;
+    if (relay.webSearch.actuallyInvoked || webRequiredFailure) {
+      const previousRate = context.selectedProfile.webSearchRecentSuccessRate ?? 1;
+      context.selectedProfile.webSearchRecentSuccessRate = (previousRate * 4 + (webSucceeded ? 1 : 0)) / 5;
+      context.selectedProfile.webSearchObservedLatencyMs = relay.webSearch.searchLatencyMs;
+      if (webSucceeded) {
+        context.selectedProfile.webSearchLastVerifiedAt = new Date().toISOString();
+        context.selectedProfile.webSearchFailureReason = undefined;
+      } else {
+        context.selectedProfile.webSearchFailureReason = relay.webSearch.actuallyInvoked
+          ? "web_search_event_incomplete"
+          : "web_search_not_invoked";
+      }
+    }
+    const transportSuccess = relay.httpStatus >= 200 && relay.httpStatus < 300 && relay.complete;
+    const success = transportSuccess && !webRequiredFailure;
     const status = relay.clientCancelled ? "cancelled" : success ? "success" : "error";
+    const errorCategory = success
+      ? undefined
+      : relay.clientCancelled
+        ? "client_cancelled"
+        : webRequiredFailure
+          ? context.webActuallyInvoked ? "web_search_failed" : "web_search_not_invoked"
+          : "provider_error";
     const providerPayloadId = alphaId("payload");
     await repository.savePayload({
       payloadId: providerPayloadId,
@@ -1400,25 +1576,66 @@ export class AlphaRequestProcessor {
       status,
       actualModel: canonicalActualModel(context.selectedProfile, usage.actualModel),
       providerRequestId,
-      errorCategory: success ? undefined : relay.clientCancelled ? "client_cancelled" : "provider_error",
+      errorCategory,
       httpStatus: relay.httpStatus,
       inputTokens: usage.inputTokens,
       cachedInputTokens: usage.cachedInputTokens,
       outputTokens: usage.outputTokens,
       reasoningTokens: usage.reasoningTokens,
       usageSource: usage.usageSource,
-      actualCostUsd: success ? usage.providerCostUsd : "0.0000000000",
-      providerBilled: success ? true : undefined,
+      actualCostUsd: transportSuccess ? usage.providerCostUsd : "0.0000000000",
+      providerBilled: transportSuccess ? true : undefined,
       visibleOutputBytes: relay.visibleOutputBytes,
-      metadata: { complete: relay.complete, clientCancelled: relay.clientCancelled },
+      metadata: {
+        complete: relay.complete,
+        clientCancelled: relay.clientCancelled,
+        clientDeclaredWebTool: context.clientDeclaredWebTool,
+        webIntent: context.webIntent,
+        webActuallyInvoked: context.webActuallyInvoked,
+        webSearchEventStatus: context.webSearchEventStatus,
+        webSearchExecutionCompleted: relay.webSearch.executionCompleted,
+        webSearchResultVerified: relay.webSearch.resultVerified,
+        webSearchObservedLatencyMs: relay.webSearch.searchLatencyMs,
+        webProfileVerified: context.selectedProfile.webSearchExecutionVerified === true,
+        webFallbackChain: context.webFallbackChain,
+        webToolPruned: context.webToolPruned,
+        webToolPruneReason: context.webToolPruneReason,
+      },
     });
     const canonicalModel = canonicalActualModel(context.selectedProfile, usage.actualModel);
     await this.recordRuntimeHealth(context.selectedProfile, context.protocol, {
-      success,
+      success: transportSuccess,
       clientCancelled: relay.clientCancelled,
       httpStatus: relay.httpStatus,
       actualModelMismatch: Boolean(usage.actualModel && canonicalModel !== context.selectedProfile.modelId),
-      usageTrusted: success ? usage.usageSource === "provider_usage" : undefined,
+      usageTrusted: transportSuccess ? usage.usageSource === "provider_usage" : undefined,
+    });
+    if (relay.webSearch.actuallyInvoked || webRequiredFailure) {
+      await repository.saveProfileWebHealth({
+        executionProfileId: context.selectedProfile.executionProfileId,
+        channelId: context.selectedProfile.channelId ?? context.selectedProfile.channel,
+        providerId: context.selectedProfile.provider,
+        canonicalModelId: context.selectedProfile.modelId,
+        protocol: context.protocol,
+        usageTrusted: context.selectedProfile.usageTrusted !== false,
+        actualModelVerified: !usage.actualModel || canonicalModel === context.selectedProfile.modelId,
+        metadata: {
+          webSearchRecentSuccessRate: context.selectedProfile.webSearchRecentSuccessRate,
+          webSearchObservedLatencyMs: context.selectedProfile.webSearchObservedLatencyMs,
+          webSearchLastVerifiedAt: context.selectedProfile.webSearchLastVerifiedAt,
+          webSearchFailureReason: context.selectedProfile.webSearchFailureReason,
+        },
+      });
+    }
+    await repository.updateLogicalRequestMetadata(context.logicalRequestId, context.newapiUserId, {
+      clientDeclaredWebTool: context.clientDeclaredWebTool,
+      webIntent: context.webIntent,
+      webActuallyInvoked: context.webActuallyInvoked,
+      webSearchEventStatus: context.webSearchEventStatus,
+      webProfileVerified: context.selectedProfile.webSearchExecutionVerified === true,
+      webFallbackChain: context.webFallbackChain,
+      webToolPruned: context.webToolPruned,
+      webToolPruneReason: context.webToolPruneReason,
     });
     await repository.completeLogicalRequest({
       logicalRequestId: context.logicalRequestId,
@@ -1426,20 +1643,18 @@ export class AlphaRequestProcessor {
       status: success ? "completed" : status,
       acceptedAttemptId: success ? context.attemptId : undefined,
       responsePayloadId,
-      errorCategory: success ? undefined : relay.clientCancelled ? "client_cancelled" : "provider_error",
+      errorCategory,
     });
     if (success) await repository.incrementAcceptedResponses(context.segmentId, context.newapiUserId);
-    if (success || (context.attemptIndex ?? 1) >= 2 || relay.clientCancelled) {
-      await this.createFinalUsageReport({
-        context,
-        actualModel: canonicalActualModel(context.selectedProfile, usage.actualModel),
-        inputTokens: usage.inputTokens,
-        cachedInputTokens: usage.cachedInputTokens,
-        outputTokens: usage.outputTokens,
-        reasoningTokens: usage.reasoningTokens,
-        providerCostUsd: success ? usage.providerCostUsd : "0.0000000000",
-        usageSource: usage.usageSource,
-      });
-    }
+    await this.createFinalUsageReport({
+      context,
+      actualModel: canonicalActualModel(context.selectedProfile, usage.actualModel),
+      inputTokens: usage.inputTokens,
+      cachedInputTokens: usage.cachedInputTokens,
+      outputTokens: usage.outputTokens,
+      reasoningTokens: usage.reasoningTokens,
+      providerCostUsd: transportSuccess ? usage.providerCostUsd : "0.0000000000",
+      usageSource: usage.usageSource,
+    });
   }
 }

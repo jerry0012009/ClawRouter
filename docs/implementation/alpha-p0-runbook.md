@@ -171,3 +171,27 @@ docker compose --env-file .env exec -T postgres-acu \
 - Finalize 失败：查 New API 内部接口鉴权、钱包余额、Token quota 和 Outbox `last_error`；不要手工重复扣费。
 - `acu-auto` 无兼容 Profile：失败关闭，不退回未经审计的直连 Provider。
 - Streaming 已向客户端输出后：不允许同响应拼接第二 Provider；需要新的客户端逻辑请求。
+
+## 11. RC1 HTTPS、公网 Gate 与紧急停止补充
+
+RC1 当前 **未通过公网 Gate**，不要仅因本机 Smoke 成功就开放端口。人工准备域名和证书后，反向代理只能指向 `127.0.0.1:${NEW_API_PORT}`，不得代理 ACU 或 PostgreSQL。Nginx 关键项示例：
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:3200;
+    proxy_http_version 1.1;
+    proxy_buffering off;
+    proxy_request_buffering off;
+    proxy_read_timeout 600s;
+    proxy_send_timeout 600s;
+    client_max_body_size 32m;
+}
+```
+
+域名、DNS、证书路径、公开 Base URL 和联系人均为人工输入，本手册不会猜测或自动修改。启用前须验证 HTTPS、SSE 首字节/取消、请求体上限、IP/用户限流、测试账户余额上限和回滚。
+
+邀请用户按“独立用户 → 受限余额/兑换码 → 普通 Group → Codex/Claude 分离 Token”创建。默认 ACU 策略为 `all_routing_eligible`；用户可改为 `custom_allowlist` 或 `explicit_only`。不得把 Provider Key 给用户。
+
+真实测试 Harness 必须显式设置 `ACU_LIVE_TEST_ENABLED=true`，配置单轮/累计 CNY 预算、并发 1、输出 Token 上限和仓库外 Budget State。Provider 余额不足、Budget Reservation 未结算或成本无法对账时停止，不得删除 State 文件绕过。
+
+紧急停止顺序：先在 New API 禁用两个 ACU Channel 或撤销测试 Token，阻断新请求；再执行 `docker compose stop new-api acu-router`；保留数据库和日志取证。恢复前核对 Provider Dashboard、`acu_attempts`、`acu_usage_reports` 和 New API Finalize。不要使用 `down -v`。

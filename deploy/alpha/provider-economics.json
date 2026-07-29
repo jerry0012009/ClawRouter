@@ -14,7 +14,7 @@
       "observedBillingMultiplier": 0.07,
       "priceSource": "Lucen authenticated /v1/usage nominal token charge; canonical catalog prices",
       "priceObservedAt": "2026-07-29T00:00:00Z",
-      "health": "healthy",
+      "health": "cooldown",
       "priority": 10,
       "enabled": true,
       "effectiveCostSource": "founder recharge batch CNY 500 for USD 500; current observed group multiplier 0.07",

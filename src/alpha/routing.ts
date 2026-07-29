@@ -133,7 +133,10 @@ function profileEstimatedCashCost(profile: AlphaExecutionProfile, inputTokens: n
 
 function providerSelectionScore(profile: AlphaExecutionProfile, inputTokens: number, outputTokens: number): number {
   const base = profileEstimatedCashCost(profile, inputTokens, outputTokens);
-  const healthFactor = profile.health === "degraded" ? 1.2 : profile.health === "unknown" ? 1.1 : 1;
+  const providerHealth = profile.economics?.health;
+  const healthFactor = profile.health === "degraded" || providerHealth === "degraded"
+    ? 1.2
+    : profile.health === "unknown" ? 1.1 : 1;
   const successRate = Math.max(0.5, Math.min(1, profile.recentSuccessRate ?? 1));
   const latencyFactor = 1 + Math.min(0.05, Math.max(0, profile.observedLatencyMs ?? 0) / 1_200_000);
   return base * healthFactor * latencyFactor / successRate;
@@ -160,6 +163,7 @@ function exclusionReasons(
   if (profile.contextWindow < requirements.contextTokens) reasons.push("context_window");
   if (profile.health === "cooldown") reasons.push("health_cooldown");
   if (profile.economics && (!profile.economics.enabled || profile.economics.health === "blocked")) reasons.push("provider_economics");
+  if (profile.economics?.health === "cooldown") reasons.push("provider_cooldown");
   if (profile.usageTrusted === false) reasons.push("usage_untrusted");
   if (requirements.allowedModelIds && !requirements.allowedModelIds.includes(profile.modelId)) reasons.push("model_policy");
   if (input.routeDirection === "hold_or_upgrade" && input.currentProfile) {

@@ -124,9 +124,10 @@ describe("Alpha RC1 deployment profiles", () => {
   it("deduplicates same-model profiles in the formula while retaining profile provenance", async () => {
     const configured = await profiles();
     const responseProfiles = configured.filter((profile) => profile.protocols.includes("responses"));
+    const baseProfile = responseProfiles.find((profile) => profile.provider === "closeai")!;
     const duplicate = {
-      ...responseProfiles[0],
-      executionProfileId: `${responseProfiles[0].executionProfileId}-secondary`,
+      ...baseProfile,
+      executionProfileId: `${baseProfile.executionProfileId}-secondary`,
       channel: "closeai-openai-secondary",
     };
     const decision = routeWithCurrentAcuFormula({
@@ -146,7 +147,7 @@ describe("Alpha RC1 deployment profiles", () => {
 
     expect(decision.candidateEstimates).toHaveLength(5);
     expect(decision.candidateEstimates.find((item) => item.modelId === duplicate.modelId)?.executionProfileIds)
-      .toHaveLength(3);
+      .toHaveLength(2);
   });
 
   it("applies a custom user allowlist as a hard policy filter without changing the routing formula", async () => {

@@ -13,6 +13,8 @@
       "responsesCandidate": 5,
       "responsesVerified": ["gpt-5.4-mini", "gpt-5.6-luna", "gpt-5.6-terra"],
       "hostedWebSearchVerified": ["gpt-5.6-luna"],
+      "health": "cooldown",
+      "healthReason": "Founder Codex request received a Provider-origin Cloudflare 502 after successful preflight; same-model recovery succeeded on CloseAI.",
       "preflightFailed": [{"modelId": "gpt-5.6-sol", "stage": "tool_call_completion", "httpStatus": 200}],
       "notPreflighted": ["gpt-5.5"],
       "unknownModelCount": 16,

@@ -43,3 +43,11 @@ export {
   type SegmentState,
   type TriggerDecision,
 } from "./state-machine.js";
+export { buildAlphaJudgeContext, type AlphaJudgeContextEnvelope } from "./judge-context.js";
+export {
+  resolveExplicitProfile,
+  routeWithCurrentAcuFormula,
+  type AlphaExecutionProfile,
+  type AlphaRouteDecision,
+  type AlphaRouteRequirements,
+} from "./routing.js";

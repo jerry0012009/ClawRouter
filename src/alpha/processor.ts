@@ -71,6 +71,14 @@ export type AlphaResolutionContext = {
   networkEndpoint?: string;
   judgeCostUsd: string;
   judgeCashCostCny: string;
+  judgeInputTokens: number;
+  judgeOutputTokens: number;
+  judgeOfficialPaygEquivalentCost: string;
+  judgeCostCurrency: string;
+  judgeCostStatus: string;
+  judgeCostSource: string;
+  judgeProvider?: string;
+  judgeModel?: string;
   requestBytes: number;
   replayed: boolean;
   clientDeclaredWebTool: boolean;
@@ -898,10 +906,7 @@ export class AlphaRequestProcessor {
       webIntentFallbackInput,
     });
     applyWebIntent(envelope, judge.webIntentDecision);
-    const judgeEconomics = this.options.judgeEconomics
-      ?? effectiveProfiles.find((profile) => profile.provider === judge.provider)?.economics;
-    const effectiveJudgeCostCny = Number(judge.costUsd)
-      * (judgeEconomics ? cashCnyPerNominalUsd(judgeEconomics) : 1);
+    const effectiveJudgeCostCny = Number(judge.costCny);
     const judgeEvaluationId = alphaId("judge");
     const judgeIdempotencyKey = sha256([
       judge.policyVersion,
@@ -950,6 +955,8 @@ export class AlphaRequestProcessor {
         judgeEntropy: judge.entropy,
         evidenceTags: judge.judge.signals,
         explanation: judge.judge.explanation,
+        explanationNormalized: judge.judge.explanationNormalized,
+        originalExplanationLength: judge.judge.originalExplanationLength,
         webIntent: judge.webIntentDecision.intent,
         webIntentConfidence: judge.webIntentDecision.confidence,
         webIntentReason: judge.webIntentDecision.reason,
@@ -959,6 +966,10 @@ export class AlphaRequestProcessor {
         completionTokens: BigInt(judge.completionTokens),
         latencyMs: judge.latencyMs,
         actualCostUsd: judge.costUsd,
+        officialPaygEquivalentCost: judge.officialPaygEquivalentCostCny,
+        costCurrency: judge.costCurrency,
+        judgeCostStatus: judge.costStatus,
+        judgeCostSource: judge.costSource,
         errorCategory: judge.errorCategory,
       });
       const storedAdmission = await transactional.saveAdmissionTrace({
@@ -975,11 +986,38 @@ export class AlphaRequestProcessor {
         ...contextAdmission,
         metadata: {
           trigger: state.decision.reason,
-          judgeCalls: judge.status === "live" ? 1 : 0,
+          judgeCalls: judge.attempts.length,
           webIntent: judge.webIntentDecision.intent,
           webIntentSource: judge.webIntentDecision.source,
         },
       });
+      for (const attempt of judge.attempts) {
+        await transactional.saveJudgeAttempt({
+          judgeAttemptId: alphaId("att"),
+          judgeEvaluationId: storedJudge.judgeEvaluationId,
+          logicalRequestId,
+          attemptIndex: attempt.attemptIndex,
+          attemptRole: attempt.role,
+          provider: attempt.provider,
+          model: attempt.model,
+          endpointHost: attempt.endpointHost,
+          upstreamRequestId: attempt.upstreamRequestId,
+          status: attempt.status,
+          errorCategory: attempt.errorCategory,
+          httpStatus: attempt.httpStatus,
+          inputTokens: BigInt(attempt.promptTokens),
+          cachedInputTokens: BigInt(attempt.cachedPromptTokens),
+          outputTokens: BigInt(attempt.completionTokens),
+          latencyMs: attempt.latencyMs,
+          nominalCostUsd: attempt.nominalCostUsd,
+          officialPaygEquivalentCost: attempt.officialPaygEquivalentCostCny,
+          effectiveCostCny: attempt.effectiveCostCny,
+          currency: attempt.currency,
+          costStatus: attempt.costStatus,
+          costSource: attempt.costSource,
+          usageStatus: attempt.usageStatus,
+        });
+      }
       await transactional.saveJudgeLedgerEntry({
         judgeLedgerEntryId: alphaId("ledger"),
         judgeEvaluationId: storedJudge.judgeEvaluationId,
@@ -991,7 +1029,11 @@ export class AlphaRequestProcessor {
         completionTokens: BigInt(judge.completionTokens),
         nominalCostUsd: judge.costUsd,
         effectiveCashCostCny: effectiveJudgeCostCny.toFixed(10),
-        costSource: judgeEconomics?.effectiveCostSource ?? "judge_cost_without_provider_economics",
+        costSource: judge.costSource,
+        officialPaygEquivalentCost: judge.officialPaygEquivalentCostCny,
+        currency: judge.costCurrency,
+        costStatus: judge.costStatus,
+        costSourceDetail: judge.costSource,
       });
       return { storedJudge, storedAdmission };
     });
@@ -1552,6 +1594,12 @@ export class AlphaRequestProcessor {
             selectedProfile: replayProfile,
             judgeCostUsd: "0.0000000000",
             judgeCashCostCny: "0.0000000000",
+            judgeInputTokens: 0,
+            judgeOutputTokens: 0,
+            judgeOfficialPaygEquivalentCost: "0.0000000000",
+            judgeCostCurrency: "CNY",
+            judgeCostStatus: "not_applicable",
+            judgeCostSource: "not_applicable",
             requestBytes: ingress.rawBody.byteLength,
             replayed: true,
             clientDeclaredWebTool: envelope.clientDeclaredWebTool,
@@ -1674,13 +1722,7 @@ export class AlphaRequestProcessor {
       routeDecisionId,
       judgeEvaluationId,
     });
-    const judgeEconomics = result.judge
-      ? this.options.judgeEconomics
-        ?? this.options.profiles.find((profile) => profile.provider === result.judge?.provider)?.economics
-      : undefined;
-    const judgeCashCostCny = result.judge
-      ? (Number(result.judge.costUsd) * (judgeEconomics ? cashCnyPerNominalUsd(judgeEconomics) : 1)).toFixed(10)
-      : "0.0000000000";
+    const judgeCashCostCny = result.judge?.costCny ?? "0.0000000000";
     const resolutionContext: AlphaResolutionContext = {
       logicalRequestId: logical.logicalRequestId,
       attemptId: initialAttempt.attemptId,
@@ -1698,6 +1740,14 @@ export class AlphaRequestProcessor {
       networkEndpoint: initialAttempt.networkEndpoint,
       judgeCostUsd: result.judge?.costUsd ?? "0.0000000000",
       judgeCashCostCny,
+      judgeInputTokens: result.judge?.promptTokens ?? 0,
+      judgeOutputTokens: result.judge?.completionTokens ?? 0,
+      judgeOfficialPaygEquivalentCost: result.judge?.officialPaygEquivalentCostCny ?? "0.0000000000",
+      judgeCostCurrency: result.judge?.costCurrency ?? "CNY",
+      judgeCostStatus: result.judge?.costStatus ?? "not_applicable",
+      judgeCostSource: result.judge?.costSource ?? "not_applicable",
+      judgeProvider: result.judge?.provider,
+      judgeModel: result.judge?.model,
       requestBytes: ingress.rawBody.byteLength,
       replayed: false,
       clientDeclaredWebTool: envelope.clientDeclaredWebTool,
@@ -1887,6 +1937,14 @@ export class AlphaRequestProcessor {
       actualTotalCashCostCny: actualTotalCashCostCny.toFixed(10),
       userChargeCny: actualTotalCashCostCny.toFixed(10),
       counterfactualQualityCeilingCostCny: counterfactualQualityCeilingCostCny?.toFixed(10),
+      judgeInputTokens: BigInt(input.context.judgeInputTokens),
+      judgeOutputTokens: BigInt(input.context.judgeOutputTokens),
+      judgeOfficialPaygEquivalentCost: input.context.judgeOfficialPaygEquivalentCost,
+      judgeCostCurrency: input.context.judgeCostCurrency,
+      judgeCostStatus: input.context.judgeCostStatus,
+      judgeCostSource: input.context.judgeCostSource,
+      judgeProvider: input.context.judgeProvider,
+      judgeModel: input.context.judgeModel,
       costBreakdown: {
         billing_version: "founder-alpha-actual-cash-v2",
         judge_nominal_cost_usd: input.context.judgeCostUsd,
@@ -1896,6 +1954,14 @@ export class AlphaRequestProcessor {
         provider_credit_cash_cost_cny: providerCash.providerCreditCashCostCny,
         effective_provider_cash_cost_cny: providerCash.effectiveCashCostCny,
         judge_cash_cost_cny: judgeCashCostCny,
+        judge_input_tokens: input.context.judgeInputTokens,
+        judge_output_tokens: input.context.judgeOutputTokens,
+        judge_official_payg_equivalent_cost: input.context.judgeOfficialPaygEquivalentCost,
+        judge_cost_currency: input.context.judgeCostCurrency,
+        judge_cost_status: input.context.judgeCostStatus,
+        judge_cost_source: input.context.judgeCostSource,
+        judge_provider: input.context.judgeProvider,
+        judge_model: input.context.judgeModel,
         failed_attempt_cash_cost_cny: failedAttemptCashCostCny,
         failed_attempt_nominal_cost_usd: failedBilledCostUsd,
         actual_total_cash_cost_cny: actualTotalCashCostCny,

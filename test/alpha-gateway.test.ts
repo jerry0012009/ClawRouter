@@ -49,6 +49,26 @@ afterEach(async () => {
 });
 
 describe("Alpha native protocol gateway", () => {
+  it("returns verifiable build, migration, Judge, and routing identity in health", async () => {
+    const identity = {
+      runningCommit: "commit-fixture",
+      buildTime: "2026-07-30T00:00:00Z",
+      buildBranch: "productization/alpha-rc1-validation",
+      latestMigration: "0007_rc22_judge_cutover",
+      judgePrimaryModel: "mimo-v2.5-pro",
+      judgeBackupModel: "deepseek-v4-flash",
+      routingFormulaVersion: "acu-routing-model-v0.3",
+    };
+    const gatewayPort = await listen(createAlphaGatewayServer({
+      trustedIdentitySecret: sharedSecret,
+      async healthCheck() { return identity; },
+      async resolveExecution() { throw new Error("health must not route an execution"); },
+    }));
+    const response = await fetch(`http://127.0.0.1:${gatewayPort}/internal/health`);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ status: "ok", ...identity });
+  });
+
   it("recognizes only loopback and private network ingress addresses", () => {
     expect(["127.0.0.1", "::1", "::ffff:127.0.0.1", "10.2.3.4", "172.16.0.1", "172.31.2.3", "192.168.1.2", "fd00::1"]
       .every(isPrivateNetworkAddress)).toBe(true);

@@ -166,6 +166,14 @@ export type UsageReportRecord = {
   actualTotalCashCostCny?: string;
   userChargeCny?: string;
   counterfactualQualityCeilingCostCny?: string;
+  judgeInputTokens?: bigint;
+  judgeOutputTokens?: bigint;
+  judgeOfficialPaygEquivalentCost?: string;
+  judgeCostCurrency?: string;
+  judgeCostStatus?: string;
+  judgeCostSource?: string;
+  judgeProvider?: string;
+  judgeModel?: string;
   costBreakdown: Record<string, unknown>;
 };
 
@@ -197,6 +205,14 @@ export type PendingUsageReport = {
   actualTotalCashCostCny: string;
   userChargeCny: string;
   counterfactualQualityCeilingCostCny?: string;
+  judgeInputTokens: bigint;
+  judgeOutputTokens: bigint;
+  judgeOfficialPaygEquivalentCost: string;
+  judgeCostCurrency: string;
+  judgeCostStatus: string;
+  judgeCostSource: string;
+  judgeProvider?: string;
+  judgeModel?: string;
   costBreakdown: Record<string, unknown>;
   sendAttemptCount: number;
 };
@@ -226,6 +242,8 @@ export type JudgeEvaluationRecord = {
   judgeEntropy?: number;
   evidenceTags: unknown[];
   explanation?: string;
+  explanationNormalized?: boolean;
+  originalExplanationLength?: number;
   webIntent?: string;
   webIntentConfidence?: number;
   webIntentReason?: string;
@@ -235,6 +253,10 @@ export type JudgeEvaluationRecord = {
   completionTokens?: bigint;
   latencyMs?: number;
   actualCostUsd?: string;
+  officialPaygEquivalentCost?: string;
+  costCurrency?: string;
+  judgeCostStatus?: string;
+  judgeCostSource?: string;
   errorCategory?: string;
 };
 
@@ -270,6 +292,36 @@ export type JudgeLedgerRecord = {
   nominalCostUsd: string;
   effectiveCashCostCny: string;
   costSource: string;
+  officialPaygEquivalentCost: string;
+  currency: string;
+  costStatus: string;
+  costSourceDetail: string;
+};
+
+export type JudgeAttemptRecord = {
+  judgeAttemptId: string;
+  judgeEvaluationId: string;
+  logicalRequestId?: string;
+  attemptIndex: 1 | 2;
+  attemptRole: "primary" | "backup";
+  provider: string;
+  model: string;
+  endpointHost: string;
+  upstreamRequestId?: string | null;
+  status: "success" | "error";
+  errorCategory?: string;
+  httpStatus?: number;
+  inputTokens: bigint;
+  cachedInputTokens: bigint;
+  outputTokens: bigint;
+  latencyMs: number;
+  nominalCostUsd: string;
+  officialPaygEquivalentCost: string;
+  effectiveCostCny: string;
+  currency: string;
+  costStatus: string;
+  costSource: string;
+  usageStatus: string;
 };
 
 export type RouteDecisionRecord = {
@@ -576,6 +628,12 @@ export class AlphaRepository {
            JOIN acu_judge_evaluations judge USING(judge_evaluation_id)
            WHERE judge.task_id=requested.task_id
          ),'[]'::jsonb),
+         'judge_attempts',COALESCE((
+           SELECT jsonb_agg(to_jsonb(value) ORDER BY value.attempt_index,value.judge_attempt_id)
+           FROM acu_judge_attempts value
+           JOIN acu_judge_evaluations judge USING(judge_evaluation_id)
+           WHERE judge.task_id=requested.task_id
+         ),'[]'::jsonb),
          'route_decisions',COALESCE((
            SELECT jsonb_agg(to_jsonb(value) ORDER BY value.created_at,value.route_decision_id)
            FROM acu_route_decisions value
@@ -652,11 +710,12 @@ export class AlphaRepository {
         judge_status,judge_result_source,judge_model,judge_provider,prompt_version,policy_version,
         difficulty_method_version,context_hash,context_token_estimate,context_truncated,
         difficulty_score_raw,difficulty_index,factors_json,probabilities_json,confidence,judge_entropy,
-        evidence_tags_json,explanation,web_intent,web_intent_confidence,web_intent_reason,
-        web_intent_evidence_json,web_intent_source,prompt_tokens,completion_tokens,latency_ms,actual_cost_usd,
-        error_category,created_at)
+        evidence_tags_json,explanation,explanation_normalized,original_explanation_length,
+        web_intent,web_intent_confidence,web_intent_reason,web_intent_evidence_json,web_intent_source,
+        prompt_tokens,completion_tokens,latency_ms,actual_cost_usd,official_payg_equivalent_cost,
+        cost_currency,judge_cost_status,judge_cost_source,error_category,created_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
-        $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,now())
+        $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,now())
        ON CONFLICT (judge_idempotency_key) DO NOTHING RETURNING judge_evaluation_id`,
       [input.judgeEvaluationId, input.newapiUserId, input.taskId, input.segmentId,
         input.triggerEventId ?? null, input.judgeIdempotencyKey, input.judgeStatus,
@@ -665,10 +724,13 @@ export class AlphaRepository {
         input.contextTokenEstimate ?? null, input.contextTruncated, input.difficultyScoreRaw ?? null,
         input.difficultyIndex ?? null, json(input.factors), json(input.probabilities),
         input.confidence ?? null, input.judgeEntropy ?? null, json(input.evidenceTags),
-        input.explanation ?? null, input.webIntent ?? null, input.webIntentConfidence ?? null,
-        input.webIntentReason ?? null, json(input.webIntentEvidence ?? []), input.webIntentSource ?? null,
+        input.explanation ?? null, input.explanationNormalized ?? false, input.originalExplanationLength ?? null,
+        input.webIntent ?? null, input.webIntentConfidence ?? null, input.webIntentReason ?? null,
+        json(input.webIntentEvidence ?? []), input.webIntentSource ?? null,
         input.promptTokens ?? null, input.completionTokens ?? null, input.latencyMs ?? null,
-        input.actualCostUsd ?? "0", input.errorCategory ?? null],
+        input.actualCostUsd ?? "0", input.officialPaygEquivalentCost ?? "0", input.costCurrency ?? "CNY",
+        input.judgeCostStatus ?? "not_applicable", input.judgeCostSource ?? "not_applicable",
+        input.errorCategory ?? null],
     );
     if (result.rowCount === 1) return { judgeEvaluationId: input.judgeEvaluationId, inserted: true };
     const existing = await this.database.query<{ judge_evaluation_id: string }>(
@@ -719,12 +781,32 @@ export class AlphaRepository {
     await this.database.query(
       `INSERT INTO acu_judge_ledger_entries
        (judge_ledger_entry_id,judge_evaluation_id,admission_trace_id,newapi_user_id,judge_provider,judge_model,
-        prompt_tokens,completion_tokens,nominal_cost_usd,effective_cash_cost_cny,cost_source)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+        prompt_tokens,completion_tokens,nominal_cost_usd,effective_cash_cost_cny,cost_source,
+        official_payg_equivalent_cost,currency,cost_status,cost_source_detail)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
        ON CONFLICT (judge_evaluation_id) DO NOTHING`,
       [input.judgeLedgerEntryId, input.judgeEvaluationId, input.admissionTraceId, input.newapiUserId,
         input.judgeProvider ?? null, input.judgeModel ?? null, input.promptTokens, input.completionTokens,
-        input.nominalCostUsd, input.effectiveCashCostCny, input.costSource],
+        input.nominalCostUsd, input.effectiveCashCostCny, input.costSource,
+        input.officialPaygEquivalentCost, input.currency, input.costStatus, input.costSourceDetail],
+    );
+  }
+
+  async saveJudgeAttempt(input: JudgeAttemptRecord): Promise<void> {
+    await this.database.query(
+      `INSERT INTO acu_judge_attempts
+       (judge_attempt_id,judge_evaluation_id,logical_request_id,attempt_index,attempt_role,provider,model,
+        endpoint_host,upstream_request_id,status,error_category,http_status,input_tokens,cached_input_tokens,
+        output_tokens,latency_ms,nominal_cost_usd,official_payg_equivalent_cost,effective_cost_cny,
+        currency,cost_status,cost_source,usage_status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+       ON CONFLICT (judge_evaluation_id,attempt_index) DO NOTHING`,
+      [input.judgeAttemptId, input.judgeEvaluationId, input.logicalRequestId ?? null,
+        input.attemptIndex, input.attemptRole, input.provider, input.model, input.endpointHost,
+        input.upstreamRequestId ?? null, input.status, input.errorCategory ?? null, input.httpStatus ?? null,
+        input.inputTokens, input.cachedInputTokens, input.outputTokens, input.latencyMs,
+        input.nominalCostUsd, input.officialPaygEquivalentCost, input.effectiveCostCny,
+        input.currency, input.costStatus, input.costSource, input.usageStatus],
     );
   }
 
@@ -996,8 +1078,9 @@ export class AlphaRepository {
         provider_balance_charge,provider_balance_currency,provider_credit_cash_cost_cny,
         effective_provider_cash_cost_cny,judge_cash_cost_cny,failed_attempt_cash_cost_cny,
         actual_total_cash_cost_cny,user_charge_cny,counterfactual_quality_ceiling_cost_cny,
-        cost_breakdown_json,status,created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,'pending',now())
+        judge_input_tokens,judge_output_tokens,judge_official_payg_equivalent_cost,judge_cost_currency,
+        judge_cost_status,judge_cost_source,judge_provider,judge_model,cost_breakdown_json,status,created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,'pending',now())
        ON CONFLICT (report_idempotency_key) DO NOTHING RETURNING usage_report_id`,
       [input.usageReportId, input.newapiUserId, input.newapiTokenId ?? null,
         input.newapiLogId ?? null, input.logicalRequestId, input.reportIdempotencyKey,
@@ -1011,7 +1094,11 @@ export class AlphaRepository {
         input.effectiveProviderCashCostCny ?? "0",
         input.judgeCashCostCny ?? "0", input.failedAttemptCashCostCny ?? "0",
         input.actualTotalCashCostCny ?? "0", input.userChargeCny ?? "0",
-        input.counterfactualQualityCeilingCostCny ?? null, json(input.costBreakdown)],
+        input.counterfactualQualityCeilingCostCny ?? null, input.judgeInputTokens ?? 0n,
+        input.judgeOutputTokens ?? 0n, input.judgeOfficialPaygEquivalentCost ?? "0",
+        input.judgeCostCurrency ?? "CNY", input.judgeCostStatus ?? "not_applicable",
+        input.judgeCostSource ?? "not_applicable", input.judgeProvider ?? null, input.judgeModel ?? null,
+        json(input.costBreakdown)],
     );
     if (result.rowCount === 1) return { usageReportId: input.usageReportId, inserted: true };
     const existing = await this.database.query<{ usage_report_id: string }>(
@@ -1052,6 +1139,14 @@ export class AlphaRepository {
       actual_total_cash_cost_cny: string;
       user_charge_cny: string;
       counterfactual_quality_ceiling_cost_cny: string | null;
+      judge_input_tokens: string;
+      judge_output_tokens: string;
+      judge_official_payg_equivalent_cost: string;
+      judge_cost_currency: string;
+      judge_cost_status: string;
+      judge_cost_source: string;
+      judge_provider: string | null;
+      judge_model: string | null;
       cost_breakdown_json: Record<string, unknown>;
       send_attempt_count: number;
     }>(
@@ -1096,6 +1191,14 @@ export class AlphaRepository {
       actualTotalCashCostCny: row.actual_total_cash_cost_cny,
       userChargeCny: row.user_charge_cny,
       counterfactualQualityCeilingCostCny: row.counterfactual_quality_ceiling_cost_cny ?? undefined,
+      judgeInputTokens: BigInt(row.judge_input_tokens),
+      judgeOutputTokens: BigInt(row.judge_output_tokens),
+      judgeOfficialPaygEquivalentCost: row.judge_official_payg_equivalent_cost,
+      judgeCostCurrency: row.judge_cost_currency,
+      judgeCostStatus: row.judge_cost_status,
+      judgeCostSource: row.judge_cost_source,
+      judgeProvider: row.judge_provider ?? undefined,
+      judgeModel: row.judge_model ?? undefined,
       costBreakdown: row.cost_breakdown_json,
       sendAttemptCount: row.send_attempt_count,
     }));

@@ -29,6 +29,8 @@ export type AcuJudgeResult = AcuTierProbabilities & {
   difficultyScore: number;
   signals: string[];
   explanation: string;
+  explanationNormalized?: boolean;
+  originalExplanationLength?: number;
   webIntent?: "required" | "likely" | "not_required";
   webIntentConfidence?: number;
   webIntentReason?: string;

@@ -50,6 +50,7 @@ export class AlphaDatabase implements SqlExecutor {
       await this.pool.query(await readFile(new URL("../../migrations/acu/0004_rc2_context_ledger.sql", import.meta.url), "utf8"));
       await this.pool.query(await readFile(new URL("../../migrations/acu/0005_rc2_judge_reconciliation.sql", import.meta.url), "utf8"));
       await this.pool.query(await readFile(new URL("../../migrations/acu/0006_rc21_cost_semantics.sql", import.meta.url), "utf8"));
+      await this.pool.query(await readFile(new URL("../../migrations/acu/0007_rc22_judge_cutover.sql", import.meta.url), "utf8"));
     }
   }
 

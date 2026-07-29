@@ -8,6 +8,11 @@ type AcuRuntimeConfig = {
     maxContextTokens: number;
     maxOutputTokens: number;
     apiKey?: string;
+    judgeProvider: string;
+    backupJudgeModel?: string;
+    backupJudgeBaseUrl?: string;
+    backupApiKey?: string;
+    backupJudgeProvider?: string;
     cachePath?: string;
     allowMock: boolean;
     shadowMode: boolean;
@@ -44,6 +49,8 @@ type AcuJudgeResult = AcuTierProbabilities & {
     difficultyScore: number;
     signals: string[];
     explanation: string;
+    explanationNormalized?: boolean;
+    originalExplanationLength?: number;
     webIntent?: "required" | "likely" | "not_required";
     webIntentConfidence?: number;
     webIntentReason?: string;
@@ -1012,12 +1019,14 @@ type JudgeRequestResult = {
     status: "live" | "cache_hit";
     resultSource: "upstream_live" | "disk_cache";
     provider: string;
+    model: string;
     endpointHost: string;
     upstreamRequestId: string | null;
     latencyMs: number;
     cost: number;
     promptTokens: number;
     completionTokens: number;
+    cachedPromptTokens: number;
     usageStatus: "reported" | "usage_missing";
     contextSha256: string;
     cacheKeySha256: string;

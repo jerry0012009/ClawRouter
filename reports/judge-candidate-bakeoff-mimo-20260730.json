@@ -1,0 +1,218 @@
+{
+  "schemaVersion": 1,
+  "reportDate": "2026-07-30",
+  "scope": "ACU Judge Candidate Bake-off",
+  "productionDeployment": {
+    "requestedClawRouterCommit": "14f6916410732b50e0eb1cdf27a15382c5ad1f4c",
+    "sourceClawRouterCommit": "14f6916410732b50e0eb1cdf27a15382c5ad1f4c",
+    "requestedNewApiCommit": "50ac356e56bf1e1cc094e78928a30141ac19c464",
+    "sourceNewApiCommit": "50ac356e56bf1e1cc094e78928a30141ac19c464",
+    "runningClawRouterCommit": null,
+    "runningNewApiCommit": null,
+    "runningCommitEvidence": "images_have_no_embedded_git_commit_label",
+    "rc21ActuallyDeployed": false,
+    "migration0006Applied": false,
+    "evidence": [
+      "running_clawrouter_bundle_contains_fixed_16_response_refresh",
+      "running_clawrouter_image_contains_migrations_0001_through_0005_only",
+      "production_acu_usage_reports_lacks_0006_cost_semantics_columns"
+    ],
+    "codexAcuDoctor": {
+      "status": "healthy",
+      "codexVersion": "0.146.0",
+      "codexHome": "/root/.local/share/codex-acu",
+      "effectiveModel": "acu-auto",
+      "nativeCodexHomeUnchanged": true
+    }
+  },
+  "candidate": {
+    "requestedExecutablePresent": false,
+    "launcherPath": "/usr/local/bin/codex-mi-1",
+    "launcherSha256": "2ca7c2e2c0f9089428abc76ebb20a3ccf57d36f2f8c45eddc0cb660908b5378c",
+    "codexBinaryPath": "/root/.local/bin/codex",
+    "codexBinarySha256": "134063e133f0b4244fa3b251acf973d4fe4b4aeeacbdc135211bf480f59f1477",
+    "codexHome": "/root/.codex-mi-1",
+    "codexVersion": "0.146.0",
+    "configuredModelId": "mimo-v2.5-pro",
+    "actualModelId": "mimo-v2.5-pro",
+    "modelProvider": "mimo",
+    "provider": "Xiaomi MiMo",
+    "ownedBy": "xiaomi",
+    "baseUrl": "https://token-plan-cn.xiaomimimo.com/v1",
+    "configuredWireApi": "responses",
+    "bakeoffWireApi": "chat/completions",
+    "transportAdaptationOnly": true,
+    "configuredReasoningEffort": "high",
+    "judgeThinking": "disabled",
+    "exactModelConfirmedByModelDirectory": true,
+    "exactModelConfirmedByApiResponses": true,
+    "confirmedAsMimoV25Pro": true,
+    "judgeCallsUsedCodexCli": false
+  },
+  "productionBaseline": {
+    "modelId": "deepseek-v4-flash",
+    "economicsProvider": "closeai",
+    "comparisonSource": "existing_durable_judge_cache_and_postgresql_only",
+    "newPaidBaselineCalls": 0,
+    "baselineIsGroundTruth": false
+  },
+  "protocol": {
+    "promptVersion": "acu-tier-requirement-v4",
+    "sameSystemPromptAsProduction": true,
+    "sameJsonSchemaAsProduction": true,
+    "sameInputFieldsAsProduction": true,
+    "temperature": 0,
+    "maxOutputTokens": 300,
+    "timeoutMs": 20000,
+    "maxContextTokens": 6000,
+    "responseFormat": "json_object",
+    "thinking": "disabled",
+    "concurrency": 1
+  },
+  "sampleSet": {
+    "historicalJudgeEvaluationsObserved": 94,
+    "historicalEligibleUniqueSnapshots": 92,
+    "historicalSelected": 20,
+    "deterministicSelected": 10,
+    "primaryEvaluated": 30,
+    "stabilitySamples": 5,
+    "stabilityCallsPerSample": 2,
+    "historicalPromptVersionCaveat": "93_of_94_production_records_are_v3; selected historical inputs were replayed with current v4 prompt",
+    "privacy": "only_sanitized_hashed_ids_and_categories_are_reported",
+    "categoriesCovered": [
+      "very_simple",
+      "ordinary_coding",
+      "single_file",
+      "multi_file_or_broad",
+      "planning",
+      "execution",
+      "recovery",
+      "long_context",
+      "web_required",
+      "coding_no_web",
+      "language_en",
+      "language_zh",
+      "language_mixed",
+      "repeated_capability_failure"
+    ]
+  },
+  "metrics": {
+    "strictJson": {"passed": 30, "total": 30, "rate": 1.0},
+    "schema": {"passed": 23, "total": 30, "rate": 0.7666666667},
+    "schemaFailureReasons": [
+      {"reason": "explanation_exceeds_80_characters", "count": 7}
+    ],
+    "timeouts": {"count": 0, "total": 30, "rate": 0.0},
+    "latencyMs": {"p50": 4449, "p95": 7214.5},
+    "allTransportCalls": 58,
+    "tokensAllTransportCalls": {
+      "input": 259640,
+      "cachedInput": 124352,
+      "output": 10244
+    },
+    "nominalCostUsdAllTransportCalls": 0.0682102272,
+    "providerCreditsAllTransportCalls": null,
+    "actualCashCnyAllTransportCalls": null,
+    "officialPaygoEquivalentCashCnyUpperBound": 0.4704368,
+    "cashBudgetCny": 1.0,
+    "budgetExceeded": false,
+    "difficulty": {
+      "comparableHistoricalSamples": 13,
+      "meanDeltaCandidateMinusCurrent": -6.0846153846,
+      "meanAbsoluteError": 8.7153846154,
+      "rankSpearman": 0.9175824176
+    },
+    "webIntent": {
+      "historicalAgreementRate": null,
+      "historicalComparisonStatus": "not_comparable_v3_baselines_did_not_persist_web_intent",
+      "deterministicPassed": 10,
+      "deterministicTotal": 10,
+      "deterministicRate": 1.0
+    }
+  },
+  "economics": {
+    "accountType": "Token Plan",
+    "providerCreditsObserved": false,
+    "rechargeCashCny": null,
+    "creditsReceived": null,
+    "providerCreditCashCostCny": null,
+    "actualCashAllocationStatus": "unobservable_without_authenticated_plan_purchase_and_usage_records",
+    "officialPaygoPriceCnyPerMillionTokens": {
+      "cachedInput": 0.025,
+      "uncachedInput": 3.0,
+      "output": 6.0
+    },
+    "officialPaygoPriceUsdPerMillionTokens": {
+      "cachedInput": 0.0036,
+      "uncachedInput": 0.435,
+      "output": 0.87
+    },
+    "budgetEnforcementMethod": "official_paygo_equivalent_cash_cny_conservative_upper_bound",
+    "costSemanticsWarning": "paygo_equivalent_is_not_observed_token_plan_credits_or_actual_cash_cost"
+  },
+  "routingImpact": {
+    "comparableHistoricalSamples": 13,
+    "changedSelections": 3,
+    "changeRate": 0.2307692308,
+    "estimatedAggregateCostDeltaCnyAcrossComparableSamples": 0.0017154161,
+    "changes": [
+      {
+        "sampleId": "hist-f8397a51a4d2",
+        "categories": ["ordinary_coding", "multi_file_or_broad", "execution", "long_context", "language_mixed"],
+        "currentDifficulty": 47.8,
+        "candidateDifficulty": 56.9,
+        "currentModel": "gpt-5.6-luna",
+        "candidateModel": "gpt-5.6-terra",
+        "estimatedCostDeltaCny": 0.0222768694
+      },
+      {
+        "sampleId": "hist-096b2a86c611",
+        "categories": ["ordinary_coding", "multi_file_or_broad", "execution", "long_context", "language_mixed"],
+        "currentDifficulty": 54.0,
+        "candidateDifficulty": 37.1,
+        "currentModel": "gpt-5.6-terra",
+        "candidateModel": "gpt-5.6-luna",
+        "estimatedCostDeltaCny": -0.0167999724
+      },
+      {
+        "sampleId": "hist-acff2f2dd4fa",
+        "categories": ["multi_file_or_broad", "execution", "long_context", "language_en"],
+        "currentDifficulty": 66.0,
+        "candidateDifficulty": 44.0,
+        "currentModel": "claude-opus-4-8",
+        "candidateModel": "gpt-5.6-luna",
+        "estimatedCostDeltaCny": -0.1022383083
+      }
+    ]
+  },
+  "criticalDisagreements": [
+    {"sampleId": "hist-125af53e03ed", "category": "planning", "currentDifficulty": 44.0, "candidateDifficulty": 20.0, "delta": -24.0},
+    {"sampleId": "hist-acff2f2dd4fa", "category": "long_execution", "currentDifficulty": 66.0, "candidateDifficulty": 44.0, "delta": -22.0},
+    {"sampleId": "hist-096b2a86c611", "category": "execution", "currentDifficulty": 54.0, "candidateDifficulty": 37.1, "delta": -16.9},
+    {"sampleId": "hist-9cb996b58dfc", "category": "planning", "currentDifficulty": 72.1, "candidateDifficulty": 55.6, "delta": -16.5},
+    {"sampleId": "hist-f8397a51a4d2", "category": "execution", "currentDifficulty": 47.8, "candidateDifficulty": 56.9, "delta": 9.1}
+  ],
+  "stability": [
+    {"sampleId": "det-greeting", "calls": 2, "strictJsonStable": true, "schemaStable": true, "difficultyRange": 0.2, "webIntentValues": ["not_required"], "extraText": false, "truncated": false},
+    {"sampleId": "det-btc-price", "calls": 2, "strictJsonStable": true, "schemaStable": true, "difficultyRange": 4.3, "webIntentValues": ["required"], "extraText": false, "truncated": false},
+    {"sampleId": "det-planning", "calls": 2, "strictJsonStable": true, "schemaStable": true, "difficultyRange": 13.8, "webIntentValues": ["not_required"], "extraText": false, "truncated": false},
+    {"sampleId": "hist-fafc01a3cf9a", "calls": 2, "strictJsonStable": true, "schemaStable": false, "difficultyRange": null, "webIntentValues": ["not_required"], "extraText": false, "truncated": false},
+    {"sampleId": "hist-e41794507dd6", "calls": 2, "strictJsonStable": true, "schemaStable": false, "difficultyRange": null, "webIntentValues": [], "extraText": false, "truncated": false}
+  ],
+  "recommendation": {
+    "decision": "keep_current",
+    "smallProductionShadowRecommended": false,
+    "reasons": [
+      "schema_conformance_is_76.67_percent",
+      "comparable_route_selection_changes_are_23.08_percent",
+      "planning_stability_range_reaches_13.8_difficulty_points",
+      "token_plan_credits_and_actual_cash_allocation_are_not_observable"
+    ],
+    "prerequisiteBeforeReconsideration": "offline_schema_conformance_study_without_changing_judgment_criteria"
+  },
+  "productionChanges": {
+    "judgeConfigurationChanged": false,
+    "routerChanged": false,
+    "productionCodeCommitted": false
+  }
+}

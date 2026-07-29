@@ -10,9 +10,10 @@ import { AlphaRequestProcessor } from "./processor.js";
 import { createNativeProviderAdapter, type NativeProviderConfig } from "./provider.js";
 import { AlphaRepository } from "./repository.js";
 import type { AlphaExecutionProfile } from "./routing.js";
-import { readProviderEconomicsCatalog, type ProviderEconomics } from "./provider-economics.js";
+import { cashCnyPerNominalUsd, readProviderEconomicsCatalog, type ProviderEconomics } from "./provider-economics.js";
 import { UsageOutboxWorker } from "./usage-outbox.js";
 import { canonicalAdvertisedContextWindow } from "./context-admission.js";
+import { ACU_ROUTING_MODEL_VERSION } from "../acu/config.js";
 
 export type ConfiguredExecutionProfile = AlphaExecutionProfile & {
   baseUrl?: string;
@@ -210,16 +211,17 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
     };
   });
   const judgeConfig = readAcuRuntimeConfig();
-  const judgeRunner = createAcuJudgeRunner({
-    config: judgeConfig,
-    rulesDecision: rulesFallbackDecision(),
-  });
   const judgeEconomics = serviceConfig.judgeEconomicsProviderId
     ? serviceConfig.providerEconomics.find((item) => item.providerId === serviceConfig.judgeEconomicsProviderId)
     : undefined;
   if (serviceConfig.judgeEconomicsProviderId && !judgeEconomics) {
     throw new Error(`No Provider Economics for Judge ${serviceConfig.judgeEconomicsProviderId}`);
   }
+  const judgeRunner = createAcuJudgeRunner({
+    config: judgeConfig,
+    rulesDecision: rulesFallbackDecision(),
+    backupCashCnyPerNominalUsd: judgeEconomics ? cashCnyPerNominalUsd(judgeEconomics) : undefined,
+  });
   const processor = new AlphaRequestProcessor({
     database,
     profiles: profiles.map((item) => item.profile),
@@ -252,7 +254,20 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
     },
     async healthCheck() {
       await database.query("SELECT 1 FROM acu_sessions LIMIT 1");
-      return { postgres: "ok" };
+      const migration = await database.query<{ migration_version: string }>(
+        "SELECT migration_version FROM acu_schema_migrations ORDER BY migration_version DESC LIMIT 1",
+      );
+      return {
+        postgres: "ok",
+        runningCommit: process.env.BUILD_COMMIT_SHA ?? "unknown",
+        buildTime: process.env.BUILD_TIME ?? "unknown",
+        buildBranch: process.env.BUILD_BRANCH ?? "unknown",
+        schemaVersion: process.env.ACU_SCHEMA_VERSION ?? "unknown",
+        latestMigration: migration.rows[0]?.migration_version ?? "unknown",
+        judgePrimaryModel: judgeConfig.judgeModel,
+        judgeBackupModel: judgeConfig.backupJudgeModel ?? null,
+        routingFormulaVersion: ACU_ROUTING_MODEL_VERSION,
+      };
     },
   });
   server.listen(serviceConfig.port, serviceConfig.bindAddress, () => {

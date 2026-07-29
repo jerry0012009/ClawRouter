@@ -54,6 +54,11 @@ export type AcuRuntimeConfig = {
   maxContextTokens: number;
   maxOutputTokens: number;
   apiKey?: string;
+  judgeProvider: string;
+  backupJudgeModel?: string;
+  backupJudgeBaseUrl?: string;
+  backupApiKey?: string;
+  backupJudgeProvider?: string;
   cachePath?: string;
   allowMock: boolean;
   shadowMode: boolean;
@@ -64,7 +69,7 @@ export type AcuRuntimeConfig = {
 
 export function readAcuRuntimeConfig(overrides: Partial<AcuRuntimeConfig> = {}): AcuRuntimeConfig {
   const enabled = booleanValue(process.env.ACU_DEMO_ROUTER_ENABLED);
-  return {
+  const config: AcuRuntimeConfig = {
     enabled,
     judgeModel: process.env.ACU_JUDGE_MODEL?.trim() || ACU_DEFAULT_JUDGE_MODEL,
     judgeBaseUrl: process.env.ACU_JUDGE_BASE_URL?.trim() || ACU_DEFAULT_JUDGE_BASE_URL,
@@ -77,6 +82,11 @@ export function readAcuRuntimeConfig(overrides: Partial<AcuRuntimeConfig> = {}):
     ),
     maxOutputTokens: ACU_DEFAULT_MAX_OUTPUT_TOKENS,
     apiKey: process.env.ACU_JUDGE_API_KEY?.trim() || process.env.DEEPSEEK_API_KEY?.trim(),
+    judgeProvider: process.env.ACU_JUDGE_PROVIDER?.trim() || "openai_compatible",
+    backupJudgeModel: process.env.ACU_JUDGE_BACKUP_MODEL?.trim() || undefined,
+    backupJudgeBaseUrl: process.env.ACU_JUDGE_BACKUP_BASE_URL?.trim() || undefined,
+    backupApiKey: process.env.ACU_JUDGE_BACKUP_API_KEY?.trim() || undefined,
+    backupJudgeProvider: process.env.ACU_JUDGE_BACKUP_PROVIDER?.trim() || undefined,
     cachePath: process.env.ACU_JUDGE_CACHE_PATH?.trim(),
     allowMock: booleanValue(process.env.ACU_ALLOW_MOCK),
     shadowMode: booleanValue(process.env.ACU_SHADOW_MODE, true),
@@ -87,4 +97,19 @@ export function readAcuRuntimeConfig(overrides: Partial<AcuRuntimeConfig> = {}):
       : ACU_DEFAULT_JUDGE_ENTROPY_PENALTY,
     ...overrides,
   };
+  if (booleanValue(process.env.ACU_JUDGE_ROLLBACK_TO_BACKUP)
+    && config.backupJudgeModel && config.backupJudgeBaseUrl && config.backupApiKey) {
+    return {
+      ...config,
+      judgeModel: config.backupJudgeModel,
+      judgeBaseUrl: config.backupJudgeBaseUrl,
+      apiKey: config.backupApiKey,
+      judgeProvider: config.backupJudgeProvider ?? "openai_compatible",
+      backupJudgeModel: undefined,
+      backupJudgeBaseUrl: undefined,
+      backupApiKey: undefined,
+      backupJudgeProvider: undefined,
+    };
+  }
+  return config;
 }

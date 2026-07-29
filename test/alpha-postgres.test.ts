@@ -34,6 +34,7 @@ run("Alpha PostgreSQL foundation", () => {
       "acu_attempts",
       "acu_channel_health",
       "acu_events",
+      "acu_judge_attempts",
       "acu_judge_evaluations",
       "acu_judge_ledger_entries",
       "acu_logical_requests",
@@ -41,12 +42,31 @@ run("Alpha PostgreSQL foundation", () => {
       "acu_provider_health",
       "acu_provider_model_profile_health",
       "acu_route_decisions",
+      "acu_schema_migrations",
       "acu_segments",
       "acu_sessions",
       "acu_tasks",
       "acu_usage_reports",
     ]);
     expect(result.rows.some((row) => /vector|embedding|memory/i.test(row.table_name))).toBe(false);
+  });
+
+  it("applies RC2.1 and RC2.2 migrations with cost and Judge attempt fields", async () => {
+    const versions = await database.query<{ migration_version: string }>(
+      "SELECT migration_version FROM acu_schema_migrations ORDER BY migration_version",
+    );
+    expect(versions.rows.map((row) => row.migration_version)).toContain("0006_rc21_cost_semantics");
+    expect(versions.rows.map((row) => row.migration_version)).toContain("0007_rc22_judge_cutover");
+    const columns = await database.query<{ column_name: string }>(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_schema='public' AND table_name='acu_usage_reports'`,
+    );
+    expect(columns.rows.map((row) => row.column_name)).toEqual(expect.arrayContaining([
+      "provider_balance_charge",
+      "actual_total_cash_cost_cny",
+      "judge_official_payg_equivalent_cost",
+      "judge_cost_status",
+    ]));
   });
 
   it("enforces one active segment per task and keeps users isolated", async () => {
@@ -288,6 +308,31 @@ run("Alpha PostgreSQL foundation", () => {
       probabilities: {},
       evidenceTags: [],
     });
+    const judgeAttempt = {
+      judgeAttemptId: "judge_attempt_a_1",
+      judgeEvaluationId: "judge_a_1",
+      logicalRequestId: "req_a_1",
+      attemptIndex: 1 as const,
+      attemptRole: "primary" as const,
+      provider: "xiaomi_mimo",
+      model: "mimo-v2.5-pro",
+      endpointHost: "mimo.invalid",
+      upstreamRequestId: "upstream-a",
+      status: "success" as const,
+      inputTokens: 1000n,
+      cachedInputTokens: 200n,
+      outputTokens: 100n,
+      latencyMs: 200,
+      nominalCostUsd: "0.0004176000",
+      officialPaygEquivalentCost: "0.0029200000",
+      effectiveCostCny: "0.0014600000",
+      currency: "CNY" as const,
+      costStatus: "estimated_blended",
+      costSource: "midpoint_openrouter_payg_and_mimo99_plan_v1",
+      usageStatus: "reported" as const,
+    };
+    await repository.saveJudgeAttempt(judgeAttempt);
+    await repository.saveJudgeAttempt({ ...judgeAttempt, judgeAttemptId: "judge_attempt_a_replay" });
     await repository.saveRouteDecision({
       routeDecisionId: "route_a_1",
       newapiUserId: "user_a",
@@ -321,6 +366,13 @@ run("Alpha PostgreSQL foundation", () => {
     expect(trace?.judge_evaluations).toEqual(expect.arrayContaining([
       expect.objectContaining({ judge_evaluation_id: "judge_a_1" }),
     ]));
+    expect(trace?.judge_attempts).toEqual([
+      expect.objectContaining({
+        judge_attempt_id: "judge_attempt_a_1",
+        model: "mimo-v2.5-pro",
+        cost_status: "estimated_blended",
+      }),
+    ]);
     expect(trace?.route_decisions).toEqual(expect.arrayContaining([
       expect.objectContaining({ route_decision_id: "route_a_1" }),
     ]));

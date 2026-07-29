@@ -1,6 +1,7 @@
 BEGIN;
 
 DROP VIEW IF EXISTS acu_provider_health;
+DROP TABLE IF EXISTS acu_judge_attempts;
 DROP TABLE IF EXISTS acu_judge_ledger_entries;
 DROP TABLE IF EXISTS acu_admission_traces;
 DROP TABLE IF EXISTS acu_provider_model_profile_health;
@@ -23,5 +24,6 @@ DROP TABLE IF EXISTS acu_logical_requests;
 DROP TABLE IF EXISTS acu_segments;
 DROP TABLE IF EXISTS acu_tasks;
 DROP TABLE IF EXISTS acu_sessions;
+DROP TABLE IF EXISTS acu_schema_migrations;
 
 COMMIT;

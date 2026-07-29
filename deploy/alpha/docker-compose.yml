@@ -48,6 +48,7 @@ services:
       - ../../migrations/acu/0004_rc2_context_ledger.sql:/migration/0004_rc2_context_ledger.sql:ro
       - ../../migrations/acu/0005_rc2_judge_reconciliation.sql:/migration/0005_rc2_judge_reconciliation.sql:ro
       - ../../migrations/acu/0006_rc21_cost_semantics.sql:/migration/0006_rc21_cost_semantics.sql:ro
+      - ../../migrations/acu/0007_rc22_judge_cutover.sql:/migration/0007_rc22_judge_cutover.sql:ro
     networks: [alpha-backend]
     command:
       - /bin/sh
@@ -61,6 +62,7 @@ services:
         psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0004_rc2_context_ledger.sql
         psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0005_rc2_judge_reconciliation.sql
         psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0006_rc21_cost_semantics.sql
+        psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0007_rc22_judge_cutover.sql
 
   newapi-codex-pool-sync:
     image: postgres:16-alpine
@@ -85,6 +87,11 @@ services:
     build:
       context: ../..
       dockerfile: deploy/alpha/Dockerfile.acu
+      args:
+        BUILD_COMMIT_SHA: ${CLAWROUTER_BUILD_COMMIT_SHA:-unknown}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+        BUILD_BRANCH: ${CLAWROUTER_BUILD_BRANCH:-unknown}
+        SCHEMA_VERSION: 0007_rc22_judge_cutover
     restart: unless-stopped
     depends_on:
       acu-migrate:
@@ -101,9 +108,15 @@ services:
       ACU_EXECUTION_PROFILES_FILE: /app/config/execution-profiles.json
       ACU_PROVIDER_ECONOMICS_FILE: /app/config/provider-economics.json
       ACU_DEMO_ROUTER_ENABLED: "true"
-      ACU_JUDGE_API_KEY: ${ACU_JUDGE_API_KEY:?set ACU_JUDGE_API_KEY}
-      ACU_JUDGE_MODEL: ${ACU_JUDGE_MODEL:-deepseek-v4-flash}
-      ACU_JUDGE_BASE_URL: ${ACU_JUDGE_BASE_URL:-https://api.openai-proxy.org/v1}
+      ACU_JUDGE_API_KEY: ${MIMO_API_KEY:?set MIMO_API_KEY}
+      ACU_JUDGE_MODEL: mimo-v2.5-pro
+      ACU_JUDGE_PROVIDER: xiaomi_mimo
+      ACU_JUDGE_BASE_URL: https://token-plan-cn.xiaomimimo.com/v1
+      ACU_JUDGE_BACKUP_API_KEY: ${ACU_JUDGE_API_KEY:?set ACU_JUDGE_API_KEY}
+      ACU_JUDGE_BACKUP_MODEL: deepseek-v4-flash
+      ACU_JUDGE_BACKUP_PROVIDER: closeai
+      ACU_JUDGE_BACKUP_BASE_URL: ${ACU_JUDGE_BASE_URL:-https://api.openai-proxy.org/v1}
+      ACU_JUDGE_ROLLBACK_TO_BACKUP: ${ACU_JUDGE_ROLLBACK_TO_BACKUP:-false}
       ACU_JUDGE_ECONOMICS_PROVIDER_ID: closeai
       ACU_JUDGE_TIMEOUT_MS: ${ACU_JUDGE_TIMEOUT_MS:-20000}
       ACU_JUDGE_MAX_CONTEXT_TOKENS: ${ACU_JUDGE_MAX_CONTEXT_TOKENS:-6000}
@@ -131,6 +144,11 @@ services:
     build:
       context: ${NEW_API_SOURCE_DIR:-../../../new-api}
       dockerfile: Dockerfile
+      args:
+        BUILD_COMMIT_SHA: ${NEW_API_BUILD_COMMIT_SHA:-unknown}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+        BUILD_BRANCH: ${NEW_API_BUILD_BRANCH:-unknown}
+        SCHEMA_VERSION: acu_usage_finalize_rc22
     restart: unless-stopped
     command: ["--log-dir", "/app/logs"]
     depends_on:
@@ -146,6 +164,10 @@ services:
       GIN_MODE: release
       TZ: UTC
       ACU_PRICING_CATALOG_FILE: /app/acu-catalog/newapi-acu-catalog.json
+      ACU_SCHEMA_VERSION: 0007_rc22_judge_cutover
+      ACU_JUDGE_PRIMARY_MODEL: mimo-v2.5-pro
+      ACU_JUDGE_BACKUP_MODEL: deepseek-v4-flash
+      ACU_ROUTING_FORMULA_VERSION: acu-routing-model-v0.3
     volumes:
       - newapi-logs:/app/logs
       - ./newapi-acu-catalog.json:/app/acu-catalog/newapi-acu-catalog.json:ro

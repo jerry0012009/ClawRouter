@@ -6,7 +6,7 @@ import fewShotData from "./catalog/twin-few-shots.json";
 import type { AcuDifficultyFactors, AcuJudgeResult, AcuVisibleMessage } from "./types.js";
 import type { AcuRuntimeConfig } from "./config.js";
 import { ACU_DIFFICULTY_METHOD_VERSION } from "./config.js";
-import { estimateCallCost, judgeModelPrice } from "./decision.js";
+import { getAcuCatalog } from "./catalog.js";
 import { normalizeProbabilities } from "./math.js";
 
 type FewShot = {
@@ -27,6 +27,7 @@ type CacheRecord = {
   upstreamRequestId: string | null;
   promptTokens: number;
   completionTokens: number;
+  cachedPromptTokens?: number;
   usageStatus: "reported" | "usage_missing";
 };
 
@@ -37,12 +38,14 @@ export type JudgeRequestResult = {
   status: "live" | "cache_hit";
   resultSource: "upstream_live" | "disk_cache";
   provider: string;
+  model: string;
   endpointHost: string;
   upstreamRequestId: string | null;
   latencyMs: number;
   cost: number;
   promptTokens: number;
   completionTokens: number;
+  cachedPromptTokens: number;
   usageStatus: "reported" | "usage_missing";
   contextSha256: string;
   cacheKeySha256: string;
@@ -50,6 +53,51 @@ export type JudgeRequestResult = {
   contextTokenEstimate: number;
   contextTruncated: boolean;
 };
+
+export type JudgeAttemptFailure = {
+  provider: string;
+  model: string;
+  endpointHost: string;
+  upstreamRequestId: string | null;
+  latencyMs: number;
+  promptTokens: number;
+  cachedPromptTokens: number;
+  completionTokens: number;
+  usageStatus: "reported" | "usage_missing";
+  errorCategory: string;
+  httpStatus?: number;
+  backupEligible: boolean;
+};
+
+export class AcuJudgeAttemptError extends Error {
+  constructor(message: string, readonly attempt: JudgeAttemptFailure) {
+    super(message);
+    this.name = "AcuJudgeAttemptError";
+  }
+}
+
+export function judgeNominalCostUsd(
+  modelId: string,
+  promptTokens: number,
+  cachedPromptTokens: number,
+  completionTokens: number,
+): number {
+  const price = modelId === "mimo-v2.5-pro"
+    ? { input: 0.435, cached: 0.0036, output: 0.87 }
+    : (() => {
+        const model = getAcuCatalog().models.find((entry) => entry.modelId === modelId);
+        if (!model || model.inputPricePerMillion === null || model.outputPricePerMillion === null) return undefined;
+        return {
+          input: model.inputPricePerMillion,
+          cached: model.cachedInputPricePerMillion ?? model.inputPricePerMillion,
+          output: model.outputPricePerMillion,
+        };
+      })();
+  if (!price) return 0;
+  const cached = Math.max(0, Math.min(promptTokens, cachedPromptTokens));
+  const uncached = Math.max(0, promptTokens - cached);
+  return ((uncached * price.input) + (cached * price.cached) + (Math.max(0, completionTokens) * price.output)) / 1_000_000;
+}
 
 function canonicalValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalValue);
@@ -177,7 +225,7 @@ export function buildJudgeSystemPrompt(): string {
     "tool_dependency衡量工具调用、代码执行、检索、多轮Agent行为和环境状态依赖；verification_burden越难通过JSON、测试或明确答案验证则越高；context_burden衡量上下文长度、分散程度和历史依赖。",
     "不要为了简洁默认使用5的倍数。请分别判断各能力需求因子，总难度由后端计算；只有真实判断恰好落在整数或5的倍数时才可输出该值。",
     "概率表达分类不确定性；除极其明确外不要机械输出单档100%，相邻档存在合理可能时应给软概率。原始总分与主要档位应大体一致，但不要求等于概率期望。",
-    "四档概率必须在0到1且总和为1；signals最多5个；explanation不超过80个中文字符。",
+    "四档概率必须在0到1且总和为1；signals最多5个；explanation不超过256个 Unicode code points。",
     "在同一次判断中输出 Web Intent。required 表示完成当前真实目标必须取得实时或外部 Web 信息；likely 表示可能有帮助但不能作为硬条件；not_required 表示当前 Segment 可完全依赖本地工作区、已给上下文和普通工具完成。",
     "Web 判断必须综合当前真实用户目标、最近用户输入、Task/Goal、Plan、Routing Segment 状态和确定性 Web 线索。客户端声明 Web Tool 只表示能力可用，不能直接判为 required。",
     "单独出现 current、latest、today、当前、最新、今天不得判为 required。代码标识符、变量名、文件名、本地日志、Git 分支和本地测试内容中的这些词应判为 not_required。",
@@ -263,9 +311,12 @@ export function parseJudgeResult(text: string): AcuJudgeResult {
   if (!Array.isArray(parsed.signals) || parsed.signals.length > 5 || parsed.signals.some((signal) => typeof signal !== "string")) {
     throw new Error("Judge signals must contain at most five strings");
   }
-  if (typeof parsed.explanation !== "string" || Array.from(parsed.explanation).length > 80) {
-    throw new Error("Judge explanation must be a string no longer than 80 characters");
-  }
+  if (typeof parsed.explanation !== "string") throw new Error("Judge explanation must be a string");
+  const originalExplanationLength = Array.from(parsed.explanation).length;
+  const explanationNormalized = originalExplanationLength > 256;
+  const explanation = explanationNormalized
+    ? Array.from(parsed.explanation).slice(0, 256).join("")
+    : parsed.explanation;
   if (!["required", "likely", "not_required"].includes(String(parsed.webIntent))) {
     throw new Error("Judge webIntent must be required, likely, or not_required");
   }
@@ -289,7 +340,9 @@ export function parseJudgeResult(text: string): AcuJudgeResult {
     difficultyMethodVersion: ACU_DIFFICULTY_METHOD_VERSION,
     difficultyScore: difficultyIndex,
     signals: parsed.signals as string[],
-    explanation: parsed.explanation,
+    explanation,
+    explanationNormalized,
+    originalExplanationLength,
     webIntent: parsed.webIntent as AcuJudgeResult["webIntent"],
     webIntentConfidence,
     webIntentReason: parsed.webIntentReason,
@@ -325,11 +378,8 @@ function writeCache(path: string, cache: CacheFile): void {
   } catch { /* cache failure must not break routing */ }
 }
 
-function endpointMetadata(baseUrl: string): { host: string; provider: string } {
+function endpointMetadata(baseUrl: string, provider: string): { host: string; provider: string } {
   const host = new URL(baseUrl).host;
-  const provider = host.includes("openrouter") ? "openrouter"
-    : host.includes("deepseek") ? "deepseek"
-      : "openai_compatible";
   return { host, provider };
 }
 
@@ -353,65 +403,102 @@ export class AcuJudgeClient {
     if (cached && !forceRefresh) {
       return {
         result: cached.result, status: "cache_hit", resultSource: "disk_cache", provider: cached.provider,
+        model: cached.model,
         endpointHost: cached.endpointHost, upstreamRequestId: cached.upstreamRequestId, latencyMs: 0, cost: 0,
-        promptTokens: cached.promptTokens, completionTokens: cached.completionTokens, usageStatus: cached.usageStatus,
+        promptTokens: cached.promptTokens, cachedPromptTokens: cached.cachedPromptTokens ?? 0,
+        completionTokens: cached.completionTokens, usageStatus: cached.usageStatus,
         contextSha256, cacheKeySha256: key, cacheCreatedAt: cached.createdAt,
         contextTokenEstimate: truncated.tokenEstimate, contextTruncated: truncated.truncated,
       };
     }
 
-    const metadata = endpointMetadata(this.config.judgeBaseUrl);
+    const metadata = endpointMetadata(this.config.judgeBaseUrl, this.config.judgeProvider);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.config.timeoutMs);
     const started = Date.now();
     try {
-      let lastPayload: { id?: string; choices?: Array<{ message?: { content?: string } }>; usage?: { prompt_tokens?: number; completion_tokens?: number } } | undefined;
-      let lastResponse: Response | undefined;
-      let result: AcuJudgeResult | undefined;
-      for (let attempt = 0; attempt < 2; attempt += 1) {
-        const response = await this.fetchImplementation(`${this.config.judgeBaseUrl.replace(/\/$/, "")}/chat/completions`, {
+      let payload: {
+        id?: string;
+        model?: string;
+        choices?: Array<{ message?: { content?: string } }>;
+        usage?: {
+          prompt_tokens?: number;
+          completion_tokens?: number;
+          prompt_tokens_details?: { cached_tokens?: number };
+        };
+      } | undefined;
+      let response: Response | undefined;
+      try {
+        response = await this.fetchImplementation(`${this.config.judgeBaseUrl.replace(/\/$/, "")}/chat/completions`, {
           method: "POST",
           headers: { Authorization: `Bearer ${this.config.apiKey}`, "Content-Type": "application/json" },
           body: JSON.stringify({
             model: this.config.judgeModel,
             messages: [
               { role: "system", content: buildJudgeSystemPrompt() },
-              { role: "user", content: `当前API上下文：\n${truncated.text}${attempt ? "\n\n上次结果的最终指数、原始总分或主要概率跨越了两个以上档位，请重新检查六因子并输出一致结果。" : ""}` },
+              { role: "user", content: `当前API上下文：\n${truncated.text}` },
             ],
             temperature: 0, max_tokens: Math.min(300, this.config.maxOutputTokens), response_format: { type: "json_object" },
             thinking: { type: "disabled" }, stream: false,
           }),
           signal: controller.signal,
         });
-        if (!response.ok) throw new Error(`ACU Judge HTTP ${response.status}`);
-        const payload = await response.json() as typeof lastPayload;
+        if (!response.ok) {
+          throw new AcuJudgeAttemptError(`ACU Judge HTTP ${response.status}`, {
+            provider: metadata.provider, model: this.config.judgeModel, endpointHost: metadata.host,
+            upstreamRequestId: response.headers.get("x-request-id"), latencyMs: Date.now() - started,
+            promptTokens: 0, cachedPromptTokens: 0, completionTokens: 0, usageStatus: "usage_missing",
+            errorCategory: `http_${response.status}`, httpStatus: response.status,
+            backupEligible: response.status === 429 || response.status >= 500,
+          });
+        }
+        payload = await response.json() as NonNullable<typeof payload>;
+        if (!payload) throw new Error("ACU Judge returned an invalid JSON payload");
+        if (payload?.model && payload.model !== this.config.judgeModel) {
+          throw new Error(`ACU Judge actual model mismatch: ${payload.model}`);
+        }
         const content = payload?.choices?.[0]?.message?.content;
         if (!content) throw new Error("ACU Judge returned no content");
-        const parsed = parseJudgeResult(content);
-        lastPayload = payload;
-        lastResponse = response;
-        if (!hasSevereTierConflict(parsed)) { result = parsed; break; }
-      }
-      if (!result || !lastPayload || !lastResponse) throw new Error("ACU Judge index, raw score and dominant tier remained severely inconsistent after retry");
-      const usageStatus = lastPayload.usage?.prompt_tokens !== undefined && lastPayload.usage?.completion_tokens !== undefined
+        const result = parseJudgeResult(content);
+        const usageStatus = payload.usage?.prompt_tokens !== undefined && payload.usage?.completion_tokens !== undefined
         ? "reported" as const : "usage_missing" as const;
-      const promptTokens = lastPayload.usage?.prompt_tokens ?? truncated.tokenEstimate;
-      const completionTokens = lastPayload.usage?.completion_tokens ?? this.config.maxOutputTokens;
-      const cost = estimateCallCost(judgeModelPrice(), promptTokens, completionTokens);
-      const upstreamRequestId = lastPayload.id ?? lastResponse.headers.get("x-request-id");
+      const promptTokens = payload.usage?.prompt_tokens ?? truncated.tokenEstimate;
+      const cachedPromptTokens = payload.usage?.prompt_tokens_details?.cached_tokens ?? 0;
+      const completionTokens = payload.usage?.completion_tokens ?? this.config.maxOutputTokens;
+      const cost = judgeNominalCostUsd(this.config.judgeModel, promptTokens, cachedPromptTokens, completionTokens);
+      const upstreamRequestId = payload.id ?? response.headers.get("x-request-id");
       const createdAt = new Date().toISOString();
       cache.entries[key] = {
         result, createdAt, promptVersion: this.config.promptVersion, model: this.config.judgeModel,
         provider: metadata.provider, endpointHost: metadata.host, upstreamRequestId,
-        promptTokens, completionTokens, usageStatus,
+        promptTokens, cachedPromptTokens, completionTokens, usageStatus,
       };
       writeCache(path, cache);
       return {
         result, status: "live", resultSource: "upstream_live", provider: metadata.provider,
+        model: this.config.judgeModel,
         endpointHost: metadata.host, upstreamRequestId, latencyMs: Date.now() - started, cost,
-        promptTokens, completionTokens, usageStatus, contextSha256, cacheKeySha256: key, cacheCreatedAt: createdAt,
+        promptTokens, cachedPromptTokens, completionTokens, usageStatus, contextSha256, cacheKeySha256: key, cacheCreatedAt: createdAt,
         contextTokenEstimate: truncated.tokenEstimate, contextTruncated: truncated.truncated,
       };
+      } catch (error) {
+        if (error instanceof AcuJudgeAttemptError) throw error;
+        const promptTokens = payload?.usage?.prompt_tokens ?? 0;
+        const cachedPromptTokens = payload?.usage?.prompt_tokens_details?.cached_tokens ?? 0;
+        const completionTokens = payload?.usage?.completion_tokens ?? 0;
+        const message = error instanceof Error ? error.message : "ACU Judge transport failure";
+        const networkFailure = error instanceof TypeError || error instanceof DOMException || controller.signal.aborted;
+        const invalidSuccessfulResponse = response?.ok === true;
+        throw new AcuJudgeAttemptError(message, {
+          provider: metadata.provider, model: this.config.judgeModel, endpointHost: metadata.host,
+          upstreamRequestId: payload?.id ?? response?.headers.get("x-request-id") ?? null,
+          latencyMs: Date.now() - started, promptTokens, cachedPromptTokens, completionTokens,
+          usageStatus: payload?.usage?.prompt_tokens !== undefined && payload.usage?.completion_tokens !== undefined
+            ? "reported" : "usage_missing",
+          errorCategory: controller.signal.aborted ? "timeout" : networkFailure ? "network_error" : "invalid_response",
+          backupEligible: networkFailure || invalidSuccessfulResponse,
+        });
+      }
     } finally {
       clearTimeout(timeout);
     }

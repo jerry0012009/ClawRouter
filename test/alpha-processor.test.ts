@@ -249,6 +249,12 @@ run("Alpha PostgreSQL request processor", () => {
           completionTokens: 10,
           latencyMs: 1,
           costUsd: "0.0010000000",
+          costCny: "0.0072000000",
+          officialPaygEquivalentCostCny: "0.0000000000",
+          costCurrency: "CNY",
+          costStatus: "verified",
+          costSource: "test_verified_cash_cost",
+          attempts: [],
           entropy: 0.5,
           webIntentDecision: {
             intent: required ? "required" : "not_required",
@@ -809,7 +815,7 @@ run("Alpha PostgreSQL request processor", () => {
     );
     expect(result.rows[0]).toEqual({
       requests: "1", judges: "1", judge_ledger: "1", admissions: "1", attempts: "0",
-      usage_reports: "1", pending_requests: "0", judge_cash: "0.0010000000",
+      usage_reports: "1", pending_requests: "0", judge_cash: "0.0072000000",
     });
   });
 

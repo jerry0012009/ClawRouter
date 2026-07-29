@@ -1,0 +1,242 @@
+{
+  "schema_version": "founder-session-audit-v1",
+  "audit_window": {
+    "asia_shanghai": ["2026-07-30T02:40:00+08:00", "2026-07-30T02:51:00+08:00"],
+    "utc": ["2026-07-29T18:40:00Z", "2026-07-29T18:51:00Z"],
+    "terminal_retry_tail_observed_until_utc": "2026-07-29T18:51:26.389Z"
+  },
+  "production_commits": {
+    "clawrouter": "fe060ca78161026792284cb78d415ad86b347e6e",
+    "new_api": "751e06f9ef284241f42542046445431b68679e10"
+  },
+  "identity": {
+    "newapi_user_id": "3",
+    "newapi_token_id": "3",
+    "api_key_fingerprint": "sha256:67fbd5a0006138e4...",
+    "session_id": "ses_0548592665134f41925f27b6e33aa6ed",
+    "task_id": "task_66805f7470a74c2d8d0c62058f942f2f",
+    "client": "codex",
+    "client_version": "0.146.0",
+    "requested_model": "acu-auto",
+    "reasoning_effort": "medium",
+    "working_directory": "/root/jerry/chuxin",
+    "supplied_origin_ip": "31.220.80.196",
+    "origin_ip_persisted": false
+  },
+  "counts": {
+    "sessions": 1,
+    "tasks": 1,
+    "segments": 7,
+    "completed_logical_requests": 19,
+    "successful_provider_attempts": 19,
+    "tool_calls": 22,
+    "blackai_attempts": 0,
+    "pending_logical_requests": 0,
+    "pending_usage_reports": 0
+  },
+  "segments": [
+    {"segment_id":"seg_e5c1fcb6dde245c788ec6fab7b020d3c","previous_segment_id":null,"creation_reason":"task_start","summary":"greeting","judge":"live_persisted","difficulty_index":1.5,"confidence":0.95,"factors":{"taskScope":0.2,"contextBurden":0.3,"reasoningDepth":0.1,"toolDependency":0,"constraintDensity":0.2,"verificationBurden":0.1},"quality_target":72,"web_intent":"not_required","web_intent_source":null,"logical_requests":1,"tool_calls":0,"pareto":["gpt-5.6-luna"],"selected_model":"gpt-5.6-luna","selected_channel":"lucen-cx006-value-dynamic","status":"superseded"},
+    {"segment_id":"seg_18c3d777d4cb48a187396dfb7cc0a694","previous_segment_id":"seg_e5c1fcb6dde245c788ec6fab7b020d3c","creation_reason":"human_message","summary":"homepage visual redesign plan and public demo","judge":"live_persisted","difficulty_index":45.1,"confidence":0.95,"factors":{"taskScope":5.5,"contextBurden":3.2,"reasoningDepth":4,"toolDependency":6.5,"constraintDensity":3.5,"verificationBurden":4},"quality_target":72,"web_intent":"not_required","web_intent_source":null,"logical_requests":1,"tool_calls":1,"pareto":["gpt-5.6-luna","gpt-5.6-terra","gpt-5.6-sol"],"selected_model":"gpt-5.6-luna","selected_channel":"lucen-cx006-value-dynamic","status":"superseded"},
+    {"segment_id":"seg_a2d9b36049d14b4e8e927f88a4a97502","previous_segment_id":"seg_18c3d777d4cb48a187396dfb7cc0a694","creation_reason":"plan_started","summary":"design and repository exploration","judge":"live_persisted","difficulty_index":39.3,"confidence":0.85,"factors":{"taskScope":5,"contextBurden":2.8,"reasoningDepth":3.5,"toolDependency":4.5,"constraintDensity":3.2,"verificationBurden":3.8},"quality_target":80,"web_intent":"not_required","web_intent_source":null,"logical_requests":8,"tool_calls":9,"pareto":["gpt-5.6-luna","gpt-5.6-sol"],"selected_model":"gpt-5.6-luna","selected_channel":"lucen-cx006-value-dynamic","status":"superseded"},
+    {"segment_id":"seg_0193872049b84c0996cf61062d633252","previous_segment_id":"seg_a2d9b36049d14b4e8e927f88a4a97502","creation_reason":"human_message","summary":"find chuxin project and prior deployment","judge":"live_persisted","difficulty_index":47.8,"confidence":0.85,"factors":{"taskScope":5.6,"contextBurden":3.8,"reasoningDepth":4.2,"toolDependency":5,"constraintDensity":4.5,"verificationBurden":4.8},"quality_target":72,"web_intent":"not_required","web_intent_source":null,"logical_requests":2,"tool_calls":4,"pareto":["gpt-5.6-luna","gpt-5.6-terra","gpt-5.6-sol"],"selected_model":"gpt-5.6-luna","selected_channel":"lucen-cx006-value-dynamic","status":"superseded"},
+    {"segment_id":"seg_6839ceaf75a64565a81b01d74e180486","previous_segment_id":"seg_0193872049b84c0996cf61062d633252","creation_reason":"plan_finished","summary":"transition to continued deployment investigation","judge":"live_persisted","difficulty_index":38.5,"confidence":0.88,"factors":{"taskScope":4.8,"contextBurden":3.8,"reasoningDepth":3.5,"toolDependency":4.2,"constraintDensity":3.2,"verificationBurden":3},"quality_target":72,"web_intent":"not_required","web_intent_source":null,"logical_requests":1,"tool_calls":1,"pareto":["gpt-5.6-luna","gpt-5.6-sol"],"selected_model":"gpt-5.6-luna","selected_channel":"lucen-cx006-value-dynamic","status":"superseded"},
+    {"segment_id":"seg_e95703142a6d498f98e9975e0017f264","previous_segment_id":"seg_6839ceaf75a64565a81b01d74e180486","creation_reason":"plan_started","summary":"continued deployment checks","judge":"live_persisted","difficulty_index":42.9,"confidence":0.88,"factors":{"taskScope":5.2,"contextBurden":3.2,"reasoningDepth":4.5,"toolDependency":4.8,"constraintDensity":3.8,"verificationBurden":3.6},"quality_target":80,"web_intent":"not_required","web_intent_source":null,"logical_requests":6,"tool_calls":7,"pareto":["gpt-5.6-luna","gpt-5.6-terra","gpt-5.6-sol"],"selected_model":"gpt-5.6-luna","selected_channel":"lucen-cx006-value-dynamic","status":"superseded"},
+    {"segment_id":"seg_30f71b9ce3bf41ce82dfe6f88d17e40f","previous_segment_id":"seg_e95703142a6d498f98e9975e0017f264","creation_reason":"human_message","summary":"Gitee, DNS and target server query","judge":"two_live_unpersisted_then_cache_hits","difficulty_index":null,"confidence":null,"quality_target":null,"web_intent":null,"web_intent_source":null,"logical_requests":0,"tool_calls":0,"pareto":[],"selected_model":null,"selected_channel":null,"status":"active_failed_admission","primary_exclusion_reason":"context_window"}
+  ],
+  "routing_common": {
+    "routing_preference": "economy",
+    "reasoning_effort": "medium",
+    "user_routing_policy": "all_routing_eligible",
+    "allowed_model_ids": [],
+    "legal_canonical_models": ["gpt-5.4-mini","gpt-5.6-luna","gpt-5.6-terra","gpt-5.6-sol","gpt-5.5"],
+    "selected_model": "gpt-5.6-luna",
+    "actual_model": "gpt-5.6-luna",
+    "selected_provider": "lucen",
+    "selected_channel": "lucen-cx006-value-dynamic",
+    "actual_channel": "lucen-cx006-value-dynamic",
+    "same_model_channel_candidates": ["lucen-cx006-value-dynamic","lucen-cx006-plus","lucen-cx008-plus-dedicated","blackai-codex-mix-low","closeai-openai-primary"],
+    "channel_fallback_occurred": false,
+    "mini_legal": true
+  },
+  "candidate_estimates": {
+    "seg_e5c1fcb6dde245c788ec6fab7b020d3c": [
+      {"model":"gpt-5.4-mini","quality":0.872301,"call_cost_cny":0.000787635,"expected_total_cny":0.0024648812,"pareto":false},
+      {"model":"gpt-5.6-luna","quality":0.996412,"call_cost_cny":0.00105018,"expected_total_cny":0.0024562317,"pareto":true},
+      {"model":"gpt-5.6-terra","quality":0.96658,"call_cost_cny":0.00262545,"expected_total_cny":0.0040966872,"pareto":false},
+      {"model":"gpt-5.6-sol","quality":0.956368,"call_cost_cny":0.01312725,"expected_total_cny":0.0146208028,"pareto":false},
+      {"model":"gpt-5.5","quality":0.95181,"call_cost_cny":0.630108,"expected_total_cny":0.6314804056,"pareto":false}
+    ],
+    "seg_18c3d777d4cb48a187396dfb7cc0a694": [
+      {"model":"gpt-5.4-mini","quality":0.291357,"call_cost_cny":0.00079578,"expected_total_cny":0.00376647,"pareto":false},
+      {"model":"gpt-5.6-luna","quality":0.778876,"call_cost_cny":0.00106104,"expected_total_cny":0.0029565314,"pareto":true},
+      {"model":"gpt-5.6-terra","quality":0.794522,"call_cost_cny":0.0026526,"expected_total_cny":0.0045135838,"pareto":true},
+      {"model":"gpt-5.6-sol","quality":0.835934,"call_cost_cny":0.013263,"expected_total_cny":0.0150326516,"pareto":true},
+      {"model":"gpt-5.5","quality":0.721026,"call_cost_cny":0.636624,"expected_total_cny":0.6385147501,"pareto":false}
+    ],
+    "seg_a2d9b36049d14b4e8e927f88a4a97502": [
+      {"model":"gpt-5.4-mini","quality":0.3806,"call_cost_cny":0.000822915,"expected_total_cny":0.0037565987,"pareto":false},
+      {"model":"gpt-5.6-luna","quality":0.853538,"call_cost_cny":0.00109722,"expected_total_cny":0.00295578,"pareto":true},
+      {"model":"gpt-5.6-terra","quality":0.844518,"call_cost_cny":0.00274305,"expected_total_cny":0.0046221157,"pareto":false},
+      {"model":"gpt-5.6-sol","quality":0.869718,"call_cost_cny":0.01371525,"expected_total_cny":0.0155370282,"pareto":true},
+      {"model":"gpt-5.5","quality":0.782173,"call_cost_cny":0.658332,"expected_total_cny":0.6602163961,"pareto":false}
+    ],
+    "seg_0193872049b84c0996cf61062d633252": [
+      {"model":"gpt-5.4-mini","quality":0.252341,"call_cost_cny":0.001243755,"expected_total_cny":0.0054431153,"pareto":false},
+      {"model":"gpt-5.6-luna","quality":0.73543,"call_cost_cny":0.00165834,"expected_total_cny":0.0042512437,"pareto":true},
+      {"model":"gpt-5.6-terra","quality":0.766296,"call_cost_cny":0.00414585,"expected_total_cny":0.0066361116,"pareto":true},
+      {"model":"gpt-5.6-sol","quality":0.816928,"call_cost_cny":0.02072925,"expected_total_cny":0.023051141,"pareto":true},
+      {"model":"gpt-5.5","quality":0.687493,"call_cost_cny":0.995004,"expected_total_cny":0.9975567881,"pareto":false}
+    ],
+    "seg_6839ceaf75a64565a81b01d74e180486": [
+      {"model":"gpt-5.4-mini","quality":0.393742,"call_cost_cny":0.001359495,"expected_total_cny":0.0053024722,"pareto":false},
+      {"model":"gpt-5.6-luna","quality":0.861868,"call_cost_cny":0.00181266,"expected_total_cny":0.0040634845,"pareto":true},
+      {"model":"gpt-5.6-terra","quality":0.850342,"call_cost_cny":0.00453165,"expected_total_cny":0.0068241383,"pareto":false},
+      {"model":"gpt-5.6-sol","quality":0.873687,"call_cost_cny":0.02265825,"expected_total_cny":0.0248663519,"pareto":true},
+      {"model":"gpt-5.5","quality":0.789512,"call_cost_cny":1.087596,"expected_total_cny":1.0898914886,"pareto":false}
+    ],
+    "seg_e95703142a6d498f98e9975e0017f264": [
+      {"model":"gpt-5.4-mini","quality":0.324166,"call_cost_cny":0.00137871,"expected_total_cny":0.0056123769,"pareto":false},
+      {"model":"gpt-5.6-luna","quality":0.810259,"call_cost_cny":0.00183828,"expected_total_cny":0.0042914989,"pareto":true},
+      {"model":"gpt-5.6-terra","quality":0.81519,"call_cost_cny":0.0045957,"expected_total_cny":0.0070308554,"pareto":true},
+      {"model":"gpt-5.6-sol","quality":0.84986,"call_cost_cny":0.0229785,"expected_total_cny":0.0252866681,"pareto":true},
+      {"model":"gpt-5.5","quality":0.74597,"call_cost_cny":1.102968,"expected_total_cny":1.105436925,"pareto":false}
+    ],
+    "seg_30f71b9ce3bf41ce82dfe6f88d17e40f": [
+      {"model":"gpt-5.4-mini","excluded_primary_reason":"context_window"},
+      {"model":"gpt-5.6-luna","excluded_primary_reason":"context_window"},
+      {"model":"gpt-5.6-terra","excluded_primary_reason":"context_window"},
+      {"model":"gpt-5.6-sol","excluded_primary_reason":"context_window"},
+      {"model":"gpt-5.5","excluded_primary_reason":"context_window"}
+    ]
+  },
+  "logical_requests": [
+    {"ordinal":1,"segment_id":"seg_e5c1fcb6dde245c788ec6fab7b020d3c","logical_request_id":"req_99a6a4cde1d241b19765187bd18363b5","step_id":null,"attempt_id":"att_3c98cfdf3feb4944969f11bce6acdac3","input":13852,"cached":3456,"output":11,"reasoning":0,"nominal_provider_usd":0.0108076,"balance_charge_usd":0.000648456,"judge_usd":0.0010923,"user_charge_usd":0.0118999,"quota":5950},
+    {"ordinal":2,"segment_id":"seg_18c3d777d4cb48a187396dfb7cc0a694","logical_request_id":"req_d1167ebab61d495894bf41cdc2c2d9e4","step_id":null,"attempt_id":"att_cd4c4e22f822429589d5d5bdc89808c4","input":13976,"cached":13696,"output":183,"reasoning":53,"nominal_provider_usd":0.0027476,"balance_charge_usd":0.000164856,"judge_usd":0.00109905,"user_charge_usd":0.00384665,"quota":1923},
+    {"ordinal":3,"segment_id":"seg_a2d9b36049d14b4e8e927f88a4a97502","logical_request_id":"req_74c22e213b44476f985b76c000269bfd","step_id":null,"attempt_id":"att_a80d422f09554869a3040b8a51f53be9","input":14172,"cached":13696,"output":221,"reasoning":0,"nominal_provider_usd":0.0031716,"balance_charge_usd":0.000190296,"judge_usd":0.00120735,"user_charge_usd":0.00437895,"quota":2189},
+    {"ordinal":4,"segment_id":"seg_a2d9b36049d14b4e8e927f88a4a97502","logical_request_id":"req_b19d0d91a84b4e408d88a49c985f35f9","step_id":null,"attempt_id":"att_e4f427e1e09541028739893d30bb973e","input":14509,"cached":13696,"output":273,"reasoning":36,"nominal_provider_usd":0.0038206,"balance_charge_usd":0.000229236,"judge_usd":0,"user_charge_usd":0.0038206,"quota":1910},
+    {"ordinal":5,"segment_id":"seg_a2d9b36049d14b4e8e927f88a4a97502","logical_request_id":"req_c9ea183a9cad49e696358c70a3e87610","step_id":null,"attempt_id":"att_6000ee300c14468487aa03f38e379882","input":15735,"cached":3456,"output":317,"reasoning":139,"nominal_provider_usd":0.0145266,"balance_charge_usd":0.000871596,"judge_usd":0,"user_charge_usd":0.0145266,"quota":7263},
+    {"ordinal":6,"segment_id":"seg_a2d9b36049d14b4e8e927f88a4a97502","logical_request_id":"req_fa462df013ca47849b7a953cad1534ca","step_id":null,"attempt_id":"att_fd32f97d411543c08bbb476ddd9a25d8","input":16065,"cached":14720,"output":162,"reasoning":51,"nominal_provider_usd":0.003789,"balance_charge_usd":0.00022734,"judge_usd":0,"user_charge_usd":0.003789,"quota":1895},
+    {"ordinal":7,"segment_id":"seg_a2d9b36049d14b4e8e927f88a4a97502","logical_request_id":"req_9f31193f29524274a3461650eaa60f53","step_id":null,"attempt_id":"att_5da059766a9e481c9d2268f93ab611f9","input":16319,"cached":15744,"output":3374,"reasoning":67,"nominal_provider_usd":0.0223934,"balance_charge_usd":0.001343604,"judge_usd":0,"user_charge_usd":0.0223934,"quota":11197},
+    {"ordinal":8,"segment_id":"seg_a2d9b36049d14b4e8e927f88a4a97502","logical_request_id":"req_de0c36949c66426fabab96c69d7836dc","step_id":null,"attempt_id":"att_e7e07e5c971a4dd8a1fd5207ec852644","input":19744,"cached":13696,"output":837,"reasoning":94,"nominal_provider_usd":0.0124396,"balance_charge_usd":0.000746376,"judge_usd":0,"user_charge_usd":0.0124396,"quota":6220},
+    {"ordinal":9,"segment_id":"seg_a2d9b36049d14b4e8e927f88a4a97502","logical_request_id":"req_7f3d4d851c4641fa95d875ea2632edb8","step_id":null,"attempt_id":"att_7f194ba0ee734d198eb77b2cf53c8c12","input":20767,"cached":18816,"output":308,"reasoning":178,"nominal_provider_usd":0.0056806,"balance_charge_usd":0.000340836,"judge_usd":0,"user_charge_usd":0.0056806,"quota":2840},
+    {"ordinal":10,"segment_id":"seg_a2d9b36049d14b4e8e927f88a4a97502","logical_request_id":"req_ff1fa60ceeee45b5b6a24fb702de79f5","step_id":null,"attempt_id":"att_e5e9203ab5454320987275f34e2c0a31","input":21088,"cached":19840,"output":422,"reasoning":0,"nominal_provider_usd":0.005764,"balance_charge_usd":0.00034584,"judge_usd":0,"user_charge_usd":0.005764,"quota":2882},
+    {"ordinal":11,"segment_id":"seg_0193872049b84c0996cf61062d633252","logical_request_id":"req_975674f455d94ecea9154a14a94cdd20","step_id":null,"attempt_id":"att_e3b883ec1a194a3194d6afdd738854d8","input":21554,"cached":20864,"output":497,"reasoning":73,"nominal_provider_usd":0.0057584,"balance_charge_usd":0.000345504,"judge_usd":0.00124755,"user_charge_usd":0.00700595,"quota":3503},
+    {"ordinal":12,"segment_id":"seg_0193872049b84c0996cf61062d633252","logical_request_id":"req_e785197c98674fa193c8494b3ef31530","step_id":null,"attempt_id":"att_d5cbdc9d078b4cc98f6ff3a96607af8b","input":23476,"cached":20864,"output":49,"reasoning":10,"nominal_provider_usd":0.0049924,"balance_charge_usd":0.000299544,"judge_usd":0,"user_charge_usd":0.0049924,"quota":2496},
+    {"ordinal":13,"segment_id":"seg_6839ceaf75a64565a81b01d74e180486","logical_request_id":"req_7d02d7fa8ab84698a0a5c7e192252ef8","step_id":null,"attempt_id":"att_93465a9b41fa488db195d82dbe18898f","input":23574,"cached":22912,"output":61,"reasoning":17,"nominal_provider_usd":0.0033192,"balance_charge_usd":0.000199152,"judge_usd":0.00124545,"user_charge_usd":0.00456465,"quota":2282},
+    {"ordinal":14,"segment_id":"seg_e95703142a6d498f98e9975e0017f264","logical_request_id":"req_2de785d3877a44b3859c3918a6f564c8","step_id":null,"attempt_id":"att_df09f37532d9472ea2398ba1772511f4","input":23827,"cached":22912,"output":477,"reasoning":68,"nominal_provider_usd":0.0060682,"balance_charge_usd":0.000364092,"judge_usd":0.00124545,"user_charge_usd":0.00731365,"quota":3657},
+    {"ordinal":15,"segment_id":"seg_e95703142a6d498f98e9975e0017f264","logical_request_id":"req_14eb9f804b1143248a3ca69d81b88f91","step_id":null,"attempt_id":"att_325b00950e534bde9a4fbdc27bd2fc2c","input":24636,"cached":22912,"output":51,"reasoning":7,"nominal_provider_usd":0.0043212,"balance_charge_usd":0.000259272,"judge_usd":0,"user_charge_usd":0.0043212,"quota":2161},
+    {"ordinal":16,"segment_id":"seg_e95703142a6d498f98e9975e0017f264","logical_request_id":"req_b5cb9bd56c404e07bc55e9d8c221fddf","step_id":null,"attempt_id":"att_e33b9bdc36114a5a90168de66d648c20","input":26313,"cached":23936,"output":142,"reasoning":23,"nominal_provider_usd":0.0056226,"balance_charge_usd":0.000337356,"judge_usd":0,"user_charge_usd":0.0056226,"quota":2811},
+    {"ordinal":17,"segment_id":"seg_e95703142a6d498f98e9975e0017f264","logical_request_id":"req_32d3eb06b3e945cfb455978c1c630249","step_id":null,"attempt_id":"att_a13a2e7e64244428a5fc51f46a88b9c7","input":29652,"cached":25984,"output":134,"reasoning":15,"nominal_provider_usd":0.0070704,"balance_charge_usd":0.000424224,"judge_usd":0,"user_charge_usd":0.0070704,"quota":3535},
+    {"ordinal":18,"segment_id":"seg_e95703142a6d498f98e9975e0017f264","logical_request_id":"req_ed97dc3362474df9ae69825e36f95f38","step_id":null,"attempt_id":"att_6a34d25765d84b25ac16a26d9a5b7871","input":31405,"cached":29056,"output":432,"reasoning":233,"nominal_provider_usd":0.0078466,"balance_charge_usd":0.000470796,"judge_usd":0,"user_charge_usd":0.0078466,"quota":3923},
+    {"ordinal":19,"segment_id":"seg_e95703142a6d498f98e9975e0017f264","logical_request_id":"req_6957bf50d32a47bc862bf6192d102650","step_id":null,"attempt_id":"att_b5ec39a1868348a697bd64ffb332ceee","input":32222,"cached":31104,"output":832,"reasoning":317,"nominal_provider_usd":0.0092204,"balance_charge_usd":0.000553224,"judge_usd":0,"user_charge_usd":0.0092204,"quota":4610}
+  ],
+  "provider_usage": {
+    "provider": "lucen",
+    "channel": "lucen-cx006-value-dynamic",
+    "model": "gpt-5.6-luna",
+    "successful_records": 19,
+    "input_tokens": 402886,
+    "uncached_input_tokens": 51526,
+    "cached_input_tokens": 351360,
+    "output_tokens": 8783,
+    "reasoning_tokens": 1381,
+    "nominal_provider_cost_usd": 0.13936,
+    "billing_multiplier": 0.06,
+    "provider_balance_charge_usd": 0.0083616,
+    "effective_cash_cost_cny": 0.0083616,
+    "founder_observed_comparison": {"cached_input_tokens":351400,"nominal_provider_cost_usd":0.139364,"provider_balance_charge_usd":0.00836184,"absolute_cost_difference_usd":0.000004,"difference_percent":0.0028701817}
+  },
+  "judge": {
+    "persisted_live_calls": 6,
+    "persisted_cost_usd": 0.00713715,
+    "unpersisted_live_calls": [
+      {"created_at":"2026-07-29T18:50:50.886Z","prompt_tokens":8009,"completion_tokens":149,"cost_usd":0.00124605},
+      {"created_at":"2026-07-29T18:50:54.888Z","prompt_tokens":8009,"completion_tokens":146,"cost_usd":0.00124515}
+    ],
+    "unpersisted_cost_usd": 0.0024912,
+    "total_live_cost_usd": 0.00962835,
+    "effective_cash_cost_cny": 0.06932412,
+    "provider_cash_ratio_cny_per_usd_credit": 7.2
+  },
+  "new_api_reconciliation": {
+    "billing_basis": "nominal_provider_cost_plus_judge_plus_failed_billed_cost",
+    "provider_cost_usd": 0.13936,
+    "persisted_judge_cost_usd": 0.00713715,
+    "failed_provider_attempt_cost_usd": 0,
+    "declared_user_charge_usd": 0.14649715,
+    "quota_decrease": 73247,
+    "quota_per_usd": 500000,
+    "actual_quota_decrease_usd": 0.146494,
+    "finalized_ledger_difference_usd": 0.00000315,
+    "finalized_ledger_difference_percent": 0.0021502125,
+    "full_incurred_nominal_cost_usd": 0.14898835,
+    "full_difference_vs_declared_charge_usd": 0.0024912,
+    "full_difference_vs_declared_charge_percent": 1.672077045,
+    "full_difference_vs_quota_decrease_usd": 0.00249435,
+    "full_difference_vs_quota_decrease_percent": 1.6741913042,
+    "under_one_percent_target_met": false
+  },
+  "effective_cash": {
+    "lucen_cny": 0.0083616,
+    "judge_cny": 0.06932412,
+    "total_cny": 0.07768572
+  },
+  "final_502": {
+    "segment_id": "seg_30f71b9ce3bf41ce82dfe6f88d17e40f",
+    "first_new_api_entry_utc": "2026-07-29T18:50:46Z",
+    "strict_window_502_requests": 8,
+    "retry_cluster_total_502_requests": 30,
+    "last_retry_utc": "2026-07-29T18:51:26Z",
+    "entered_acu": true,
+    "logical_request_created": false,
+    "selected_model": null,
+    "selected_profile": null,
+    "selected_channel": null,
+    "attempts": [],
+    "provider_usage": false,
+    "user_charge": 0,
+    "sse_bytes_sent": false,
+    "fallback_triggered": false,
+    "circuit_state": null,
+    "cooldown_until": null,
+    "pending": 0,
+    "source": "acu_router_admission",
+    "primary_root_cause": "all_responses_profiles_excluded_by_32768_context_window",
+    "reported_error": "No compatible Alpha execution profile supports required tool capabilities: function, local_tool",
+    "error_message_accuracy": "misleading",
+    "potential_router_defect_per_requested_provider_502_definition": false,
+    "cf_ray_exact_row_mapping": "not_possible_from_persisted_nginx_format"
+  },
+  "model_plaza": {
+    "pricing_models": [
+      {"id":"acu-auto","display_name":"ACU Auto Router"},
+      {"id":"gpt-5.4-mini","display_name":"GPT-5.4 Mini"},
+      {"id":"gpt-5.6-luna","display_name":"GPT-5.6 Luna"},
+      {"id":"gpt-5.6-terra","display_name":"GPT-5.6 Terra"},
+      {"id":"gpt-5.5","display_name":"GPT-5.5"},
+      {"id":"gpt-5.6-sol","display_name":"GPT-5.6 Sol"}
+    ],
+    "founder_v1_models": ["acu-auto"],
+    "new_api_models_table": [],
+    "token_model_limits": ["acu-auto"],
+    "router_curve_models": ["gpt-5.4-mini","gpt-5.6-luna","gpt-5.6-terra","gpt-5.5","gpt-5.6-sol"],
+    "active_channel_counts": {"gpt-5.4-mini":2,"gpt-5.6-luna":5,"gpt-5.6-terra":3,"gpt-5.5":1,"gpt-5.6-sol":2},
+    "consistent": false
+  },
+  "findings": {
+    "P0": [],
+    "P1": [
+      "All active Responses profiles share a 32768 context ceiling; continuous use failed before Logical Request creation and the error masked context_window as tool capability.",
+      "Two live Judge calls totaling USD 0.0024912 were incurred on the failed segment but were not persisted or billed; full reconciliation misses the 1% target.",
+      "Final-segment Judge outputs remained focused on the previous design task instead of the new Gitee/DNS/server goal.",
+      "Pricing exposes six models while the Founder Key exposes one and the New API models table exposes none of the five fixed models."
+    ],
+    "P2": [
+      "New API charges nominal Provider cost rather than provider-balance or effective cash cost.",
+      "Origin IP and CF-Ray are not durably correlated.",
+      "Nginx limit_conn caused ten transient 503 responses during normal Codex concurrency.",
+      "Route records stored webIntent but not webIntentSource for this Session."
+    ]
+  },
+  "audit_controls": {"provider_calls":0,"new_cost":0,"database_writes":0,"config_changes":0,"code_changes":0,"evidence_collection_commits":0,"evidence_collection_pushes":0,"report_delivery_requested_after_audit":true}
+}

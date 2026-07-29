@@ -90,7 +90,7 @@ run("Alpha PostgreSQL request processor", () => {
       upstreamCaseCalls.set(testCase, testCaseCall);
       const failuresBeforeSuccess = Number(requestBody.test_failures_before_success ?? 0);
       if (testCase && testCaseCall <= failuresBeforeSuccess) {
-        response.statusCode = 503;
+        response.statusCode = Number(requestBody.test_failure_status ?? 503);
         response.setHeader("content-type", "application/json");
         response.setHeader("x-request-id", `provider-${testCase}-failed-${testCaseCall}`);
         response.end(JSON.stringify({ error: { type: "overloaded_error", message: "controlled test overload" } }));
@@ -329,7 +329,7 @@ run("Alpha PostgreSQL request processor", () => {
       pareto_models: "1",
       excluded_profiles: [],
       routing_preference: "balanced",
-      routing_model_version: "acu-routing-model-v0.2",
+      routing_model_version: "acu-routing-model-v0.3",
     });
     const payloadKinds = await database.query<{ payload_kind: string }>(
       "SELECT payload_kind FROM acu_payloads ORDER BY created_at,payload_kind",
@@ -432,7 +432,7 @@ run("Alpha PostgreSQL request processor", () => {
     expect(recovery.rows[0]).toEqual({ creation_reason: "repeated_failure", phase: "recovery" });
   });
 
-  it("owns one pre-stream Provider recovery Attempt without another Judge", async () => {
+  it("backs off a 502 Channel and recovers on the same model without duplicating the Logical Request", async () => {
     const beforeJudge = judgeCalls;
     const body = {
       model: "acu-auto",
@@ -440,6 +440,7 @@ run("Alpha PostgreSQL request processor", () => {
       stream: true,
       test_case: "retry-once",
       test_failures_before_success: 1,
+      test_failure_status: 502,
     };
     await send(body, "retry-1", "user-retry");
     expect(judgeCalls).toBe(beforeJudge + 1);
@@ -455,8 +456,37 @@ run("Alpha PostgreSQL request processor", () => {
        ORDER BY attempt_index`,
     );
     expect(attempts.rows).toEqual([
-      { attempt_index: 1, retry_owner: "acu", status: "error", http_status: 503, channel: "test-channel" },
+      { attempt_index: 1, retry_owner: "acu", status: "error", http_status: 502, channel: "test-channel" },
       { attempt_index: 2, retry_owner: "acu", status: "success", http_status: 200, channel: "test-recovery-channel" },
+    ]);
+    const requestAndModels = await database.query<{
+      logical_requests: string;
+      attempt_models: string[];
+      final_model: string;
+    }>(
+      `SELECT
+       (SELECT count(*) FROM acu_logical_requests WHERE newapi_user_id='user-retry') logical_requests,
+       (SELECT array_agg(actual_model ORDER BY attempt_index) FROM acu_attempts
+        WHERE logical_request_id=(SELECT logical_request_id FROM acu_logical_requests WHERE newapi_user_id='user-retry')) attempt_models,
+       (SELECT actual_model FROM acu_usage_reports WHERE newapi_user_id='user-retry') final_model`,
+    );
+    expect(requestAndModels.rows[0]).toEqual({
+      logical_requests: "1",
+      attempt_models: ["gpt-5.4-mini", "gpt-5.4-mini"],
+      final_model: "gpt-5.4-mini",
+    });
+    const health = await database.query<{
+      channel_id: string;
+      circuit_state: string;
+      error_class: string;
+      cooldown_active: boolean;
+    }>(
+      `SELECT channel_id,circuit_state,error_class,coalesce(cooldown_until>now(),false) cooldown_active
+       FROM acu_channel_health WHERE channel_id IN ('test-channel','test-recovery-channel') ORDER BY channel_id`,
+    );
+    expect(health.rows).toEqual([
+      { channel_id: "test-channel", circuit_state: "open", error_class: "provider_5xx", cooldown_active: true },
+      { channel_id: "test-recovery-channel", circuit_state: "healthy", error_class: "none", cooldown_active: false },
     ]);
     const events = await database.query<{ event_type: string }>(
       `SELECT event_type FROM acu_events WHERE task_id=(SELECT task_id FROM acu_tasks WHERE newapi_user_id='user-retry')`,

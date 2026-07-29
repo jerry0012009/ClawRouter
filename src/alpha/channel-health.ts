@@ -60,7 +60,8 @@ export function classifyAttemptOutcome(outcome: AttemptOutcome, consecutiveFailu
   if (/model[_ -]?not[_ -]?found|unknown model|does not exist/.test(code)) return { errorClass: "model_not_found", scope: "profile", permanent: true, cooldownSeconds: 0, usageTrusted: true };
   if (/tool.*(?:unsupported|not supported)|unsupported.*tool/.test(code)) return { errorClass: "tool_incompatible", scope: "profile", permanent: true, cooldownSeconds: 0, usageTrusted: true };
   if (/protocol|unsupported.*(?:responses|messages)|invalid.*schema/.test(code)) return { errorClass: "protocol_incompatible", scope: "profile", permanent: true, cooldownSeconds: 0, usageTrusted: true };
-  if (outcome.httpStatus && [500, 502, 503, 504].includes(outcome.httpStatus)) return { errorClass: "provider_5xx", scope: "profile", permanent: false, cooldownSeconds: networkBackoff(consecutiveFailures + 1), usageTrusted: true };
+  if (outcome.httpStatus && [502, 503, 504].includes(outcome.httpStatus)) return { errorClass: "provider_5xx", scope: "channel", permanent: false, cooldownSeconds: networkBackoff(consecutiveFailures + 1), usageTrusted: true };
+  if (outcome.httpStatus === 500) return { errorClass: "provider_5xx", scope: "profile", permanent: false, cooldownSeconds: networkBackoff(consecutiveFailures + 1), usageTrusted: true };
   if (/timeout|timed out|aborterror/.test(code)) return { errorClass: "timeout", scope: "channel", permanent: false, cooldownSeconds: networkBackoff(consecutiveFailures + 1), usageTrusted: true };
   if (/econn|enotfound|network|fetch failed|socket/.test(code)) return { errorClass: "network", scope: "channel", permanent: false, cooldownSeconds: networkBackoff(consecutiveFailures + 1), usageTrusted: true };
   return { errorClass: "other_provider_error", scope: "profile", permanent: false, cooldownSeconds: networkBackoff(consecutiveFailures + 1), usageTrusted: true };

@@ -8,7 +8,20 @@ type Json = Record<string, unknown>;
 type Usage = { input: number; cached: number; output: number; reasoning: number };
 
 if (process.env.ACU_CHANNEL_PREFLIGHT_LIVE !== "1") throw new Error("Set ACU_CHANNEL_PREFLIGHT_LIVE=1 to authorize the paid preflight");
-const maxCashCny = Math.min(2, Math.max(0, Number(process.env.ACU_CHANNEL_PREFLIGHT_MAX_CNY ?? "2")));
+const maxCashCny = Math.min(1, Math.max(0, Number(process.env.ACU_CHANNEL_PREFLIGHT_MAX_CNY ?? "1")));
+const preflightRunId = process.env.ACU_CHANNEL_PREFLIGHT_RUN_ID?.trim() || "founder-economic-alpha-20260729-v1";
+
+const SELECTED_PROFILES = [
+  "blackai-codex-mix-low:gpt-5.4-mini:responses",
+  "blackai-codex-mix-low:gpt-5.6-luna:responses",
+  "blackai-codex-mix-low:gpt-5.6-terra:responses",
+  "blackai-codex-mix-low:gpt-5.6-sol:responses",
+  "lucen-cx006-value-dynamic:gpt-5.4-mini:responses",
+  "lucen-cx006-value-dynamic:gpt-5.6-luna:responses",
+  "lucen-cx006-value-dynamic:gpt-5.6-terra:responses",
+  "lucen-cx006-plus:gpt-5.6-luna:responses",
+  "lucen-cx008-plus-dedicated:gpt-5.6-luna:responses",
+] as const;
 
 function dotenv(text: string): Map<string, string> {
   return new Map(text.split(/\r?\n/).flatMap((line) => {
@@ -62,24 +75,30 @@ function actualVerified(requested: string, actual: string): boolean {
   return actual === requested || (requested === "gpt-5.4-mini" && actual === "gpt-5.4-mini-2026-03-17");
 }
 
+function classifyError(error: unknown): string {
+  if (error instanceof Error && (error.name === "AbortError" || /aborted|timeout/i.test(error.message))) return "timeout";
+  if (error instanceof Error && /^HTTP [45]\d\d$/.test(error.message)) return `provider_http_${error.message.slice(5)}`;
+  return error instanceof Error ? error.message : "unknown_provider_error";
+}
+
 async function main(): Promise<void> {
   const env = dotenv(await readFile(resolve(".env"), "utf8"));
   const channels = await readProviderChannelRegistry(resolve("deploy/alpha/provider-channels.json"));
   const profileRegistry = await readProviderModelProfiles(resolve("deploy/alpha/provider-model-profiles.json"));
-  const selectedChannelIds = channels.channels.filter((channel) => (
-    (channel.providerId === "lucen" && channel.routingGroupSlug.startsWith("cx"))
-    || (channel.providerId === "blackai" && ["codex_mix_low", "pro_1_4", "codex_mix_pro_fallback"].includes(channel.routingGroupSlug))
-  )).map((channel) => channel.channelId);
   const observations: Json[] = [];
   let spentCny = 0;
-  for (const channelId of selectedChannelIds) {
+  for (const executionProfileId of SELECTED_PROFILES) {
     if (spentCny >= maxCashCny) break;
-    const channel = channels.channels.find((item) => item.channelId === channelId)!;
-    const model = "gpt-5.6-luna";
-    const profile = profileRegistry.profiles.find((item) => item.channelId === channelId
-      && item.canonicalModelId === model && item.protocol === "responses");
+    const profile = profileRegistry.profiles.find((item) => item.executionProfileId === executionProfileId);
     if (!profile) {
-      observations.push({ channelId, model, status: "not_in_directory" });
+      observations.push({ preflightRunId, executionProfileId, status: "failed", errorClass: "profile_not_found" });
+      continue;
+    }
+    const channel = channels.channels.find((item) => item.channelId === profile.channelId)!;
+    const model = profile.canonicalModelId;
+    if (profile.activeInAcuAuto && profile.actualModelVerified && profile.usageTrusted && profile.effectivePriceAvailable) {
+      observations.push({ preflightRunId, executionProfileId, channelId: channel.channelId, providerId: channel.providerId,
+        model, status: "skipped", skipReason: "sufficient_existing_evidence" });
       continue;
     }
     const apiKey = env.get(channel.apiKeyEnv)!;
@@ -97,12 +116,8 @@ async function main(): Promise<void> {
         { type: "function_call_output", call_id: call.call_id, output: "{\"ok\":true}" },
       ], tools: [tool], reasoning: { effort: "medium" }, max_output_tokens: 128 });
       if (!outputs(second.response).some((item) => item.type === "message")) throw new Error("tool_result_no_message");
-      const web = await streamed(url, apiKey, { model, input: "Use web search to find the IANA example domain, then reply only example.com.",
-        tools: [{ type: "web_search" }], tool_choice: "required", reasoning: { effort: "medium" }, max_output_tokens: 128 });
-      const webUsed = outputs(web.response).some((item) => String(item.type).includes("web_search"));
-      if (!webUsed) throw new Error("hosted_web_search_not_observed");
-      const totalUsage = add(add(usage(first.response.usage), usage(second.response.usage)), usage(web.response.usage));
-      const actualModels = [first.response.model, second.response.model, web.response.model].map(String);
+      const totalUsage = add(usage(first.response.usage), usage(second.response.usage));
+      const actualModels = [first.response.model, second.response.model].map(String);
       if (!actualModels.every((actual) => actualVerified(model, actual))) throw new Error("actual_model_mismatch");
       if (totalUsage.input + totalUsage.output === 0) throw new Error("usage_missing");
       const nominalUsd = Number(calculateProviderCost(model, BigInt(totalUsage.input), BigInt(totalUsage.cached), BigInt(totalUsage.output)));
@@ -113,32 +128,37 @@ async function main(): Promise<void> {
       const canActivate = channel.effectiveCostStatus !== "missing";
       Object.assign(profile, {
         toolCallSupport: true,
-        supportedToolTypes: ["function", "custom", "local_tool", "hosted_web_search"],
+        supportedToolTypes: ["function", "custom", "local_tool"],
         thinkingSupport: true,
         supportedReasoningEfforts: ["low", "medium", "high"],
         contextWindow: 32768,
         actualModelVerified: true,
+        actualModelAliases: [...new Set(actualModels.filter((actual) => actual !== model))],
         usageTrusted: true,
         effectivePriceAvailable: canActivate,
+        effectiveCostStatus: channel.effectiveCostStatus,
         health: canActivate ? "healthy" : "degraded",
         healthReason: canActivate ? "minimal_native_responses_preflight_passed" : "preflight_passed_but_effective_price_missing",
         lastVerifiedAt: new Date().toISOString(),
         activeInAcuAuto: canActivate,
       });
-      observations.push({ channelId, providerId: channel.providerId, routingGroupName: channel.routingGroupName,
+      observations.push({ preflightRunId, executionProfileId, channelId: channel.channelId, providerId: channel.providerId, routingGroupName: channel.routingGroupName,
         model, status: "passed", nativePath: "/responses", streaming: true, toolRoundtrip: true,
-        hostedWebSearch: true, reasoningEffort: "medium", actualModels, usage: totalUsage,
+        hostedWebSearch: false, reasoningEffort: "medium", actualModels, usage: totalUsage,
         nominalProviderCostUsd: nominalUsd, effectiveCashCostCny, activated: canActivate });
     } catch (error) {
-      observations.push({ channelId, providerId: channel.providerId, routingGroupName: channel.routingGroupName,
-        model, status: "failed", errorClass: error instanceof Error ? error.message : "unknown" });
+      const errorClass = classifyError(error);
+      Object.assign(profile, { health: "disabled", healthReason: `preflight_failed:${errorClass}`, activeInAcuAuto: false });
+      observations.push({ preflightRunId, executionProfileId, channelId: channel.channelId, providerId: channel.providerId, routingGroupName: channel.routingGroupName,
+        model, status: "failed", errorClass });
     }
   }
   profileRegistry.generatedAt = new Date().toISOString();
   validateProviderModelProfiles(profileRegistry);
   await writeFile(resolve("deploy/alpha/provider-model-profiles.json"), `${JSON.stringify(profileRegistry, null, 2)}\n`);
   await writeFile(resolve("deploy/alpha/provider-channel-preflight-observations.json"), `${JSON.stringify({
-    schemaVersion: "acu-provider-channel-preflight-v1", capturedAt: new Date().toISOString(), budgetCny: maxCashCny,
+    schemaVersion: "acu-provider-channel-preflight-v1", capturedAt: new Date().toISOString(), preflightRunId,
+    budgetCny: maxCashCny, concurrency: 1, webSearch: false,
     actualEstimatedCashCostCny: spentCny, observations,
   }, null, 2)}\n`);
   console.log(JSON.stringify({ tested: observations.length, passed: observations.filter((item) => item.status === "passed").length,

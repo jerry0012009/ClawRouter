@@ -1,6 +1,6 @@
 {
   "schemaVersion": "acu-provider-model-profile-registry-v1",
-  "generatedAt": "2026-07-29T15:30:10.987Z",
+  "generatedAt": "2026-07-29T16:39:29.252Z",
   "profiles": [
     {
       "executionProfileId": "blackai-codex-mix-low:gpt-5.4-mini:responses",
@@ -8,6 +8,7 @@
       "providerId": "blackai",
       "canonicalModelId": "gpt-5.4-mini",
       "providerModelId": "gpt-5.4-mini",
+      "actualModelAliases": [],
       "protocol": "responses",
       "toolCallSupport": false,
       "supportedToolTypes": [],
@@ -19,7 +20,7 @@
       "effectivePriceAvailable": false,
       "effectiveCostStatus": "missing",
       "health": "disabled",
-      "healthReason": "directory_only_pending_minimal_protocol_preflight",
+      "healthReason": "preflight_failed:timeout",
       "lastVerifiedAt": null,
       "activeInAcuAuto": false
     },
@@ -67,12 +68,12 @@
       "contextWindow": 32768,
       "actualModelVerified": true,
       "usageTrusted": true,
-      "effectivePriceAvailable": false,
-      "effectiveCostStatus": "missing",
-      "health": "degraded",
-      "healthReason": "preflight_passed_but_effective_price_missing",
+      "effectivePriceAvailable": true,
+      "effectiveCostStatus": "estimated",
+      "health": "healthy",
+      "healthReason": "minimal_native_responses_preflight_passed; founder_cost_estimate_admitted",
       "lastVerifiedAt": "2026-07-29T15:27:52.000Z",
-      "activeInAcuAuto": false
+      "activeInAcuAuto": true
     },
     {
       "executionProfileId": "blackai-codex-mix-low:gpt-5.6-sol:responses",
@@ -81,19 +82,27 @@
       "canonicalModelId": "gpt-5.6-sol",
       "providerModelId": "gpt-5.6-sol",
       "protocol": "responses",
-      "toolCallSupport": false,
-      "supportedToolTypes": [],
-      "thinkingSupport": false,
-      "supportedReasoningEfforts": [],
-      "contextWindow": null,
-      "actualModelVerified": false,
-      "usageTrusted": false,
-      "effectivePriceAvailable": false,
-      "effectiveCostStatus": "missing",
-      "health": "disabled",
-      "healthReason": "directory_only_pending_minimal_protocol_preflight",
-      "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "toolCallSupport": true,
+      "supportedToolTypes": [
+        "function",
+        "custom",
+        "local_tool"
+      ],
+      "thinkingSupport": true,
+      "supportedReasoningEfforts": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "contextWindow": 32768,
+      "actualModelVerified": true,
+      "usageTrusted": true,
+      "effectivePriceAvailable": true,
+      "effectiveCostStatus": "estimated",
+      "health": "healthy",
+      "healthReason": "minimal_native_responses_preflight_passed",
+      "lastVerifiedAt": "2026-07-29T16:39:20.045Z",
+      "activeInAcuAuto": true
     },
     {
       "executionProfileId": "blackai-codex-mix-low:gpt-5.6-terra:responses",
@@ -102,19 +111,27 @@
       "canonicalModelId": "gpt-5.6-terra",
       "providerModelId": "gpt-5.6-terra",
       "protocol": "responses",
-      "toolCallSupport": false,
-      "supportedToolTypes": [],
-      "thinkingSupport": false,
-      "supportedReasoningEfforts": [],
-      "contextWindow": null,
-      "actualModelVerified": false,
-      "usageTrusted": false,
-      "effectivePriceAvailable": false,
-      "effectiveCostStatus": "missing",
-      "health": "disabled",
-      "healthReason": "directory_only_pending_minimal_protocol_preflight",
-      "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "toolCallSupport": true,
+      "supportedToolTypes": [
+        "function",
+        "custom",
+        "local_tool"
+      ],
+      "thinkingSupport": true,
+      "supportedReasoningEfforts": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "contextWindow": 32768,
+      "actualModelVerified": true,
+      "usageTrusted": true,
+      "effectivePriceAvailable": true,
+      "effectiveCostStatus": "estimated",
+      "health": "healthy",
+      "healthReason": "minimal_native_responses_preflight_passed",
+      "lastVerifiedAt": "2026-07-29T16:39:14.209Z",
+      "activeInAcuAuto": true
     },
     {
       "executionProfileId": "blackai-pro-1-4:gpt-5.4-mini:responses",
@@ -677,20 +694,31 @@
       "providerId": "lucen",
       "canonicalModelId": "gpt-5.4-mini",
       "providerModelId": "gpt-5.4-mini",
+      "actualModelAliases": [
+        "gpt-5.4-mini-2026-03-17"
+      ],
       "protocol": "responses",
-      "toolCallSupport": false,
-      "supportedToolTypes": [],
-      "thinkingSupport": false,
-      "supportedReasoningEfforts": [],
-      "contextWindow": null,
-      "actualModelVerified": false,
-      "usageTrusted": false,
+      "toolCallSupport": true,
+      "supportedToolTypes": [
+        "function",
+        "custom",
+        "local_tool"
+      ],
+      "thinkingSupport": true,
+      "supportedReasoningEfforts": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "contextWindow": 32768,
+      "actualModelVerified": true,
+      "usageTrusted": true,
       "effectivePriceAvailable": true,
       "effectiveCostStatus": "estimated",
-      "health": "disabled",
-      "healthReason": "directory_only_pending_minimal_protocol_preflight",
-      "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "health": "healthy",
+      "healthReason": "minimal_native_responses_preflight_passed",
+      "lastVerifiedAt": "2026-07-29T16:39:24.348Z",
+      "activeInAcuAuto": true
     },
     {
       "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.5:responses",
@@ -771,19 +799,27 @@
       "canonicalModelId": "gpt-5.6-terra",
       "providerModelId": "gpt-5.6-terra",
       "protocol": "responses",
-      "toolCallSupport": false,
-      "supportedToolTypes": [],
-      "thinkingSupport": false,
-      "supportedReasoningEfforts": [],
-      "contextWindow": null,
-      "actualModelVerified": false,
-      "usageTrusted": false,
+      "toolCallSupport": true,
+      "supportedToolTypes": [
+        "function",
+        "custom",
+        "local_tool"
+      ],
+      "thinkingSupport": true,
+      "supportedReasoningEfforts": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "contextWindow": 32768,
+      "actualModelVerified": true,
+      "usageTrusted": true,
       "effectivePriceAvailable": true,
       "effectiveCostStatus": "estimated",
-      "health": "disabled",
-      "healthReason": "directory_only_pending_minimal_protocol_preflight",
-      "lastVerifiedAt": null,
-      "activeInAcuAuto": false
+      "health": "healthy",
+      "healthReason": "minimal_native_responses_preflight_passed",
+      "lastVerifiedAt": "2026-07-29T16:39:29.252Z",
+      "activeInAcuAuto": true
     },
     {
       "executionProfileId": "lucen-cx006-plus:gpt-5.4-mini:responses",

@@ -37,6 +37,7 @@ export type ProviderModelProfile = {
   providerId: string;
   canonicalModelId: string;
   providerModelId: string;
+  actualModelAliases?: string[];
   protocol: "responses" | "messages" | "chat_completions";
   toolCallSupport: boolean;
   supportedToolTypes: string[];

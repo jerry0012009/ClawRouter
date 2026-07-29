@@ -23,7 +23,11 @@
       "activeInAcuAuto": true,
       "provider": "CloseAI",
       "status": "healthy",
-      "healthyChannelCount": 1
+      "healthyChannelCount": 2,
+      "effectiveCostStatuses": [
+        "estimated",
+        "verified"
+      ]
     },
     {
       "modelId": "gpt-5.6-luna",
@@ -37,7 +41,11 @@
       "activeInAcuAuto": true,
       "provider": "Multi-provider",
       "status": "healthy",
-      "healthyChannelCount": 4
+      "healthyChannelCount": 5,
+      "effectiveCostStatuses": [
+        "estimated",
+        "verified"
+      ]
     },
     {
       "modelId": "gpt-5.6-terra",
@@ -51,7 +59,11 @@
       "activeInAcuAuto": true,
       "provider": "CloseAI",
       "status": "healthy",
-      "healthyChannelCount": 1
+      "healthyChannelCount": 3,
+      "effectiveCostStatuses": [
+        "estimated",
+        "verified"
+      ]
     },
     {
       "modelId": "gpt-5.5",
@@ -65,7 +77,10 @@
       "activeInAcuAuto": true,
       "provider": "CloseAI",
       "status": "healthy",
-      "healthyChannelCount": 1
+      "healthyChannelCount": 1,
+      "effectiveCostStatuses": [
+        "verified"
+      ]
     },
     {
       "modelId": "gpt-5.6-sol",
@@ -79,7 +94,11 @@
       "activeInAcuAuto": true,
       "provider": "CloseAI",
       "status": "healthy",
-      "healthyChannelCount": 1
+      "healthyChannelCount": 2,
+      "effectiveCostStatuses": [
+        "estimated",
+        "verified"
+      ]
     }
   ],
   "curveModelStatuses": [
@@ -89,8 +108,11 @@
         "active_responses",
         "active_messages"
       ],
-      "healthyChannelCount": 2,
-      "temporarilyUnavailableReason": null
+      "healthyChannelCount": 1,
+      "temporarilyUnavailableReason": null,
+      "effectiveCostStatuses": [
+        "verified"
+      ]
     },
     {
       "modelId": "gpt-5.4-mini",
@@ -99,7 +121,11 @@
         "active_messages"
       ],
       "healthyChannelCount": 2,
-      "temporarilyUnavailableReason": null
+      "temporarilyUnavailableReason": null,
+      "effectiveCostStatuses": [
+        "estimated",
+        "verified"
+      ]
     },
     {
       "modelId": "claude-opus-4-8",
@@ -107,7 +133,10 @@
         "active_messages"
       ],
       "healthyChannelCount": 1,
-      "temporarilyUnavailableReason": null
+      "temporarilyUnavailableReason": null,
+      "effectiveCostStatuses": [
+        "verified"
+      ]
     },
     {
       "modelId": "claude-sonnet-5",
@@ -115,7 +144,10 @@
         "active_messages"
       ],
       "healthyChannelCount": 1,
-      "temporarilyUnavailableReason": null
+      "temporarilyUnavailableReason": null,
+      "effectiveCostStatuses": [
+        "verified"
+      ]
     },
     {
       "modelId": "gemini-3.5-flash",
@@ -123,7 +155,8 @@
         "provider_unavailable"
       ],
       "healthyChannelCount": 0,
-      "temporarilyUnavailableReason": "No active verified Channel (provider_unavailable)"
+      "temporarilyUnavailableReason": "No active verified Channel (provider_unavailable)",
+      "effectiveCostStatuses": []
     },
     {
       "modelId": "deepseek-v4-flash",
@@ -131,7 +164,8 @@
         "responses_incompatible"
       ],
       "healthyChannelCount": 0,
-      "temporarilyUnavailableReason": "No active verified Channel (responses_incompatible)"
+      "temporarilyUnavailableReason": "No active verified Channel (responses_incompatible)",
+      "effectiveCostStatuses": []
     },
     {
       "modelId": "deepseek-v4-pro",
@@ -139,7 +173,8 @@
         "responses_incompatible"
       ],
       "healthyChannelCount": 0,
-      "temporarilyUnavailableReason": "No active verified Channel (responses_incompatible)"
+      "temporarilyUnavailableReason": "No active verified Channel (responses_incompatible)",
+      "effectiveCostStatuses": []
     },
     {
       "modelId": "glm-5.1",
@@ -147,7 +182,8 @@
         "responses_incompatible"
       ],
       "healthyChannelCount": 0,
-      "temporarilyUnavailableReason": "No active verified Channel (responses_incompatible)"
+      "temporarilyUnavailableReason": "No active verified Channel (responses_incompatible)",
+      "effectiveCostStatuses": []
     },
     {
       "modelId": "kimi-k2.6",
@@ -155,7 +191,8 @@
         "curve_only"
       ],
       "healthyChannelCount": 0,
-      "temporarilyUnavailableReason": "No active verified Channel (curve_only)"
+      "temporarilyUnavailableReason": "No active verified Channel (curve_only)",
+      "effectiveCostStatuses": []
     },
     {
       "modelId": "qwen3.5-flash",
@@ -163,7 +200,8 @@
         "responses_incompatible"
       ],
       "healthyChannelCount": 0,
-      "temporarilyUnavailableReason": "No active verified Channel (responses_incompatible)"
+      "temporarilyUnavailableReason": "No active verified Channel (responses_incompatible)",
+      "effectiveCostStatuses": []
     },
     {
       "modelId": "qwen3.6-plus",
@@ -171,7 +209,8 @@
         "responses_incompatible"
       ],
       "healthyChannelCount": 0,
-      "temporarilyUnavailableReason": "No active verified Channel (responses_incompatible)"
+      "temporarilyUnavailableReason": "No active verified Channel (responses_incompatible)",
+      "effectiveCostStatuses": []
     },
     {
       "modelId": "qwen3.7-max",
@@ -179,7 +218,8 @@
         "responses_incompatible"
       ],
       "healthyChannelCount": 0,
-      "temporarilyUnavailableReason": "No active verified Channel (responses_incompatible)"
+      "temporarilyUnavailableReason": "No active verified Channel (responses_incompatible)",
+      "effectiveCostStatuses": []
     },
     {
       "modelId": "minimax-m3",
@@ -187,15 +227,20 @@
         "missing_price"
       ],
       "healthyChannelCount": 0,
-      "temporarilyUnavailableReason": "No active verified Channel (missing_price)"
+      "temporarilyUnavailableReason": "No active verified Channel (missing_price)",
+      "effectiveCostStatuses": []
     },
     {
       "modelId": "gpt-5.6-sol",
       "statuses": [
         "active_responses"
       ],
-      "healthyChannelCount": 1,
-      "temporarilyUnavailableReason": null
+      "healthyChannelCount": 2,
+      "temporarilyUnavailableReason": null,
+      "effectiveCostStatuses": [
+        "estimated",
+        "verified"
+      ]
     },
     {
       "modelId": "gpt-5.6-terra",
@@ -203,8 +248,12 @@
         "active_responses",
         "active_messages"
       ],
-      "healthyChannelCount": 2,
-      "temporarilyUnavailableReason": null
+      "healthyChannelCount": 3,
+      "temporarilyUnavailableReason": null,
+      "effectiveCostStatuses": [
+        "estimated",
+        "verified"
+      ]
     },
     {
       "modelId": "gpt-5.6-luna",
@@ -213,7 +262,11 @@
         "active_messages"
       ],
       "healthyChannelCount": 5,
-      "temporarilyUnavailableReason": null
+      "temporarilyUnavailableReason": null,
+      "effectiveCostStatuses": [
+        "estimated",
+        "verified"
+      ]
     },
     {
       "modelId": "glm-5.2",
@@ -221,7 +274,8 @@
         "responses_incompatible"
       ],
       "healthyChannelCount": 0,
-      "temporarilyUnavailableReason": "No active verified Channel (responses_incompatible)"
+      "temporarilyUnavailableReason": "No active verified Channel (responses_incompatible)",
+      "effectiveCostStatuses": []
     },
     {
       "modelId": "kimi-k2.7-code",
@@ -229,7 +283,8 @@
         "curve_only"
       ],
       "healthyChannelCount": 0,
-      "temporarilyUnavailableReason": "No active verified Channel (curve_only)"
+      "temporarilyUnavailableReason": "No active verified Channel (curve_only)",
+      "effectiveCostStatuses": []
     },
     {
       "modelId": "gemini-2.5-flash",
@@ -237,7 +292,8 @@
         "provider_unavailable"
       ],
       "healthyChannelCount": 0,
-      "temporarilyUnavailableReason": "No active verified Channel (provider_unavailable)"
+      "temporarilyUnavailableReason": "No active verified Channel (provider_unavailable)",
+      "effectiveCostStatuses": []
     },
     {
       "modelId": "meta-llama/llama-4-maverick",
@@ -245,7 +301,8 @@
         "blocked"
       ],
       "healthyChannelCount": 0,
-      "temporarilyUnavailableReason": "No active verified Channel (blocked)"
+      "temporarilyUnavailableReason": "No active verified Channel (blocked)",
+      "effectiveCostStatuses": []
     },
     {
       "modelId": "deepseek/deepseek-chat-v3-0324",
@@ -253,7 +310,8 @@
         "blocked"
       ],
       "healthyChannelCount": 0,
-      "temporarilyUnavailableReason": "No active verified Channel (blocked)"
+      "temporarilyUnavailableReason": "No active verified Channel (blocked)",
+      "effectiveCostStatuses": []
     },
     {
       "modelId": "meta-llama/llama-3.3-70b-instruct",
@@ -261,7 +319,8 @@
         "blocked"
       ],
       "healthyChannelCount": 0,
-      "temporarilyUnavailableReason": "No active verified Channel (blocked)"
+      "temporarilyUnavailableReason": "No active verified Channel (blocked)",
+      "effectiveCostStatuses": []
     },
     {
       "modelId": "qwen/qwen3-235b-a22b",
@@ -269,7 +328,8 @@
         "blocked"
       ],
       "healthyChannelCount": 0,
-      "temporarilyUnavailableReason": "No active verified Channel (blocked)"
+      "temporarilyUnavailableReason": "No active verified Channel (blocked)",
+      "effectiveCostStatuses": []
     }
   ]
 }

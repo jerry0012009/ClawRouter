@@ -8,13 +8,17 @@ async function main(): Promise<void> {
   const existing = JSON.parse(await readFile(path, "utf8")) as Array<Record<string, unknown>>;
   const channels = await readProviderChannelRegistry(resolve("deploy/alpha/provider-channels.json"));
   const profiles = await readProviderModelProfiles(resolve("deploy/alpha/provider-model-profiles.json"));
-  const retained = existing.filter((item) => item.provider === "closeai");
+  const retained = existing.filter((item) => item.provider === "closeai").map((item) => ({
+    ...item,
+    effectiveCostStatus: item.effectiveCostStatus ?? "verified",
+  }));
   const promoted = profiles.profiles.filter((item) => item.activeInAcuAuto).map((profile) => {
     const channel = channels.channels.find((item) => item.channelId === profile.channelId)!;
     return {
       executionProfileId: profile.executionProfileId,
       modelId: profile.canonicalModelId,
       providerModelId: profile.providerModelId,
+      actualModelAliases: profile.actualModelAliases,
       provider: profile.providerId,
       channel: profile.channelId,
       channelId: profile.channelId,

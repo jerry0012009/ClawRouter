@@ -1,5 +1,170 @@
 [
   {
+    "executionProfileId": "blackai-codex-mix-low:gpt-5.6-luna:responses",
+    "modelId": "gpt-5.6-luna",
+    "providerModelId": "gpt-5.6-luna",
+    "provider": "blackai",
+    "channel": "blackai-codex-mix-low",
+    "channelId": "blackai-codex-mix-low",
+    "routingGroupName": "codex混合渠道--低价1x",
+    "protocols": [
+      "responses"
+    ],
+    "toolCallSupport": true,
+    "supportedToolTypes": [
+      "function",
+      "custom",
+      "local_tool",
+      "hosted_web_search"
+    ],
+    "thinkingSupport": true,
+    "supportedReasoningEfforts": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "contextWindow": 32768,
+    "health": "healthy",
+    "enabled": true,
+    "administratorAllowed": true,
+    "usageTrusted": true,
+    "recentSuccessRate": 1,
+    "baseUrlEnv": "ACU_CHANNEL_BLACKAI_CODEX_MIX_LOW_BASE_URL",
+    "networkFallbackBaseUrlEnvs": [
+      "ACU_CHANNEL_BLACKAI_CODEX_MIX_LOW_FALLBACK_1_BASE_URL",
+      "ACU_CHANNEL_BLACKAI_CODEX_MIX_LOW_FALLBACK_2_BASE_URL"
+    ],
+    "apiKeyEnv": "ACU_CHANNEL_BLACKAI_CODEX_MIX_LOW_API_KEY",
+    "authMode": "bearer",
+    "stripV1Path": true,
+    "economicsProviderId": "blackai",
+    "observedBillingMultiplier": 1,
+    "effectiveCostStatus": "estimated"
+  },
+  {
+    "executionProfileId": "blackai-codex-mix-low:gpt-5.6-sol:responses",
+    "modelId": "gpt-5.6-sol",
+    "providerModelId": "gpt-5.6-sol",
+    "provider": "blackai",
+    "channel": "blackai-codex-mix-low",
+    "channelId": "blackai-codex-mix-low",
+    "routingGroupName": "codex混合渠道--低价1x",
+    "protocols": [
+      "responses"
+    ],
+    "toolCallSupport": true,
+    "supportedToolTypes": [
+      "function",
+      "custom",
+      "local_tool"
+    ],
+    "thinkingSupport": true,
+    "supportedReasoningEfforts": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "contextWindow": 32768,
+    "health": "healthy",
+    "enabled": true,
+    "administratorAllowed": true,
+    "usageTrusted": true,
+    "recentSuccessRate": 1,
+    "baseUrlEnv": "ACU_CHANNEL_BLACKAI_CODEX_MIX_LOW_BASE_URL",
+    "networkFallbackBaseUrlEnvs": [
+      "ACU_CHANNEL_BLACKAI_CODEX_MIX_LOW_FALLBACK_1_BASE_URL",
+      "ACU_CHANNEL_BLACKAI_CODEX_MIX_LOW_FALLBACK_2_BASE_URL"
+    ],
+    "apiKeyEnv": "ACU_CHANNEL_BLACKAI_CODEX_MIX_LOW_API_KEY",
+    "authMode": "bearer",
+    "stripV1Path": true,
+    "economicsProviderId": "blackai",
+    "observedBillingMultiplier": 1,
+    "effectiveCostStatus": "estimated"
+  },
+  {
+    "executionProfileId": "blackai-codex-mix-low:gpt-5.6-terra:responses",
+    "modelId": "gpt-5.6-terra",
+    "providerModelId": "gpt-5.6-terra",
+    "provider": "blackai",
+    "channel": "blackai-codex-mix-low",
+    "channelId": "blackai-codex-mix-low",
+    "routingGroupName": "codex混合渠道--低价1x",
+    "protocols": [
+      "responses"
+    ],
+    "toolCallSupport": true,
+    "supportedToolTypes": [
+      "function",
+      "custom",
+      "local_tool"
+    ],
+    "thinkingSupport": true,
+    "supportedReasoningEfforts": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "contextWindow": 32768,
+    "health": "healthy",
+    "enabled": true,
+    "administratorAllowed": true,
+    "usageTrusted": true,
+    "recentSuccessRate": 1,
+    "baseUrlEnv": "ACU_CHANNEL_BLACKAI_CODEX_MIX_LOW_BASE_URL",
+    "networkFallbackBaseUrlEnvs": [
+      "ACU_CHANNEL_BLACKAI_CODEX_MIX_LOW_FALLBACK_1_BASE_URL",
+      "ACU_CHANNEL_BLACKAI_CODEX_MIX_LOW_FALLBACK_2_BASE_URL"
+    ],
+    "apiKeyEnv": "ACU_CHANNEL_BLACKAI_CODEX_MIX_LOW_API_KEY",
+    "authMode": "bearer",
+    "stripV1Path": true,
+    "economicsProviderId": "blackai",
+    "observedBillingMultiplier": 1,
+    "effectiveCostStatus": "estimated"
+  },
+  {
+    "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.4-mini:responses",
+    "modelId": "gpt-5.4-mini",
+    "providerModelId": "gpt-5.4-mini",
+    "actualModelAliases": [
+      "gpt-5.4-mini-2026-03-17"
+    ],
+    "provider": "lucen",
+    "channel": "lucen-cx006-value-dynamic",
+    "channelId": "lucen-cx006-value-dynamic",
+    "routingGroupName": "cx006-性价比-动态调价-0.06x",
+    "protocols": [
+      "responses"
+    ],
+    "toolCallSupport": true,
+    "supportedToolTypes": [
+      "function",
+      "custom",
+      "local_tool"
+    ],
+    "thinkingSupport": true,
+    "supportedReasoningEfforts": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "contextWindow": 32768,
+    "health": "healthy",
+    "enabled": true,
+    "administratorAllowed": true,
+    "usageTrusted": true,
+    "recentSuccessRate": 1,
+    "baseUrlEnv": "ACU_CHANNEL_LUCEN_CX006_VALUE_DYNAMIC_BASE_URL",
+    "networkFallbackBaseUrlEnvs": [],
+    "apiKeyEnv": "ACU_CHANNEL_LUCEN_CX006_VALUE_DYNAMIC_API_KEY",
+    "authMode": "bearer",
+    "stripV1Path": true,
+    "economicsProviderId": "lucen",
+    "observedBillingMultiplier": 0.06,
+    "effectiveCostStatus": "estimated"
+  },
+  {
     "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.6-luna:responses",
     "modelId": "gpt-5.6-luna",
     "providerModelId": "gpt-5.6-luna",
@@ -16,6 +181,44 @@
       "custom",
       "local_tool",
       "hosted_web_search"
+    ],
+    "thinkingSupport": true,
+    "supportedReasoningEfforts": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "contextWindow": 32768,
+    "health": "healthy",
+    "enabled": true,
+    "administratorAllowed": true,
+    "usageTrusted": true,
+    "recentSuccessRate": 1,
+    "baseUrlEnv": "ACU_CHANNEL_LUCEN_CX006_VALUE_DYNAMIC_BASE_URL",
+    "networkFallbackBaseUrlEnvs": [],
+    "apiKeyEnv": "ACU_CHANNEL_LUCEN_CX006_VALUE_DYNAMIC_API_KEY",
+    "authMode": "bearer",
+    "stripV1Path": true,
+    "economicsProviderId": "lucen",
+    "observedBillingMultiplier": 0.06,
+    "effectiveCostStatus": "estimated"
+  },
+  {
+    "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.6-terra:responses",
+    "modelId": "gpt-5.6-terra",
+    "providerModelId": "gpt-5.6-terra",
+    "provider": "lucen",
+    "channel": "lucen-cx006-value-dynamic",
+    "channelId": "lucen-cx006-value-dynamic",
+    "routingGroupName": "cx006-性价比-动态调价-0.06x",
+    "protocols": [
+      "responses"
+    ],
+    "toolCallSupport": true,
+    "supportedToolTypes": [
+      "function",
+      "custom",
+      "local_tool"
     ],
     "thinkingSupport": true,
     "supportedReasoningEfforts": [
@@ -137,7 +340,8 @@
     "administratorAllowed": true,
     "baseUrlEnv": "CLOSEAI_OPENAI_BASE_URL",
     "apiKeyEnv": "CLOSEAI_API_KEY",
-    "authMode": "bearer"
+    "authMode": "bearer",
+    "effectiveCostStatus": "verified"
   },
   {
     "executionProfileId": "closeai-gpt-5.6-luna-responses-value",
@@ -161,7 +365,8 @@
     "administratorAllowed": true,
     "baseUrlEnv": "CLOSEAI_OPENAI_BASE_URL",
     "apiKeyEnv": "CLOSEAI_API_KEY",
-    "authMode": "bearer"
+    "authMode": "bearer",
+    "effectiveCostStatus": "verified"
   },
   {
     "executionProfileId": "closeai-gpt-5.6-terra-responses-strong",
@@ -184,7 +389,8 @@
     "administratorAllowed": true,
     "baseUrlEnv": "CLOSEAI_OPENAI_BASE_URL",
     "apiKeyEnv": "CLOSEAI_API_KEY",
-    "authMode": "bearer"
+    "authMode": "bearer",
+    "effectiveCostStatus": "verified"
   },
   {
     "executionProfileId": "closeai-gpt-5.5-responses-frontier",
@@ -207,7 +413,8 @@
     "administratorAllowed": true,
     "baseUrlEnv": "CLOSEAI_OPENAI_BASE_URL",
     "apiKeyEnv": "CLOSEAI_API_KEY",
-    "authMode": "bearer"
+    "authMode": "bearer",
+    "effectiveCostStatus": "verified"
   },
   {
     "executionProfileId": "closeai-gpt-5.6-sol-responses-recovery",
@@ -230,7 +437,8 @@
     "administratorAllowed": true,
     "baseUrlEnv": "CLOSEAI_OPENAI_BASE_URL",
     "apiKeyEnv": "CLOSEAI_API_KEY",
-    "authMode": "bearer"
+    "authMode": "bearer",
+    "effectiveCostStatus": "verified"
   },
   {
     "executionProfileId": "closeai-gpt-5.4-mini-messages-economy",
@@ -252,7 +460,8 @@
     "baseUrlEnv": "CLOSEAI_ANTHROPIC_BASE_URL",
     "apiKeyEnv": "CLOSEAI_API_KEY",
     "authMode": "x-api-key",
-    "anthropicVersion": "2023-06-01"
+    "anthropicVersion": "2023-06-01",
+    "effectiveCostStatus": "verified"
   },
   {
     "executionProfileId": "closeai-gpt-5.6-luna-messages-value",
@@ -274,7 +483,8 @@
     "baseUrlEnv": "CLOSEAI_ANTHROPIC_BASE_URL",
     "apiKeyEnv": "CLOSEAI_API_KEY",
     "authMode": "x-api-key",
-    "anthropicVersion": "2023-06-01"
+    "anthropicVersion": "2023-06-01",
+    "effectiveCostStatus": "verified"
   },
   {
     "executionProfileId": "closeai-gpt-5.6-terra-messages-strong",
@@ -296,7 +506,8 @@
     "baseUrlEnv": "CLOSEAI_ANTHROPIC_BASE_URL",
     "apiKeyEnv": "CLOSEAI_API_KEY",
     "authMode": "x-api-key",
-    "anthropicVersion": "2023-06-01"
+    "anthropicVersion": "2023-06-01",
+    "effectiveCostStatus": "verified"
   },
   {
     "executionProfileId": "closeai-claude-sonnet-5-messages-strong",
@@ -318,7 +529,8 @@
     "baseUrlEnv": "CLOSEAI_ANTHROPIC_BASE_URL",
     "apiKeyEnv": "CLOSEAI_API_KEY",
     "authMode": "x-api-key",
-    "anthropicVersion": "2023-06-01"
+    "anthropicVersion": "2023-06-01",
+    "effectiveCostStatus": "verified"
   },
   {
     "executionProfileId": "closeai-claude-opus-4-8-messages-frontier",
@@ -340,7 +552,8 @@
     "baseUrlEnv": "CLOSEAI_ANTHROPIC_BASE_URL",
     "apiKeyEnv": "CLOSEAI_API_KEY",
     "authMode": "x-api-key",
-    "anthropicVersion": "2023-06-01"
+    "anthropicVersion": "2023-06-01",
+    "effectiveCostStatus": "verified"
   },
   {
     "executionProfileId": "closeai-gpt-5.5-messages-recovery",
@@ -362,6 +575,7 @@
     "baseUrlEnv": "CLOSEAI_ANTHROPIC_BASE_URL",
     "apiKeyEnv": "CLOSEAI_API_KEY",
     "authMode": "x-api-key",
-    "anthropicVersion": "2023-06-01"
+    "anthropicVersion": "2023-06-01",
+    "effectiveCostStatus": "verified"
   }
 ]

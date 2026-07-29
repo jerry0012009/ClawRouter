@@ -9,6 +9,7 @@ const catalog = validateProviderEconomicsCatalog(JSON.parse(readFileSync(
 )) as unknown);
 const lucen = catalog.providers.find((item) => item.providerId === "lucen")!;
 const healthyLucen = { ...lucen, health: "healthy" as const };
+const cooldownLucen = { ...lucen, health: "cooldown" as const };
 const closeai = catalog.providers.find((item) => item.providerId === "closeai")!;
 const judge: AcuJudgeResult = {
   pLow: 0.7, pMid: 0.2, pMidHigh: 0.08, pHigh: 0.02, confidence: 0.9,
@@ -64,7 +65,7 @@ describe("Provider Economics and v0.3 Provider selection", () => {
     const decision = routeWithCurrentAcuFormula({
       judge, judgeCost: 0, inputTokens: 1000, expectedOutputTokens: 100,
       effectiveQualityTarget: 70,
-      profiles: [profile("lucen", lucen), profile("closeai", closeai)],
+      profiles: [profile("lucen", cooldownLucen), profile("closeai", closeai)],
       requirements: { protocol: "responses", requireTools: true, requireThinking: false, contextTokens: 1000 },
     });
     expect(decision.selectedProfile.provider).toBe("closeai");

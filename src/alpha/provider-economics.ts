@@ -17,6 +17,7 @@ export type ProviderEconomics = {
   health: ProviderEconomicsHealth;
   priority: number;
   enabled: boolean;
+  effectiveCostStatus: "verified" | "estimated";
   effectiveCostSource: string;
   effectiveCostVersion: string;
 };
@@ -69,6 +70,7 @@ export function providerCostBreakdown(provider: ProviderEconomics, nominalProvid
   nominalProviderCostUsd: number;
   providerBalanceChargeUsd: number;
   effectiveCashCostCny: number;
+  effectiveCostStatus: "verified" | "estimated";
   effectiveCostSource: string;
   effectiveCostVersion: string;
 } {
@@ -77,6 +79,7 @@ export function providerCostBreakdown(provider: ProviderEconomics, nominalProvid
     nominalProviderCostUsd: nominal,
     providerBalanceChargeUsd: nominal * provider.observedBillingMultiplier,
     effectiveCashCostCny: nominal * cashCnyPerNominalUsd(provider),
+    effectiveCostStatus: provider.effectiveCostStatus,
     effectiveCostSource: provider.effectiveCostSource,
     effectiveCostVersion: provider.effectiveCostVersion,
   };

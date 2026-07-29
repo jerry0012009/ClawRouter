@@ -14,9 +14,10 @@
       "observedBillingMultiplier": 0.07,
       "priceSource": "Lucen authenticated /v1/usage nominal token charge; canonical catalog prices",
       "priceObservedAt": "2026-07-29T00:00:00Z",
-      "health": "cooldown",
+      "health": "healthy",
       "priority": 10,
       "enabled": true,
+      "effectiveCostStatus": "verified",
       "effectiveCostSource": "founder recharge batch CNY 500 for USD 500; current observed group multiplier 0.07",
       "effectiveCostVersion": "lucen-founder-batch-20260729-v1"
     },
@@ -27,16 +28,17 @@
       "baseUrlEnv": "BLACKAI_BASE_URL",
       "apiKeyEnv": "BLACKAI_API_KEY",
       "balanceCurrency": "USD",
-      "rechargeCashCny": null,
-      "creditsReceivedUsd": null,
+      "rechargeCashCny": 15,
+      "creditsReceivedUsd": 100,
       "observedBillingMultiplier": 1,
-      "priceSource": "BlackAI authenticated /v1/usage; exact purchase batch not exposed to API-key authentication",
+      "priceSource": "Founder supplied package pricing; conservative CNY 0.15 per USD credit used because the current purchase batch is unknown",
       "priceObservedAt": "2026-07-29T00:00:00Z",
-      "health": "blocked",
+      "health": "healthy",
       "priority": 20,
-      "enabled": false,
-      "effectiveCostSource": "blocked_pending_exact_purchase_batch; approximate range was not used",
-      "effectiveCostVersion": "blackai-founder-batch-pending-v1"
+      "enabled": true,
+      "effectiveCostStatus": "estimated",
+      "effectiveCostSource": "founder_supplied_package_pricing_conservative",
+      "effectiveCostVersion": "blackai-founder-package-conservative-20260729-v1"
     },
     {
       "providerId": "closeai",
@@ -53,6 +55,7 @@
       "health": "healthy",
       "priority": 30,
       "enabled": true,
+      "effectiveCostStatus": "verified",
       "effectiveCostSource": "deployment operator USD/CNY settlement reference ACU_TEST_USD_TO_CNY=7.2",
       "effectiveCostVersion": "closeai-deployment-fx-20260729-v1"
     }

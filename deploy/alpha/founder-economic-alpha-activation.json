@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "acu-founder-economic-alpha-activation-v1",
+  "capturedAt": "2026-07-29T16:57:00Z",
+  "selectedProfileCount": 9,
+  "activeProfileCountBefore": 3,
+  "activeProfileCountAfter": 8,
+  "selectedProfiles": [
+    { "executionProfileId": "blackai-codex-mix-low:gpt-5.4-mini:responses", "status": "inactive", "primaryReason": "preflight_timeout" },
+    { "executionProfileId": "blackai-codex-mix-low:gpt-5.6-luna:responses", "status": "active", "costStatus": "estimated" },
+    { "executionProfileId": "blackai-codex-mix-low:gpt-5.6-terra:responses", "status": "active", "costStatus": "estimated" },
+    { "executionProfileId": "blackai-codex-mix-low:gpt-5.6-sol:responses", "status": "active", "costStatus": "estimated" },
+    { "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.4-mini:responses", "status": "active", "costStatus": "estimated" },
+    { "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.6-luna:responses", "status": "active", "costStatus": "estimated" },
+    { "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.6-terra:responses", "status": "active", "costStatus": "estimated" },
+    { "executionProfileId": "lucen-cx006-plus:gpt-5.6-luna:responses", "status": "active", "costStatus": "estimated" },
+    { "executionProfileId": "lucen-cx008-plus-dedicated:gpt-5.6-luna:responses", "status": "active", "costStatus": "estimated" }
+  ],
+  "healthyResponsesChannels": {
+    "gpt-5.4-mini": 2,
+    "gpt-5.6-luna": 5,
+    "gpt-5.6-terra": 3,
+    "gpt-5.5": 1,
+    "gpt-5.6-sol": 2
+  },
+  "activeByProvider": {
+    "lucen": 5,
+    "blackai": 3,
+    "closeaiRecovery": 5
+  },
+  "sameModelFallbackTest": {
+    "status": "passed",
+    "firstChannelStatus": 502,
+    "recoveryChannelStatus": 200,
+    "logicalRequestCount": 1,
+    "attemptCount": 2,
+    "failedChannelCircuitState": "open",
+    "recoveryChannelCircuitState": "healthy",
+    "modelUpgrade": false
+  },
+  "liveCodingTask": {
+    "executedOnce": true,
+    "preference": "economy",
+    "webSearchUsed": false,
+    "result": "failed_read_only_workspace",
+    "modelCandidateCount": 1,
+    "selectedModelChannelCandidateCount": 5,
+    "selectedModel": "gpt-5.6-luna",
+    "actualModel": "gpt-5.6-luna",
+    "selectedChannel": "lucen-cx006-value-dynamic",
+    "actualChannel": "lucen-cx006-value-dynamic",
+    "logicalRequestCount": 4,
+    "attemptCount": 4,
+    "duplicateAttempts": 0,
+    "pendingLogicalRequests": 0,
+    "usage": {
+      "inputTokens": 50654,
+      "cachedInputTokens": 39424,
+      "outputTokens": 407,
+      "reasoningTokens": 217
+    },
+    "providerCostUsd": 0.0176144,
+    "judgeCostUsd": 0.0010971,
+    "finalUserCostUsd": 0.0187115,
+    "knownEffectiveCashCostCny": 0.008955984,
+    "failureReason": "Codex workspace sandbox was read-only, so the requested file edit and local check could not complete"
+  },
+  "newCashSpend": {
+    "knownPreflightCashCostCny": 0.01204323,
+    "knownLiveTaskCashCostCny": 0.008955984,
+    "knownTotalCashCostCny": 0.020999214,
+    "timedOutProbeBillingStatus": "unknown",
+    "budgetCny": 1
+  },
+  "founderContinuousUse": false
+}

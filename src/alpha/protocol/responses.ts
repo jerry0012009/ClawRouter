@@ -15,6 +15,10 @@ export function normalizeResponsesRequest(body: unknown, headers: NativeRequestH
   const toolCalls: CanonicalEnvelope["toolCalls"] = [];
   const toolResults: CanonicalEnvelope["toolResults"] = [];
   const planCalls: string[] = [];
+  const reasoning = record(raw.reasoning);
+  const reasoningEffort = typeof reasoning?.effort === "string" && reasoning.effort.trim()
+    ? reasoning.effort.trim()
+    : undefined;
 
   input.forEach((entry, sourceIndex) => {
     if (typeof entry === "string") {
@@ -64,7 +68,8 @@ export function normalizeResponsesRequest(body: unknown, headers: NativeRequestH
       fingerprintVersion: planCalls.length ? "codex-plan-v1" : undefined,
       evidence: planCalls.map((id) => `function_call:update_plan:${id}`),
     },
-    containsThinking: input.some((entry) => record(entry)?.type === "reasoning"),
+    reasoningEffort,
+    containsThinking: reasoningEffort !== undefined || input.some((entry) => record(entry)?.type === "reasoning"),
     thinkingSignatures: [],
     historyHash: canonicalHash(input),
     raw,

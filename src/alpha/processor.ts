@@ -52,6 +52,7 @@ export type AlphaResolutionContext = {
   newapiTokenId: string;
   newapiLogId: string;
   protocol: AlphaProtocol;
+  reasoningEffort?: string;
   selectedProfile: AlphaExecutionProfile;
   judgeCostUsd: string;
   requestBytes: number;
@@ -464,6 +465,7 @@ export class AlphaRequestProcessor {
         protocol: envelope.protocol,
         requireTools: envelope.tools.length > 0,
         requireThinking: envelope.containsThinking,
+        reasoningEffort: envelope.reasoningEffort,
         contextTokens: Math.ceil(rawBytes / 4),
       });
       if (state.decision.createSegment || !state.segment.segmentId) {
@@ -481,6 +483,7 @@ export class AlphaRequestProcessor {
           formulaInputs: {
             requestedModel: envelope.requestedModel,
             judgeCalls: 0,
+            reasoningEffort: envelope.reasoningEffort,
             userRoutingPolicy: identity.routingPolicy,
             userRoutingPolicyVersion: identity.routingPolicyVersion,
           },
@@ -548,6 +551,7 @@ export class AlphaRequestProcessor {
         protocol: envelope.protocol,
         requireTools: envelope.tools.length > 0,
         requireThinking: envelope.containsThinking,
+        reasoningEffort: envelope.reasoningEffort,
         contextTokens: Math.ceil(rawBytes / 4),
         allowedModelIds: identity.routingPolicy === "all_routing_eligible"
           ? undefined
@@ -667,6 +671,7 @@ export class AlphaRequestProcessor {
         hardFilteredCandidateModelCount: route.candidateEstimates.length,
         paretoFrontierCandidateCount: route.paretoFrontier.length,
         excludedProfiles: route.excludedProfiles,
+        reasoningEffort: envelope.reasoningEffort,
       },
       candidateEstimates: route.candidateEstimates,
       paretoFrontier: route.paretoFrontier,
@@ -891,7 +896,7 @@ export class AlphaRequestProcessor {
       selectedProfileId: result.profile.executionProfileId,
       streaming: envelope.stream,
       hadTools: envelope.tools.length > 0,
-      metadata: { requestId: identity.requestId },
+      metadata: { requestId: identity.requestId, reasoningEffort: envelope.reasoningEffort },
     });
     const logicalRow = await repository.getLogicalRequest(logical.logicalRequestId, identity.newapiUserId);
     if (!logical.inserted && logicalRow?.status === "completed" && stringValue(logicalRow.response_payload_id)) {
@@ -912,6 +917,7 @@ export class AlphaRequestProcessor {
             newapiTokenId: identity.newapiTokenId,
             newapiLogId: identity.newapiLogId,
             protocol: envelope.protocol,
+            reasoningEffort: envelope.reasoningEffort,
             selectedProfile: result.profile,
             judgeCostUsd: result.judge?.costUsd ?? "0.0000000000",
             requestBytes: ingress.rawBody.byteLength,
@@ -971,6 +977,7 @@ export class AlphaRequestProcessor {
       newapiTokenId: identity.newapiTokenId,
       newapiLogId: identity.newapiLogId,
       protocol: envelope.protocol,
+      reasoningEffort: envelope.reasoningEffort,
       selectedProfile: result.profile,
       judgeCostUsd: result.judge?.costUsd ?? "0.0000000000",
       requestBytes: ingress.rawBody.byteLength,
@@ -1075,6 +1082,7 @@ export class AlphaRequestProcessor {
         judge: input.context.judgeCostUsd,
         provider: providerCostUsd,
         usageSource: input.usageSource,
+        reasoning_effort: input.context.reasoningEffort,
         mode: input.context.routeSummary.mode,
         difficulty: input.context.routeSummary.difficulty,
         candidate_count: input.context.routeSummary.candidateCount,

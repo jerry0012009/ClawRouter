@@ -44,11 +44,27 @@ case "${1:-}" in
     grep -q '^model = "acu-auto"$' "$acu_home/config.toml"
     base_url=$(sed -n 's/^base_url = "\(https:\/\/.*\/v1\)"$/\1/p' "$acu_home/config.toml")
     test -n "$base_url" || { echo "invalid Base URL" >&2; exit 1; }
+    provider=$(sed -n 's/^model_provider = "\([^"]*\)"$/\1/p' "$acu_home/config.toml")
+    test "$provider" = "acu-founder-alpha" || { echo "invalid model provider" >&2; exit 1; }
+    native_config=${CODEX_NATIVE_HOME:-${HOME}/.codex}/config.toml
+    native_hash_file="$acu_home/native-config.sha256"
+    native_unchanged=no
+    if [ -f "$native_hash_file" ] && [ -f "$native_config" ]; then
+      current_native_hash=$(sha256sum "$native_config" | awk '{print $1}')
+      recorded_native_hash=$(sed -n '1p' "$native_hash_file")
+      if [ "$current_native_hash" = "$recorded_native_hash" ]; then native_unchanged=yes; fi
+    elif [ -f "$native_hash_file" ] && [ "$(sed -n '1p' "$native_hash_file")" = "MISSING" ]; then
+      [ ! -f "$native_config" ] && native_unchanged=yes
+    fi
     echo "codex-acu: healthy"
+    echo "Codex version: $(codex --version)"
     echo "CODEX_HOME: $acu_home"
     echo "base_url: $base_url"
-    echo "model: acu-auto"
-    codex --version
+    echo "model_provider: $provider"
+    echo "effective model: acu-auto"
+    echo "reasoning effort: medium"
+    echo "credential loaded: yes"
+    echo "native ~/.codex unchanged: $native_unchanged"
     exit 0
     ;;
 esac
@@ -59,4 +75,12 @@ case "$ACU_API_KEY" in sk-?*) ;; *) echo "invalid ACU credential" >&2; exit 1 ;;
 
 export CODEX_HOME="$acu_home"
 export ACU_API_KEY
-exec codex "$@"
+for argument in "$@"; do
+  case "$argument" in
+    -m|--model|--model=*|model=*|model_provider=*)
+      echo "codex-acu fixes model=acu-auto and provider=acu-founder-alpha; explicit model overrides are not allowed" >&2
+      exit 2
+      ;;
+  esac
+done
+exec codex -m acu-auto -c 'model_provider="acu-founder-alpha"' -c 'model_reasoning_effort="medium"' "$@"

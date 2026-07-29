@@ -40,6 +40,7 @@ export type CanonicalEnvelope = {
   toolCalls: CanonicalToolCall[];
   toolResults: CanonicalToolResult[];
   planning: PlanningSignals;
+  reasoningEffort?: string;
   containsThinking: boolean;
   thinkingSignatures: string[];
   historyHash: string;

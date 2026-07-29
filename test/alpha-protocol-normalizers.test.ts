@@ -7,6 +7,7 @@ describe("Responses canonical envelope", () => {
     const envelope = normalizeResponsesRequest({
       model: "acu-auto",
       stream: true,
+      reasoning: { effort: "medium", summary: "auto" },
       input: [
         { type: "message", role: "user", content: [{ type: "input_text", text: "Fix the bug" }] },
         { type: "reasoning", id: "reasoning-1", summary: [] },
@@ -24,6 +25,8 @@ describe("Responses canonical envelope", () => {
       { toolCallId: "call-shell", content: "failed", isError: true, sourceIndex: 5 },
     ]);
     expect(envelope.planning).toMatchObject({ started: true, signalFamily: "codex_update_plan_call" });
+    expect(envelope.reasoningEffort).toBe("medium");
+    expect(envelope.raw.reasoning).toEqual({ effort: "medium", summary: "auto" });
     expect(envelope.containsThinking).toBe(true);
   });
 

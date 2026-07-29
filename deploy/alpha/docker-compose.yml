@@ -54,6 +54,19 @@ services:
           psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0001_alpha_p0.sql
         fi
 
+  newapi-codex-pool-sync:
+    image: postgres:16-alpine
+    restart: "no"
+    depends_on:
+      new-api:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_NEWAPI_PASSWORD:?set POSTGRES_NEWAPI_PASSWORD}
+    volumes:
+      - ./sync-newapi-codex-pool.sql:/sync/sync-newapi-codex-pool.sql:ro
+    networks: [alpha-backend]
+    command: ["psql", "-v", "ON_ERROR_STOP=1", "-h", "postgres-newapi", "-U", "newapi_alpha", "-d", "newapi_alpha", "-f", "/sync/sync-newapi-codex-pool.sql"]
+
   acu-router:
     build:
       context: ../..
@@ -111,10 +124,12 @@ services:
       ERROR_LOG_ENABLED: "true"
       GIN_MODE: release
       TZ: UTC
+      ACU_PRICING_CATALOG_FILE: /app/acu-catalog/newapi-acu-catalog.json
     volumes:
       - newapi-logs:/app/logs
+      - ./newapi-acu-catalog.json:/app/acu-catalog/newapi-acu-catalog.json:ro
     ports:
-      - "${NEW_API_BIND_ADDRESS:-0.0.0.0}:${NEW_API_PORT:-3000}:3000"
+      - "${NEW_API_BIND_ADDRESS:-127.0.0.1}:${NEW_API_PORT:-3200}:3000"
     networks: [alpha-backend]
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:3000/api/status | grep -q '\"success\":true'"]

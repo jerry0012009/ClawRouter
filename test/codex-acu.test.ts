@@ -14,7 +14,7 @@ describe("codex-acu isolated launcher", () => {
     await Promise.all([fakeBin, nativeHome].map((path) => mkdir(path, { recursive: true })));
     await writeFile(join(nativeHome, "config.toml"), "model = \"native\"\n");
     const fakeCodex = join(fakeBin, "codex");
-    await writeFile(fakeCodex, "#!/bin/sh\nprintf '%s\\n' \"$CODEX_HOME\"\n");
+    await writeFile(fakeCodex, "#!/bin/sh\nprintf '%s\\n' \"$CODEX_HOME|$*\"\n");
     await chmod(fakeCodex, 0o755);
     const env = { ...process.env, PATH: `${fakeBin}:${process.env.PATH ?? ""}` };
     const install = spawnSync(resolve("tools/codex-acu/install.sh"), [
@@ -43,6 +43,21 @@ describe("codex-acu isolated launcher", () => {
     expect(launch.status).toBe(0);
     expect(launch.stdout).toContain("codex-acu: healthy");
     expect(launch.stdout).toContain(acuHome);
+    expect(launch.stdout).toContain("effective model: acu-auto");
+    expect(launch.stdout).toContain("model_provider: acu-founder-alpha");
+    expect(launch.stdout).toContain("reasoning effort: medium");
+    const effective = spawnSync(join(installBin, "codex-acu"), ["exec", "hello"], {
+      env: { ...env, CODEX_ACU_HOME: acuHome },
+      encoding: "utf8",
+    });
+    expect(effective.status).toBe(0);
+    expect(effective.stdout).toContain('-m acu-auto -c model_provider="acu-founder-alpha"');
+    expect(effective.stdout).toContain('-c model_reasoning_effort="medium" exec hello');
+    const override = spawnSync(join(installBin, "codex-acu"), ["-m", "gpt-5.6-sol"], {
+      env: { ...env, CODEX_ACU_HOME: acuHome },
+      encoding: "utf8",
+    });
+    expect(override.status).toBe(2);
     expect(await readFile(join(nativeHome, "config.toml"), "utf8")).toBe('model = "native"\n');
 
     const uninstall = spawnSync(resolve("tools/codex-acu/uninstall.sh"), [], {

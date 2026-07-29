@@ -13,6 +13,7 @@ export type AlphaExecutionProfile = {
   protocols: AlphaProtocol[];
   toolCallSupport: boolean;
   thinkingSupport: boolean;
+  supportedReasoningEfforts?: string[];
   contextWindow: number;
   health: ProfileHealth;
   enabled: boolean;
@@ -23,6 +24,7 @@ export type AlphaRouteRequirements = {
   protocol: AlphaProtocol;
   requireTools: boolean;
   requireThinking: boolean;
+  reasoningEffort?: string;
   contextTokens: number;
   allowedModelIds?: string[];
 };
@@ -62,6 +64,10 @@ function exclusionReasons(
   if (!profile.protocols.includes(requirements.protocol)) reasons.push("native_protocol");
   if (requirements.requireTools && !profile.toolCallSupport) reasons.push("tool_call_support");
   if (requirements.requireThinking && !profile.thinkingSupport) reasons.push("thinking_support");
+  if (requirements.reasoningEffort && profile.supportedReasoningEfforts
+    && !profile.supportedReasoningEfforts.includes(requirements.reasoningEffort)) {
+    reasons.push(`reasoning_effort:${requirements.reasoningEffort}`);
+  }
   if (profile.contextWindow < requirements.contextTokens) reasons.push("context_window");
   if (profile.health === "cooldown") reasons.push("health_cooldown");
   if (requirements.allowedModelIds && !requirements.allowedModelIds.includes(profile.modelId)) reasons.push("model_policy");

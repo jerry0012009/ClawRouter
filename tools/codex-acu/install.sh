@@ -42,6 +42,13 @@ wire_api = "responses"
 EOF
 chmod 600 "$config_tmp"
 mv "$config_tmp" "$acu_home/config.toml"
+native_config=${CODEX_NATIVE_HOME:-${HOME}/.codex}/config.toml
+if [ -f "$native_config" ]; then
+  sha256sum "$native_config" | awk '{print $1}' > "$acu_home/native-config.sha256"
+else
+  printf '%s\n' MISSING > "$acu_home/native-config.sha256"
+fi
+chmod 600 "$acu_home/native-config.sha256"
 
 echo "installed: $bin_dir/codex-acu"
 echo "isolated CODEX_HOME: $acu_home"

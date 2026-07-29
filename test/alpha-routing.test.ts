@@ -164,6 +164,26 @@ describe("Alpha current-formula routing", () => {
     });
   });
 
+  it("excludes a profile that explicitly does not support the requested reasoning effort", () => {
+    const effortProfiles = profiles.map((profile) => ({
+      ...profile,
+      supportedReasoningEfforts: profile.modelId === "gpt-5.4-mini" ? ["low", "medium"] : undefined,
+    }));
+    const result = routeWithCurrentAcuFormula({
+      judge,
+      judgeCost: 0,
+      inputTokens: 2_000,
+      expectedOutputTokens: 500,
+      effectiveQualityTarget: 88,
+      profiles: effortProfiles,
+      requirements: { ...requirements, reasoningEffort: "high" },
+    });
+    expect(result.excludedProfiles).toContainEqual({
+      executionProfileId: "closeai:gpt-5.4-mini:responses",
+      reasons: ["reasoning_effort:high"],
+    });
+  });
+
   it("resolves explicit models without invoking Judge or substituting a model", () => {
     expect(resolveExplicitProfile("gpt-5.4-mini", profiles, requirements).modelId).toBe("gpt-5.4-mini");
     expect(() => resolveExplicitProfile("acu-auto", profiles, requirements)).toThrow(/no compatible/);

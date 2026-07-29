@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "acu-newapi-catalog-v1",
+  "sourceCatalogVersion": "acu-model-catalog-v2",
+  "pricingVersion": "acu-catalog-v0.1",
+  "provider": "CloseAI",
+  "auto": {
+    "modelId": "acu-auto",
+    "displayName": "ACU Auto Router",
+    "description": "根据任务难度、模型能力曲线、价格、协议兼容性和当前健康状态，从真实可用模型中动态选择。",
+    "pricingLabel": "动态计费",
+    "pricingDescription": "按实际执行模型的 Provider 成本 + Judge 成本结算，不存在固定输入/输出单价。"
+  },
+  "responses": [
+    { "modelId": "gpt-5.4-mini", "role": "Economy", "inputPricePerMillion": 0.75, "outputPricePerMillion": 4.5, "cachedInputPricePerMillion": 0.375, "protocol": "Responses", "toolCall": true, "reasoning": true, "activeInAcuAuto": true, "provider": "CloseAI", "status": "healthy" },
+    { "modelId": "gpt-5.6-luna", "role": "Value", "inputPricePerMillion": 1.0, "outputPricePerMillion": 6.0, "cachedInputPricePerMillion": 0.1, "protocol": "Responses", "toolCall": true, "reasoning": true, "activeInAcuAuto": true, "provider": "CloseAI", "status": "healthy" },
+    { "modelId": "gpt-5.6-terra", "role": "Strong", "inputPricePerMillion": 2.5, "outputPricePerMillion": 15.0, "cachedInputPricePerMillion": 0.25, "protocol": "Responses", "toolCall": true, "reasoning": true, "activeInAcuAuto": true, "provider": "CloseAI", "status": "healthy" },
+    { "modelId": "gpt-5.5", "role": "Frontier", "inputPricePerMillion": 5.0, "outputPricePerMillion": 30.0, "cachedInputPricePerMillion": 2.5, "protocol": "Responses", "toolCall": true, "reasoning": true, "activeInAcuAuto": true, "provider": "CloseAI", "status": "healthy" },
+    { "modelId": "gpt-5.6-sol", "role": "Recovery", "inputPricePerMillion": 5.0, "outputPricePerMillion": 30.0, "cachedInputPricePerMillion": 0.5, "protocol": "Responses", "toolCall": true, "reasoning": true, "activeInAcuAuto": true, "provider": "CloseAI", "status": "healthy" }
+  ],
+  "curveModelStatuses": [
+    { "modelId": "gpt-5.5", "statuses": ["active_responses", "active_messages"] },
+    { "modelId": "gpt-5.4-mini", "statuses": ["active_responses", "active_messages"] },
+    { "modelId": "claude-opus-4-8", "statuses": ["active_messages"] },
+    { "modelId": "claude-sonnet-5", "statuses": ["active_messages"] },
+    { "modelId": "gemini-3.5-flash", "statuses": ["provider_unavailable"] },
+    { "modelId": "deepseek-v4-flash", "statuses": ["responses_incompatible"] },
+    { "modelId": "deepseek-v4-pro", "statuses": ["responses_incompatible"] },
+    { "modelId": "glm-5.1", "statuses": ["responses_incompatible"] },
+    { "modelId": "kimi-k2.6", "statuses": ["curve_only"] },
+    { "modelId": "qwen3.5-flash", "statuses": ["responses_incompatible"] },
+    { "modelId": "qwen3.6-plus", "statuses": ["responses_incompatible"] },
+    { "modelId": "qwen3.7-max", "statuses": ["responses_incompatible"] },
+    { "modelId": "minimax-m3", "statuses": ["missing_price"] },
+    { "modelId": "gpt-5.6-sol", "statuses": ["active_responses"] },
+    { "modelId": "gpt-5.6-terra", "statuses": ["active_responses", "active_messages"] },
+    { "modelId": "gpt-5.6-luna", "statuses": ["active_responses", "active_messages"] },
+    { "modelId": "glm-5.2", "statuses": ["responses_incompatible"] },
+    { "modelId": "kimi-k2.7-code", "statuses": ["curve_only"] },
+    { "modelId": "gemini-2.5-flash", "statuses": ["provider_unavailable"] },
+    { "modelId": "meta-llama/llama-4-maverick", "statuses": ["blocked"] },
+    { "modelId": "deepseek/deepseek-chat-v3-0324", "statuses": ["blocked"] },
+    { "modelId": "meta-llama/llama-3.3-70b-instruct", "statuses": ["blocked"] },
+    { "modelId": "qwen/qwen3-235b-a22b", "statuses": ["blocked"] }
+  ]
+}

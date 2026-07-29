@@ -72,11 +72,19 @@ services:
       ACU_ADMIN_TRACE_TOKEN: ${ACU_ADMIN_TRACE_TOKEN:?set ACU_ADMIN_TRACE_TOKEN}
       NEW_API_INTERNAL_BASE_URL: http://new-api:3000
       ACU_EXECUTION_PROFILES_FILE: /app/config/execution-profiles.json
+      ACU_DEMO_ROUTER_ENABLED: "true"
+      ACU_JUDGE_API_KEY: ${ACU_JUDGE_API_KEY:?set ACU_JUDGE_API_KEY}
+      ACU_JUDGE_MODEL: ${ACU_JUDGE_MODEL:-deepseek-v4-flash}
+      ACU_JUDGE_BASE_URL: ${ACU_JUDGE_BASE_URL:-https://api.openai-proxy.org/v1}
+      ACU_JUDGE_TIMEOUT_MS: ${ACU_JUDGE_TIMEOUT_MS:-20000}
+      ACU_JUDGE_MAX_CONTEXT_TOKENS: ${ACU_JUDGE_MAX_CONTEXT_TOKENS:-6000}
+      ACU_JUDGE_CACHE_PATH: /var/lib/acu/judge-cache-v3.json
       CLOSEAI_OPENAI_BASE_URL: ${CLOSEAI_OPENAI_BASE_URL:-https://api.openai-proxy.org/v1}
       CLOSEAI_ANTHROPIC_BASE_URL: ${CLOSEAI_ANTHROPIC_BASE_URL:-https://api.openai-proxy.org/anthropic}
       CLOSEAI_API_KEY: ${CLOSEAI_API_KEY:?set CLOSEAI_API_KEY}
     volumes:
       - ./execution-profiles.json:/app/config/execution-profiles.json:ro
+      - acu-runtime-data:/var/lib/acu
     expose: ["8403"]
     networks: [alpha-backend]
     healthcheck:
@@ -122,3 +130,4 @@ volumes:
   postgres-newapi-data:
   postgres-acu-data:
   newapi-logs:
+  acu-runtime-data:

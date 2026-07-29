@@ -1,3 +1,224 @@
+declare const ACU_TIERS: readonly ["low", "mid", "mid_high", "high"];
+type AcuTier = (typeof ACU_TIERS)[number];
+type AcuTierProbabilities = {
+    pLow: number;
+    pMid: number;
+    pMidHigh: number;
+    pHigh: number;
+    confidence: number;
+};
+type AcuDifficultyFactors = {
+    reasoningDepth: number;
+    taskScope: number;
+    constraintDensity: number;
+    toolDependency: number;
+    verificationBurden: number;
+    contextBurden: number;
+};
+type AcuJudgeResult = AcuTierProbabilities & {
+    difficultyScoreRaw: number;
+    factors: AcuDifficultyFactors;
+    factorComposite: number;
+    difficultyIndex: number;
+    difficultyMethodVersion: "acu-difficulty-index-v1";
+    /** Compatibility alias; always identical to difficultyIndex for v3 results. */
+    difficultyScore: number;
+    signals: string[];
+    explanation: string;
+};
+type AcuJudgeStatus = "live" | "cache_hit" | "rules_fallback" | "live_error";
+type AcuJudgeResultSource = "upstream_live" | "disk_cache" | "rules_strategy";
+type AcuBenchmarkEvidence = {
+    benchmarkName: string;
+    normalizedScore: number;
+    scoreScale: string;
+    sampleSize: number;
+    sourceModelName: string;
+    evaluationMode: string;
+    sourceUrl: string;
+    resultsUrl: string;
+    sourceVersion: string;
+    benchmarkDate: string;
+    directForModel: boolean;
+    configuredRelativeDelta: number;
+};
+type AcuModelCatalogEntry = {
+    modelId: string;
+    displayName: string;
+    provider: string;
+    upstream: string;
+    availability: string;
+    routingEligible: boolean;
+    defaultDisplay: boolean;
+    abilityAnchor: number;
+    solvedAbilityParameter: number;
+    fittingError: number;
+    sufficientLow: number;
+    sufficientMid: number;
+    sufficientMidHigh: number;
+    sufficientHigh: number;
+    inputPricePerMillion: number | null;
+    outputPricePerMillion: number | null;
+    cachedInputPricePerMillion: number | null;
+    cacheWritePricePerMillion: number | null;
+    contextWindow: number | null;
+    maxOutputTokens: number | null;
+    toolCallSupport: boolean;
+    visionSupport: boolean;
+    benchmarkEvidence: AcuBenchmarkEvidence[];
+    evidenceConfidence: "low" | "medium" | "high";
+    uncertaintyWidth: number;
+    curveMethod: string;
+    curveProfile: "frontier_resilient" | "balanced_frontier" | "efficient_fast" | "coding_specialist";
+    curveTemperature: number;
+    curveFloor: number;
+    curveCeiling: number;
+    tierAdjustments: {
+        low: number;
+        mid: number;
+        midHigh: number;
+        high: number;
+    };
+    profileEvidence: string[];
+    profileConfidence: "low" | "medium" | "high";
+    sourceNames: string[];
+    sourceRetrievedAt: string;
+    notes: string;
+};
+type AcuModelEstimate = {
+    modelId: string;
+    displayName: string;
+    provider: string;
+    estimatedQuality: number;
+    conservativeQuality: number;
+    qualityLower: number;
+    qualityUpper: number;
+    estimatedCallCost: number;
+    expectedFallbackCost: number;
+    expectedTotalCost: number;
+    predictedScore: number;
+    conservativeScore: number;
+    riskAdjustedCost: number;
+    riskAdjustedScore: number;
+    qualityUtility: number;
+    costUtility: number;
+    valueUtility: number;
+    scoreGapVsBest: number;
+    costSavingsVsBest: number;
+    paretoEfficient: boolean;
+    selectionReason: string;
+    savingsVsFlagship: number;
+    savingsPercentVsFlagship: number;
+    meetsQualityTarget: boolean;
+};
+type AcuRecommendation = {
+    recommended: AcuModelEstimate;
+    valueAlternative: AcuModelEstimate | null;
+    flagshipAlternative: AcuModelEstimate;
+    fallbackModel: AcuModelEstimate;
+    estimates: AcuModelEstimate[];
+    reason: string;
+};
+type AcuVisibleMessage = {
+    role: string;
+    content?: unknown;
+    name?: string;
+    tool_call_id?: string;
+    [key: string]: unknown;
+};
+type AcuEvaluateInput = {
+    messages: AcuVisibleMessage[];
+    tools?: unknown[];
+    qualityTarget?: number;
+    expectedOutputTokens?: number;
+    eligibleModelIds?: string[];
+    requireToolCallSupport?: boolean;
+    requireVisionSupport?: boolean;
+    forceJudgeRefresh?: boolean;
+    requestId?: string;
+    requestedModel?: string;
+    sessionHash?: string;
+};
+type AcuEvaluation = {
+    estimateLabel: "public-benchmark constrained estimate";
+    promptVersion: string;
+    judgeModel: string;
+    judgeMode: "non-thinking";
+    judge: AcuJudgeResult;
+    judgeStatus: AcuJudgeStatus;
+    judgeResultSource: AcuJudgeResultSource;
+    judgeProvider: string;
+    judgeEndpointHost: string;
+    upstreamRequestId: string | null;
+    cacheKeySha256: string;
+    cacheCreatedAt: string;
+    usageStatus: "reported" | "usage_missing" | "not_applicable";
+    judgeErrorCategory?: string;
+    judgeLatencyMs: number;
+    judgeCost: number;
+    judgePromptTokens: number;
+    judgeCompletionTokens: number;
+    contextSha256: string;
+    contextTokenEstimate: number;
+    contextTruncated: boolean;
+    difficultyScoreRaw: number;
+    difficultyFactors: AcuDifficultyFactors;
+    factorComposite: number;
+    difficultyIndex: number;
+    difficultyMethodVersion: "acu-difficulty-index-v1";
+    difficultyScore: number;
+    judgeEntropy: number;
+    routingModelVersion: string;
+    shadowMode: boolean;
+    actualModel?: string;
+    recommendationApplied?: boolean;
+    requestId: string;
+    qualityTarget: number;
+    recommendation: AcuRecommendation;
+    disclaimer: string;
+};
+type AcuCurvePoint = {
+    difficultyScore: number;
+    pLow: number;
+    pMid: number;
+    pMidHigh: number;
+    pHigh: number;
+    estimatedQuality: number;
+    qualityLower: number;
+    qualityUpper: number;
+};
+
+type AcuDecisionInput = {
+    probabilities: AcuTierProbabilities;
+    difficultyScore: number;
+    inputTokens: number;
+    expectedOutputTokens: number;
+    judgeCost: number;
+    qualityTarget?: number;
+    eligibleModelIds?: string[];
+    requireToolCallSupport?: boolean;
+    requireVisionSupport?: boolean;
+    switchCost?: number;
+    judgeEntropyPenalty?: number;
+};
+declare function estimateCallCost(model: Pick<AcuModelCatalogEntry, "inputPricePerMillion" | "outputPricePerMillion">, inputTokens: number, outputTokens: number): number;
+type ValueCandidate = Pick<AcuModelEstimate, "modelId" | "displayName" | "predictedScore" | "riskAdjustedCost"> & {
+    conservativeScore?: number;
+};
+declare function isParetoEfficient(candidate: ValueCandidate, candidates: ValueCandidate[]): boolean;
+declare function selectValueRoute<T extends ValueCandidate>(candidates: T[], targetScore: number): {
+    selected: T;
+    bestScore: T;
+    reason: string;
+    utilities: Map<string, {
+        riskAdjustedScore: number;
+        qualityUtility: number;
+        costUtility: number;
+        valueUtility: number;
+    }>;
+};
+declare function recommendModel(input: AcuDecisionInput): AcuRecommendation;
+
 /**
  * OpenClaw Plugin Types (locally defined)
  *
@@ -774,196 +995,6 @@ type AcuRuntimeConfig = {
 };
 declare function readAcuRuntimeConfig(overrides?: Partial<AcuRuntimeConfig>): AcuRuntimeConfig;
 
-declare const ACU_TIERS: readonly ["low", "mid", "mid_high", "high"];
-type AcuTier = (typeof ACU_TIERS)[number];
-type AcuTierProbabilities = {
-    pLow: number;
-    pMid: number;
-    pMidHigh: number;
-    pHigh: number;
-    confidence: number;
-};
-type AcuDifficultyFactors = {
-    reasoningDepth: number;
-    taskScope: number;
-    constraintDensity: number;
-    toolDependency: number;
-    verificationBurden: number;
-    contextBurden: number;
-};
-type AcuJudgeResult = AcuTierProbabilities & {
-    difficultyScoreRaw: number;
-    factors: AcuDifficultyFactors;
-    factorComposite: number;
-    difficultyIndex: number;
-    difficultyMethodVersion: "acu-difficulty-index-v1";
-    /** Compatibility alias; always identical to difficultyIndex for v3 results. */
-    difficultyScore: number;
-    signals: string[];
-    explanation: string;
-};
-type AcuJudgeStatus = "live" | "cache_hit" | "rules_fallback" | "live_error";
-type AcuJudgeResultSource = "upstream_live" | "disk_cache" | "rules_strategy";
-type AcuBenchmarkEvidence = {
-    benchmarkName: string;
-    normalizedScore: number;
-    scoreScale: string;
-    sampleSize: number;
-    sourceModelName: string;
-    evaluationMode: string;
-    sourceUrl: string;
-    resultsUrl: string;
-    sourceVersion: string;
-    benchmarkDate: string;
-    directForModel: boolean;
-    configuredRelativeDelta: number;
-};
-type AcuModelCatalogEntry = {
-    modelId: string;
-    displayName: string;
-    provider: string;
-    upstream: string;
-    availability: string;
-    routingEligible: boolean;
-    defaultDisplay: boolean;
-    abilityAnchor: number;
-    solvedAbilityParameter: number;
-    fittingError: number;
-    sufficientLow: number;
-    sufficientMid: number;
-    sufficientMidHigh: number;
-    sufficientHigh: number;
-    inputPricePerMillion: number | null;
-    outputPricePerMillion: number | null;
-    cachedInputPricePerMillion: number | null;
-    cacheWritePricePerMillion: number | null;
-    contextWindow: number | null;
-    maxOutputTokens: number | null;
-    toolCallSupport: boolean;
-    visionSupport: boolean;
-    benchmarkEvidence: AcuBenchmarkEvidence[];
-    evidenceConfidence: "low" | "medium" | "high";
-    uncertaintyWidth: number;
-    curveMethod: string;
-    curveProfile: "frontier_resilient" | "balanced_frontier" | "efficient_fast" | "coding_specialist";
-    curveTemperature: number;
-    curveFloor: number;
-    curveCeiling: number;
-    tierAdjustments: {
-        low: number;
-        mid: number;
-        midHigh: number;
-        high: number;
-    };
-    profileEvidence: string[];
-    profileConfidence: "low" | "medium" | "high";
-    sourceNames: string[];
-    sourceRetrievedAt: string;
-    notes: string;
-};
-type AcuModelEstimate = {
-    modelId: string;
-    displayName: string;
-    provider: string;
-    estimatedQuality: number;
-    conservativeQuality: number;
-    qualityLower: number;
-    qualityUpper: number;
-    estimatedCallCost: number;
-    expectedFallbackCost: number;
-    expectedTotalCost: number;
-    predictedScore: number;
-    conservativeScore: number;
-    riskAdjustedCost: number;
-    riskAdjustedScore: number;
-    qualityUtility: number;
-    costUtility: number;
-    valueUtility: number;
-    scoreGapVsBest: number;
-    costSavingsVsBest: number;
-    paretoEfficient: boolean;
-    selectionReason: string;
-    savingsVsFlagship: number;
-    savingsPercentVsFlagship: number;
-    meetsQualityTarget: boolean;
-};
-type AcuRecommendation = {
-    recommended: AcuModelEstimate;
-    valueAlternative: AcuModelEstimate | null;
-    flagshipAlternative: AcuModelEstimate;
-    fallbackModel: AcuModelEstimate;
-    estimates: AcuModelEstimate[];
-    reason: string;
-};
-type AcuVisibleMessage = {
-    role: string;
-    content?: unknown;
-    name?: string;
-    tool_call_id?: string;
-    [key: string]: unknown;
-};
-type AcuEvaluateInput = {
-    messages: AcuVisibleMessage[];
-    tools?: unknown[];
-    qualityTarget?: number;
-    expectedOutputTokens?: number;
-    eligibleModelIds?: string[];
-    requireToolCallSupport?: boolean;
-    requireVisionSupport?: boolean;
-    forceJudgeRefresh?: boolean;
-    requestId?: string;
-    requestedModel?: string;
-    sessionHash?: string;
-};
-type AcuEvaluation = {
-    estimateLabel: "public-benchmark constrained estimate";
-    promptVersion: string;
-    judgeModel: string;
-    judgeMode: "non-thinking";
-    judge: AcuJudgeResult;
-    judgeStatus: AcuJudgeStatus;
-    judgeResultSource: AcuJudgeResultSource;
-    judgeProvider: string;
-    judgeEndpointHost: string;
-    upstreamRequestId: string | null;
-    cacheKeySha256: string;
-    cacheCreatedAt: string;
-    usageStatus: "reported" | "usage_missing" | "not_applicable";
-    judgeErrorCategory?: string;
-    judgeLatencyMs: number;
-    judgeCost: number;
-    judgePromptTokens: number;
-    judgeCompletionTokens: number;
-    contextSha256: string;
-    contextTokenEstimate: number;
-    contextTruncated: boolean;
-    difficultyScoreRaw: number;
-    difficultyFactors: AcuDifficultyFactors;
-    factorComposite: number;
-    difficultyIndex: number;
-    difficultyMethodVersion: "acu-difficulty-index-v1";
-    difficultyScore: number;
-    judgeEntropy: number;
-    routingModelVersion: string;
-    shadowMode: boolean;
-    actualModel?: string;
-    recommendationApplied?: boolean;
-    requestId: string;
-    qualityTarget: number;
-    recommendation: AcuRecommendation;
-    disclaimer: string;
-};
-type AcuCurvePoint = {
-    difficultyScore: number;
-    pLow: number;
-    pMid: number;
-    pMidHigh: number;
-    pHigh: number;
-    estimatedQuality: number;
-    qualityLower: number;
-    qualityUpper: number;
-};
-
 type JudgeRequestResult = {
     result: AcuJudgeResult;
     status: "live" | "cache_hit";
@@ -1068,37 +1099,6 @@ declare function getAcuModel(modelId: string): AcuModelCatalogEntry | undefined;
 declare function buildModelCurve(model: AcuModelCatalogEntry): AcuCurvePoint[];
 declare function interpolateModelCurve(model: AcuModelCatalogEntry, difficultyScore: number): AcuCurvePoint;
 declare function publicCatalogPayload(): Record<string, unknown>;
-
-type AcuDecisionInput = {
-    probabilities: AcuTierProbabilities;
-    difficultyScore: number;
-    inputTokens: number;
-    expectedOutputTokens: number;
-    judgeCost: number;
-    qualityTarget?: number;
-    eligibleModelIds?: string[];
-    requireToolCallSupport?: boolean;
-    requireVisionSupport?: boolean;
-    switchCost?: number;
-    judgeEntropyPenalty?: number;
-};
-declare function estimateCallCost(model: Pick<AcuModelCatalogEntry, "inputPricePerMillion" | "outputPricePerMillion">, inputTokens: number, outputTokens: number): number;
-type ValueCandidate = Pick<AcuModelEstimate, "modelId" | "displayName" | "predictedScore" | "riskAdjustedCost"> & {
-    conservativeScore?: number;
-};
-declare function isParetoEfficient(candidate: ValueCandidate, candidates: ValueCandidate[]): boolean;
-declare function selectValueRoute<T extends ValueCandidate>(candidates: T[], targetScore: number): {
-    selected: T;
-    bestScore: T;
-    reason: string;
-    utilities: Map<string, {
-        riskAdjustedScore: number;
-        qualityUtility: number;
-        costUtility: number;
-        valueUtility: number;
-    }>;
-};
-declare function recommendModel(input: AcuDecisionInput): AcuRecommendation;
 
 declare function normalizeProbabilities(value: Omit<AcuTierProbabilities, "confidence"> & {
     confidence?: number;

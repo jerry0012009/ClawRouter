@@ -3,6 +3,8 @@ import { isHopByHopHeader } from "./provider.js";
 
 export type RelayResult = {
   body: Buffer;
+  httpStatus: number;
+  responseHeaders: Record<string, string>;
   complete: boolean;
   clientCancelled: boolean;
   visibleOutputBytes: number;
@@ -48,9 +50,10 @@ export async function relayProviderResponse(upstream: Response, response: Server
       if (!clientCancelled) throw error;
     }
   }
-  if (!response.destroyed) response.end();
   return {
     body: Buffer.concat(chunks),
+    httpStatus: upstream.status,
+    responseHeaders: Object.fromEntries(upstream.headers.entries()),
     complete,
     clientCancelled,
     visibleOutputBytes,

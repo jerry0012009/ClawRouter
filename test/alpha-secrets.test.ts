@@ -7,6 +7,8 @@ describe("Alpha persistence secret boundary", () => {
       Authorization: "Bearer secret",
       Cookie: "session=secret",
       "X-Api-Key": "secret",
+      "X-ACU-NewAPI-User-ID": "user-1",
+      "X-ACU-Signature": "signed-value",
       "X-Request-ID": "request-1",
     })).toEqual({ "x-request-id": "request-1" });
   });

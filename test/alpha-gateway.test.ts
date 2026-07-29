@@ -1,7 +1,11 @@
 import { createServer, request as httpRequest, type Server } from "node:http";
 import { once } from "node:events";
 import { afterEach, describe, expect, it } from "vitest";
-import { createAlphaGatewayServer, type AlphaGatewayTrace } from "../src/alpha/gateway.js";
+import {
+  createAlphaGatewayServer,
+  isPrivateNetworkAddress,
+  type AlphaGatewayTrace,
+} from "../src/alpha/gateway.js";
 import { createNativeProviderAdapter } from "../src/alpha/provider.js";
 import { bodySha256, trustedIdentityHeaders } from "../src/alpha/trusted-identity.js";
 
@@ -39,6 +43,39 @@ afterEach(async () => {
 });
 
 describe("Alpha native protocol gateway", () => {
+  it("recognizes only loopback and private network ingress addresses", () => {
+    expect(["127.0.0.1", "::1", "::ffff:127.0.0.1", "10.2.3.4", "172.16.0.1", "172.31.2.3", "192.168.1.2", "fd00::1"]
+      .every(isPrivateNetworkAddress)).toBe(true);
+    expect(["8.8.8.8", "172.15.0.1", "172.32.0.1", "2001:4860:4860::8888"]
+      .some(isPrivateNetworkAddress)).toBe(false);
+  });
+
+  it("lists auxiliary Alpha models only for trusted New API requests", async () => {
+    const gatewayPort = await listen(createAlphaGatewayServer({
+      trustedIdentitySecret: sharedSecret,
+      models: ["gpt-test", "claude-test", "gpt-test"],
+      async resolveExecution() {
+        throw new Error("models must not resolve an execution");
+      },
+    }));
+    const unsigned = await fetch(`http://127.0.0.1:${gatewayPort}/v1/models`);
+    expect(unsigned.status).toBe(401);
+
+    const response = await fetch(`http://127.0.0.1:${gatewayPort}/v1/models`, {
+      headers: signedHeaders(Buffer.alloc(0)),
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      object: "list",
+      data: ["acu-auto", "acu-high", "gpt-test", "claude-test"].map((id) => ({
+        id,
+        object: "model",
+        created: 0,
+        owned_by: "acu",
+      })),
+    });
+  });
+
   it("forwards an explicit Responses request body unchanged and replaces credentials", async () => {
     let upstreamBody = Buffer.alloc(0);
     let upstreamHeaders: Record<string, string | string[] | undefined> = {};
@@ -173,8 +210,26 @@ describe("Alpha native protocol gateway", () => {
     const headers = signedHeaders(body);
     headers["x-acu-newapi-user-id"] = "forged-user";
     const response = await fetch(`http://127.0.0.1:${gatewayPort}/v1/responses`, { method: "POST", headers, body });
-    expect(response.status).toBe(502);
+    expect(response.status).toBe(401);
     expect(upstreamCalls).toBe(0);
+  });
+
+  it("uses a native Messages error envelope for invalid trusted identity", async () => {
+    const gatewayPort = await listen(createAlphaGatewayServer({
+      trustedIdentitySecret: sharedSecret,
+      async resolveExecution() { throw new Error("must not execute"); },
+    }));
+    const body = Buffer.from('{"model":"claude-test","messages":[]}');
+    const response = await fetch(`http://127.0.0.1:${gatewayPort}/v1/messages`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body,
+    });
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({
+      type: "error",
+      error: { type: "api_error", message: "Missing or repeated trusted identity header: x-acu-newapi-user-id" },
+    });
   });
 
   it("aborts the Provider stream after client cancellation", async () => {

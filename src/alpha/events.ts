@@ -184,7 +184,11 @@ export function extractIncrementalEvents(
       }));
     } else if (category) {
       const signature = failureSignature(category, result, call);
-      events.push(event("execution_failure", { signature }, {
+      events.push(event("execution_failure", {
+        signature,
+        sourceIndex: result.sourceIndex,
+        toolCallId: result.toolCallId,
+      }, {
         sourceIndex: result.sourceIndex,
         toolCallId: result.toolCallId,
         failureCategory: category,

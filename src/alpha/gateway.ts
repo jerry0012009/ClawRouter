@@ -13,6 +13,14 @@ export type AlphaExecutionResolution = {
   provider: string;
   channel: string;
   body?: Uint8Array;
+  context?: unknown;
+};
+
+export type AlphaIngressContext = {
+  headers: IncomingMessage["headers"];
+  path: string;
+  query: string;
+  rawBody: Uint8Array;
 };
 
 export type AlphaGatewayTrace = {
@@ -27,8 +35,16 @@ export type AlphaGatewayTrace = {
 
 export type AlphaGatewayOptions = {
   trustedIdentitySecret: string;
-  resolveExecution(envelope: CanonicalEnvelope, identity: TrustedNewApiIdentity): Promise<AlphaExecutionResolution>;
+  models?: string[];
+  requirePrivateNetwork?: boolean;
+  healthCheck?(): Promise<Record<string, unknown>>;
+  resolveExecution(
+    envelope: CanonicalEnvelope,
+    identity: TrustedNewApiIdentity,
+    ingress: AlphaIngressContext,
+  ): Promise<AlphaExecutionResolution>;
   onTrace?(trace: AlphaGatewayTrace): Promise<void> | void;
+  onTraceError?(error: unknown, trace: AlphaGatewayTrace): Promise<void> | void;
   maxRequestBytes?: number;
   now?: () => Date;
 };
@@ -45,11 +61,18 @@ async function readRequestBody(request: IncomingMessage, maxBytes: number): Prom
   return Buffer.concat(chunks);
 }
 
-function jsonError(response: ServerResponse, status: number, message: string): void {
+function jsonError(
+  response: ServerResponse,
+  status: number,
+  message: string,
+  protocol?: "responses" | "messages",
+): void {
   if (response.headersSent || response.destroyed) return;
   response.statusCode = status;
   response.setHeader("content-type", "application/json");
-  response.end(JSON.stringify({ error: { type: "acu_gateway_error", message } }));
+  response.end(JSON.stringify(protocol === "messages"
+    ? { type: "error", error: { type: "api_error", message } }
+    : { error: { type: "acu_gateway_error", message } }));
 }
 
 function pathProtocol(pathname: string): "responses" | "messages" | undefined {
@@ -58,17 +81,53 @@ function pathProtocol(pathname: string): "responses" | "messages" | undefined {
   return undefined;
 }
 
+export function isPrivateNetworkAddress(address: string | undefined): boolean {
+  if (!address) return false;
+  const normalized = address.toLowerCase().replace(/^::ffff:/, "");
+  if (normalized === "::1" || normalized === "127.0.0.1") return true;
+  if (normalized.startsWith("10.") || normalized.startsWith("192.168.")) return true;
+  const secondOctet = /^172\.(\d+)\./.exec(normalized)?.[1];
+  if (secondOctet && Number(secondOctet) >= 16 && Number(secondOctet) <= 31) return true;
+  return normalized.startsWith("fc") || normalized.startsWith("fd") || normalized.startsWith("fe80:");
+}
+
 export function createAlphaGatewayServer(options: AlphaGatewayOptions): Server {
   return createServer(async (request, response) => {
     const url = new URL(request.url ?? "/", "http://acu.internal");
     if (request.method === "GET" && url.pathname === "/internal/health") {
-      response.setHeader("content-type", "application/json");
-      response.end(JSON.stringify({ status: "ok" }));
+      try {
+        const details = await options.healthCheck?.() ?? {};
+        response.setHeader("content-type", "application/json");
+        response.end(JSON.stringify({ status: "ok", ...details }));
+      } catch {
+        jsonError(response, 503, "ACU dependency health check failed");
+      }
+      return;
+    }
+    if ((options.requirePrivateNetwork ?? true) && !isPrivateNetworkAddress(request.socket.remoteAddress)) {
+      jsonError(response, 403, "ACU ingress is restricted to private network sources");
+      return;
+    }
+    if (request.method === "GET" && url.pathname === "/v1/models") {
+      try {
+        verifyTrustedIdentity(request.headers, Buffer.alloc(0), {
+          sharedSecret: options.trustedIdentitySecret,
+          now: options.now?.(),
+        });
+        const modelIds = [...new Set(["acu-auto", "acu-high", ...(options.models ?? [])])];
+        response.setHeader("content-type", "application/json");
+        response.end(JSON.stringify({
+          object: "list",
+          data: modelIds.map((id) => ({ id, object: "model", created: 0, owned_by: "acu" })),
+        }));
+      } catch (error) {
+        jsonError(response, 401, error instanceof Error ? error.message : "Untrusted ACU identity");
+      }
       return;
     }
     const protocol = pathProtocol(url.pathname);
     if (request.method !== "POST" || !protocol) {
-      jsonError(response, 404, "Unsupported ACU endpoint");
+      jsonError(response, 404, "Unsupported ACU endpoint", protocol);
       return;
     }
 
@@ -79,17 +138,26 @@ export function createAlphaGatewayServer(options: AlphaGatewayOptions): Server {
     });
 
     let trace: AlphaGatewayTrace | undefined;
+    let stage: "body" | "identity" | "protocol" | "execution" = "body";
     try {
       const body = await readRequestBody(request, options.maxRequestBytes ?? 32 * 1024 * 1024);
+      stage = "identity";
       const identity = verifyTrustedIdentity(request.headers, body, {
         sharedSecret: options.trustedIdentitySecret,
         now: options.now?.(),
       });
+      stage = "protocol";
       const parsed = JSON.parse(body.toString("utf8")) as unknown;
       const envelope = protocol === "responses"
         ? normalizeResponsesRequest(parsed, request.headers)
         : normalizeMessagesRequest(parsed, request.headers, request.headers["x-claude-code-version"] as string | undefined);
-      const resolution = await options.resolveExecution(envelope, identity);
+      stage = "execution";
+      const resolution = await options.resolveExecution(envelope, identity, {
+        headers: request.headers,
+        path: url.pathname,
+        query: url.search,
+        rawBody: body,
+      });
       trace = { requestBody: body, envelope, identity, resolution, status: "started" };
       await options.onTrace?.(trace);
       const upstream = await resolution.adapter.execute({
@@ -103,14 +171,29 @@ export function createAlphaGatewayServer(options: AlphaGatewayOptions): Server {
       const relay = await relayProviderResponse(upstream, response);
       trace.response = relay;
       trace.status = relay.clientCancelled ? "cancelled" : "completed";
-      await options.onTrace?.(trace);
+      try {
+        await options.onTrace?.(trace);
+      } catch (traceError) {
+        await options.onTraceError?.(traceError, trace);
+      }
+      if (!response.destroyed) response.end();
     } catch (error) {
       if (trace) {
         trace.status = abortController.signal.aborted ? "cancelled" : "failed";
         trace.error = error;
-        await options.onTrace?.(trace);
+        try {
+          await options.onTrace?.(trace);
+        } catch (traceError) {
+          await options.onTraceError?.(traceError, trace);
+        }
       }
-      if (!abortController.signal.aborted) jsonError(response, 502, error instanceof Error ? error.message : "ACU gateway failure");
+      if (!abortController.signal.aborted) {
+        if (response.headersSent && !response.destroyed) response.end();
+        else {
+          const status = stage === "identity" ? 401 : stage === "protocol" ? 400 : stage === "body" ? 413 : 502;
+          jsonError(response, status, error instanceof Error ? error.message : "ACU gateway failure", protocol);
+        }
+      }
     }
   });
 }

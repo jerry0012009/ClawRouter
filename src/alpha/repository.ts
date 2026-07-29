@@ -88,6 +88,8 @@ export type LogicalRequestRecord = {
   ingressIdempotencyKey: string;
   requestProtocol: AlphaProtocol;
   requestedModel: string;
+  requestPayloadId?: string;
+  selectedProfileId?: string;
   streaming: boolean;
   status?: string;
   hadTools?: boolean;
@@ -126,6 +128,8 @@ export type AttemptRecord = {
   errorCategory?: string;
   httpStatus?: number;
   usageSource?: string;
+  inputPricePerMillion?: string;
+  outputPricePerMillion?: string;
   actualCostUsd?: string;
   providerBilled?: boolean;
   metadata?: Record<string, unknown>;
@@ -152,12 +156,75 @@ export type UsageReportRecord = {
   costBreakdown: Record<string, unknown>;
 };
 
+export type JudgeEvaluationRecord = {
+  judgeEvaluationId: string;
+  newapiUserId: string;
+  taskId: string;
+  segmentId: string;
+  triggerEventId?: string;
+  judgeIdempotencyKey: string;
+  judgeStatus: string;
+  judgeResultSource: string;
+  judgeModel?: string;
+  judgeProvider?: string;
+  promptVersion: string;
+  policyVersion: string;
+  difficultyMethodVersion: string;
+  contextHash: string;
+  contextTokenEstimate?: bigint;
+  contextTruncated: boolean;
+  difficultyScoreRaw?: number;
+  difficultyIndex?: number;
+  factors: Record<string, unknown>;
+  probabilities: Record<string, unknown>;
+  confidence?: number;
+  judgeEntropy?: number;
+  evidenceTags: unknown[];
+  explanation?: string;
+  promptTokens?: bigint;
+  completionTokens?: bigint;
+  latencyMs?: number;
+  actualCostUsd?: string;
+  errorCategory?: string;
+};
+
+export type RouteDecisionRecord = {
+  routeDecisionId: string;
+  newapiUserId: string;
+  segmentId: string;
+  judgeEvaluationId?: string;
+  mode: string;
+  policyVersion: string;
+  routingModelVersion: string;
+  qualityCurveVersion: string;
+  priceVersion: string;
+  effectiveQualityTarget: number;
+  formulaInputs: Record<string, unknown>;
+  candidateEstimates: unknown[];
+  paretoFrontier: unknown[];
+  selectedProfile: Record<string, unknown>;
+  routeExplanation?: string;
+  fallbackSource?: string;
+};
+
 function json(value: unknown): string {
-  return JSON.stringify(value ?? {});
+  return JSON.stringify(sanitizePayloadForPersistence(value ?? {}));
 }
 
 export class AlphaRepository {
   constructor(private readonly database: SqlExecutor) {}
+
+  async lockUserState(newapiUserId: string): Promise<void> {
+    await this.database.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [newapiUserId]);
+  }
+
+  async lockTask(taskId: string, newapiUserId: string): Promise<void> {
+    const result = await this.database.query(
+      "SELECT task_id FROM acu_tasks WHERE task_id=$1 AND newapi_user_id=$2 FOR UPDATE",
+      [taskId, newapiUserId],
+    );
+    if (result.rowCount !== 1) throw new Error("Task lock failed or crossed user scope");
+  }
 
   async createSession(input: SessionRecord): Promise<void> {
     const now = new Date();
@@ -172,6 +239,47 @@ export class AlphaRepository {
         input.historyPrefixHash ?? null, input.systemFingerprint ?? null,
         input.toolSchemaFingerprint ?? null, input.lastToolCallId ?? null, now, json(input.metadata)],
     );
+  }
+
+  async listSessionCandidates(
+    newapiUserId: string,
+    protocol: AlphaProtocol,
+    limit = 20,
+  ): Promise<Array<Record<string, unknown>>> {
+    const result = await this.database.query(
+      `SELECT * FROM acu_sessions
+       WHERE newapi_user_id=$1 AND native_protocol=$2
+       ORDER BY updated_at DESC LIMIT $3`,
+      [newapiUserId, protocol, limit],
+    );
+    return result.rows;
+  }
+
+  async updateSessionState(input: {
+    sessionId: string;
+    newapiUserId: string;
+    currentTaskId: string;
+    currentSegmentId: string;
+    historyPrefixHash: string;
+    lastToolCallId?: string;
+    metadata: Record<string, unknown>;
+  }): Promise<void> {
+    const result = await this.database.query(
+      `UPDATE acu_sessions SET current_task_id=$3,current_segment_id=$4,history_prefix_hash=$5,
+       last_tool_call_id=$6,last_activity_at=now(),updated_at=now(),metadata_json=$7
+       WHERE session_id=$1 AND newapi_user_id=$2`,
+      [input.sessionId, input.newapiUserId, input.currentTaskId, input.currentSegmentId,
+        input.historyPrefixHash, input.lastToolCallId ?? null, json(input.metadata)],
+    );
+    if (result.rowCount !== 1) throw new Error("Session update failed or crossed user scope");
+  }
+
+  async getTask(taskId: string, newapiUserId: string): Promise<Record<string, unknown> | undefined> {
+    return this.findUserScoped("acu_tasks", "task_id", taskId, newapiUserId);
+  }
+
+  async getSegment(segmentId: string, newapiUserId: string): Promise<Record<string, unknown> | undefined> {
+    return this.findUserScoped("acu_segments", "segment_id", segmentId, newapiUserId);
   }
 
   async createTask(input: TaskRecord): Promise<void> {
@@ -200,6 +308,48 @@ export class AlphaRepository {
         input.capabilityEscalationFloor ?? 0, input.temporaryPhaseOverride ?? 0,
         input.effectiveQualityTarget, now, json(input.metadata)],
     );
+  }
+
+  async updateSegmentDecision(input: {
+    segmentId: string;
+    newapiUserId: string;
+    judgeEvaluationId?: string;
+    routeDecisionId?: string;
+    selectedExecutionProfileId: string;
+    metadata: Record<string, unknown>;
+  }): Promise<void> {
+    const result = await this.database.query(
+      `UPDATE acu_segments SET judge_evaluation_id=$3,route_decision_id=$4,
+       selected_execution_profile_id=$5,metadata_json=$6,last_activity_at=now()
+       WHERE segment_id=$1 AND newapi_user_id=$2`,
+      [input.segmentId, input.newapiUserId, input.judgeEvaluationId ?? null,
+        input.routeDecisionId ?? null, input.selectedExecutionProfileId, json(input.metadata)],
+    );
+    if (result.rowCount !== 1) throw new Error("Segment decision update failed or crossed user scope");
+  }
+
+  async updateSegmentMetadata(
+    segmentId: string,
+    newapiUserId: string,
+    value: Record<string, unknown>,
+  ): Promise<void> {
+    const result = await this.database.query(
+      `UPDATE acu_segments SET metadata_json=$3,last_activity_at=now()
+       WHERE segment_id=$1 AND newapi_user_id=$2`,
+      [segmentId, newapiUserId, json(value)],
+    );
+    if (result.rowCount !== 1) throw new Error("Segment metadata update failed or crossed user scope");
+  }
+
+  async incrementAcceptedResponses(segmentId: string, newapiUserId: string): Promise<number> {
+    const result = await this.database.query<{ accepted_responses_since_judge: number }>(
+      `UPDATE acu_segments SET accepted_responses_since_judge=accepted_responses_since_judge+1,
+       last_activity_at=now() WHERE segment_id=$1 AND newapi_user_id=$2
+       RETURNING accepted_responses_since_judge`,
+      [segmentId, newapiUserId],
+    );
+    if (result.rowCount !== 1) throw new Error("Accepted response update failed or crossed user scope");
+    return result.rows[0].accepted_responses_since_judge;
   }
 
   async supersedeActiveSegment(taskId: string, newapiUserId: string): Promise<void> {
@@ -236,13 +386,15 @@ export class AlphaRepository {
     const result = await this.database.query<{ logical_request_id: string }>(
       `INSERT INTO acu_logical_requests
        (logical_request_id,newapi_user_id,newapi_token_id,newapi_log_id,session_id,task_id,segment_id,
-        ingress_idempotency_key,request_protocol,requested_model,status,had_tools,streaming,started_at,metadata_json)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,now(),$14)
+        ingress_idempotency_key,request_protocol,requested_model,request_payload_id,selected_profile_id,
+        status,had_tools,streaming,started_at,metadata_json)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,now(),$16)
        ON CONFLICT (newapi_user_id,ingress_idempotency_key) DO NOTHING RETURNING logical_request_id`,
       [input.logicalRequestId, input.newapiUserId, input.newapiTokenId ?? null,
         input.newapiLogId ?? null, input.sessionId, input.taskId, input.segmentId,
         input.ingressIdempotencyKey, input.requestProtocol, input.requestedModel,
-        input.status ?? "pending", input.hadTools ?? false, input.streaming, json(input.metadata)],
+        input.requestPayloadId ?? null, input.selectedProfileId ?? null, input.status ?? "pending",
+        input.hadTools ?? false, input.streaming, json(input.metadata)],
     );
     if (result.rowCount === 1) return { logicalRequestId: input.logicalRequestId, inserted: true };
     const existing = await this.database.query<{ logical_request_id: string }>(
@@ -250,6 +402,113 @@ export class AlphaRepository {
       [input.newapiUserId, input.ingressIdempotencyKey],
     );
     return { logicalRequestId: existing.rows[0].logical_request_id, inserted: false };
+  }
+
+  async getLogicalRequest(logicalRequestId: string, newapiUserId: string): Promise<Record<string, unknown> | undefined> {
+    return this.findUserScoped("acu_logical_requests", "logical_request_id", logicalRequestId, newapiUserId);
+  }
+
+  async nextProviderAttemptIndex(logicalRequestId: string): Promise<number> {
+    const result = await this.database.query<{ next_index: number }>(
+      `SELECT COALESCE(MAX(attempt_index),0)::int+1 AS next_index
+       FROM acu_attempts WHERE logical_request_id=$1 AND attempt_kind='provider'`,
+      [logicalRequestId],
+    );
+    return result.rows[0].next_index;
+  }
+
+  async attachRequestPayload(logicalRequestId: string, newapiUserId: string, payloadId: string): Promise<void> {
+    const result = await this.database.query(
+      `UPDATE acu_logical_requests SET request_payload_id=$3
+       WHERE logical_request_id=$1 AND newapi_user_id=$2`,
+      [logicalRequestId, newapiUserId, payloadId],
+    );
+    if (result.rowCount !== 1) throw new Error("Request payload attachment failed or crossed user scope");
+  }
+
+  async completeLogicalRequest(input: {
+    logicalRequestId: string;
+    newapiUserId: string;
+    status: string;
+    acceptedAttemptId?: string;
+    responsePayloadId?: string;
+    errorCategory?: string;
+  }): Promise<void> {
+    const result = await this.database.query(
+      `UPDATE acu_logical_requests SET status=$3,accepted_attempt_id=$4,response_payload_id=$5,
+       error_category=$6,completed_at=now() WHERE logical_request_id=$1 AND newapi_user_id=$2`,
+      [input.logicalRequestId, input.newapiUserId, input.status, input.acceptedAttemptId ?? null,
+        input.responsePayloadId ?? null, input.errorCategory ?? null],
+    );
+    if (result.rowCount !== 1) throw new Error("Logical request completion failed or crossed user scope");
+  }
+
+  async saveJudgeEvaluation(input: JudgeEvaluationRecord): Promise<{ judgeEvaluationId: string; inserted: boolean }> {
+    const result = await this.database.query<{ judge_evaluation_id: string }>(
+      `INSERT INTO acu_judge_evaluations
+       (judge_evaluation_id,newapi_user_id,task_id,segment_id,trigger_event_id,judge_idempotency_key,
+        judge_status,judge_result_source,judge_model,judge_provider,prompt_version,policy_version,
+        difficulty_method_version,context_hash,context_token_estimate,context_truncated,
+        difficulty_score_raw,difficulty_index,factors_json,probabilities_json,confidence,judge_entropy,
+        evidence_tags_json,explanation,prompt_tokens,completion_tokens,latency_ms,actual_cost_usd,
+        error_category,created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
+        $21,$22,$23,$24,$25,$26,$27,$28,$29,now())
+       ON CONFLICT (judge_idempotency_key) DO NOTHING RETURNING judge_evaluation_id`,
+      [input.judgeEvaluationId, input.newapiUserId, input.taskId, input.segmentId,
+        input.triggerEventId ?? null, input.judgeIdempotencyKey, input.judgeStatus,
+        input.judgeResultSource, input.judgeModel ?? null, input.judgeProvider ?? null,
+        input.promptVersion, input.policyVersion, input.difficultyMethodVersion, input.contextHash,
+        input.contextTokenEstimate ?? null, input.contextTruncated, input.difficultyScoreRaw ?? null,
+        input.difficultyIndex ?? null, json(input.factors), json(input.probabilities),
+        input.confidence ?? null, input.judgeEntropy ?? null, json(input.evidenceTags),
+        input.explanation ?? null, input.promptTokens ?? null, input.completionTokens ?? null,
+        input.latencyMs ?? null, input.actualCostUsd ?? "0", input.errorCategory ?? null],
+    );
+    if (result.rowCount === 1) return { judgeEvaluationId: input.judgeEvaluationId, inserted: true };
+    const existing = await this.database.query<{ judge_evaluation_id: string }>(
+      "SELECT judge_evaluation_id FROM acu_judge_evaluations WHERE judge_idempotency_key=$1",
+      [input.judgeIdempotencyKey],
+    );
+    return { judgeEvaluationId: existing.rows[0].judge_evaluation_id, inserted: false };
+  }
+
+  async attachJudgePayloads(input: {
+    judgeEvaluationId: string;
+    newapiUserId: string;
+    inputPayloadId: string;
+    outputPayloadId: string;
+  }): Promise<void> {
+    const result = await this.database.query(
+      `UPDATE acu_judge_evaluations SET input_payload_id=$3,output_payload_id=$4
+       WHERE judge_evaluation_id=$1 AND newapi_user_id=$2`,
+      [input.judgeEvaluationId, input.newapiUserId, input.inputPayloadId, input.outputPayloadId],
+    );
+    if (result.rowCount !== 1) throw new Error("Judge payload attachment failed or crossed user scope");
+  }
+
+  async saveRouteDecision(input: RouteDecisionRecord): Promise<void> {
+    await this.database.query(
+      `INSERT INTO acu_route_decisions
+       (route_decision_id,newapi_user_id,segment_id,judge_evaluation_id,mode,policy_version,
+        routing_model_version,quality_curve_version,price_version,effective_quality_target,
+        formula_inputs_json,candidate_estimates_json,pareto_frontier_json,selected_profile_json,
+        route_explanation,fallback_source,created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,now())`,
+      [input.routeDecisionId, input.newapiUserId, input.segmentId, input.judgeEvaluationId ?? null,
+        input.mode, input.policyVersion, input.routingModelVersion, input.qualityCurveVersion,
+        input.priceVersion, input.effectiveQualityTarget, json(input.formulaInputs),
+        json(input.candidateEstimates), json(input.paretoFrontier), json(input.selectedProfile),
+        input.routeExplanation ?? null, input.fallbackSource ?? null],
+    );
+  }
+
+  async getRouteDecision(routeDecisionId: string, newapiUserId: string): Promise<Record<string, unknown> | undefined> {
+    const result = await this.database.query(
+      "SELECT * FROM acu_route_decisions WHERE route_decision_id=$1 AND newapi_user_id=$2",
+      [routeDecisionId, newapiUserId],
+    );
+    return result.rows[0];
   }
 
   async savePayload(input: PayloadRecord): Promise<void> {
@@ -265,8 +524,16 @@ export class AlphaRepository {
       [input.payloadId, input.newapiUserId, input.logicalRequestId ?? null, input.attemptId ?? null,
         input.payloadKind, input.protocol ?? null, input.contentType ?? null,
         json(sanitizeHeadersForPersistence(input.headers ?? {})), bodyJson, bodyText,
-        sha256(serialized), input.isComplete, json(input.metadata)],
+        sha256(serialized), input.isComplete, json(sanitizePayloadForPersistence(input.metadata ?? {}))],
     );
+  }
+
+  async getPayload(payloadId: string, newapiUserId: string): Promise<Record<string, unknown> | undefined> {
+    const result = await this.database.query(
+      "SELECT * FROM acu_payloads WHERE payload_id=$1 AND newapi_user_id=$2",
+      [payloadId, newapiUserId],
+    );
+    return result.rows[0];
   }
 
   async createAttempt(input: AttemptRecord): Promise<void> {
@@ -275,15 +542,48 @@ export class AlphaRepository {
        (attempt_id,logical_request_id,attempt_index,attempt_kind,retry_owner,route_decision_id,
         judge_evaluation_id,execution_profile_id,requested_model,actual_model,provider,channel,
         provider_request_id,status,error_category,http_status,usage_source,actual_cost_usd,
-        provider_billed,started_at,metadata_json)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,now(),$20)`,
+        input_price_per_million,output_price_per_million,provider_billed,started_at,metadata_json)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,now(),$22)`,
       [input.attemptId, input.logicalRequestId, input.attemptIndex, input.attemptKind,
         input.retryOwner, input.routeDecisionId ?? null, input.judgeEvaluationId ?? null,
         input.executionProfileId ?? null, input.requestedModel ?? null, input.actualModel ?? null,
         input.provider, input.channel ?? null, input.providerRequestId ?? null, input.status,
         input.errorCategory ?? null, input.httpStatus ?? null, input.usageSource ?? null,
-        input.actualCostUsd ?? "0", input.providerBilled ?? null, json(input.metadata)],
+        input.actualCostUsd ?? "0", input.inputPricePerMillion ?? null,
+        input.outputPricePerMillion ?? null, input.providerBilled ?? null, json(input.metadata)],
     );
+  }
+
+  async completeAttempt(input: {
+    attemptId: string;
+    status: string;
+    actualModel?: string;
+    providerRequestId?: string;
+    errorCategory?: string;
+    httpStatus?: number;
+    inputTokens?: bigint;
+    cachedInputTokens?: bigint;
+    outputTokens?: bigint;
+    reasoningTokens?: bigint;
+    usageSource?: string;
+    actualCostUsd?: string;
+    providerBilled?: boolean;
+    latencyMs?: number;
+    visibleOutputBytes?: number;
+    metadata?: Record<string, unknown>;
+  }): Promise<void> {
+    const result = await this.database.query(
+      `UPDATE acu_attempts SET status=$2,actual_model=$3,provider_request_id=$4,error_category=$5,
+       http_status=$6,input_tokens=$7,cached_input_tokens=$8,output_tokens=$9,reasoning_tokens=$10,
+       usage_source=$11,actual_cost_usd=$12,provider_billed=$13,latency_ms=$14,
+       visible_output_bytes=$15,completed_at=now(),metadata_json=$16 WHERE attempt_id=$1`,
+      [input.attemptId, input.status, input.actualModel ?? null, input.providerRequestId ?? null,
+        input.errorCategory ?? null, input.httpStatus ?? null, input.inputTokens ?? 0n,
+        input.cachedInputTokens ?? 0n, input.outputTokens ?? 0n, input.reasoningTokens ?? 0n,
+        input.usageSource ?? null, input.actualCostUsd ?? "0", input.providerBilled ?? null,
+        input.latencyMs ?? null, input.visibleOutputBytes ?? 0, json(input.metadata)],
+    );
+    if (result.rowCount !== 1) throw new Error("Attempt completion failed");
   }
 
   async createUsageReport(input: UsageReportRecord): Promise<{ usageReportId: string; inserted: boolean }> {

@@ -88,18 +88,18 @@ function decision(reason: TriggerReason, overrides: Partial<TriggerDecision> = {
 
 export function decideTrigger(input: TriggerInput): TriggerDecision {
   if (input.mode === "explicit") return decision("explicit_model", { createSegment: input.isNewTask });
+  if (input.events.some((item) => item.type === "plan_finished")) {
+    return decision("plan_finished", { phase: "execution" });
+  }
+  if (input.events.some((item) => item.type === "plan_started")) {
+    return decision("plan_started", { phase: "planning", temporaryPhaseOverride: 88 });
+  }
   if (input.isNewTask) return decision("new_task");
   if (input.events.some((item) => (
     item.type === "user_rejected"
     || (item.type === "human_message" && item.evidenceStrength === "high")
   ))) {
     return decision("human_message");
-  }
-  if (input.events.some((item) => item.type === "plan_started")) {
-    return decision("plan_started", { phase: "planning", temporaryPhaseOverride: 88 });
-  }
-  if (input.events.some((item) => item.type === "plan_finished")) {
-    return decision("plan_finished", { phase: "execution" });
   }
   const counters = applyFailureEvidence(input.segment?.failureCounters ?? {}, input.events);
   if (Object.values(counters).some((counter) => counter.count >= 2 && !counter.progressSinceLast)) {

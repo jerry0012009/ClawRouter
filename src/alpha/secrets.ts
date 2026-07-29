@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { isInternalIdentityHeader } from "./trusted-identity.js";
 
 const SECRET_HEADER_NAMES = new Set([
   "authorization",
@@ -10,7 +11,7 @@ const SECRET_HEADER_NAMES = new Set([
   "x-auth-token",
 ]);
 
-const SECRET_FIELD_PATTERN = /(?:^|_)(?:api_?key|authorization|cookie|password|passwd|provider_?key|secret|token)(?:$|_)/i;
+const SECRET_FIELD_PATTERN = /(?:^|[_-])(?:api[_-]?key|authorization|cookie|password|passwd|provider[_-]?key|secret|token)(?:$|[_-])/i;
 const BEARER_PATTERN = /\bBearer\s+[A-Za-z0-9._~+/-]+=*/gi;
 const COMMON_KEY_PATTERN = /\b(?:sk|sk-proj|sk-ant|or)-[A-Za-z0-9_-]{12,}\b/g;
 const PRIVATE_KEY_PATTERN = /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g;
@@ -34,7 +35,8 @@ export function sanitizeHeadersForPersistence(
 ): Record<string, string | string[]> {
   const sanitized: Record<string, string | string[]> = {};
   for (const [name, rawValue] of Object.entries(headers)) {
-    if (rawValue === undefined || SECRET_HEADER_NAMES.has(name.toLowerCase())) continue;
+    if (rawValue === undefined || SECRET_HEADER_NAMES.has(name.toLowerCase())
+      || isInternalIdentityHeader(name)) continue;
     sanitized[name.toLowerCase()] = Array.isArray(rawValue)
       ? rawValue.map(sanitizeString)
       : sanitizeString(rawValue);

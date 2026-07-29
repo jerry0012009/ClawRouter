@@ -5,7 +5,8 @@ export type SessionContinuityRecord = {
   sessionId: string;
   newapiUserId: string;
   protocol: CanonicalEnvelope["protocol"];
-  history: unknown[];
+  history?: unknown[];
+  historyItemHashes?: string[];
   lastToolCallIds: string[];
   clientSessionCandidate?: string;
 };
@@ -38,7 +39,13 @@ export function matchSession(
   ));
   const matches = eligible.flatMap((candidate) => {
     const reasons: string[] = [];
-    if (isExactHistoryPrefix(candidate.history, evidence.envelope.history)) reasons.push("exact_history_prefix");
+    const previousHashes = candidate.historyItemHashes
+      ?? (candidate.history ?? []).map((item) => canonicalHash(item));
+    const currentHashes = evidence.envelope.history.map((item) => canonicalHash(item));
+    if (previousHashes.length <= currentHashes.length
+      && previousHashes.every((hash, index) => hash === currentHashes[index])) {
+      reasons.push("exact_history_prefix");
+    }
     const resultIds = new Set(evidence.envelope.toolResults.map((result) => result.toolCallId));
     if (candidate.lastToolCallIds.some((id) => resultIds.has(id))) reasons.push("tool_call_result_causality");
     if (candidate.clientSessionCandidate && evidence.clientSessionCandidate
@@ -55,6 +62,8 @@ export function matchSession(
     sessionId: matches[0].candidate.sessionId,
     confidence: "strong",
     reasons: matches[0].reasons,
-    previousHistoryLength: matches[0].candidate.history.length,
+    previousHistoryLength: matches[0].candidate.historyItemHashes?.length
+      ?? matches[0].candidate.history?.length
+      ?? 0,
   };
 }

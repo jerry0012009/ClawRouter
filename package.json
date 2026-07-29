@@ -6,7 +6,8 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "clawrouter": "./dist/cli.js"
+    "clawrouter": "./dist/cli.js",
+    "acu-router-alpha": "./dist/alpha/server.js"
   },
   "exports": {
     ".": {

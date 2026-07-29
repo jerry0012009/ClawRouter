@@ -2,7 +2,7 @@ import { builtinModules } from "node:module";
 import { defineConfig } from "tsup";
 
 export default defineConfig({
-  entry: ["src/index.ts", "src/cli.ts"],
+  entry: ["src/index.ts", "src/cli.ts", "src/alpha/server.ts"],
   format: ["esm"],
   dts: true,
   clean: true,

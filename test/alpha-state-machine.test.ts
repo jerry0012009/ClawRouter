@@ -134,6 +134,18 @@ describe("Alpha Judge triggers", () => {
       .toMatchObject({ runJudge: true, reason: "human_message" });
   });
 
+  it("coalesces a new Claude Plan-only Task into a Planning Segment with quality anchor 88", () => {
+    const envelope = normalizeMessagesRequest({
+      model: "acu-auto",
+      system: "You are in plan mode and must remain read-only.",
+      messages: [{ role: "user", content: "Plan the change first" }],
+      tools: [{ name: "Read" }, { name: "ExitPlanMode" }],
+    }, {}, "2.1.220");
+    const events = extractIncrementalEvents(envelope, { previousHistoryLength: 0, planningActive: false });
+    expect(decideTrigger({ mode: "acu-auto", isNewTask: true, events }))
+      .toMatchObject({ runJudge: true, reason: "plan_started", phase: "planning", temporaryPhaseOverride: 88 });
+  });
+
   it("does not Judge ambiguous Claude text mixed with tool_result", () => {
     const envelope = normalizeMessagesRequest({
       model: "acu-auto",

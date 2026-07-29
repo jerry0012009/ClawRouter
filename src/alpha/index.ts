@@ -12,6 +12,8 @@ export {
   type SessionRecord,
   type TaskRecord,
   type UsageReportRecord,
+  type JudgeEvaluationRecord,
+  type RouteDecisionRecord,
 } from "./repository.js";
 export { sanitizeHeadersForPersistence, sanitizePayloadForPersistence } from "./secrets.js";
 export { normalizeResponsesRequest } from "./protocol/responses.js";
@@ -24,7 +26,7 @@ export type {
   NativeRequestHeaders,
   PlanningSignals,
 } from "./protocol/types.js";
-export { createAlphaGatewayServer, type AlphaGatewayOptions } from "./gateway.js";
+export { createAlphaGatewayServer, isPrivateNetworkAddress, type AlphaGatewayOptions } from "./gateway.js";
 export { createNativeProviderAdapter, type NativeProviderConfig } from "./provider.js";
 export { relayProviderResponse, type RelayResult } from "./stream-relay.js";
 export {
@@ -51,3 +53,22 @@ export {
   type AlphaRouteDecision,
   type AlphaRouteRequirements,
 } from "./routing.js";
+export { calculateProviderCost, parseProviderUsage, sumCost, type AlphaUsage } from "./usage.js";
+export {
+  createAcuJudgeRunner,
+  type AlphaJudgeInput,
+  type AlphaJudgeRun,
+  type AlphaJudgeRunner,
+} from "./judge-runner.js";
+export {
+  AlphaRequestProcessor,
+  type AlphaProcessorOptions,
+  type AlphaResolutionContext,
+} from "./processor.js";
+export {
+  createRecoveringProviderAdapter,
+  isRecoverableProviderStatus,
+  type BufferedProviderFailure,
+  type ProviderAttemptHandle,
+  type ProviderRecoveryOptions,
+} from "./execution.js";

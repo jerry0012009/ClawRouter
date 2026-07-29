@@ -70,7 +70,7 @@
   },
   "dependencies": {
     "pg": "^8.22.0",
-    "undici": "^6.22.0"
+    "undici": "^6.27.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

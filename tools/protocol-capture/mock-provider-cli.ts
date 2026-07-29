@@ -3,6 +3,7 @@ import { startMockProvider } from "./mock-provider.js";
 
 const handle = await startMockProvider({
   port: Number(process.env.PROTOCOL_MOCK_PORT || 9090),
+  host: process.env.PROTOCOL_MOCK_HOST || "127.0.0.1",
   status: Number(process.env.PROTOCOL_MOCK_STATUS || 200),
   failCount: process.env.PROTOCOL_MOCK_FAIL_COUNT === undefined
     ? undefined

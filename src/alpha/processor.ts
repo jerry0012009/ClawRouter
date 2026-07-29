@@ -409,12 +409,17 @@ export class AlphaRequestProcessor {
           newapiUserId: identity.newapiUserId,
           segmentId: state.segmentId,
           mode: "explicit",
-          policyVersion: POLICY_VERSION,
+          policyVersion: `${POLICY_VERSION}:${identity.routingPolicyVersion}`,
           routingModelVersion: "explicit-model-v1",
           qualityCurveVersion: QUALITY_CURVE_VERSION,
           priceVersion: PRICE_VERSION,
           effectiveQualityTarget: 0,
-          formulaInputs: { requestedModel: envelope.requestedModel, judgeCalls: 0 },
+          formulaInputs: {
+            requestedModel: envelope.requestedModel,
+            judgeCalls: 0,
+            userRoutingPolicy: identity.routingPolicy,
+            userRoutingPolicyVersion: identity.routingPolicyVersion,
+          },
           candidateEstimates: [],
           paretoFrontier: [],
           selectedProfile: { ...profile },
@@ -425,14 +430,25 @@ export class AlphaRequestProcessor {
           newapiUserId: identity.newapiUserId,
           routeDecisionId,
           selectedExecutionProfileId: profile.executionProfileId,
-          metadata: { ...state.stateMetadata, selectedProfile: profile },
+          metadata: {
+            ...state.stateMetadata,
+            selectedProfile: profile,
+            userRoutingPolicyVersion: identity.routingPolicyVersion,
+          },
         });
       }
       return { profile };
     }
 
     const storedSegment = await repository.getSegment(state.segmentId, identity.newapiUserId);
-    const reused = selectedProfileFromSegment(storedSegment, this.options.profiles);
+    const storedProfile = selectedProfileFromSegment(storedSegment, this.options.profiles);
+    const policyVersionMatches = metadata(storedSegment).userRoutingPolicyVersion === identity.routingPolicyVersion;
+    const reused = storedProfile
+      && policyVersionMatches
+      && identity.routingPolicy !== "explicit_only"
+      && (identity.routingPolicy !== "custom_allowlist" || identity.allowedModelIds.includes(storedProfile.modelId))
+      ? storedProfile
+      : undefined;
     if (!state.decision.runJudge && reused) return { profile: reused };
 
     const context = buildAlphaJudgeContext(envelope, {
@@ -469,6 +485,11 @@ export class AlphaRequestProcessor {
         requireTools: envelope.tools.length > 0,
         requireThinking: envelope.containsThinking,
         contextTokens: Math.ceil(rawBytes / 4),
+        allowedModelIds: identity.routingPolicy === "all_routing_eligible"
+          ? undefined
+          : identity.routingPolicy === "custom_allowlist"
+            ? identity.allowedModelIds
+            : [],
       },
       routeDirection: state.decision.routeDirection,
       currentProfile: reused,
@@ -557,7 +578,7 @@ export class AlphaRequestProcessor {
       segmentId: state.segmentId,
       judgeEvaluationId: storedJudge.judgeEvaluationId,
       mode: envelope.requestedModel,
-      policyVersion: POLICY_VERSION,
+      policyVersion: `${POLICY_VERSION}:${identity.routingPolicyVersion}`,
       routingModelVersion: route.formulaVersion,
       qualityCurveVersion: QUALITY_CURVE_VERSION,
       priceVersion: PRICE_VERSION,
@@ -567,6 +588,21 @@ export class AlphaRequestProcessor {
         judgeCost: judge.costUsd,
         inputTokens: Math.ceil(rawBytes / 4),
         expectedOutputTokens: this.expectedOutputTokens,
+        userRoutingPolicy: identity.routingPolicy,
+        userRoutingPolicyVersion: identity.routingPolicyVersion,
+        allowedModelIds: identity.allowedModelIds,
+        configuredProfileCount: this.options.profiles.length,
+        protocolProfileCount: this.options.profiles.filter((profile) => profile.protocols.includes(envelope.protocol)).length,
+        initialCandidateModelCount: new Set(
+          this.options.profiles
+            .filter((profile) => profile.protocols.includes(envelope.protocol))
+            .map((profile) => profile.modelId),
+        ).size,
+        hardFilteredProfileCount: route.candidateEstimates
+          .reduce((count, estimate) => count + estimate.executionProfileIds.length, 0),
+        hardFilteredCandidateModelCount: route.candidateEstimates.length,
+        paretoFrontierCandidateCount: route.paretoFrontier.length,
+        excludedProfiles: route.excludedProfiles,
       },
       candidateEstimates: route.candidateEstimates,
       paretoFrontier: route.paretoFrontier,
@@ -580,7 +616,12 @@ export class AlphaRequestProcessor {
       judgeEvaluationId: storedJudge.judgeEvaluationId,
       routeDecisionId,
       selectedExecutionProfileId: route.selectedProfile.executionProfileId,
-      metadata: { ...state.stateMetadata, judgeRun: judge, selectedProfile: route.selectedProfile },
+      metadata: {
+        ...state.stateMetadata,
+        judgeRun: judge,
+        selectedProfile: route.selectedProfile,
+        userRoutingPolicyVersion: identity.routingPolicyVersion,
+      },
     });
     return { profile: route.selectedProfile, judge, route };
   }

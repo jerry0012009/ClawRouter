@@ -49,6 +49,9 @@ function signedHeaders(
     newapiTokenId: `token-${userId}`,
     newapiLogId: `log-${requestId}`,
     requestId,
+    routingPolicy: "all_routing_eligible" as const,
+    allowedModelIds: [],
+    routingPolicyVersion: "acu-user-policy-v1-0000000000000000",
     timestamp: new Date().toISOString(),
     bodySha256: bodySha256(body),
   };
@@ -292,6 +295,34 @@ run("Alpha PostgreSQL request processor", () => {
       attempts: "1",
       payloads: "6",
       usage: "1",
+    });
+    const routeEvidence = await database.query<{
+      configured_profiles: string;
+      protocol_profiles: string;
+      initial_models: string;
+      filtered_profiles: string;
+      filtered_models: string;
+      pareto_models: string;
+      excluded_profiles: unknown;
+    }>(
+      `SELECT
+       formula_inputs_json->>'configuredProfileCount' configured_profiles,
+       formula_inputs_json->>'protocolProfileCount' protocol_profiles,
+       formula_inputs_json->>'initialCandidateModelCount' initial_models,
+       formula_inputs_json->>'hardFilteredProfileCount' filtered_profiles,
+       formula_inputs_json->>'hardFilteredCandidateModelCount' filtered_models,
+       formula_inputs_json->>'paretoFrontierCandidateCount' pareto_models,
+       formula_inputs_json->'excludedProfiles' excluded_profiles
+       FROM acu_route_decisions LIMIT 1`,
+    );
+    expect(routeEvidence.rows[0]).toEqual({
+      configured_profiles: "2",
+      protocol_profiles: "2",
+      initial_models: "1",
+      filtered_profiles: "2",
+      filtered_models: "1",
+      pareto_models: "1",
+      excluded_profiles: [],
     });
     const payloadKinds = await database.query<{ payload_kind: string }>(
       "SELECT payload_kind FROM acu_payloads ORDER BY created_at,payload_kind",

@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import { getAcuModel } from "../../src/acu/catalog.js";
+import { calculateProviderCost } from "../../src/alpha/usage.js";
+import { readLiveTestBudgetConfig, reserveLiveTestBudget } from "./live-test-budget.js";
 
 type Protocol = "responses" | "messages";
 
@@ -18,6 +20,7 @@ type Usage = {
 type ProbeResult = {
   model: string;
   protocol: Protocol;
+  nativePath: string;
   catalogPresent: boolean;
   catalogInputPricePerMillion: number | null;
   catalogOutputPricePerMillion: number | null;
@@ -35,6 +38,14 @@ type ProbeResult = {
     toolIdPreserved?: boolean;
     usage?: Usage;
   };
+  thinking: {
+    accepted: boolean;
+    actualModel?: string;
+    evidenceBlocks?: number;
+    signatureBlocks?: number;
+    reasoningTokens?: number;
+    behavior?: string;
+  };
   context: {
     ok: boolean;
     requestedProbeTokens: number;
@@ -42,6 +53,7 @@ type ProbeResult = {
     usage?: Usage;
   };
   estimatedProviderCostUsd: number;
+  pricingCalculable: boolean;
   error?: string;
 };
 
@@ -64,6 +76,23 @@ const candidates: Candidate[] = process.env.RC1_PREFLIGHT_CANDIDATES_JSON
       { model: "claude-sonnet-5", protocol: "messages" },
       { model: "claude-opus-4-8", protocol: "messages" },
     ];
+
+const budgetConfig = readLiveTestBudgetConfig();
+if (budgetConfig.maxOutputTokens < 128) {
+  throw new Error("ACU_TEST_MAX_OUTPUT_TOKENS must be at least 128 for the protocol preflight");
+}
+
+const worstCaseCostUsd = candidates.reduce((sum, candidate) => sum + Number(calculateProviderCost(
+  candidate.model,
+  BigInt(contextProbeTokens * 2 + 4_096),
+  0n,
+  464n,
+)), 0);
+const budgetRun = await reserveLiveTestBudget({
+  purpose: "provider_preflight",
+  estimatedCostUsd: worstCaseCostUsd,
+  requestedConcurrency: 1,
+});
 
 function numberValue(value: unknown): number {
   const parsed = Number(value);
@@ -89,7 +118,7 @@ function usageFromMessages(value: unknown): Usage {
   return {
     inputTokens: numberValue(usage.input_tokens),
     outputTokens: numberValue(usage.output_tokens),
-    cachedInputTokens: numberValue(usage.cache_read_input_tokens),
+    cachedInputTokens: numberValue(usage.cache_read_input_tokens) + numberValue(usage.cache_creation_input_tokens),
     reasoningTokens: 0,
   };
 }
@@ -109,7 +138,18 @@ async function jsonRequest(url: string, headers: Record<string, string>, body: J
     headers: { ...headers, "content-type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!response.ok) throw new Error(`HTTP ${response.status} from ${new URL(url).pathname}`);
+  if (!response.ok) {
+    const text = await response.text();
+    let detail: string;
+    try {
+      const parsed = JSON.parse(text) as JsonRecord;
+      const providerError = parsed.error && typeof parsed.error === "object" ? parsed.error as JsonRecord : parsed;
+      detail = String(providerError.message ?? providerError.type ?? "").replace(/\s+/g, " ").slice(0, 180);
+    } catch {
+      detail = text.replace(/\s+/g, " ").slice(0, 180);
+    }
+    throw new Error(`HTTP ${response.status} from ${new URL(url).pathname}${detail ? `: ${detail}` : ""}`);
+  }
   return await response.json() as JsonRecord;
 }
 
@@ -123,7 +163,18 @@ async function sseRequest(
     headers: { ...headers, "content-type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!response.ok) throw new Error(`HTTP ${response.status} from ${new URL(url).pathname}`);
+  if (!response.ok) {
+    const text = await response.text();
+    let detail: string;
+    try {
+      const parsed = JSON.parse(text) as JsonRecord;
+      const providerError = parsed.error && typeof parsed.error === "object" ? parsed.error as JsonRecord : parsed;
+      detail = String(providerError.message ?? providerError.type ?? "").replace(/\s+/g, " ").slice(0, 180);
+    } catch {
+      detail = text.replace(/\s+/g, " ").slice(0, 180);
+    }
+    throw new Error(`HTTP ${response.status} from ${new URL(url).pathname}${detail ? `: ${detail}` : ""}`);
+  }
   const text = await response.text();
   const events: JsonRecord[] = [];
   for (const line of text.split(/\r?\n/)) {
@@ -147,7 +198,8 @@ function responseOutput(response: JsonRecord): JsonRecord[] {
 }
 
 async function probeResponses(model: string): Promise<Omit<ProbeResult, "model" | "protocol" | "catalogPresent" |
-"catalogInputPricePerMillion" | "catalogOutputPricePerMillion" | "catalogContextWindow" | "estimatedProviderCostUsd"> & { totalUsage: Usage }> {
+"nativePath" | "catalogInputPricePerMillion" | "catalogOutputPricePerMillion" | "catalogContextWindow" |
+"estimatedProviderCostUsd" | "pricingCalculable"> & { totalUsage: Usage }> {
   const url = `${openAiBaseUrl}/responses`;
   const headers = { authorization: `Bearer ${apiKey}` };
   const streamEvents = await sseRequest(url, headers, {
@@ -159,6 +211,15 @@ async function probeResponses(model: string): Promise<Omit<ProbeResult, "model" 
   const completed = [...streamEvents].reverse().find((event) => event.type === "response.completed")?.response as JsonRecord | undefined;
   const textDeltaCount = streamEvents.filter((event) => event.type === "response.output_text.delta").length;
   if (!completed || textDeltaCount === 0) throw new Error("Responses stream lacked text delta or completion");
+
+  const reasoningResponse = await jsonRequest(url, headers, {
+    model,
+    input: "Reason briefly, then reply OK.",
+    reasoning: { effort: "low" },
+    max_output_tokens: 128,
+  });
+  const reasoningItems = responseOutput(reasoningResponse).filter((item) => item.type === "reasoning");
+  const reasoningUsage = usageFromResponses(reasoningResponse.usage);
 
   const toolPrompt = "Call rc1_probe exactly once with value alpha. Do not answer in text before the tool call.";
   const toolDefinition = {
@@ -176,6 +237,7 @@ async function probeResponses(model: string): Promise<Omit<ProbeResult, "model" 
   const toolResponse = await jsonRequest(url, headers, {
     model,
     input: toolPrompt,
+    reasoning: { effort: "low" },
     tools: [toolDefinition],
     tool_choice: "required",
     max_output_tokens: 128,
@@ -190,6 +252,7 @@ async function probeResponses(model: string): Promise<Omit<ProbeResult, "model" 
       functionCall,
       { type: "function_call_output", call_id: callId, output: "{\"ok\":true}" },
     ],
+    reasoning: { effort: "low" },
     tools: [toolDefinition],
     tool_choice: "auto",
     max_output_tokens: 128,
@@ -221,13 +284,22 @@ async function probeResponses(model: string): Promise<Omit<ProbeResult, "model" 
       toolIdPreserved: true,
       usage: toolUsage,
     },
+    thinking: {
+      accepted: true,
+      actualModel: String(reasoningResponse.model ?? "unknown"),
+      evidenceBlocks: reasoningItems.length,
+      reasoningTokens: reasoningUsage.reasoningTokens,
+      behavior: reasoningItems.length > 0 || reasoningUsage.reasoningTokens > 0
+        ? "reasoning request accepted with provider-visible reasoning evidence"
+        : "reasoning request accepted without provider-visible reasoning evidence",
+    },
     context: {
       ok: true,
       requestedProbeTokens: contextProbeTokens,
       actualModel: String(contextResponse.model ?? "unknown"),
       usage: contextUsage,
     },
-    totalUsage: mergeUsage(mergeUsage(streamUsage, toolUsage), contextUsage),
+    totalUsage: mergeUsage(mergeUsage(mergeUsage(streamUsage, reasoningUsage), toolUsage), contextUsage),
   };
 }
 
@@ -238,7 +310,8 @@ function messageContent(response: JsonRecord): JsonRecord[] {
 }
 
 async function probeMessages(model: string): Promise<Omit<ProbeResult, "model" | "protocol" | "catalogPresent" |
-"catalogInputPricePerMillion" | "catalogOutputPricePerMillion" | "catalogContextWindow" | "estimatedProviderCostUsd"> & { totalUsage: Usage }> {
+"nativePath" | "catalogInputPricePerMillion" | "catalogOutputPricePerMillion" | "catalogContextWindow" |
+"estimatedProviderCostUsd" | "pricingCalculable"> & { totalUsage: Usage }> {
   const url = `${anthropicBaseUrl}/v1/messages`;
   const headers = { "x-api-key": apiKey!, "anthropic-version": "2023-06-01" };
   const streamEvents = await sseRequest(url, headers, {
@@ -258,6 +331,16 @@ async function probeMessages(model: string): Promise<Omit<ProbeResult, "model" |
   }
   const streamUsage = mergeUsage(usageFromMessages(messageStart.usage), usageFromMessages(messageDelta?.usage));
 
+  const thinkingResponse = await jsonRequest(url, headers, {
+    model,
+    messages: [{ role: "user", content: "Reason briefly, then reply OK." }],
+    thinking: { type: "adaptive" },
+    output_config: { effort: "low" },
+    max_tokens: 128,
+  });
+  const thinkingContent = messageContent(thinkingResponse).filter((item) => item.type === "thinking");
+  const thinkingUsage = usageFromMessages(thinkingResponse.usage);
+
   const toolPrompt = "Call rc1_probe exactly once with value alpha. Do not answer in text before the tool call.";
   const toolDefinition = {
     name: "rc1_probe",
@@ -272,6 +355,8 @@ async function probeMessages(model: string): Promise<Omit<ProbeResult, "model" |
   const toolResponse = await jsonRequest(url, headers, {
     model,
     messages: [{ role: "user", content: toolPrompt }],
+    thinking: { type: "adaptive" },
+    output_config: { effort: "low" },
     tools: [toolDefinition],
     tool_choice: { type: "any" },
     max_tokens: 128,
@@ -286,6 +371,8 @@ async function probeMessages(model: string): Promise<Omit<ProbeResult, "model" |
       { role: "assistant", content: toolResponse.content },
       { role: "user", content: [{ type: "tool_result", tool_use_id: toolId, content: "{\"ok\":true}" }] },
     ],
+    thinking: { type: "adaptive" },
+    output_config: { effort: "low" },
     tools: [toolDefinition],
     max_tokens: 128,
   });
@@ -316,39 +403,57 @@ async function probeMessages(model: string): Promise<Omit<ProbeResult, "model" |
       toolIdPreserved: true,
       usage: toolUsage,
     },
+    thinking: {
+      accepted: true,
+      actualModel: String(thinkingResponse.model ?? "unknown"),
+      evidenceBlocks: thinkingContent.length,
+      signatureBlocks: thinkingContent.filter((item) => typeof item.signature === "string").length,
+      reasoningTokens: numberValue((thinkingResponse.usage as JsonRecord | undefined)?.output_tokens_details
+        && ((thinkingResponse.usage as JsonRecord).output_tokens_details as JsonRecord).thinking_tokens),
+      behavior: thinkingContent.length > 0
+        ? "adaptive thinking accepted with signed thinking block"
+        : "adaptive thinking accepted without a visible thinking block",
+    },
     context: {
       ok: true,
       requestedProbeTokens: contextProbeTokens,
       actualModel: String(contextResponse.model ?? "unknown"),
       usage: contextUsage,
     },
-    totalUsage: mergeUsage(mergeUsage(streamUsage, toolUsage), contextUsage),
+    totalUsage: mergeUsage(mergeUsage(mergeUsage(streamUsage, thinkingUsage), toolUsage), contextUsage),
   };
 }
 
 function estimatedCost(model: string, usage: Usage): number {
-  const catalog = getAcuModel(model);
-  if (!catalog?.inputPricePerMillion || !catalog.outputPricePerMillion) return 0;
-  return ((usage.inputTokens - usage.cachedInputTokens) * catalog.inputPricePerMillion
-    + usage.outputTokens * catalog.outputPricePerMillion) / 1_000_000;
+  return Number(calculateProviderCost(
+    model,
+    BigInt(usage.inputTokens),
+    BigInt(usage.cachedInputTokens),
+    BigInt(usage.outputTokens),
+  ));
 }
 
 const results: ProbeResult[] = [];
 for (const candidate of candidates) {
   const catalog = getAcuModel(candidate.model);
-  const base: Omit<ProbeResult, "stream" | "toolLoop" | "context" | "estimatedProviderCostUsd"> = {
+  const base: Omit<ProbeResult, "stream" | "toolLoop" | "thinking" | "context" | "estimatedProviderCostUsd"> = {
     model: candidate.model,
     protocol: candidate.protocol,
+    nativePath: candidate.protocol === "responses" ? "/v1/responses" : "/anthropic/v1/messages",
     catalogPresent: Boolean(catalog),
     catalogInputPricePerMillion: catalog?.inputPricePerMillion ?? null,
     catalogOutputPricePerMillion: catalog?.outputPricePerMillion ?? null,
     catalogContextWindow: catalog?.contextWindow ?? null,
+    pricingCalculable: typeof catalog?.inputPricePerMillion === "number"
+      && typeof catalog.outputPricePerMillion === "number"
+      && typeof catalog.cachedInputPricePerMillion === "number",
   };
   if (!catalog) {
     results.push({
       ...base,
       stream: { ok: false },
       toolLoop: { ok: false },
+      thinking: { accepted: false },
       context: { ok: false, requestedProbeTokens: contextProbeTokens },
       estimatedProviderCostUsd: 0,
       error: "candidate is absent from the ACU catalog",
@@ -363,6 +468,7 @@ for (const candidate of candidates) {
       ...base,
       stream: probe.stream,
       toolLoop: probe.toolLoop,
+      thinking: probe.thinking,
       context: probe.context,
       estimatedProviderCostUsd: estimatedCost(candidate.model, probe.totalUsage),
     });
@@ -371,6 +477,7 @@ for (const candidate of candidates) {
       ...base,
       stream: { ok: false },
       toolLoop: { ok: false },
+      thinking: { accepted: false },
       context: { ok: false, requestedProbeTokens: contextProbeTokens },
       estimatedProviderCostUsd: 0,
       error: error instanceof Error ? error.message.slice(0, 240) : "preflight failed",
@@ -381,7 +488,16 @@ for (const candidate of candidates) {
 console.log(JSON.stringify({
   schemaVersion: "acu-rc1-provider-preflight-v1",
   capturedAt: new Date().toISOString(),
+  testRunId: budgetRun.runId,
+  estimatedWorstCaseCostCny: budgetRun.estimatedCostCny,
   contextProbeTokens,
   results,
 }, null, 2));
-if (results.some((result) => !result.stream.ok || !result.toolLoop.ok || !result.context.ok)) process.exitCode = 1;
+const settledBudget = await budgetRun.finish(results.reduce((sum, result) => sum + result.estimatedProviderCostUsd, 0));
+console.error(JSON.stringify({
+  testRunId: budgetRun.runId,
+  actualRunCostCny: settledBudget.runCostCny,
+  cumulativeTestCostCny: settledBudget.cumulativeCostCny,
+}));
+if (results.some((result) => !result.stream.ok || !result.toolLoop.ok || !result.thinking.accepted
+  || !result.context.ok || !result.pricingCalculable)) process.exitCode = 1;

@@ -7,6 +7,9 @@ const INTERNAL_HEADER_NAMES = [
   "x-acu-newapi-log-id",
   "x-acu-request-id",
   "x-acu-client-version",
+  "x-acu-routing-policy",
+  "x-acu-allowed-model-ids",
+  "x-acu-routing-policy-version",
   "x-acu-timestamp",
   "x-acu-body-sha256",
   "x-acu-signature",
@@ -18,6 +21,9 @@ export type TrustedNewApiIdentity = {
   newapiLogId: string;
   requestId: string;
   clientVersion?: string;
+  routingPolicy: "all_routing_eligible" | "custom_allowlist" | "explicit_only";
+  allowedModelIds: string[];
+  routingPolicyVersion: string;
   timestamp: string;
   bodySha256: string;
 };
@@ -47,6 +53,9 @@ export function trustedIdentitySigningPayload(identity: TrustedNewApiIdentity): 
     identity.newapiLogId,
     identity.requestId,
     identity.clientVersion ?? "unknown",
+    identity.routingPolicy,
+    JSON.stringify(identity.allowedModelIds),
+    identity.routingPolicyVersion,
     identity.timestamp,
     identity.bodySha256,
   ].join("\n");
@@ -66,6 +75,9 @@ export function trustedIdentityHeaders(
     "x-acu-newapi-log-id": identity.newapiLogId,
     "x-acu-request-id": identity.requestId,
     "x-acu-client-version": identity.clientVersion ?? "unknown",
+    "x-acu-routing-policy": identity.routingPolicy,
+    "x-acu-allowed-model-ids": JSON.stringify(identity.allowedModelIds),
+    "x-acu-routing-policy-version": identity.routingPolicyVersion,
     "x-acu-timestamp": identity.timestamp,
     "x-acu-body-sha256": identity.bodySha256,
     "x-acu-signature": signTrustedIdentity(identity, sharedSecret),
@@ -84,10 +96,28 @@ export function verifyTrustedIdentity(
     newapiLogId: singleHeader(headers, INTERNAL_HEADER_NAMES[2]),
     requestId: singleHeader(headers, INTERNAL_HEADER_NAMES[3]),
     clientVersion: singleHeader(headers, INTERNAL_HEADER_NAMES[4]),
-    timestamp: singleHeader(headers, INTERNAL_HEADER_NAMES[5]),
-    bodySha256: singleHeader(headers, INTERNAL_HEADER_NAMES[6]),
+    routingPolicy: singleHeader(headers, INTERNAL_HEADER_NAMES[5]) as TrustedNewApiIdentity["routingPolicy"],
+    allowedModelIds: JSON.parse(singleHeader(headers, INTERNAL_HEADER_NAMES[6])) as string[],
+    routingPolicyVersion: singleHeader(headers, INTERNAL_HEADER_NAMES[7]),
+    timestamp: singleHeader(headers, INTERNAL_HEADER_NAMES[8]),
+    bodySha256: singleHeader(headers, INTERNAL_HEADER_NAMES[9]),
   };
-  const signature = singleHeader(headers, INTERNAL_HEADER_NAMES[7]);
+  const signature = singleHeader(headers, INTERNAL_HEADER_NAMES[10]);
+  if (!["all_routing_eligible", "custom_allowlist", "explicit_only"].includes(identity.routingPolicy)) {
+    throw new Error("Trusted routing policy is invalid");
+  }
+  if (!Array.isArray(identity.allowedModelIds)
+    || identity.allowedModelIds.length > 64
+    || identity.allowedModelIds.some((modelId) => typeof modelId !== "string" || modelId.length < 1 || modelId.length > 128)
+    || new Set(identity.allowedModelIds).size !== identity.allowedModelIds.length) {
+    throw new Error("Trusted routing model allowlist is invalid");
+  }
+  if (identity.routingPolicy === "custom_allowlist" && identity.allowedModelIds.length === 0) {
+    throw new Error("Trusted custom routing allowlist is empty");
+  }
+  if (!/^acu-user-policy-v1-[a-f0-9]{16}$/.test(identity.routingPolicyVersion)) {
+    throw new Error("Trusted routing policy version is invalid");
+  }
   const timestampMs = Date.parse(identity.timestamp);
   if (!Number.isFinite(timestampMs)) throw new Error("Trusted identity timestamp is invalid");
   const skewMs = Math.abs((options.now ?? new Date()).getTime() - timestampMs);

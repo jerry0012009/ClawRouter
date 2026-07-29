@@ -40,17 +40,24 @@ function judgeAt(difficulty: number): AcuJudgeResult {
 }
 
 describe("Alpha RC1 deployment profiles", () => {
-  it("contains two preflighted catalog candidates for each native protocol", async () => {
+  it("contains 4-6 unique preflighted catalog candidates for each native protocol", async () => {
     const configured = await profiles();
+    expect(configured).toHaveLength(11);
     for (const protocol of ["responses", "messages"] as const) {
       const candidates = configured.filter((profile) => profile.protocols.includes(protocol));
-      expect(new Set(candidates.map((profile) => profile.modelId)).size).toBe(2);
+      const uniqueModels = new Set(candidates.map((profile) => profile.modelId));
+      expect(uniqueModels.size).toBeGreaterThanOrEqual(4);
+      expect(uniqueModels.size).toBeLessThanOrEqual(6);
+      expect(uniqueModels.size).toBe(candidates.length);
       for (const profile of candidates) {
         const catalog = getAcuModel(profile.modelId);
         expect(catalog?.routingEligible).toBe(true);
         expect(catalog?.toolCallSupport).toBe(true);
+        expect(profile.toolCallSupport).toBe(true);
+        expect(profile.thinkingSupport).toBe(true);
         expect(catalog?.inputPricePerMillion).toBeTypeOf("number");
         expect(catalog?.outputPricePerMillion).toBeTypeOf("number");
+        expect(catalog?.cachedInputPricePerMillion).toBeTypeOf("number");
         expect(profile.contextWindow).toBeLessThanOrEqual(catalog?.contextWindow ?? 0);
         expect(profile.baseUrlEnv).toMatch(/^CLOSEAI_/);
         expect(profile.apiKeyEnv).toBe("CLOSEAI_API_KEY");
@@ -58,7 +65,7 @@ describe("Alpha RC1 deployment profiles", () => {
     }
   });
 
-  it("selects different value profiles for simple and difficult tasks without treating 88 as a hard threshold", async () => {
+  it("routes over every legal model, persists rich estimates, and does not treat 88 as a hard threshold", async () => {
     const configured = await profiles();
     const route = (protocol: "responses" | "messages", difficulty: number, target: number) => (
       routeWithCurrentAcuFormula({
@@ -71,20 +78,91 @@ describe("Alpha RC1 deployment profiles", () => {
         requirements: {
           protocol,
           requireTools: true,
-          requireThinking: false,
+          requireThinking: true,
           contextTokens: 1_000,
         },
       })
     );
 
-    expect(route("responses", 5, 80).selectedProfile.modelId).toBe("gpt-5.4-mini");
-    expect(route("responses", 80, 80).selectedProfile.modelId).toBe("gpt-5.5");
-    expect(route("messages", 5, 80).selectedProfile.modelId).toBe("claude-sonnet-5");
-    expect(route("messages", 80, 80).selectedProfile.modelId).toBe("claude-opus-4-8");
+    const simpleResponses = route("responses", 5, 80);
+    const hardResponses = route("responses", 80, 80);
+    const simpleMessages = route("messages", 5, 80);
+    const hardMessages = route("messages", 80, 80);
+    expect(simpleResponses.selectedProfile.modelId).toBe("gpt-5.6-luna");
+    expect(hardResponses.selectedProfile.modelId).toBe("gpt-5.6-sol");
+    expect(simpleMessages.selectedProfile.modelId).toBe("gpt-5.6-luna");
+    expect(hardMessages.selectedProfile.modelId).toBe("claude-opus-4-8");
+    expect(simpleResponses.candidateEstimates).toHaveLength(5);
+    expect(simpleMessages.candidateEstimates).toHaveLength(6);
+    expect(simpleResponses.excludedProfiles).toHaveLength(6);
+    expect(simpleResponses.excludedProfiles.every((item) => item.reasons.includes("native_protocol"))).toBe(true);
+    for (const estimate of [...simpleResponses.candidateEstimates, ...simpleMessages.candidateEstimates]) {
+      expect(estimate.predictedScore).toBeTypeOf("number");
+      expect(estimate.conservativeScore).toBeTypeOf("number");
+      expect(estimate.estimatedCallCost).toBeTypeOf("number");
+      expect(estimate.expectedFallbackCost).toBeTypeOf("number");
+      expect(estimate.expectedTotalCost).toBeTypeOf("number");
+      expect(estimate.paretoEfficient).toBeTypeOf("boolean");
+      expect(estimate.valueUtility).toBeTypeOf("number");
+      expect(estimate.executionProfileIds).toHaveLength(1);
+    }
 
     const planning = route("responses", 5, 88);
-    expect(planning.selectedProfile.modelId).toBe("gpt-5.4-mini");
-    expect(planning.candidateEstimates.find((item) => item.modelId === "gpt-5.4-mini")?.meetsQualityTarget)
-      .toBe(false);
+    expect(planning.candidateEstimates).toHaveLength(5);
+    expect(planning.selectedProfile.modelId).toBe("gpt-5.6-luna");
+    expect(planning.selectedProfile.modelId).not.toBe("gpt-5.6-sol");
+    expect(planning.candidateEstimates.some((item) => !item.meetsQualityTarget)).toBe(true);
+  });
+
+  it("deduplicates same-model profiles in the formula while retaining profile provenance", async () => {
+    const configured = await profiles();
+    const responseProfiles = configured.filter((profile) => profile.protocols.includes("responses"));
+    const duplicate = {
+      ...responseProfiles[0],
+      executionProfileId: `${responseProfiles[0].executionProfileId}-secondary`,
+      channel: "closeai-openai-secondary",
+    };
+    const decision = routeWithCurrentAcuFormula({
+      judge: judgeAt(5),
+      judgeCost: 0.0003,
+      inputTokens: 1_000,
+      expectedOutputTokens: 800,
+      effectiveQualityTarget: 80,
+      profiles: [...responseProfiles, duplicate],
+      requirements: {
+        protocol: "responses",
+        requireTools: true,
+        requireThinking: true,
+        contextTokens: 1_000,
+      },
+    });
+
+    expect(decision.candidateEstimates).toHaveLength(5);
+    expect(decision.candidateEstimates.find((item) => item.modelId === duplicate.modelId)?.executionProfileIds)
+      .toHaveLength(2);
+  });
+
+  it("applies a custom user allowlist as a hard policy filter without changing the routing formula", async () => {
+    const configured = await profiles();
+    const decision = routeWithCurrentAcuFormula({
+      judge: judgeAt(80),
+      judgeCost: 0.0003,
+      inputTokens: 1_000,
+      expectedOutputTokens: 800,
+      effectiveQualityTarget: 80,
+      profiles: configured,
+      requirements: {
+        protocol: "responses",
+        requireTools: true,
+        requireThinking: true,
+        contextTokens: 1_000,
+        allowedModelIds: ["gpt-5.6-luna", "gpt-5.6-sol"],
+      },
+    });
+
+    expect(decision.candidateEstimates.map((estimate) => estimate.modelId).sort())
+      .toEqual(["gpt-5.6-luna", "gpt-5.6-sol"]);
+    expect(decision.excludedProfiles.filter((profile) => profile.reasons.includes("model_policy")))
+      .toHaveLength(8);
   });
 });

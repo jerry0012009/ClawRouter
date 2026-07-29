@@ -4,6 +4,7 @@ import type { AddressInfo } from "node:net";
 
 export type MockProviderOptions = {
   port?: number;
+  host?: string;
   status?: number;
   failCount?: number;
   delayMs?: number;
@@ -75,6 +76,7 @@ function errorPayload(status: number, attempt: number): Record<string, unknown> 
 export async function startMockProvider(options: number | MockProviderOptions = 0): Promise<MockProviderHandle> {
   const normalized = typeof options === "number" ? { port: options } : options;
   const port = normalized.port ?? 0;
+  const host = normalized.host ?? "127.0.0.1";
   const status = normalized.status ?? 200;
   const failCount = normalized.failCount ?? (status === 200 ? 0 : Number.POSITIVE_INFINITY);
   const delayMs = normalized.delayMs ?? 0;
@@ -128,8 +130,9 @@ export async function startMockProvider(options: number | MockProviderOptions = 
   });
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
-    server.listen(port, "127.0.0.1", () => resolve());
+    server.listen(port, host, () => resolve());
   });
   const bound = (server.address() as AddressInfo).port;
-  return { baseUrl: `http://127.0.0.1:${bound}`, close: () => new Promise((resolve) => server.close(() => resolve())) };
+  const advertisedHost = host === "0.0.0.0" || host === "::" ? "127.0.0.1" : host;
+  return { baseUrl: `http://${advertisedHost}:${bound}`, close: () => new Promise((resolve) => server.close(() => resolve())) };
 }

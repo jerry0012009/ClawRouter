@@ -33,6 +33,9 @@ function signedHeaders(body: Buffer): Record<string, string> {
     newapiLogId: "test-log",
     requestId: "test-request",
     clientVersion: "2.1.220",
+    routingPolicy: "all_routing_eligible" as const,
+    allowedModelIds: [],
+    routingPolicyVersion: "acu-user-policy-v1-0000000000000000",
     timestamp: new Date().toISOString(),
     bodySha256: bodySha256(body),
   };

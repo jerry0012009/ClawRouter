@@ -2,14 +2,61 @@
 set -eu
 
 acu_home=${CODEX_ACU_HOME:-${XDG_DATA_HOME:-${HOME}/.local/share}/codex-acu}
+credential_file="$acu_home/credentials"
 if [ ! -d "$acu_home" ] || [ ! -f "$acu_home/config.toml" ]; then
   echo "codex-acu is not configured; run tools/codex-acu/install.sh first" >&2
   exit 1
 fi
-if [ -z "${ACU_API_KEY:-}" ]; then
-  echo "ACU_API_KEY is required in the current shell; it is never stored by codex-acu" >&2
-  exit 1
-fi
+case "${1:-}" in
+  --version|-V) exec codex --version ;;
+  home) printf '%s\n' "$acu_home"; exit 0 ;;
+  credentials)
+    case "${2:-status}" in
+      status)
+        test -s "$credential_file" || { echo "credential: not configured ($credential_file)"; exit 1; }
+        echo "credential: configured ($credential_file)"
+        ;;
+      set)
+        umask 077
+        printf 'ACU API Key: ' >&2
+        if [ -t 0 ]; then stty -echo; fi
+        IFS= read -r new_key
+        if [ -t 0 ]; then stty echo; printf '\n' >&2; fi
+        case "$new_key" in sk-?*) ;; *) echo "key must start with sk-" >&2; exit 2 ;; esac
+        credential_tmp="$credential_file.tmp"
+        printf '%s\n' "$new_key" > "$credential_tmp"
+        chmod 600 "$credential_tmp"
+        mv "$credential_tmp" "$credential_file"
+        echo "credential updated"
+        ;;
+      clear)
+        if [ -f "$credential_file" ]; then rm -f "$credential_file"; fi
+        echo "credential cleared"
+        ;;
+      *) echo "usage: codex-acu credentials [status|set|clear]" >&2; exit 2 ;;
+    esac
+    exit 0
+    ;;
+  doctor)
+    test "$(stat -c '%a' "$acu_home")" = "700" || { echo "invalid CODEX_HOME permissions" >&2; exit 1; }
+    test -s "$credential_file" || { echo "credential is not configured" >&2; exit 1; }
+    test "$(stat -c '%a' "$credential_file")" = "600" || { echo "invalid credential permissions" >&2; exit 1; }
+    grep -q '^model = "acu-auto"$' "$acu_home/config.toml"
+    base_url=$(sed -n 's/^base_url = "\(https:\/\/.*\/v1\)"$/\1/p' "$acu_home/config.toml")
+    test -n "$base_url" || { echo "invalid Base URL" >&2; exit 1; }
+    echo "codex-acu: healthy"
+    echo "CODEX_HOME: $acu_home"
+    echo "base_url: $base_url"
+    echo "model: acu-auto"
+    codex --version
+    exit 0
+    ;;
+esac
+
+test -s "$credential_file" || { echo "ACU credential is missing; run: codex-acu credentials set" >&2; exit 1; }
+IFS= read -r ACU_API_KEY < "$credential_file"
+case "$ACU_API_KEY" in sk-?*) ;; *) echo "invalid ACU credential" >&2; exit 1 ;; esac
 
 export CODEX_HOME="$acu_home"
+export ACU_API_KEY
 exec codex "$@"

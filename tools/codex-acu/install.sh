@@ -45,4 +45,5 @@ mv "$config_tmp" "$acu_home/config.toml"
 
 echo "installed: $bin_dir/codex-acu"
 echo "isolated CODEX_HOME: $acu_home"
-echo "set ACU_API_KEY in your shell, then run: codex-acu doctor"
+echo "configure the key once with: codex-acu credentials set"
+echo "then verify with: codex-acu doctor"

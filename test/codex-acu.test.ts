@@ -28,12 +28,21 @@ describe("codex-acu isolated launcher", () => {
     expect(config).toContain('base_url = "https://acu.example.test/v1"');
     expect(config).toContain('env_key = "ACU_API_KEY"');
     expect(config).not.toContain("test-only-key");
+    const credential = spawnSync(join(installBin, "codex-acu"), ["credentials", "set"], {
+      env: { ...env, CODEX_ACU_HOME: acuHome },
+      input: "sk-test-only-key\n",
+      encoding: "utf8",
+    });
+    expect(credential.status).toBe(0);
+    expect(await readFile(join(acuHome, "credentials"), "utf8")).toBe("sk-test-only-key\n");
+    expect((await stat(join(acuHome, "credentials"))).mode & 0o777).toBe(0o600);
     const launch = spawnSync(join(installBin, "codex-acu"), ["doctor"], {
-      env: { ...env, ACU_API_KEY: "test-only-key", CODEX_ACU_HOME: acuHome },
+      env: { ...env, CODEX_ACU_HOME: acuHome },
       encoding: "utf8",
     });
     expect(launch.status).toBe(0);
-    expect(launch.stdout.trim()).toBe(acuHome);
+    expect(launch.stdout).toContain("codex-acu: healthy");
+    expect(launch.stdout).toContain(acuHome);
     expect(await readFile(join(nativeHome, "config.toml"), "utf8")).toBe('model = "native"\n');
 
     const uninstall = spawnSync(resolve("tools/codex-acu/uninstall.sh"), [], {

@@ -1,0 +1,124 @@
+name: acu-router-alpha
+
+services:
+  postgres-newapi:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: newapi_alpha
+      POSTGRES_USER: newapi_alpha
+      POSTGRES_PASSWORD: ${POSTGRES_NEWAPI_PASSWORD:?set POSTGRES_NEWAPI_PASSWORD}
+    volumes:
+      - postgres-newapi-data:/var/lib/postgresql/data
+    networks: [alpha-backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U newapi_alpha -d newapi_alpha"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  postgres-acu:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: acu_alpha
+      POSTGRES_USER: acu_alpha
+      POSTGRES_PASSWORD: ${POSTGRES_ACU_PASSWORD:?set POSTGRES_ACU_PASSWORD}
+    volumes:
+      - postgres-acu-data:/var/lib/postgresql/data
+    networks: [alpha-backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U acu_alpha -d acu_alpha"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  acu-migrate:
+    image: postgres:16-alpine
+    restart: "no"
+    depends_on:
+      postgres-acu:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_ACU_PASSWORD:?set POSTGRES_ACU_PASSWORD}
+    volumes:
+      - ../../migrations/acu/0001_alpha_p0.sql:/migration/0001_alpha_p0.sql:ro
+    networks: [alpha-backend]
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        if [ "$$(psql -h postgres-acu -U acu_alpha -d acu_alpha -tAc "SELECT to_regclass('public.acu_sessions')")" = "acu_sessions" ]; then
+          echo "ACU migration already applied"
+        else
+          psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0001_alpha_p0.sql
+        fi
+
+  acu-router:
+    build:
+      context: ../..
+      dockerfile: deploy/alpha/Dockerfile.acu
+    restart: unless-stopped
+    depends_on:
+      acu-migrate:
+        condition: service_completed_successfully
+      new-api:
+        condition: service_healthy
+    environment:
+      ACU_BIND_ADDRESS: 0.0.0.0
+      ACU_PORT: 8403
+      ACU_DATABASE_URL: postgresql://acu_alpha:${POSTGRES_ACU_PASSWORD}@postgres-acu:5432/acu_alpha
+      ACU_TRUSTED_IDENTITY_SECRET: ${ACU_TRUSTED_IDENTITY_SECRET:?set ACU_TRUSTED_IDENTITY_SECRET}
+      ACU_ADMIN_TRACE_TOKEN: ${ACU_ADMIN_TRACE_TOKEN:?set ACU_ADMIN_TRACE_TOKEN}
+      NEW_API_INTERNAL_BASE_URL: http://new-api:3000
+      ACU_EXECUTION_PROFILES_FILE: /app/config/execution-profiles.json
+      CLOSEAI_OPENAI_BASE_URL: ${CLOSEAI_OPENAI_BASE_URL:-https://api.openai-proxy.org/v1}
+      CLOSEAI_ANTHROPIC_BASE_URL: ${CLOSEAI_ANTHROPIC_BASE_URL:-https://api.openai-proxy.org/anthropic}
+      CLOSEAI_API_KEY: ${CLOSEAI_API_KEY:?set CLOSEAI_API_KEY}
+    volumes:
+      - ./execution-profiles.json:/app/config/execution-profiles.json:ro
+    expose: ["8403"]
+    networks: [alpha-backend]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8403/internal/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  new-api:
+    build:
+      context: ${NEW_API_SOURCE_DIR:-../../../new-api}
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["--log-dir", "/app/logs"]
+    depends_on:
+      postgres-newapi:
+        condition: service_healthy
+    environment:
+      SQL_DSN: postgresql://newapi_alpha:${POSTGRES_NEWAPI_PASSWORD}@postgres-newapi:5432/newapi_alpha
+      SESSION_SECRET: ${NEW_API_SESSION_SECRET:?set NEW_API_SESSION_SECRET}
+      ACU_TRUSTED_IDENTITY_SECRET: ${ACU_TRUSTED_IDENTITY_SECRET:?set ACU_TRUSTED_IDENTITY_SECRET}
+      BATCH_UPDATE_ENABLED: "false"
+      MEMORY_CACHE_ENABLED: "false"
+      ERROR_LOG_ENABLED: "true"
+      GIN_MODE: release
+      TZ: UTC
+    volumes:
+      - newapi-logs:/app/logs
+    ports:
+      - "${NEW_API_BIND_ADDRESS:-0.0.0.0}:${NEW_API_PORT:-3000}:3000"
+    networks: [alpha-backend]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:3000/api/status | grep -q '\"success\":true'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+networks:
+  alpha-backend:
+    driver: bridge
+
+volumes:
+  postgres-newapi-data:
+  postgres-acu-data:
+  newapi-logs:

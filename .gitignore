@@ -12,6 +12,11 @@ __pycache__/
 research/quality-curves/.cache/
 research/quality-curves/openhands/.cache/
 .env
+deploy/alpha/.env
+acu-router.log
+acu_export/
+.protocol-captures-raw/
+protocol-captures-raw/
 .env.protocol-recon
 .env.protocol-recon.local
 new-api-protocol-recon.env

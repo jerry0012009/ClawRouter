@@ -2,4 +2,11 @@ node_modules
 .git
 dist
 docs
+research
 .claude
+.env
+deploy/alpha/.env
+acu-router.log
+acu_export
+.protocol-captures-raw
+protocol-captures-raw

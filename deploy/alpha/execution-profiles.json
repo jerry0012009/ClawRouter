@@ -1,0 +1,35 @@
+[
+  {
+    "executionProfileId": "closeai-gpt-5.5-responses-primary",
+    "modelId": "gpt-5.5",
+    "provider": "closeai",
+    "channel": "closeai-openai-primary",
+    "protocols": ["responses"],
+    "toolCallSupport": true,
+    "thinkingSupport": true,
+    "contextWindow": 400000,
+    "health": "healthy",
+    "enabled": true,
+    "administratorAllowed": true,
+    "baseUrlEnv": "CLOSEAI_OPENAI_BASE_URL",
+    "apiKeyEnv": "CLOSEAI_API_KEY",
+    "authMode": "bearer"
+  },
+  {
+    "executionProfileId": "closeai-claude-sonnet-5-messages-primary",
+    "modelId": "claude-sonnet-5",
+    "provider": "closeai",
+    "channel": "closeai-anthropic-primary",
+    "protocols": ["messages"],
+    "toolCallSupport": true,
+    "thinkingSupport": true,
+    "contextWindow": 200000,
+    "health": "healthy",
+    "enabled": true,
+    "administratorAllowed": true,
+    "baseUrlEnv": "CLOSEAI_ANTHROPIC_BASE_URL",
+    "apiKeyEnv": "CLOSEAI_API_KEY",
+    "authMode": "x-api-key",
+    "anthropicVersion": "2023-06-01"
+  }
+]

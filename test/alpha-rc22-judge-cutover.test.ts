@@ -83,6 +83,10 @@ const runInput = {
   trigger: "new_task" as const,
   contextHash: "fixture-context",
   webIntentFallbackInput: { recentUserInputs: ["Fix one local line."] },
+  rawNative: {
+    stateMetadata: { sessionId: "session-fixture", phase: "execution", trigger: "new_task" },
+    rawRequest: JSON.stringify({ model: "acu-auto", input: "Fix one local line." }),
+  },
 };
 
 describe("RC2.2 Judge cutover", () => {
@@ -116,6 +120,48 @@ describe("RC2.2 Judge cutover", () => {
     expect(result.originalExplanationLength).toBe(4096);
     expect(result.difficultyIndex).toBeGreaterThan(0);
     expect(result.webIntent).toBe("not_required");
+  });
+
+  it("accepts an unbounded webIntentReason string while retaining strict routing fields", () => {
+    const reason = "外部证据".repeat(2_000);
+    const result = parseJudgeResult(JSON.stringify({ ...validJudgePayload, webIntentReason: reason }));
+    expect(result.webIntentReason).toBe(reason);
+    expect(result.difficultyIndex).toBeGreaterThan(0);
+  });
+
+  it("sends a complete roughly 200k-token native request without rewriting or truncation", async () => {
+    const early = "EARLY_GOAL";
+    const plan = "PLAN_STATE";
+    const toolResult = "TOOL_RESULT";
+    const latest = "LATEST_GOAL";
+    const filler = "a".repeat(790_000);
+    const rawRequest = JSON.stringify({
+      model: "acu-auto",
+      input: [early, filler, { type: "function_call_output", output: toolResult }, plan, latest],
+      tools: [{ type: "function", name: "exec_command", description: "fixture tool" }],
+    });
+    let postedBody: Record<string, unknown> | undefined;
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+      postedBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return judgeResponse();
+    });
+    const client = new AcuJudgeClient(config(), fetchMock);
+    const result = await client.judge([], [], true, {
+      stateMetadata: { sessionId: "session-long", phase: "planning", trigger: "plan_started" },
+      rawRequest,
+    });
+    const messages = postedBody?.messages as Array<{ role: string; content: string }>;
+    const rawSection = messages[1].content.split("[RAW_NATIVE_API_REQUEST]\n")[1];
+    expect(rawSection).toBe(rawRequest);
+    expect(rawSection).toContain(early);
+    expect(rawSection).toContain(plan);
+    expect(rawSection).toContain(toolResult);
+    expect(rawSection).toContain(latest);
+    expect(rawSection.match(/fixture tool/g)).toHaveLength(1);
+    expect(result.rawRequestBytes).toBe(Buffer.byteLength(rawRequest, "utf8"));
+    expect(result.rawRequestTokenEstimate).toBeGreaterThan(190_000);
+    expect(result.contextTruncated).toBe(false);
+    expect(result.judgeContextSource).toBe("raw_native_request_v1");
   });
 
   it.each([

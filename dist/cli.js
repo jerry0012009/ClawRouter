@@ -4185,7 +4185,7 @@ var ACU_DEFAULT_JUDGE_MODEL = "deepseek-v4-flash";
 var ACU_DEFAULT_JUDGE_BASE_URL = "https://api.deepseek.com";
 var ACU_DEFAULT_JUDGE_MODE = "non-thinking";
 var ACU_DEFAULT_JUDGE_TIMEOUT_MS = 8e3;
-var ACU_DEFAULT_MAX_CONTEXT_TOKENS = 6e3;
+var ACU_DEFAULT_MAX_CONTEXT_TOKENS = 262144;
 var ACU_DEFAULT_MAX_OUTPUT_TOKENS = 300;
 var ACU_DEFAULT_QUALITY_TARGET = 0.8;
 var ACU_DEFAULT_SWITCH_COST_USD = 2e-4;
@@ -4349,7 +4349,7 @@ var model_catalog_default = {
       mode: "non-thinking",
       promptVersion: "acu-tier-requirement-v4",
       timeoutMs: 8e3,
-      maxContextTokens: 6e3,
+      maxContextTokens: 262144,
       maxOutputTokens: 300
     },
     cost: {
@@ -6410,6 +6410,16 @@ var twin_few_shots_default = {
 };
 
 // src/acu/judge.ts
+var AcuJudgeContextLengthError = class extends Error {
+  constructor(requiredTokens, contextLimit) {
+    super(`Judge raw request requires ${requiredTokens} tokens but only ${contextLimit} are available`);
+    this.requiredTokens = requiredTokens;
+    this.contextLimit = contextLimit;
+    this.name = "AcuJudgeContextLengthError";
+  }
+  requiredTokens;
+  contextLimit;
+};
 var AcuJudgeAttemptError = class extends Error {
   constructor(message, attempt) {
     super(message);
@@ -6515,24 +6525,6 @@ function estimateVisibleTokens(text) {
   }
   return Math.ceil(ascii / 4) + nonAscii;
 }
-function truncateVisibleContext(text, maxTokens) {
-  const originalTokens = estimateVisibleTokens(text);
-  if (originalTokens <= maxTokens) return { text, tokenEstimate: originalTokens, truncated: false };
-  const characters = Array.from(text);
-  let lower = 0;
-  let upper = characters.length;
-  const marker = "\n[...deterministic head-tail truncation...]\n";
-  while (lower < upper) {
-    const keep = Math.ceil((lower + upper) / 2);
-    const head2 = Math.ceil(keep * 0.58);
-    const candidate = `${characters.slice(0, head2).join("")}${marker}${characters.slice(-(keep - head2)).join("")}`;
-    if (estimateVisibleTokens(candidate) <= maxTokens) lower = keep;
-    else upper = keep - 1;
-  }
-  const head = Math.ceil(lower * 0.58);
-  const truncatedText = `${characters.slice(0, head).join("")}${marker}${characters.slice(-(lower - head)).join("")}`;
-  return { text: truncatedText, tokenEstimate: estimateVisibleTokens(truncatedText), truncated: true };
-}
 function buildJudgeSystemPrompt() {
   const examples = twin_few_shots_default.examples.map((example) => [
     `\u793A\u4F8B ${example.exampleId}`,
@@ -6561,7 +6553,7 @@ function buildJudgeSystemPrompt() {
     "Web \u5224\u65AD\u5FC5\u987B\u7EFC\u5408\u5F53\u524D\u771F\u5B9E\u7528\u6237\u76EE\u6807\u3001\u6700\u8FD1\u7528\u6237\u8F93\u5165\u3001Task/Goal\u3001Plan\u3001Routing Segment \u72B6\u6001\u548C\u786E\u5B9A\u6027 Web \u7EBF\u7D22\u3002\u5BA2\u6237\u7AEF\u58F0\u660E Web Tool \u53EA\u8868\u793A\u80FD\u529B\u53EF\u7528\uFF0C\u4E0D\u80FD\u76F4\u63A5\u5224\u4E3A required\u3002",
     "\u5355\u72EC\u51FA\u73B0 current\u3001latest\u3001today\u3001\u5F53\u524D\u3001\u6700\u65B0\u3001\u4ECA\u5929\u4E0D\u5F97\u5224\u4E3A required\u3002\u4EE3\u7801\u6807\u8BC6\u7B26\u3001\u53D8\u91CF\u540D\u3001\u6587\u4EF6\u540D\u3001\u672C\u5730\u65E5\u5FD7\u3001Git \u5206\u652F\u548C\u672C\u5730\u6D4B\u8BD5\u5185\u5BB9\u4E2D\u7684\u8FD9\u4E9B\u8BCD\u5E94\u5224\u4E3A not_required\u3002",
     "\u4F8B\u5982\uFF1A\u2018\u4FEE\u6539 currentUser \u51FD\u6570\u2019\u3001\u2018\u66F4\u65B0 latestVersion \u53D8\u91CF\u2019\u3001\u2018\u67E5\u770B\u4ECA\u5929\u751F\u6210\u7684\u672C\u5730\u65E5\u5FD7\u2019\u5747\u4E3A not_required\uFF1B\u2018\u67E5\u8BE2\u4ECA\u5929 BTC \u4EF7\u683C\u2019\u3001\u2018\u641C\u7D22\u6700\u65B0 Codex \u5B98\u65B9\u6587\u6863\u2019\u4E3A required\u3002",
-    "webIntentConfidence \u5FC5\u987B\u57280\u52301\uFF1BwebIntentReason\u4E0D\u8D85\u8FC7120\u4E2A\u5B57\u7B26\uFF1BwebIntentEvidence\u6700\u591A8\u9879\uFF0C\u53EA\u5217\u53EF\u5BA1\u8BA1\u7684\u7B80\u77ED\u8BC1\u636E\u6807\u7B7E\u3002",
+    "webIntentConfidence \u5FC5\u987B\u57280\u52301\uFF1BwebIntentReason\u5FC5\u987B\u662F\u5B57\u7B26\u4E32\uFF1BwebIntentEvidence\u6700\u591A8\u9879\uFF0C\u53EA\u5217\u53EF\u5BA1\u8BA1\u7684\u7B80\u77ED\u8BC1\u636E\u6807\u7B7E\u3002",
     "\u4EE5\u4E0B\u793A\u4F8B\u53EA\u5305\u542B\u5F53\u65F6\u53EF\u89C1\u4E0A\u4E0B\u6587\uFF0C\u4E0D\u542B\u672A\u6765\u6D88\u606F\uFF1A",
     examples
   ].join("\n\n");
@@ -6625,9 +6617,7 @@ function parseJudgeResult(text) {
   if (!Number.isFinite(webIntentConfidence) || webIntentConfidence < 0 || webIntentConfidence > 1) {
     throw new Error("Judge webIntentConfidence must be finite and in [0, 1]");
   }
-  if (typeof parsed.webIntentReason !== "string" || Array.from(parsed.webIntentReason).length > 120) {
-    throw new Error("Judge webIntentReason must be a string no longer than 120 characters");
-  }
+  if (typeof parsed.webIntentReason !== "string") throw new Error("Judge webIntentReason must be a string");
   if (!Array.isArray(parsed.webIntentEvidence) || parsed.webIntentEvidence.length > 8 || parsed.webIntentEvidence.some((item) => typeof item !== "string")) {
     throw new Error("Judge webIntentEvidence must contain at most eight strings");
   }
@@ -6690,12 +6680,23 @@ var AcuJudgeClient = class {
   }
   config;
   fetchImplementation;
-  async judge(messages, tools = [], forceRefresh = false) {
+  async judge(messages, tools = [], forceRefresh = false, rawNative) {
     if (!this.config.apiKey) throw new Error("ACU Judge API key is not configured");
     if (this.config.promptVersion !== twin_few_shots_default.promptVersion) throw new Error("ACU Judge prompt version does not match frozen few-shot data");
-    const visible = serializeVisibleContext(messages, tools);
+    const rawRequestBytes = rawNative ? Buffer.byteLength(rawNative.rawRequest, "utf8") : 0;
+    const rawRequestTokenEstimate = rawNative ? estimateVisibleTokens(rawNative.rawRequest) : 0;
+    const visible = rawNative ? `[ACU_STATE_METADATA]
+${stableJson(rawNative.stateMetadata)}
+[RAW_NATIVE_API_REQUEST]
+${rawNative.rawRequest}` : serializeVisibleContext(messages, tools);
     const contextSha256 = createHash4("sha256").update(visible).digest("hex");
-    const truncated = truncateVisibleContext(visible, this.config.maxContextTokens);
+    const systemTokens = estimateVisibleTokens(buildJudgeSystemPrompt());
+    const judgeContextLimit = Math.max(0, this.config.maxContextTokens - systemTokens - this.config.maxOutputTokens - 2048);
+    const contextTokenEstimate = estimateVisibleTokens(visible);
+    if (contextTokenEstimate > judgeContextLimit) {
+      throw new AcuJudgeContextLengthError(contextTokenEstimate, judgeContextLimit);
+    }
+    const truncated = { text: visible, tokenEstimate: contextTokenEstimate, truncated: false };
     const key = createHash4("sha256").update(`${this.config.promptVersion}
 ${this.config.judgeModel}
 ${contextSha256}`).digest("hex");
@@ -6721,7 +6722,11 @@ ${contextSha256}`).digest("hex");
         cacheKeySha256: key,
         cacheCreatedAt: cached.createdAt,
         contextTokenEstimate: truncated.tokenEstimate,
-        contextTruncated: truncated.truncated
+        contextTruncated: false,
+        rawRequestBytes,
+        rawRequestTokenEstimate,
+        judgeContextLimit,
+        judgeContextSource: rawNative ? "raw_native_request_v1" : "visible_context_legacy"
       };
     }
     const metadata = endpointMetadata(this.config.judgeBaseUrl, this.config.judgeProvider);
@@ -6813,7 +6818,11 @@ ${truncated.text}` }
           cacheKeySha256: key,
           cacheCreatedAt: createdAt,
           contextTokenEstimate: truncated.tokenEstimate,
-          contextTruncated: truncated.truncated
+          contextTruncated: false,
+          rawRequestBytes,
+          rawRequestTokenEstimate,
+          judgeContextLimit,
+          judgeContextSource: rawNative ? "raw_native_request_v1" : "visible_context_legacy"
         };
       } catch (error) {
         if (error instanceof AcuJudgeAttemptError) throw error;
@@ -6902,7 +6911,6 @@ var AcuDemoStrategy = class {
   }
   async evaluate(input, rulesDecision) {
     const visible = serializeVisibleContext(input.messages, input.tools);
-    const fallbackContext = truncateVisibleContext(visible, this.config.maxContextTokens);
     let judge;
     let judgeStatus;
     let judgeLatencyMs = 0;
@@ -6918,8 +6926,8 @@ var AcuDemoStrategy = class {
     let usageStatus = "not_applicable";
     let judgeErrorCategory;
     let contextSha256 = createHash5("sha256").update(visible).digest("hex");
-    let contextTokenEstimate = estimateVisibleTokens(fallbackContext.text);
-    let contextTruncated = fallbackContext.truncated;
+    let contextTokenEstimate = estimateVisibleTokens(visible);
+    let contextTruncated = false;
     try {
       if (!this.config.enabled) throw new Error("ACU Demo Router feature flag is disabled");
       const response = await this.judgeClient.judge(input.messages, input.tools, input.forceJudgeRefresh === true);

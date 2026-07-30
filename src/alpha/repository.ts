@@ -234,6 +234,12 @@ export type JudgeEvaluationRecord = {
   contextHash: string;
   contextTokenEstimate?: bigint;
   contextTruncated: boolean;
+  rawRequestBytes?: bigint;
+  rawRequestTokenEstimate?: bigint;
+  judgeContextLimit?: bigint;
+  judgeContextSource?: string;
+  curveCalibrationEligible?: boolean;
+  curveCalibrationExclusionReason?: string;
   difficultyScoreRaw?: number;
   difficultyIndex?: number;
   factors: Record<string, unknown>;
@@ -748,19 +754,26 @@ export class AlphaRepository {
        (judge_evaluation_id,newapi_user_id,task_id,segment_id,trigger_event_id,judge_idempotency_key,
         judge_status,judge_result_source,judge_model,judge_provider,prompt_version,policy_version,
         difficulty_method_version,context_hash,context_token_estimate,context_truncated,
+        raw_request_bytes,raw_request_token_estimate,judge_context_limit,judge_context_source,
+        curve_calibration_eligible,curve_calibration_exclusion_reason,
         difficulty_score_raw,difficulty_index,factors_json,probabilities_json,confidence,judge_entropy,
         evidence_tags_json,explanation,explanation_normalized,original_explanation_length,
         web_intent,web_intent_confidence,web_intent_reason,web_intent_evidence_json,web_intent_source,
         prompt_tokens,completion_tokens,latency_ms,actual_cost_usd,official_payg_equivalent_cost,
         cost_currency,judge_cost_status,judge_cost_source,error_category,created_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
-        $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,now())
+        $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,
+        $41,$42,$43,$44,$45,$46,now())
        ON CONFLICT (judge_idempotency_key) DO NOTHING RETURNING judge_evaluation_id`,
       [input.judgeEvaluationId, input.newapiUserId, input.taskId, input.segmentId,
         input.triggerEventId ?? null, input.judgeIdempotencyKey, input.judgeStatus,
         input.judgeResultSource, input.judgeModel ?? null, input.judgeProvider ?? null,
         input.promptVersion, input.policyVersion, input.difficultyMethodVersion, input.contextHash,
-        input.contextTokenEstimate ?? null, input.contextTruncated, input.difficultyScoreRaw ?? null,
+        input.contextTokenEstimate ?? null, input.contextTruncated,
+        input.rawRequestBytes ?? 0n, input.rawRequestTokenEstimate ?? 0n,
+        input.judgeContextLimit ?? 0n, input.judgeContextSource ?? "visible_context_legacy",
+        input.curveCalibrationEligible ?? false, input.curveCalibrationExclusionReason ?? null,
+        input.difficultyScoreRaw ?? null,
         input.difficultyIndex ?? null, json(input.factors), json(input.probabilities),
         input.confidence ?? null, input.judgeEntropy ?? null, json(input.evidenceTags),
         input.explanation ?? null, input.explanationNormalized ?? false, input.originalExplanationLength ?? null,

@@ -50,6 +50,7 @@ services:
       - ../../migrations/acu/0006_rc21_cost_semantics.sql:/migration/0006_rc21_cost_semantics.sql:ro
       - ../../migrations/acu/0007_rc22_judge_cutover.sql:/migration/0007_rc22_judge_cutover.sql:ro
       - ../../migrations/acu/0008_alpha_final_user_loop.sql:/migration/0008_alpha_final_user_loop.sql:ro
+      - ../../migrations/acu/0009_raw_judge_context.sql:/migration/0009_raw_judge_context.sql:ro
     networks: [alpha-backend]
     command:
       - /bin/sh
@@ -65,6 +66,7 @@ services:
         psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0006_rc21_cost_semantics.sql
         psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0007_rc22_judge_cutover.sql
         psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0008_alpha_final_user_loop.sql
+        psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0009_raw_judge_context.sql
 
   newapi-codex-pool-sync:
     image: postgres:16-alpine
@@ -93,7 +95,7 @@ services:
         BUILD_COMMIT_SHA: ${CLAWROUTER_BUILD_COMMIT_SHA:-unknown}
         BUILD_TIME: ${BUILD_TIME:-unknown}
         BUILD_BRANCH: ${CLAWROUTER_BUILD_BRANCH:-unknown}
-        SCHEMA_VERSION: 0008_alpha_final_user_loop
+        SCHEMA_VERSION: 0009_raw_judge_context
     restart: unless-stopped
     depends_on:
       acu-migrate:
@@ -121,7 +123,7 @@ services:
       ACU_JUDGE_ROLLBACK_TO_BACKUP: ${ACU_JUDGE_ROLLBACK_TO_BACKUP:-false}
       ACU_JUDGE_ECONOMICS_PROVIDER_ID: closeai
       ACU_JUDGE_TIMEOUT_MS: ${ACU_JUDGE_TIMEOUT_MS:-20000}
-      ACU_JUDGE_MAX_CONTEXT_TOKENS: ${ACU_JUDGE_MAX_CONTEXT_TOKENS:-6000}
+      ACU_JUDGE_MAX_CONTEXT_TOKENS: ${ACU_JUDGE_MAX_CONTEXT_TOKENS:-262144}
       ACU_JUDGE_CACHE_PATH: /var/lib/acu/judge-cache-v3.json
       CLOSEAI_OPENAI_BASE_URL: ${CLOSEAI_OPENAI_BASE_URL:-https://api.openai-proxy.org/v1}
       CLOSEAI_ANTHROPIC_BASE_URL: ${CLOSEAI_ANTHROPIC_BASE_URL:-https://api.openai-proxy.org/anthropic}

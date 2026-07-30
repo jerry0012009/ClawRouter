@@ -1,4 +1,4 @@
-import { AcuJudgeAttemptError, AcuJudgeClient, judgeNominalCostUsd, type JudgeRequestResult } from "../acu/judge.js";
+import { AcuJudgeAttemptError, AcuJudgeClient, AcuJudgeContextLengthError, judgeNominalCostUsd, type JudgeRequestResult, type RawNativeJudgeContext } from "../acu/judge.js";
 import { normalizedEntropy } from "../acu/math.js";
 import { rulesFallbackJudge } from "../acu/strategy.js";
 import type { AcuRuntimeConfig } from "../acu/config.js";
@@ -22,6 +22,10 @@ export type AlphaJudgeRun = {
   contextHash: string;
   contextTokenEstimate: number;
   contextTruncated: boolean;
+  rawRequestBytes: number;
+  rawRequestTokenEstimate: number;
+  judgeContextLimit: number;
+  judgeContextSource: "raw_native_request_v1" | "visible_context_legacy";
   promptTokens: number;
   completionTokens: number;
   latencyMs: number;
@@ -67,6 +71,7 @@ export type AlphaJudgeInput = {
   contextHash: string;
   recentEvaluation?: AlphaJudgeRun;
   webIntentFallbackInput: WebIntentFallbackInput;
+  rawNative: RawNativeJudgeContext;
 };
 
 export type AlphaJudgeRunner = {
@@ -186,6 +191,10 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
       contextHash: result.contextSha256,
       contextTokenEstimate: result.contextTokenEstimate,
       contextTruncated: result.contextTruncated,
+      rawRequestBytes: result.rawRequestBytes,
+      rawRequestTokenEstimate: result.rawRequestTokenEstimate,
+      judgeContextLimit: result.judgeContextLimit,
+      judgeContextSource: result.judgeContextSource,
       promptTokens: attempts.reduce((sum, attempt) => sum + attempt.promptTokens, 0),
       completionTokens: attempts.reduce((sum, attempt) => sum + attempt.completionTokens, 0),
       latencyMs: attempts.reduce((sum, attempt) => sum + attempt.latencyMs, 0),
@@ -207,14 +216,15 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
     async run(input) {
       const attempts: AlphaJudgeAttempt[] = [];
       try {
-        const result = await client.judge(input.messages, input.tools);
+        const result = await client.judge(input.messages, [], false, input.rawNative);
         if (result.status === "live") attempts.push(successfulAttempt(result, 1, "primary"));
         return completeRun(result, attempts, result.status);
       } catch (error) {
+        if (error instanceof AcuJudgeContextLengthError) throw error;
         if (error instanceof AcuJudgeAttemptError) attempts.push(failedAttempt(error, 1, "primary"));
         if (error instanceof AcuJudgeAttemptError && error.attempt.backupEligible && backupClient) {
           try {
-            const backup = await backupClient.judge(input.messages, input.tools);
+            const backup = await backupClient.judge(input.messages, [], false, input.rawNative);
             if (backup.status === "live") attempts.push(successfulAttempt(backup, 2, "backup"));
             return completeRun(backup, attempts, backup.status === "cache_hit" ? "cache_hit" : "backup_live");
           } catch (backupError) {
@@ -254,6 +264,10 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
           contextHash: input.contextHash,
           contextTokenEstimate: 0,
           contextTruncated: false,
+          rawRequestBytes: Buffer.byteLength(input.rawNative.rawRequest, "utf8"),
+          rawRequestTokenEstimate: 0,
+          judgeContextLimit: 0,
+          judgeContextSource: "raw_native_request_v1",
           promptTokens: 0,
           completionTokens: 0,
           latencyMs: 0,

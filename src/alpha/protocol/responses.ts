@@ -28,6 +28,14 @@ function isHostedWebTool(value: unknown): boolean {
   return type === "web_search" || type.startsWith("web_search_");
 }
 
+export function isCodexEnvironmentContextWrapper(text: string): boolean {
+  const trimmed = text.trim();
+  if (!/^<environment_context>[\s\S]*<\/environment_context>$/.test(trimmed)) return false;
+  return ["<cwd>", "<shell>", "<current_date>", "<timezone>", "<filesystem>"].filter((tag) => (
+    trimmed.includes(tag)
+  )).length >= 3;
+}
+
 export function normalizeResponsesRequest(body: unknown, headers: NativeRequestHeaders = {}): CanonicalEnvelope {
   void headers;
   const raw = parseJsonBody(body);
@@ -44,13 +52,17 @@ export function normalizeResponsesRequest(body: unknown, headers: NativeRequestH
 
   input.forEach((entry, sourceIndex) => {
     if (typeof entry === "string") {
-      if (entry.trim()) humanCandidates.push({ text: entry, sourceIndex, confidence: "high" });
+      if (entry.trim() && !isCodexEnvironmentContextWrapper(entry)) {
+        humanCandidates.push({ text: entry, sourceIndex, confidence: "high" });
+      }
       return;
     }
     const item = record(entry);
     if (!item) return;
     if (item.type === "message" && item.role === "user") {
-      for (const text of textParts(item.content)) humanCandidates.push({ text, sourceIndex, confidence: "high" });
+      for (const text of textParts(item.content)) {
+        if (!isCodexEnvironmentContextWrapper(text)) humanCandidates.push({ text, sourceIndex, confidence: "high" });
+      }
     }
     if (item.type === "function_call" || item.type === "custom_tool_call") {
       const id = String(item.call_id ?? item.id ?? "");

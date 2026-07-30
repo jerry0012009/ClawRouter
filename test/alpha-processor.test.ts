@@ -253,6 +253,10 @@ run("Alpha PostgreSQL request processor", () => {
           contextHash: input.contextHash,
           contextTokenEstimate: 100,
           contextTruncated: false,
+          rawRequestBytes: Buffer.byteLength(input.rawNative.rawRequest, "utf8"),
+          rawRequestTokenEstimate: 100,
+          judgeContextLimit: 250_000,
+          judgeContextSource: "raw_native_request_v1",
           promptTokens: 10,
           completionTokens: 10,
           latencyMs: 1,
@@ -705,6 +709,37 @@ run("Alpha PostgreSQL request processor", () => {
     const retriedBodies = upstreamBodies.filter((item) => item.test_case === "retry-once");
     expect(retriedBodies).toHaveLength(2);
     expect(retriedBodies[0]).toEqual(retriedBodies[1]);
+
+    const segmentBeforeRefresh = await database.query<{ route_decision_id: string; judge_evaluation_id: string }>(
+      `SELECT route_decision_id,judge_evaluation_id FROM acu_segments
+       WHERE newapi_user_id='user-retry' AND status='active'`,
+    );
+    const callsBeforeRefresh = judgeCalls;
+    await send({
+      model: "acu-auto",
+      input: [
+        ...(body.input as Array<Record<string, unknown>>),
+        { type: "function_call", call_id: "cooldown-read", name: "read_file", arguments: "{}" },
+        { type: "function_call_output", call_id: "cooldown-read", output: "continued without a new goal" },
+      ],
+      stream: true,
+    }, "retry-cooldown-continuation", "user-retry");
+    expect(judgeCalls).toBe(callsBeforeRefresh);
+    const refreshed = await database.query<{
+      route_decision_id: string; judge_evaluation_id: string; metadata_json: Record<string, unknown>;
+    }>(
+      `SELECT s.route_decision_id,s.judge_evaluation_id,a.metadata_json
+       FROM acu_segments s JOIN acu_admission_traces a ON a.segment_id=s.segment_id
+       WHERE s.newapi_user_id='user-retry' ORDER BY a.created_at DESC LIMIT 1`,
+    );
+    expect(refreshed.rows[0].judge_evaluation_id).toBe(segmentBeforeRefresh.rows[0].judge_evaluation_id);
+    expect(refreshed.rows[0].route_decision_id).not.toBe(segmentBeforeRefresh.rows[0].route_decision_id);
+    expect(refreshed.rows[0].metadata_json).toMatchObject({
+      trigger: "reuse_route",
+      judgeCalls: 0,
+      judgeReused: true,
+      routeRefreshReason: "profile_health",
+    });
   });
 
   it("uses a different Provider for the third same-model Channel after two Lucen failures", async () => {

@@ -52,7 +52,23 @@ export type JudgeRequestResult = {
   cacheCreatedAt: string;
   contextTokenEstimate: number;
   contextTruncated: boolean;
+  rawRequestBytes: number;
+  rawRequestTokenEstimate: number;
+  judgeContextLimit: number;
+  judgeContextSource: "raw_native_request_v1" | "visible_context_legacy";
 };
+
+export type RawNativeJudgeContext = {
+  stateMetadata: Record<string, unknown>;
+  rawRequest: string;
+};
+
+export class AcuJudgeContextLengthError extends Error {
+  constructor(readonly requiredTokens: number, readonly contextLimit: number) {
+    super(`Judge raw request requires ${requiredTokens} tokens but only ${contextLimit} are available`);
+    this.name = "AcuJudgeContextLengthError";
+  }
+}
 
 export type JudgeAttemptFailure = {
   provider: string;
@@ -183,25 +199,6 @@ export function estimateVisibleTokens(text: string): number {
   return Math.ceil(ascii / 4) + nonAscii;
 }
 
-export function truncateVisibleContext(text: string, maxTokens: number): { text: string; tokenEstimate: number; truncated: boolean } {
-  const originalTokens = estimateVisibleTokens(text);
-  if (originalTokens <= maxTokens) return { text, tokenEstimate: originalTokens, truncated: false };
-  const characters = Array.from(text);
-  let lower = 0;
-  let upper = characters.length;
-  const marker = "\n[...deterministic head-tail truncation...]\n";
-  while (lower < upper) {
-    const keep = Math.ceil((lower + upper) / 2);
-    const head = Math.ceil(keep * 0.58);
-    const candidate = `${characters.slice(0, head).join("")}${marker}${characters.slice(-(keep - head)).join("")}`;
-    if (estimateVisibleTokens(candidate) <= maxTokens) lower = keep;
-    else upper = keep - 1;
-  }
-  const head = Math.ceil(lower * 0.58);
-  const truncatedText = `${characters.slice(0, head).join("")}${marker}${characters.slice(-(lower - head)).join("")}`;
-  return { text: truncatedText, tokenEstimate: estimateVisibleTokens(truncatedText), truncated: true };
-}
-
 export function buildJudgeSystemPrompt(): string {
   const examples = (fewShotData.examples as FewShot[]).map((example) => [
     `示例 ${example.exampleId}`,
@@ -230,7 +227,7 @@ export function buildJudgeSystemPrompt(): string {
     "Web 判断必须综合当前真实用户目标、最近用户输入、Task/Goal、Plan、Routing Segment 状态和确定性 Web 线索。客户端声明 Web Tool 只表示能力可用，不能直接判为 required。",
     "单独出现 current、latest、today、当前、最新、今天不得判为 required。代码标识符、变量名、文件名、本地日志、Git 分支和本地测试内容中的这些词应判为 not_required。",
     "例如：‘修改 currentUser 函数’、‘更新 latestVersion 变量’、‘查看今天生成的本地日志’均为 not_required；‘查询今天 BTC 价格’、‘搜索最新 Codex 官方文档’为 required。",
-    "webIntentConfidence 必须在0到1；webIntentReason不超过120个字符；webIntentEvidence最多8项，只列可审计的简短证据标签。",
+    "webIntentConfidence 必须在0到1；webIntentReason必须是字符串；webIntentEvidence最多8项，只列可审计的简短证据标签。",
     "以下示例只包含当时可见上下文，不含未来消息：",
     examples,
   ].join("\n\n");
@@ -322,9 +319,7 @@ export function parseJudgeResult(text: string): AcuJudgeResult {
   if (!Number.isFinite(webIntentConfidence) || webIntentConfidence < 0 || webIntentConfidence > 1) {
     throw new Error("Judge webIntentConfidence must be finite and in [0, 1]");
   }
-  if (typeof parsed.webIntentReason !== "string" || Array.from(parsed.webIntentReason).length > 120) {
-    throw new Error("Judge webIntentReason must be a string no longer than 120 characters");
-  }
+  if (typeof parsed.webIntentReason !== "string") throw new Error("Judge webIntentReason must be a string");
   if (!Array.isArray(parsed.webIntentEvidence) || parsed.webIntentEvidence.length > 8
     || parsed.webIntentEvidence.some((item) => typeof item !== "string")) {
     throw new Error("Judge webIntentEvidence must contain at most eight strings");
@@ -388,12 +383,27 @@ export class AcuJudgeClient {
     }
   }
 
-  async judge(messages: AcuVisibleMessage[], tools: unknown[] = [], forceRefresh = false): Promise<JudgeRequestResult> {
+  async judge(
+    messages: AcuVisibleMessage[],
+    tools: unknown[] = [],
+    forceRefresh = false,
+    rawNative?: RawNativeJudgeContext,
+  ): Promise<JudgeRequestResult> {
     if (!this.config.apiKey) throw new Error("ACU Judge API key is not configured");
     if (this.config.promptVersion !== fewShotData.promptVersion) throw new Error("ACU Judge prompt version does not match frozen few-shot data");
-    const visible = serializeVisibleContext(messages, tools);
+    const rawRequestBytes = rawNative ? Buffer.byteLength(rawNative.rawRequest, "utf8") : 0;
+    const rawRequestTokenEstimate = rawNative ? estimateVisibleTokens(rawNative.rawRequest) : 0;
+    const visible = rawNative
+      ? `[ACU_STATE_METADATA]\n${stableJson(rawNative.stateMetadata)}\n[RAW_NATIVE_API_REQUEST]\n${rawNative.rawRequest}`
+      : serializeVisibleContext(messages, tools);
     const contextSha256 = createHash("sha256").update(visible).digest("hex");
-    const truncated = truncateVisibleContext(visible, this.config.maxContextTokens);
+    const systemTokens = estimateVisibleTokens(buildJudgeSystemPrompt());
+    const judgeContextLimit = Math.max(0, this.config.maxContextTokens - systemTokens - this.config.maxOutputTokens - 2_048);
+    const contextTokenEstimate = estimateVisibleTokens(visible);
+    if (contextTokenEstimate > judgeContextLimit) {
+      throw new AcuJudgeContextLengthError(contextTokenEstimate, judgeContextLimit);
+    }
+    const truncated = { text: visible, tokenEstimate: contextTokenEstimate, truncated: false };
     const key = createHash("sha256").update(`${this.config.promptVersion}\n${this.config.judgeModel}\n${contextSha256}`).digest("hex");
     const path = cachePath(this.config);
     const cache = readCache(path);
@@ -406,7 +416,9 @@ export class AcuJudgeClient {
         promptTokens: cached.promptTokens, cachedPromptTokens: cached.cachedPromptTokens ?? 0,
         completionTokens: cached.completionTokens, usageStatus: cached.usageStatus,
         contextSha256, cacheKeySha256: key, cacheCreatedAt: cached.createdAt,
-        contextTokenEstimate: truncated.tokenEstimate, contextTruncated: truncated.truncated,
+        contextTokenEstimate: truncated.tokenEstimate, contextTruncated: false,
+        rawRequestBytes, rawRequestTokenEstimate, judgeContextLimit,
+        judgeContextSource: rawNative ? "raw_native_request_v1" : "visible_context_legacy",
       };
     }
 
@@ -477,7 +489,9 @@ export class AcuJudgeClient {
         model: this.config.judgeModel,
         endpointHost: metadata.host, upstreamRequestId, latencyMs: Date.now() - started, cost,
         promptTokens, cachedPromptTokens, completionTokens, usageStatus, contextSha256, cacheKeySha256: key, cacheCreatedAt: createdAt,
-        contextTokenEstimate: truncated.tokenEstimate, contextTruncated: truncated.truncated,
+        contextTokenEstimate: truncated.tokenEstimate, contextTruncated: false,
+        rawRequestBytes, rawRequestTokenEstimate, judgeContextLimit,
+        judgeContextSource: rawNative ? "raw_native_request_v1" : "visible_context_legacy",
       };
       } catch (error) {
         if (error instanceof AcuJudgeAttemptError) throw error;

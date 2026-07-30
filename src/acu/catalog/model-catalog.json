@@ -37,7 +37,7 @@
       "mode": "non-thinking",
       "promptVersion": "acu-tier-requirement-v4",
       "timeoutMs": 8000,
-      "maxContextTokens": 6000,
+      "maxContextTokens": 262144,
       "maxOutputTokens": 300
     },
     "cost": {

@@ -1033,6 +1033,14 @@ type JudgeRequestResult = {
     cacheCreatedAt: string;
     contextTokenEstimate: number;
     contextTruncated: boolean;
+    rawRequestBytes: number;
+    rawRequestTokenEstimate: number;
+    judgeContextLimit: number;
+    judgeContextSource: "raw_native_request_v1" | "visible_context_legacy";
+};
+type RawNativeJudgeContext = {
+    stateMetadata: Record<string, unknown>;
+    rawRequest: string;
 };
 declare function serializeVisibleContext(messages: AcuVisibleMessage[], tools?: unknown[]): string;
 declare function estimateVisibleTokens(text: string): number;
@@ -1047,7 +1055,7 @@ declare class AcuJudgeClient {
     private readonly config;
     private readonly fetchImplementation;
     constructor(config: AcuRuntimeConfig, fetchImplementation?: typeof fetch);
-    judge(messages: AcuVisibleMessage[], tools?: unknown[], forceRefresh?: boolean): Promise<JudgeRequestResult>;
+    judge(messages: AcuVisibleMessage[], tools?: unknown[], forceRefresh?: boolean, rawNative?: RawNativeJudgeContext): Promise<JudgeRequestResult>;
 }
 
 declare function rulesFallbackJudge(decision: RoutingDecision): AcuJudgeResult;

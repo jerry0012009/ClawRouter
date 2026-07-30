@@ -21,6 +21,7 @@ import type { NativeProviderAdapter } from "./provider.js";
 import type { TrustedNewApiIdentity } from "./trusted-identity.js";
 import { parseProviderUsage } from "./usage.js";
 import { buildModelCurve, getAcuModel } from "../acu/catalog.js";
+import { AcuJudgeContextLengthError } from "../acu/judge.js";
 import { cashCnyPerNominalUsd, providerCostBreakdown, type ProviderEconomics } from "./provider-economics.js";
 import {
   createRecoveringProviderAdapter,
@@ -92,6 +93,10 @@ export type AlphaResolutionContext = {
   webToolPruned: boolean;
   webToolPruneReason?: string;
   webFallbackChain: string[];
+  attemptedExecutionProfileIds: string[];
+  attemptedChannelIds: string[];
+  attemptedProviders: string[];
+  attemptedNetworkEndpoints: string[];
   routeSummary: {
     mode: string;
     routingPreference: string;
@@ -672,7 +677,13 @@ export class AlphaRequestProcessor {
     identity: TrustedNewApiIdentity,
     state: PreparedState,
     logicalRequestId: string,
-  ): Promise<{ profile: AlphaExecutionProfile; judge?: AlphaJudgeRun; route?: AlphaRouteDecision }> {
+    ingress: AlphaIngressContext,
+  ): Promise<{
+    profile: AlphaExecutionProfile;
+    judge?: AlphaJudgeRun;
+    route?: AlphaRouteDecision;
+    recoveryProfiles: AlphaExecutionProfile[];
+  }> {
     const repository = new AlphaRepository(this.options.database);
     const contextAdmission = estimateContextAdmission(envelope, this.expectedOutputTokens);
     const { profiles: effectiveProfiles, probeClaims } = await this.effectiveProfiles();
@@ -819,10 +830,12 @@ export class AlphaRequestProcessor {
         });
       }
       await this.releaseUnusedProbeClaims(probeClaims, profile);
-      return { profile };
+      return { profile, recoveryProfiles: effectiveProfiles };
     }
 
+    const originalStoredProfile = selectedProfileFromSegment(storedSegment, this.options.profiles);
     const storedProfile = selectedProfileFromSegment(storedSegment, effectiveProfiles);
+    const previousJudge = record(storedSegmentMetadata.judgeRun) as AlphaJudgeRun | undefined;
     const policyVersionMatches = metadata(storedSegment).userRoutingPolicyVersion === identity.routingPolicyVersion;
     const reused = storedProfile
       && policyVersionMatches
@@ -876,7 +889,128 @@ export class AlphaRequestProcessor {
         });
       }
       await this.releaseUnusedProbeClaims(probeClaims, compatible);
-      return { profile: compatible };
+      return { profile: compatible, recoveryProfiles: effectiveProfiles };
+    }
+
+    const reusedJudgeEvaluationId = stringValue(storedSegment?.judge_evaluation_id);
+    const profileHealthRefresh = !state.decision.runJudge
+      && Boolean(reusedJudgeEvaluationId)
+      && Boolean(previousJudge)
+      && Boolean(originalStoredProfile)
+      && (!reused || reused.health === "cooldown"
+        || originalStoredProfile?.health === "cooldown" || originalStoredProfile?.enabled === false);
+    if (profileHealthRefresh && previousJudge && reusedJudgeEvaluationId) {
+      applyWebIntent(envelope, previousJudge.webIntentDecision);
+      const admission = await startAdmissionTrace(reusedJudgeEvaluationId);
+      let route: AlphaRouteDecision;
+      try {
+        route = routeWithCurrentAcuFormula({
+          judge: previousJudge.judge,
+          judgeCost: 0,
+          inputTokens: contextAdmission.estimatedInputTokens,
+          expectedOutputTokens: this.expectedOutputTokens,
+          effectiveQualityTarget: state.effectiveQualityTarget,
+          routingPreference: identity.routingPreference,
+          profiles: effectiveProfiles,
+          requirements: {
+            protocol: envelope.protocol,
+            requireTools: envelope.requiredToolTypes.length > 0,
+            requiredToolTypes: envelope.requiredToolTypes,
+            requireThinking: envelope.containsThinking,
+            reasoningEffort: envelope.reasoningEffort,
+            context: contextAdmission,
+            allowedModelIds: identity.routingPolicy === "all_routing_eligible"
+              ? undefined
+              : identity.routingPolicy === "custom_allowlist" ? identity.allowedModelIds : [],
+            clientDeclaredWebTool: envelope.clientDeclaredWebTool,
+            webIntent: envelope.webIntent,
+          },
+          routeDirection: state.decision.routeDirection,
+          currentProfile: originalStoredProfile,
+        });
+      } catch (error) {
+        const typed = error instanceof AlphaAdmissionError ? error : undefined;
+        await repository.completeAdmissionTrace({
+          admissionTraceId: admission.admissionTraceId,
+          status: "rejected",
+          errorType: typed?.errorType ?? "admission_failed",
+          httpStatus: typed?.statusCode ?? 502,
+          maximumAvailableContextTokens: Number(typed?.details.maximum_available_context_tokens ?? 0) || undefined,
+          candidateContextLimits: typed?.details.candidate_context_limits as Record<string, number> | undefined,
+          exclusionCounts: typed?.details.exclusion_counts as Record<string, number> | undefined,
+          metadata: {
+            trigger: "reuse_route", judgeCalls: 0, judgeReused: true,
+            reusedJudgeEvaluationId, routeRefreshReason: "profile_health",
+          },
+        });
+        throw error;
+      }
+      await repository.completeAdmissionTrace({
+        admissionTraceId: admission.admissionTraceId,
+        status: "admitted",
+        maximumAvailableContextTokens: effectiveContextCeiling(route.selectedProfile),
+        exclusionCounts: Object.fromEntries(route.excludedProfiles.flatMap((item) => item.reasons)
+          .map(exclusionCategory)
+          .reduce((counts, category) => counts.set(category, (counts.get(category) ?? 0) + 1), new Map<string, number>())),
+        metadata: {
+          trigger: "reuse_route", judgeCalls: 0, judgeReused: true,
+          reusedJudgeEvaluationId, routeRefreshReason: "profile_health",
+          selectedProfileId: route.selectedProfile.executionProfileId,
+        },
+      });
+      const routeDecisionId = alphaId("route");
+      await repository.saveRouteDecision({
+        routeDecisionId,
+        newapiUserId: identity.newapiUserId,
+        segmentId: state.segmentId,
+        judgeEvaluationId: reusedJudgeEvaluationId,
+        mode: envelope.requestedModel,
+        policyVersion: `${POLICY_VERSION}:${identity.routingPolicyVersion}`,
+        routingModelVersion: route.formulaVersion,
+        qualityCurveVersion: QUALITY_CURVE_VERSION,
+        priceVersion: PRICE_VERSION,
+        effectiveQualityTarget: route.effectiveQualityTarget,
+        formulaInputs: {
+          judge: previousJudge.judge,
+          judgeCost: 0,
+          judgeReused: true,
+          reusedJudgeEvaluationId,
+          routeRefreshReason: "profile_health",
+          inputTokens: contextAdmission.estimatedInputTokens,
+          expectedOutputTokens: this.expectedOutputTokens,
+          userRoutingPolicy: identity.routingPolicy,
+          routingPreference: identity.routingPreference,
+          routingPreferenceParameters: route.preferenceParameters,
+          userRoutingPolicyVersion: identity.routingPolicyVersion,
+          allowedModelIds: identity.allowedModelIds,
+          providerCandidateEstimates: route.providerCandidateEstimates,
+          excludedProfiles: route.excludedProfiles,
+          costUnit: "CNY",
+          ...webIntentMetadata(previousJudge.webIntentDecision),
+        },
+        candidateEstimates: route.candidateEstimates,
+        paretoFrontier: route.paretoFrontier,
+        selectedProfile: { ...route.selectedProfile },
+        routeExplanation: `Reused Judge Evaluation ${reusedJudgeEvaluationId}; refreshed route for profile health. ${route.recommendation.reason} ${route.providerSelectionReason}`,
+      });
+      await repository.updateSegmentDecision({
+        segmentId: state.segmentId,
+        newapiUserId: identity.newapiUserId,
+        judgeEvaluationId: reusedJudgeEvaluationId,
+        routeDecisionId,
+        selectedExecutionProfileId: route.selectedProfile.executionProfileId,
+        metadata: {
+          ...storedSegmentMetadata,
+          ...webIntentMetadata(previousJudge.webIntentDecision),
+          judgeRun: previousJudge,
+          selectedProfile: route.selectedProfile,
+          userRoutingPolicyVersion: identity.routingPolicyVersion,
+          routingPreference: identity.routingPreference,
+          routeRefreshReason: "profile_health",
+        },
+      });
+      await this.releaseUnusedProbeClaims(probeClaims, route.selectedProfile);
+      return { profile: route.selectedProfile, route, recoveryProfiles: effectiveProfiles };
     }
 
     const context = buildAlphaJudgeContext(envelope, {
@@ -893,21 +1027,51 @@ export class AlphaRequestProcessor {
       temporaryPhaseOverride: state.decision.temporaryPhaseOverride,
     });
     const contextHash = canonicalHash(context.envelope);
-    const previousJudge = record(storedSegmentMetadata.judgeRun) as AlphaJudgeRun | undefined;
     const webIntentFallbackInput = {
       recentUserInputs: envelope.humanCandidates
         .filter((candidate) => candidate.confidence === "high")
         .map((candidate) => candidate.text),
       rootGoalText: state.rootGoalText,
     };
-    const judge = await this.options.judgeRunner.run({
-      messages: context.messages,
-      tools: context.tools,
-      trigger: state.decision.reason,
-      contextHash,
-      recentEvaluation: previousJudge,
-      webIntentFallbackInput,
-    });
+    const rawNative = {
+      stateMetadata: {
+        sessionId: state.sessionId,
+        taskId: state.taskId,
+        segmentId: state.segmentId,
+        phase: state.decision.phase,
+        trigger: state.decision.reason,
+        priorJudgeEvaluationId: stringValue(storedSegment?.judge_evaluation_id),
+        currentExecutionProfileId: stringValue(storedSegment?.selected_execution_profile_id),
+      },
+      rawRequest: Buffer.from(ingress.rawBody).toString("utf8"),
+    };
+    let judge: AlphaJudgeRun;
+    try {
+      judge = await this.options.judgeRunner.run({
+        messages: context.messages,
+        tools: context.tools,
+        trigger: state.decision.reason,
+        contextHash,
+        recentEvaluation: previousJudge,
+        webIntentFallbackInput,
+        rawNative,
+      });
+    } catch (error) {
+      if (error instanceof AcuJudgeContextLengthError) {
+        throw new AlphaAdmissionError(
+          "judge_context_length_exceeded",
+          "The complete native request exceeds the Judge context window.",
+          400,
+          {
+            judge_context_token_estimate: error.requiredTokens,
+            judge_context_limit: error.contextLimit,
+            context_truncated: false,
+            judge_context_source: "raw_native_request_v1",
+          },
+        );
+      }
+      throw error;
+    }
     applyWebIntent(envelope, judge.webIntentDecision);
     const effectiveJudgeCostCny = Number(judge.costCny);
     const judgeEvaluationId = alphaId("judge");
@@ -945,6 +1109,11 @@ export class AlphaRequestProcessor {
         contextHash: judge.contextHash,
         contextTokenEstimate: BigInt(judge.contextTokenEstimate),
         contextTruncated: judge.contextTruncated,
+        rawRequestBytes: BigInt(judge.rawRequestBytes),
+        rawRequestTokenEstimate: BigInt(judge.rawRequestTokenEstimate),
+        judgeContextLimit: BigInt(judge.judgeContextLimit),
+        judgeContextSource: judge.judgeContextSource,
+        curveCalibrationEligible: !judge.contextTruncated && judge.judgeContextSource === "raw_native_request_v1",
         difficultyScoreRaw: judge.judge.difficultyScoreRaw,
         difficultyIndex: judge.judge.difficultyIndex,
         factors: { ...judge.judge.factors },
@@ -990,6 +1159,8 @@ export class AlphaRequestProcessor {
         metadata: {
           trigger: state.decision.reason,
           judgeCalls: judge.attempts.length,
+          judgeReused: false,
+          routeRefreshReason: !state.decision.runJudge ? "missing_prior_judge" : undefined,
           webIntent: judge.webIntentDecision.intent,
           webIntentSource: judge.webIntentDecision.source,
         },
@@ -1101,10 +1272,13 @@ export class AlphaRequestProcessor {
         protocol: envelope.protocol,
         contentType: "application/json",
         body: {
-          messages: context.messages,
-          tools: context.tools,
+          stateMetadata: rawNative.stateMetadata,
+          rawNativeApiRequest: rawNative.rawRequest,
+          rawRequestSha256: sha256(rawNative.rawRequest),
           trigger: state.decision.reason,
-          contextHash,
+          contextHash: judge.contextHash,
+          judgeContextSource: judge.judgeContextSource,
+          contextTruncated: judge.contextTruncated,
         },
         isComplete: true,
       });
@@ -1260,7 +1434,7 @@ export class AlphaRequestProcessor {
       },
     });
     await this.releaseUnusedProbeClaims(probeClaims, route.selectedProfile);
-    return { profile: route.selectedProfile, judge, route };
+    return { profile: route.selectedProfile, judge, route, recoveryProfiles: effectiveProfiles };
   }
 
   private recoveryProfile(
@@ -1631,6 +1805,10 @@ export class AlphaRequestProcessor {
             webSearchEventStatus: [],
             webToolPruned: false,
             webFallbackChain: [],
+            attemptedExecutionProfileIds: [replayProfile.executionProfileId],
+            attemptedChannelIds: [replayProfile.channelId ?? replayProfile.channel],
+            attemptedProviders: [replayProfile.provider],
+            attemptedNetworkEndpoints: [],
             phase: stringValue(replaySegment?.phase),
             routeDecisionSnapshot: replayStoredRoute,
             routeSummary: routeDisplaySummary(
@@ -1667,7 +1845,7 @@ export class AlphaRequestProcessor {
     }
     let result: Awaited<ReturnType<AlphaRequestProcessor["judgeAndRoute"]>>;
     try {
-      result = await this.judgeAndRoute(envelope, identity, state, logical.logicalRequestId);
+      result = await this.judgeAndRoute(envelope, identity, state, logical.logicalRequestId, ingress);
     } catch (error) {
       if (error instanceof AlphaAdmissionError) {
         await repository.updateLogicalRequestMetadata(logical.logicalRequestId, identity.newapiUserId, {
@@ -1780,6 +1958,10 @@ export class AlphaRequestProcessor {
       webToolPruned: prepared.webToolPruned,
       webToolPruneReason: prepared.pruneReason,
       webFallbackChain: [],
+      attemptedExecutionProfileIds: [result.profile.executionProfileId],
+      attemptedChannelIds: [result.profile.channelId ?? result.profile.channel],
+      attemptedProviders: [result.profile.provider],
+      attemptedNetworkEndpoints: initialAttempt.networkEndpoint ? [initialAttempt.networkEndpoint] : [],
       phase: state.decision.phase,
       judgeExplanation: result.judge?.judge.explanation,
       routeDecisionSnapshot: storedRoute,
@@ -1792,39 +1974,74 @@ export class AlphaRequestProcessor {
         storedRoute,
       ),
     };
+    const recoveryContextAdmission = estimateContextAdmission(envelope, this.expectedOutputTokens);
     const adapter = createRecoveringProviderAdapter({
       initial: initialAttempt,
       maxAttempts: maxProviderAttempts,
       isRecoverableResponse: (response) => isWebSearchProviderError(response, envelope.webIntent),
       selectRecoveryTarget: (() => {
-        const attemptedProfiles = new Set([result.profile.executionProfileId]);
-        const attemptedProviders = [result.profile.provider];
-        const recoveryPool = (result.route?.providerCandidateEstimates ?? [])
+        const attemptedProfiles = new Set(resolutionContext.attemptedExecutionProfileIds);
+        const attemptedChannels = new Set(resolutionContext.attemptedChannelIds);
+        const attemptedProviders = new Set(resolutionContext.attemptedProviders);
+        const attemptedEndpoints = new Set(resolutionContext.attemptedNetworkEndpoints);
+        const routeProfiles = (result.route?.providerCandidateEstimates ?? [])
           .filter((candidate) => candidate.health === "healthy" && candidate.usageTrusted)
           .map((candidate) => this.options.profiles.find((profile) => (
             profile.executionProfileId === candidate.executionProfileId
           )))
           .filter((profile): profile is AlphaExecutionProfile => Boolean(profile));
+        const recoveryPool = [...routeProfiles, ...result.recoveryProfiles].filter((profile, index, all) => (
+          all.findIndex((candidate) => candidate.executionProfileId === profile.executionProfileId) === index
+          && profile.modelId === result.profile.modelId
+          && profile.enabled
+          && profile.administratorAllowed
+          && profile.health === "healthy"
+          && profile.usageTrusted !== false
+          && (!profile.economics || (profile.economics.enabled && profile.economics.health === "healthy"))
+          && profile.protocols.includes(envelope.protocol)
+          && (!envelope.requiredToolTypes.length || profile.toolCallSupport)
+          && envelope.requiredToolTypes.every((toolType) => profile.supportedToolTypes?.includes(toolType))
+          && (envelope.webIntent !== "required" || profile.webSearchExecutionVerified === true)
+          && (!envelope.containsThinking || profile.thinkingSupport)
+          && effectiveContextCeiling(profile) >= recoveryContextAdmission.requiredTotalContextTokens
+          && this.options.adapters.has(profile.executionProfileId)
+        ));
         return (current): ProviderRecoveryTarget | undefined => {
-          const nextEndpoint = (current.networkEndpointIndex ?? 0) + 1;
-          if (nextEndpoint < this.endpoints(current.profile).length) {
-            return { profile: current.profile, networkEndpointIndex: nextEndpoint, reason: "network_endpoint_fallback" };
-          }
-          const preferDifferentProvider = current.attemptIndex >= 2
-            && attemptedProviders.every((provider) => provider === attemptedProviders[0]);
-          const eligible = recoveryPool.filter((profile) => !attemptedProfiles.has(profile.executionProfileId));
+          const eligible = recoveryPool.filter((profile) => (
+            !attemptedProfiles.has(profile.executionProfileId)
+            && !attemptedChannels.has(profile.channelId ?? profile.channel)
+          ));
           const profile = (current.attemptIndex === 1
             ? eligible.find((candidate) => candidate.provider === current.profile.provider)
             : undefined)
-            ?? (preferDifferentProvider
-            ? eligible.find((candidate) => candidate.provider !== attemptedProviders[0])
+            ?? (current.attemptIndex >= 2
+            ? eligible.find((candidate) => candidate.provider !== result.profile.provider)
             : undefined)
-            ?? eligible[0]
-            ?? this.recoveryProfile(current.profile, envelope, mode, attemptedProfiles);
-          if (!profile) return undefined;
-          attemptedProfiles.add(profile.executionProfileId);
-          attemptedProviders.push(profile.provider);
-          return { profile, networkEndpointIndex: 0, reason: "same_model_channel_fallback" };
+            ?? eligible[0];
+          if (profile) {
+            attemptedProfiles.add(profile.executionProfileId);
+            attemptedChannels.add(profile.channelId ?? profile.channel);
+            attemptedProviders.add(profile.provider);
+            const primaryEndpoint = this.endpoints(profile)[0]?.endpoint;
+            if (primaryEndpoint) attemptedEndpoints.add(primaryEndpoint);
+            resolutionContext.attemptedExecutionProfileIds = [...attemptedProfiles];
+            resolutionContext.attemptedChannelIds = [...attemptedChannels];
+            resolutionContext.attemptedProviders = [...attemptedProviders];
+            resolutionContext.attemptedNetworkEndpoints = [...attemptedEndpoints];
+            return { profile, networkEndpointIndex: 0, reason: "same_model_channel_fallback" };
+          }
+          const endpointProfiles = [current.profile, ...recoveryPool.filter((candidate) => attemptedProfiles.has(candidate.executionProfileId))];
+          for (const endpointProfile of endpointProfiles) {
+            const endpoints = this.endpoints(endpointProfile);
+            for (let index = 0; index < endpoints.length; index += 1) {
+              const endpoint = endpoints[index]?.endpoint;
+              if (!endpoint || attemptedEndpoints.has(endpoint)) continue;
+              attemptedEndpoints.add(endpoint);
+              resolutionContext.attemptedNetworkEndpoints = [...attemptedEndpoints];
+              return { profile: endpointProfile, networkEndpointIndex: index, reason: "network_endpoint_fallback" };
+            }
+          }
+          return undefined;
         };
       })(),
       recordFailedAttempt: async ({ attempt, response, error, latencyMs }) => {
@@ -1867,6 +2084,15 @@ export class AlphaRequestProcessor {
         resolutionContext.attemptIndex = next.attemptIndex;
         resolutionContext.selectedProfile = next.profile;
         resolutionContext.networkEndpoint = next.networkEndpoint;
+        if (!resolutionContext.attemptedExecutionProfileIds.includes(next.profile.executionProfileId)) {
+          resolutionContext.attemptedExecutionProfileIds.push(next.profile.executionProfileId);
+        }
+        const nextChannelId = next.profile.channelId ?? next.profile.channel;
+        if (!resolutionContext.attemptedChannelIds.includes(nextChannelId)) resolutionContext.attemptedChannelIds.push(nextChannelId);
+        if (!resolutionContext.attemptedProviders.includes(next.profile.provider)) resolutionContext.attemptedProviders.push(next.profile.provider);
+        if (next.networkEndpoint && !resolutionContext.attemptedNetworkEndpoints.includes(next.networkEndpoint)) {
+          resolutionContext.attemptedNetworkEndpoints.push(next.networkEndpoint);
+        }
         resolutionContext.webToolPruned = retryPrepared.webToolPruned;
         resolutionContext.webToolPruneReason = retryPrepared.pruneReason;
         if (envelope.webIntent !== "not_required") {
@@ -2102,6 +2328,10 @@ export class AlphaRequestProcessor {
         web_search_event_status: input.context.webSearchEventStatus,
         web_profile_verified: input.context.selectedProfile.webSearchExecutionVerified === true,
         web_fallback_chain: input.context.webFallbackChain,
+        attempted_execution_profile_ids: input.context.attemptedExecutionProfileIds,
+        attempted_channel_ids: input.context.attemptedChannelIds,
+        attempted_providers: input.context.attemptedProviders,
+        attempted_network_endpoints: input.context.attemptedNetworkEndpoints,
         web_tool_pruned: input.context.webToolPruned,
         web_tool_prune_reason: input.context.webToolPruneReason,
         ...(() => {

@@ -6,7 +6,6 @@ import {
   AcuJudgeClient,
   estimateVisibleTokens,
   serializeVisibleContext,
-  truncateVisibleContext,
 } from "./judge.js";
 import type { AcuEvaluateInput, AcuEvaluation, AcuJudgeResult } from "./types.js";
 import type { RoutingDecision, Tier } from "../router/types.js";
@@ -74,7 +73,6 @@ export class AcuDemoStrategy {
     rulesDecision: RoutingDecision,
   ): Promise<AcuEvaluation> {
     const visible = serializeVisibleContext(input.messages, input.tools);
-    const fallbackContext = truncateVisibleContext(visible, this.config.maxContextTokens);
     let judge: AcuJudgeResult;
     let judgeStatus: AcuEvaluation["judgeStatus"];
     let judgeLatencyMs = 0;
@@ -90,8 +88,8 @@ export class AcuDemoStrategy {
     let usageStatus: AcuEvaluation["usageStatus"] = "not_applicable";
     let judgeErrorCategory: string | undefined;
     let contextSha256 = createHash("sha256").update(visible).digest("hex");
-    let contextTokenEstimate = estimateVisibleTokens(fallbackContext.text);
-    let contextTruncated = fallbackContext.truncated;
+    let contextTokenEstimate = estimateVisibleTokens(visible);
+    let contextTruncated = false;
     try {
       if (!this.config.enabled) throw new Error("ACU Demo Router feature flag is disabled");
       const response = await this.judgeClient.judge(input.messages, input.tools, input.forceJudgeRefresh === true);

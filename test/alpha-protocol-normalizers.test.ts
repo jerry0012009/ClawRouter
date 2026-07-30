@@ -87,6 +87,20 @@ describe("Responses canonical envelope", () => {
     });
     expect(envelope.planning.started).toBe(false);
   });
+
+  it("keeps Codex environment context in raw history but excludes it from human goals", () => {
+    const environment = `<environment_context>\n<cwd>/tmp/work</cwd>\n<shell>bash</shell>\n<current_date>2026-07-30</current_date>\n<timezone>UTC</timezone>\n<filesystem>workspace-write</filesystem>\n</environment_context>`;
+    const envelope = normalizeResponsesRequest({
+      model: "acu-auto",
+      input: [
+        { type: "message", role: "user", content: [{ type: "input_text", text: environment }] },
+        { type: "function_call_output", call_id: "tool-1", output: "complete tool result" },
+      ],
+    });
+    expect((envelope.history[0] as { content: Array<{ text: string }> }).content[0].text).toBe(environment);
+    expect(envelope.humanCandidates).toEqual([]);
+    expect(envelope.toolResults[0]?.content).toBe("complete tool result");
+  });
 });
 
 describe("Messages canonical envelope", () => {

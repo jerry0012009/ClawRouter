@@ -406,9 +406,15 @@ run("Alpha PostgreSQL foundation", () => {
     expect(trace?.route_decisions).toEqual(expect.arrayContaining([
       expect.objectContaining({ route_decision_id: "route_a_1" }),
     ]));
+    expect(trace?.logical_requests).toEqual(expect.arrayContaining([
+      expect.objectContaining({ logical_request_id: "req_a_1" }),
+    ]));
     expect(trace?.attempts).toHaveLength(3);
     expect(trace?.payloads).toEqual(expect.arrayContaining([
       expect.objectContaining({ payload_id: "payload_a_1" }),
+    ]));
+    expect(trace?.usage_reports).toEqual(expect.arrayContaining([
+      expect.objectContaining({ usage_report_id: "usage_a_1" }),
     ]));
     expect(await repository.getAdminLogicalRequestTrace("req_missing")).toBeUndefined();
   });

@@ -66,6 +66,7 @@ export type AlphaResolutionContext = {
   newapiTokenId: string;
   newapiLogId: string;
   protocol: AlphaProtocol;
+  requestedModel: string;
   reasoningEffort?: string;
   selectedProfile: AlphaExecutionProfile;
   networkEndpoint?: string;
@@ -111,6 +112,11 @@ export type AlphaResolutionContext = {
   };
   phase?: string;
   judgeExplanation?: string;
+  judgeTrigger?: string;
+  judgeCalls: number;
+  judgeReused: boolean;
+  reusedJudgeEvaluationId?: string;
+  routeRefreshReason?: string;
   routeDecisionSnapshot?: JsonObject;
 };
 
@@ -1838,6 +1844,7 @@ export class AlphaRequestProcessor {
             newapiTokenId: identity.newapiTokenId,
             newapiLogId: identity.newapiLogId,
             protocol: envelope.protocol,
+            requestedModel: envelope.requestedModel,
             reasoningEffort: envelope.reasoningEffort,
             selectedProfile: replayProfile,
             judgeCostUsd: "0.0000000000",
@@ -1865,6 +1872,9 @@ export class AlphaRequestProcessor {
             attemptedProviders: [replayProfile.provider],
             attemptedNetworkEndpoints: [],
             phase: stringValue(replaySegment?.phase),
+            judgeCalls: 0,
+            judgeReused: Boolean(replaySegment?.judge_evaluation_id),
+            reusedJudgeEvaluationId: stringValue(replaySegment?.judge_evaluation_id),
             routeDecisionSnapshot: replayStoredRoute,
             routeSummary: routeDisplaySummary(
               envelope.requestedModel,
@@ -1944,6 +1954,12 @@ export class AlphaRequestProcessor {
     const storedRoute = routeDecisionId
       ? await repository.getRouteDecision(routeDecisionId, identity.newapiUserId)
       : undefined;
+    const storedRouteInputs = record(storedRoute?.formula_inputs_json);
+    const storedExecutionMetadata = metadata(executionSegment);
+    const routeRefreshReason = stringValue(storedRouteInputs?.routeRefreshReason)
+      ?? stringValue(storedExecutionMetadata.routeRefreshReason);
+    const judgeReused = Boolean(storedRouteInputs?.judgeReused)
+      || (!result.judge && Boolean(judgeEvaluationId) && mode !== "explicit");
     const attemptIndex = await repository.nextProviderAttemptIndex(logical.logicalRequestId);
     const maxProviderAttempts = 3;
     if (attemptIndex > maxProviderAttempts) throw new Error("Provider Attempt budget exhausted for logical request");
@@ -1996,6 +2012,7 @@ export class AlphaRequestProcessor {
       newapiTokenId: identity.newapiTokenId,
       newapiLogId: identity.newapiLogId,
       protocol: envelope.protocol,
+      requestedModel: envelope.requestedModel,
       reasoningEffort: envelope.reasoningEffort,
       selectedProfile: result.profile,
       networkEndpoint: initialAttempt.networkEndpoint,
@@ -2028,6 +2045,11 @@ export class AlphaRequestProcessor {
       attemptedNetworkEndpoints: initialAttempt.networkEndpoint ? [initialAttempt.networkEndpoint] : [],
       phase: state.decision.phase,
       judgeExplanation: result.judge?.judge.explanation,
+      judgeTrigger: routeRefreshReason ? "reuse_route" : state.decision.reason,
+      judgeCalls: result.judge ? 1 : 0,
+      judgeReused,
+      reusedJudgeEvaluationId: judgeReused ? judgeEvaluationId : undefined,
+      routeRefreshReason,
       routeDecisionSnapshot: storedRoute,
       routeSummary: routeDisplaySummary(
         envelope.requestedModel,
@@ -2319,6 +2341,16 @@ export class AlphaRequestProcessor {
       judgeModel: input.context.judgeModel,
       costBreakdown: {
         billing_version: "founder-alpha-actual-cash-v2",
+        requested_model: input.context.requestedModel,
+        routed_by_acu: modeForModel(input.context.requestedModel) !== "explicit",
+        session_id: input.context.sessionId,
+        task_id: input.context.taskId,
+        segment_id: input.context.segmentId,
+        judge_trigger: input.context.judgeTrigger,
+        judge_calls: input.context.judgeCalls,
+        judge_reused: input.context.judgeReused,
+        reused_judge_evaluation_id: input.context.reusedJudgeEvaluationId,
+        route_refresh_reason: input.context.routeRefreshReason,
         judge_nominal_cost_usd: input.context.judgeCostUsd,
         nominal_provider_cost_usd: providerCash.nominalProviderCostUsd,
         provider_balance_charge: providerCash.providerBalanceCharge,

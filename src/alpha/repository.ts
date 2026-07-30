@@ -684,9 +684,15 @@ export class AlphaRepository {
            JOIN acu_segments segment ON segment.segment_id=value.segment_id
            WHERE segment.task_id=requested.task_id
          ),'[]'::jsonb),
+         'logical_requests',COALESCE((
+           SELECT jsonb_agg(to_jsonb(value) ORDER BY value.started_at,value.logical_request_id)
+           FROM acu_logical_requests value WHERE value.task_id=requested.task_id
+         ),'[]'::jsonb),
          'attempts',COALESCE((
-           SELECT jsonb_agg(to_jsonb(value) ORDER BY value.attempt_index,value.attempt_kind,value.attempt_id)
-           FROM acu_attempts value WHERE value.logical_request_id=requested.logical_request_id
+           SELECT jsonb_agg(to_jsonb(value) ORDER BY request.started_at,value.attempt_index,value.attempt_kind,value.attempt_id)
+           FROM acu_attempts value
+           JOIN acu_logical_requests request USING(logical_request_id)
+           WHERE request.task_id=requested.task_id
          ),'[]'::jsonb),
          'payloads',COALESCE((
            SELECT jsonb_agg(to_jsonb(value) ORDER BY value.created_at,value.payload_id)
@@ -704,7 +710,13 @@ export class AlphaRepository {
               )
          ),'[]'::jsonb),
          'usage_report',(SELECT to_jsonb(value) FROM acu_usage_reports value
-                         WHERE value.logical_request_id=requested.logical_request_id)
+                         WHERE value.logical_request_id=requested.logical_request_id),
+         'usage_reports',COALESCE((
+           SELECT jsonb_agg(to_jsonb(value) ORDER BY value.created_at,value.usage_report_id)
+           FROM acu_usage_reports value
+           JOIN acu_logical_requests request USING(logical_request_id)
+           WHERE request.task_id=requested.task_id
+         ),'[]'::jsonb)
        ) AS trace
        FROM requested`,
       [logicalRequestId],

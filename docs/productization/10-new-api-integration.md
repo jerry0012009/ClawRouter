@@ -322,12 +322,13 @@ New API 用户页面 P0 展示：
 - Judge 成本；
 - Provider 成本；
 - 最终总成本；
-- 简短 Route Summary。
+- 完整历史 Route Decision：任务 Difficulty、Routing Preference、阶段、全部合法候选及其历史质量曲线与现金成本、Pareto Frontier、最终选择与原因、被排除模型主因；
+- 实际 Provider / Channel、最多三次 Channel Attempt 时间线、实际成本、质量上界反事实成本和相对成本下降；
+- 可折叠但不截断保存数据的 Judge Explanation。
 
 用户页面不展示：
 
 - 完整 Judge Prompt；
-- 全部候选效用；
 - 原始 Tool 轨迹；
 - 完整输入输出；
 - 内部失败签名。

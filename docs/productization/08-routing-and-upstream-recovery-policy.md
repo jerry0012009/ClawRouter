@@ -329,17 +329,18 @@ ACU 是网关侧 Retry Owner。Codex / Claude Code 仍可能自行 Retry；ACU �
 ## 15. P0 上游恢复预算
 
 ```text
-max_provider_attempts_per_logical_request = 2
+max_provider_attempts_per_logical_request = 3
 ```
 
-即初始 Attempt + 一次 ACU 控制的恢复 Attempt。
+即初始 Attempt + 最多两次 ACU 控制的恢复 Attempt。
 
 恢复顺序：
 
 1. 初始 Profile 首选 Channel；
 2. 同模型、同协议与等价能力配置的健康备用 Channel；
-3. 无同模型备用时，使用最近 Evaluation 和当前 T 重跑硬过滤、Pareto 与连续价值公式，并限制 recovery Route 不低于当前 recovery policy；
-4. 预算耗尽则返回明确错误。
+3. 前两个 Channel 同属一个 Provider 且均失败时，第三个优先选择另一 Provider 的同模型健康 Channel；
+4. 无同模型备用时，使用最近 Evaluation 和当前 T 重跑硬过滤、Pareto 与连续价值公式，并限制 recovery Route 不低于当前 recovery policy；
+5. 预算耗尽则返回明确错误。
 
 模型变化时创建 availability / compatibility recovery Segment，不重新 Judge。
 

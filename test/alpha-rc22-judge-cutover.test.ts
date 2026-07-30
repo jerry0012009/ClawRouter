@@ -122,6 +122,17 @@ describe("RC2.2 Judge cutover", () => {
     expect(result.webIntent).toBe("not_required");
   });
 
+  it.each([
+    ["array", ["reason", { detail: true }], '["reason",{"detail":true}]'],
+    ["object", { reason: "fixture", weight: 2 }, '{"reason":"fixture","weight":2}'],
+    ["null", null, ""],
+  ])("normalizes non-critical %s explanation without invalidating the evaluation", (type, value, expected) => {
+    const result = parseJudgeResult(JSON.stringify({ ...validJudgePayload, explanation: value }));
+    expect(result.explanation).toBe(expected);
+    expect(result.explanationNormalized).toBe(true);
+    expect(result.originalExplanationType).toBe(type);
+  });
+
   it("accepts an unbounded webIntentReason string while retaining strict routing fields", () => {
     const reason = "外部证据".repeat(2_000);
     const result = parseJudgeResult(JSON.stringify({ ...validJudgePayload, webIntentReason: reason }));

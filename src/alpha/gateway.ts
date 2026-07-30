@@ -42,6 +42,11 @@ export type AlphaGatewayOptions = {
     token: string;
     load(logicalRequestId: string): Promise<Record<string, unknown> | undefined>;
   };
+  adminChannelMonitor?: {
+    token: string;
+    load(range: "1h" | "24h" | "7d"): Promise<Record<string, unknown>>;
+    pause(channelId: string, durationMinutes: 30 | 120, actor: string): Promise<Record<string, unknown>>;
+  };
   models?: string[];
   requirePrivateNetwork?: boolean;
   healthCheck?(): Promise<Record<string, unknown>>;
@@ -134,6 +139,33 @@ export function createAlphaGatewayServer(options: AlphaGatewayOptions): Server {
     }
     if ((options.requirePrivateNetwork ?? true) && !isPrivateNetworkAddress(request.socket.remoteAddress)) {
       jsonError(response, 403, "ACU ingress is restricted to private network sources");
+      return;
+    }
+    if (url.pathname === "/internal/admin/channel-monitor" && (request.method === "GET" || request.method === "POST")) {
+      if (!options.adminChannelMonitor) {
+        jsonError(response, 404, "Unsupported ACU endpoint");
+        return;
+      }
+      const token = adminBearerToken(request);
+      if (!token || !tokenMatches(token, options.adminChannelMonitor.token)) {
+        jsonError(response, token ? 403 : 401, token ? "Administrator identity is not authorized" : "Administrator bearer token is required");
+        return;
+      }
+      try {
+        const result = request.method === "GET"
+          ? await options.adminChannelMonitor.load((url.searchParams.get("range") as "1h" | "24h" | "7d") || "1h")
+          : await (async () => {
+            const body = JSON.parse((await readRequestBody(request, 16 * 1024)).toString("utf8")) as Record<string, unknown>;
+            const durationMinutes = Number(body.durationMinutes);
+            if (typeof body.channelId !== "string" || ![30, 120].includes(durationMinutes)) throw new Error("Invalid Channel pause request");
+            return options.adminChannelMonitor!.pause(body.channelId, durationMinutes as 30 | 120, String(body.actor || "new-api-admin"));
+          })();
+        response.setHeader("cache-control", "no-store");
+        response.setHeader("content-type", "application/json");
+        response.end(JSON.stringify(result));
+      } catch (error) {
+        jsonError(response, 400, error instanceof Error ? error.message : "Channel monitor request failed");
+      }
       return;
     }
     const adminTraceMatch = /^\/internal\/admin\/traces\/(req_[A-Za-z0-9_-]{1,128})$/.exec(url.pathname);

@@ -12,15 +12,9 @@ const maxCashCny = Math.min(1, Math.max(0, Number(process.env.ACU_CHANNEL_PREFLI
 const preflightRunId = process.env.ACU_CHANNEL_PREFLIGHT_RUN_ID?.trim() || "founder-economic-alpha-20260729-v1";
 
 const SELECTED_PROFILES = [
-  "blackai-codex-mix-low:gpt-5.4-mini:responses",
-  "blackai-codex-mix-low:gpt-5.6-luna:responses",
-  "blackai-codex-mix-low:gpt-5.6-terra:responses",
-  "blackai-codex-mix-low:gpt-5.6-sol:responses",
-  "lucen-cx006-value-dynamic:gpt-5.4-mini:responses",
-  "lucen-cx006-value-dynamic:gpt-5.6-luna:responses",
-  "lucen-cx006-value-dynamic:gpt-5.6-terra:responses",
-  "lucen-cx006-plus:gpt-5.6-luna:responses",
-  "lucen-cx008-plus-dedicated:gpt-5.6-luna:responses",
+  "lucen-cx004-low-dedicated:gpt-5.6-luna:responses",
+  "lucen-cx014-pro-stable:gpt-5.6-luna:responses",
+  "lucen-cx025-pro-premium:gpt-5.6-luna:responses",
 ] as const;
 
 function dotenv(text: string): Map<string, string> {

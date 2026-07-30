@@ -49,6 +49,32 @@ afterEach(async () => {
 });
 
 describe("Alpha native protocol gateway", () => {
+  it("protects Channel Monitor and records an authorized manual pause", async () => {
+    const pauses: Array<{ channelId: string; durationMinutes: number; actor: string }> = [];
+    const gatewayPort = await listen(createAlphaGatewayServer({
+      trustedIdentitySecret: sharedSecret,
+      adminChannelMonitor: {
+        token: "monitor-token",
+        async load(range) { return { range, profiles: [] }; },
+        async pause(channelId, durationMinutes, actor) {
+          pauses.push({ channelId, durationMinutes, actor });
+          return { channelId, state: "open", recovery: "half_open_probe" };
+        },
+      },
+      async resolveExecution() { throw new Error("monitor must not route an execution"); },
+    }));
+    const unauthorized = await fetch(`http://127.0.0.1:${gatewayPort}/internal/admin/channel-monitor`);
+    expect(unauthorized.status).toBe(401);
+    const response = await fetch(`http://127.0.0.1:${gatewayPort}/internal/admin/channel-monitor`, {
+      method: "POST",
+      headers: { authorization: "Bearer monitor-token", "content-type": "application/json" },
+      body: JSON.stringify({ channelId: "lucen-cx014-pro-stable", durationMinutes: 30, actor: "admin-fixture" }),
+    });
+    expect(response.status).toBe(200);
+    expect(pauses).toEqual([{ channelId: "lucen-cx014-pro-stable", durationMinutes: 30, actor: "admin-fixture" }]);
+    expect(await response.json()).toMatchObject({ state: "open", recovery: "half_open_probe" });
+  });
+
   it("returns verifiable build, migration, Judge, and routing identity in health", async () => {
     const identity = {
       runningCommit: "commit-fixture",

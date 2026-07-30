@@ -31,6 +31,7 @@ export type AcuJudgeResult = AcuTierProbabilities & {
   explanation: string;
   explanationNormalized?: boolean;
   originalExplanationLength?: number;
+  originalExplanationType?: "string" | "array" | "object" | "null" | "missing";
   webIntent?: "required" | "likely" | "not_required";
   webIntentConfidence?: number;
   webIntentReason?: string;

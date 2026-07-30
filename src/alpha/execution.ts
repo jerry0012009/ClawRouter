@@ -47,6 +47,33 @@ export function isRecoverableProviderStatus(status: number): boolean {
   return status === 429 || (status >= 500 && status <= 599);
 }
 
+export type FirstModelEventDeadlineInput = {
+  estimatedInputTokens: number;
+  successfulLatenciesMs: number[];
+  recentErrorClasses: string[];
+  profileState?: string;
+};
+
+export function computeFirstModelEventDeadlineMs(input: FirstModelEventDeadlineInput): number {
+  const fallback = input.estimatedInputTokens >= 100_000 ? 75_000 : 45_000;
+  const samples = input.successfulLatenciesMs.filter(Number.isFinite).sort((a, b) => a - b);
+  if (samples.length < 10) return fallback;
+  const percentile = (ratio: number): number => samples[Math.min(samples.length - 1, Math.ceil(samples.length * ratio) - 1)]!;
+  const p50 = percentile(0.5);
+  const p95 = percentile(0.95);
+  const recentFailures = input.recentErrorClasses.slice(0, 5).filter((value) => (
+    value === "slow_first_model_event"
+    || value === "timeout"
+    || value === "provider_5xx"
+    || value === "provider_edge_timeout"
+  )).length;
+  const volatile = (p50 > 0 && p95 / p50 > 3)
+    || recentFailures >= 2
+    || input.profileState === "degraded";
+  if (volatile) return fallback;
+  return Math.max(30_000, Math.min(90_000, Math.round(p95 * 1.5)));
+}
+
 async function bufferFailure(response: Response): Promise<BufferedProviderFailure> {
   const observer = new ModelOutputObserver(Date.now());
   const body = Buffer.from(await response.arrayBuffer());

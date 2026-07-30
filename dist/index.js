@@ -6701,10 +6701,11 @@ function parseJudgeResult(text) {
   if (!Array.isArray(parsed.signals) || parsed.signals.some((signal) => typeof signal !== "string")) {
     throw new Error("Judge signals must be an array of strings");
   }
-  if (typeof parsed.explanation !== "string") throw new Error("Judge explanation must be a string");
-  const originalExplanationLength = Array.from(parsed.explanation).length;
-  const explanationNormalized = false;
-  const explanation = parsed.explanation;
+  const rawExplanation = parsed.explanation;
+  const originalExplanationType = !("explanation" in parsed) ? "missing" : rawExplanation === null ? "null" : Array.isArray(rawExplanation) ? "array" : typeof rawExplanation === "object" ? "object" : "string";
+  const explanation = typeof rawExplanation === "string" ? rawExplanation : rawExplanation === null || rawExplanation === void 0 ? "" : stableJson(rawExplanation);
+  const originalExplanationLength = typeof rawExplanation === "string" ? Array.from(rawExplanation).length : void 0;
+  const explanationNormalized = originalExplanationType !== "string";
   if (!["required", "likely", "not_required"].includes(String(parsed.webIntent))) {
     throw new Error("Judge webIntent must be required, likely, or not_required");
   }
@@ -6728,6 +6729,7 @@ function parseJudgeResult(text) {
     explanation,
     explanationNormalized,
     originalExplanationLength,
+    originalExplanationType,
     webIntent: parsed.webIntent,
     webIntentConfidence,
     webIntentReason: parsed.webIntentReason,

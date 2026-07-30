@@ -1,6 +1,6 @@
 {
   "schemaVersion": "acu-provider-channel-discovery-v1",
-  "generatedAt": "2026-07-29T15:17:29.385Z",
+  "generatedAt": "2026-07-30T18:18:01.551Z",
   "curveModelCount": 23,
   "summary": {
     "channelCount": 46,
@@ -9,7 +9,7 @@
     "noDirectory": 0,
     "failed": 0,
     "curveIntersections": 119,
-    "aliasPending": 481,
+    "aliasPending": 491,
     "responsesCandidates": 81,
     "messagesCandidates": 31
   },
@@ -66,7 +66,7 @@
         "gpt-5.6-terra"
       ],
       "messagesCandidates": [],
-      "observedAt": "2026-07-29T15:17:20.643Z"
+      "observedAt": "2026-07-30T18:17:52.648Z"
     },
     {
       "channelId": "blackai-pro-1-4",
@@ -153,7 +153,7 @@
         "gpt-5.6-terra"
       ],
       "messagesCandidates": [],
-      "observedAt": "2026-07-29T15:17:20.897Z"
+      "observedAt": "2026-07-30T18:17:52.774Z"
     },
     {
       "channelId": "blackai-claude-reverse",
@@ -288,7 +288,7 @@
         "claude-opus-4-8",
         "claude-sonnet-5"
       ],
-      "observedAt": "2026-07-29T15:17:21.020Z"
+      "observedAt": "2026-07-30T18:17:52.905Z"
     },
     {
       "channelId": "blackai-grok",
@@ -346,7 +346,7 @@
       ],
       "responsesCandidates": [],
       "messagesCandidates": [],
-      "observedAt": "2026-07-29T15:17:21.140Z"
+      "observedAt": "2026-07-30T18:17:53.030Z"
     },
     {
       "channelId": "blackai-image",
@@ -397,7 +397,7 @@
       ],
       "responsesCandidates": [],
       "messagesCandidates": [],
-      "observedAt": "2026-07-29T15:17:21.251Z"
+      "observedAt": "2026-07-30T18:17:53.152Z"
     },
     {
       "channelId": "blackai-codex-mix-pro-fallback",
@@ -484,7 +484,7 @@
         "gpt-5.6-terra"
       ],
       "messagesCandidates": [],
-      "observedAt": "2026-07-29T15:17:21.386Z"
+      "observedAt": "2026-07-30T18:17:53.257Z"
     },
     {
       "channelId": "lucen-cn-image-010",
@@ -506,7 +506,7 @@
       ],
       "responsesCandidates": [],
       "messagesCandidates": [],
-      "observedAt": "2026-07-29T15:17:21.988Z"
+      "observedAt": "2026-07-30T18:17:53.798Z"
     },
     {
       "channelId": "lucen-cn-models-k3-015",
@@ -557,7 +557,7 @@
         "glm-5.2"
       ],
       "messagesCandidates": [],
-      "observedAt": "2026-07-29T15:17:22.522Z"
+      "observedAt": "2026-07-30T18:17:53.989Z"
     },
     {
       "channelId": "lucen-grok-020",
@@ -579,7 +579,7 @@
       ],
       "responsesCandidates": [],
       "messagesCandidates": [],
-      "observedAt": "2026-07-29T15:17:22.712Z"
+      "observedAt": "2026-07-30T18:17:54.178Z"
     },
     {
       "channelId": "lucen-image-003",
@@ -601,7 +601,7 @@
       ],
       "responsesCandidates": [],
       "messagesCandidates": [],
-      "observedAt": "2026-07-29T15:17:22.893Z"
+      "observedAt": "2026-07-30T18:17:54.363Z"
     },
     {
       "channelId": "lucen-image-006",
@@ -623,7 +623,7 @@
       ],
       "responsesCandidates": [],
       "messagesCandidates": [],
-      "observedAt": "2026-07-29T15:17:23.074Z"
+      "observedAt": "2026-07-30T18:17:54.548Z"
     },
     {
       "channelId": "lucen-image-008",
@@ -645,7 +645,7 @@
       ],
       "responsesCandidates": [],
       "messagesCandidates": [],
-      "observedAt": "2026-07-29T15:17:23.251Z"
+      "observedAt": "2026-07-30T18:17:54.733Z"
     },
     {
       "channelId": "lucen-claude-clone-020",
@@ -693,7 +693,7 @@
         "claude-opus-4-8",
         "claude-sonnet-5"
       ],
-      "observedAt": "2026-07-29T15:17:23.428Z"
+      "observedAt": "2026-07-30T18:17:54.932Z"
     },
     {
       "channelId": "lucen-claude-cursor-reverse-030",
@@ -762,7 +762,7 @@
         "claude-opus-4-8",
         "claude-sonnet-5"
       ],
-      "observedAt": "2026-07-29T15:17:23.607Z"
+      "observedAt": "2026-07-30T18:17:55.143Z"
     },
     {
       "channelId": "lucen-cx003-low",
@@ -798,7 +798,7 @@
         "gpt-5.6-terra"
       ],
       "messagesCandidates": [],
-      "observedAt": "2026-07-29T15:17:23.782Z"
+      "observedAt": "2026-07-30T18:17:55.338Z"
     },
     {
       "channelId": "lucen-cx004-low-dedicated",
@@ -882,7 +882,7 @@
         "gpt-5.6-terra"
       ],
       "messagesCandidates": [],
-      "observedAt": "2026-07-29T15:17:23.956Z"
+      "observedAt": "2026-07-30T18:17:55.526Z"
     },
     {
       "channelId": "lucen-cx006-value-dynamic",
@@ -966,7 +966,7 @@
         "gpt-5.6-terra"
       ],
       "messagesCandidates": [],
-      "observedAt": "2026-07-29T15:17:24.130Z"
+      "observedAt": "2026-07-30T18:17:55.716Z"
     },
     {
       "channelId": "lucen-cx006-plus",
@@ -1026,7 +1026,7 @@
         "gpt-5.6-terra"
       ],
       "messagesCandidates": [],
-      "observedAt": "2026-07-29T15:17:24.307Z"
+      "observedAt": "2026-07-30T18:17:55.909Z"
     },
     {
       "channelId": "lucen-cx008-plus-dedicated",
@@ -1095,7 +1095,7 @@
         "gpt-5.6-terra"
       ],
       "messagesCandidates": [],
-      "observedAt": "2026-07-29T15:17:24.483Z"
+      "observedAt": "2026-07-30T18:17:56.094Z"
     },
     {
       "channelId": "lucen-cx010-plus-fast",
@@ -1176,7 +1176,7 @@
         "gpt-5.6-terra"
       ],
       "messagesCandidates": [],
-      "observedAt": "2026-07-29T15:17:24.663Z"
+      "observedAt": "2026-07-30T18:17:56.280Z"
     },
     {
       "channelId": "lucen-cx012-pro",
@@ -1260,7 +1260,7 @@
         "gpt-5.6-terra"
       ],
       "messagesCandidates": [],
-      "observedAt": "2026-07-29T15:17:24.840Z"
+      "observedAt": "2026-07-30T18:17:56.465Z"
     },
     {
       "channelId": "lucen-cx014-pro-stable",
@@ -1344,7 +1344,7 @@
         "gpt-5.6-terra"
       ],
       "messagesCandidates": [],
-      "observedAt": "2026-07-29T15:17:25.016Z"
+      "observedAt": "2026-07-30T18:17:56.652Z"
     },
     {
       "channelId": "lucen-cx017-pro-first-token",
@@ -1425,7 +1425,7 @@
         "gpt-5.6-terra"
       ],
       "messagesCandidates": [],
-      "observedAt": "2026-07-29T15:17:25.207Z"
+      "observedAt": "2026-07-30T18:17:56.845Z"
     },
     {
       "channelId": "lucen-cx025-pro-premium",
@@ -1530,7 +1530,7 @@
         "gpt-5.6-terra"
       ],
       "messagesCandidates": [],
-      "observedAt": "2026-07-29T15:17:25.397Z"
+      "observedAt": "2026-07-30T18:17:57.033Z"
     },
     {
       "channelId": "lucen-gemini-image-008",
@@ -1555,7 +1555,7 @@
       ],
       "responsesCandidates": [],
       "messagesCandidates": [],
-      "observedAt": "2026-07-29T15:17:25.576Z"
+      "observedAt": "2026-07-30T18:17:57.216Z"
     },
     {
       "channelId": "lucen-gemini-image-007",
@@ -1577,7 +1577,7 @@
       ],
       "responsesCandidates": [],
       "messagesCandidates": [],
-      "observedAt": "2026-07-29T15:17:25.752Z"
+      "observedAt": "2026-07-30T18:17:57.417Z"
     },
     {
       "channelId": "lucen-claude-aws-reverse-040",
@@ -1643,7 +1643,7 @@
       "messagesCandidates": [
         "claude-opus-4-8"
       ],
-      "observedAt": "2026-07-29T15:17:25.928Z"
+      "observedAt": "2026-07-30T18:17:57.651Z"
     },
     {
       "channelId": "lucen-claude-max-090",
@@ -1730,7 +1730,7 @@
         "claude-opus-4-8",
         "claude-sonnet-5"
       ],
-      "observedAt": "2026-07-29T15:17:26.103Z"
+      "observedAt": "2026-07-30T18:17:57.840Z"
     },
     {
       "channelId": "lucen-claude-antigravity-reverse-040",
@@ -1796,7 +1796,7 @@
       "messagesCandidates": [
         "claude-opus-4-8"
       ],
-      "observedAt": "2026-07-29T15:17:26.280Z"
+      "observedAt": "2026-07-30T18:17:58.028Z"
     },
     {
       "channelId": "lucen-gemini-openai-030",
@@ -1871,7 +1871,7 @@
         "gemini-3.5-flash"
       ],
       "messagesCandidates": [],
-      "observedAt": "2026-07-29T15:17:26.455Z"
+      "observedAt": "2026-07-30T18:17:58.210Z"
     },
     {
       "channelId": "lucen-mainstream-cn-claude-030",
@@ -1952,7 +1952,7 @@
         "kimi-k2.6",
         "kimi-k2.7-code"
       ],
-      "observedAt": "2026-07-29T15:17:26.631Z"
+      "observedAt": "2026-07-30T18:17:58.409Z"
     },
     {
       "channelId": "lucen-grok-openai-006",
@@ -1989,7 +1989,7 @@
       ],
       "responsesCandidates": [],
       "messagesCandidates": [],
-      "observedAt": "2026-07-29T15:17:26.865Z"
+      "observedAt": "2026-07-30T18:17:58.595Z"
     },
     {
       "channelId": "lucen-kiro-cache-claude-015",
@@ -1998,7 +1998,7 @@
       "status": "success",
       "httpStatus": 200,
       "endpointHost": "lucen.cc",
-      "responseSha256": "5def5d9258e7f6a90259ef10eeeaa0193e44354e63be3cad2149b90c1d203286",
+      "responseSha256": "0135b68c03a9fd9b5979c7fc83be97ad4e86ee32a2267aa3492ed5b821a84a9d",
       "providerModelIds": [
         "claude-3-5-haiku-20241022",
         "claude-3-5-sonnet-20240620",
@@ -2006,17 +2006,27 @@
         "claude-3-7-sonnet-20250219",
         "claude-fable-5",
         "claude-haiku-4-5-20251001",
+        "claude-haiku-4-5-20251001-thinking",
         "claude-opus-4-1-20250805",
         "claude-opus-4-20250514",
         "claude-opus-4-5-20251101",
+        "claude-opus-4-5-20251101-thinking",
         "claude-opus-4-6",
+        "claude-opus-4-6-thinking",
         "claude-opus-4-7",
+        "claude-opus-4-7-thinking",
         "claude-opus-4-8",
+        "claude-opus-4-8-thinking",
+        "claude-opus-5",
+        "claude-opus-5-thinking",
         "claude-sonnet-4-20250514",
         "claude-sonnet-4-5-20250929",
+        "claude-sonnet-4-5-20250929-thinking",
         "claude-sonnet-4-6",
+        "claude-sonnet-4-6-thinking",
         "claude-sonnet-4-8",
-        "claude-sonnet-5"
+        "claude-sonnet-5",
+        "claude-sonnet-5-thinking"
       ],
       "exactCanonicalMatches": [
         "claude-opus-4-8",
@@ -2029,15 +2039,25 @@
         "claude-3-7-sonnet-20250219",
         "claude-fable-5",
         "claude-haiku-4-5-20251001",
+        "claude-haiku-4-5-20251001-thinking",
         "claude-opus-4-1-20250805",
         "claude-opus-4-20250514",
         "claude-opus-4-5-20251101",
+        "claude-opus-4-5-20251101-thinking",
         "claude-opus-4-6",
+        "claude-opus-4-6-thinking",
         "claude-opus-4-7",
+        "claude-opus-4-7-thinking",
+        "claude-opus-4-8-thinking",
+        "claude-opus-5",
+        "claude-opus-5-thinking",
         "claude-sonnet-4-20250514",
         "claude-sonnet-4-5-20250929",
+        "claude-sonnet-4-5-20250929-thinking",
         "claude-sonnet-4-6",
-        "claude-sonnet-4-8"
+        "claude-sonnet-4-6-thinking",
+        "claude-sonnet-4-8",
+        "claude-sonnet-5-thinking"
       ],
       "aliasMappingRequired": [
         "claude-3-5-haiku-20241022",
@@ -2046,22 +2066,32 @@
         "claude-3-7-sonnet-20250219",
         "claude-fable-5",
         "claude-haiku-4-5-20251001",
+        "claude-haiku-4-5-20251001-thinking",
         "claude-opus-4-1-20250805",
         "claude-opus-4-20250514",
         "claude-opus-4-5-20251101",
+        "claude-opus-4-5-20251101-thinking",
         "claude-opus-4-6",
+        "claude-opus-4-6-thinking",
         "claude-opus-4-7",
+        "claude-opus-4-7-thinking",
+        "claude-opus-4-8-thinking",
+        "claude-opus-5",
+        "claude-opus-5-thinking",
         "claude-sonnet-4-20250514",
         "claude-sonnet-4-5-20250929",
+        "claude-sonnet-4-5-20250929-thinking",
         "claude-sonnet-4-6",
-        "claude-sonnet-4-8"
+        "claude-sonnet-4-6-thinking",
+        "claude-sonnet-4-8",
+        "claude-sonnet-5-thinking"
       ],
       "responsesCandidates": [],
       "messagesCandidates": [
         "claude-opus-4-8",
         "claude-sonnet-5"
       ],
-      "observedAt": "2026-07-29T15:17:27.049Z"
+      "observedAt": "2026-07-30T18:17:58.779Z"
     },
     {
       "channelId": "lucen-glm-official-claude-030",
@@ -2097,7 +2127,7 @@
         "glm-5.1",
         "glm-5.2"
       ],
-      "observedAt": "2026-07-29T15:17:27.235Z"
+      "observedAt": "2026-07-30T18:17:58.964Z"
     },
     {
       "channelId": "lucen-glm-official-openai-030",
@@ -2133,7 +2163,7 @@
         "gpt-5.5"
       ],
       "messagesCandidates": [],
-      "observedAt": "2026-07-29T15:17:27.416Z"
+      "observedAt": "2026-07-30T18:17:59.146Z"
     },
     {
       "channelId": "lucen-qwen-official-claude-010",
@@ -2163,7 +2193,7 @@
       "messagesCandidates": [
         "qwen3.7-max"
       ],
-      "observedAt": "2026-07-29T15:17:27.593Z"
+      "observedAt": "2026-07-30T18:17:59.334Z"
     },
     {
       "channelId": "lucen-qwen-official-openai-010",
@@ -2193,7 +2223,7 @@
         "qwen3.7-max"
       ],
       "messagesCandidates": [],
-      "observedAt": "2026-07-29T15:17:27.767Z"
+      "observedAt": "2026-07-30T18:17:59.518Z"
     },
     {
       "channelId": "lucen-grok-006",
@@ -2241,7 +2271,7 @@
         "claude-sonnet-5"
       ],
       "messagesCandidates": [],
-      "observedAt": "2026-07-29T15:17:27.939Z"
+      "observedAt": "2026-07-30T18:17:59.701Z"
     },
     {
       "channelId": "lucen-deepseek-openai-050",
@@ -2319,7 +2349,7 @@
         "qwen3.7-max"
       ],
       "messagesCandidates": [],
-      "observedAt": "2026-07-29T15:17:28.116Z"
+      "observedAt": "2026-07-30T18:17:59.913Z"
     },
     {
       "channelId": "lucen-deepseek-claude-050",
@@ -2344,7 +2374,7 @@
         "deepseek-v4-flash",
         "deepseek-v4-pro"
       ],
-      "observedAt": "2026-07-29T15:17:28.294Z"
+      "observedAt": "2026-07-30T18:18:00.161Z"
     },
     {
       "channelId": "lucen-kimi-k3-claude-040",
@@ -2375,7 +2405,7 @@
       ],
       "responsesCandidates": [],
       "messagesCandidates": [],
-      "observedAt": "2026-07-29T15:17:28.476Z"
+      "observedAt": "2026-07-30T18:18:00.579Z"
     },
     {
       "channelId": "lucen-kimi-k3-openai-040",
@@ -2406,7 +2436,7 @@
       ],
       "responsesCandidates": [],
       "messagesCandidates": [],
-      "observedAt": "2026-07-29T15:17:28.669Z"
+      "observedAt": "2026-07-30T18:18:00.772Z"
     },
     {
       "channelId": "lucen-kiro-cache90-claude-006",
@@ -2505,7 +2535,7 @@
         "claude-opus-4-8",
         "claude-sonnet-5"
       ],
-      "observedAt": "2026-07-29T15:17:28.851Z"
+      "observedAt": "2026-07-30T18:18:00.966Z"
     },
     {
       "channelId": "lucen-kiro-cache70-claude-006",
@@ -2601,7 +2631,7 @@
         "claude-opus-4-8",
         "claude-sonnet-5"
       ],
-      "observedAt": "2026-07-29T15:17:29.026Z"
+      "observedAt": "2026-07-30T18:18:01.157Z"
     },
     {
       "channelId": "lucen-claude-max-unlimited-100",
@@ -2682,7 +2712,7 @@
         "claude-opus-4-8",
         "claude-sonnet-5"
       ],
-      "observedAt": "2026-07-29T15:17:29.210Z"
+      "observedAt": "2026-07-30T18:18:01.352Z"
     },
     {
       "channelId": "lucen-gemini-reverse-native-030",
@@ -2745,7 +2775,7 @@
       ],
       "responsesCandidates": [],
       "messagesCandidates": [],
-      "observedAt": "2026-07-29T15:17:29.385Z"
+      "observedAt": "2026-07-30T18:18:01.550Z"
     }
   ]
 }

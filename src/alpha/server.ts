@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { readFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { readAcuRuntimeConfig } from "../acu/config.js";
 import type { RoutingDecision } from "../router/types.js";
@@ -248,6 +249,99 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
     adminTrace: {
       token: serviceConfig.adminTraceToken,
       load: (logicalRequestId) => repository.getAdminLogicalRequestTrace(logicalRequestId),
+    },
+    adminChannelMonitor: {
+      token: serviceConfig.adminTraceToken,
+      async load(range) {
+        const interval = range === "7d" ? "7 days" : range === "24h" ? "24 hours" : "1 hour";
+        const [channels, profileHealth, attempts, history] = await Promise.all([
+          database.query<Record<string, unknown>>("SELECT * FROM acu_channel_health ORDER BY provider_id,channel_id"),
+          database.query<Record<string, unknown>>("SELECT * FROM acu_provider_model_profile_health ORDER BY canonical_model_id,provider_id,channel_id"),
+          database.query<Record<string, unknown>>(
+            `SELECT execution_profile_id, count(*)::int request_count,
+              count(*) FILTER (WHERE status='success')::int success_count,
+              count(*) FILTER (WHERE http_status=429)::int rate_limited_count,
+              count(*) FILTER (WHERE http_status BETWEEN 500 AND 599)::int server_error_count,
+              count(*) FILTER (WHERE error_category='slow_first_model_event' OR metadata_json->>'errorClass'='slow_first_model_event')::int watchdog_count,
+              count(*) FILTER (WHERE attempt_index>1 AND status='success')::int recovery_count,
+              percentile_cont(.5) WITHIN GROUP (ORDER BY (metadata_json->>'first_model_event_latency_ms')::double precision)
+                FILTER (WHERE metadata_json ? 'first_model_event_latency_ms') p50_first_model_event_ms,
+              percentile_cont(.95) WITHIN GROUP (ORDER BY (metadata_json->>'first_model_event_latency_ms')::double precision)
+                FILTER (WHERE metadata_json ? 'first_model_event_latency_ms') p95_first_model_event_ms
+             FROM acu_attempts WHERE attempt_kind='provider' AND started_at>=now()-$1::interval
+             GROUP BY execution_profile_id`, [interval]),
+          database.query<Record<string, unknown>>(
+            `SELECT date_trunc('hour',started_at) bucket,execution_profile_id,count(*)::int request_count,
+              count(*) FILTER (WHERE status='success')::int success_count,
+              count(*) FILTER (WHERE http_status=429)::int rate_limited_count,
+              count(*) FILTER (WHERE http_status BETWEEN 500 AND 599)::int server_error_count,
+              count(*) FILTER (WHERE metadata_json->>'errorClass'='slow_first_model_event')::int watchdog_count,
+              count(*) FILTER (WHERE attempt_index>1 AND status='success')::int recovery_count,
+              percentile_cont(.5) WITHIN GROUP (ORDER BY (metadata_json->>'first_model_event_latency_ms')::double precision)
+                FILTER (WHERE metadata_json ? 'first_model_event_latency_ms') p50_first_model_event_ms,
+              percentile_cont(.95) WITHIN GROUP (ORDER BY (metadata_json->>'first_model_event_latency_ms')::double precision)
+                FILTER (WHERE metadata_json ? 'first_model_event_latency_ms') p95_first_model_event_ms
+             FROM acu_attempts WHERE attempt_kind='provider' AND started_at>=now()-$1::interval
+             GROUP BY bucket,execution_profile_id ORDER BY bucket`, [interval]),
+        ]);
+        const healthByChannel = new Map(channels.rows.map((row) => [String(row.channel_id), row]));
+        const healthByProfile = new Map(profileHealth.rows.map((row) => [String(row.execution_profile_id), row]));
+        const aggregateByProfile = new Map(attempts.rows.map((row) => [String(row.execution_profile_id), row]));
+        const publicProfiles = serviceConfig.profiles.map((profile) => {
+          const channel = healthByChannel.get(profile.channelId ?? profile.channel) ?? {};
+          const runtime = healthByProfile.get(profile.executionProfileId) ?? {};
+          const aggregate = aggregateByProfile.get(profile.executionProfileId) ?? {};
+          let endpointHost = "";
+          try { endpointHost = new URL(profile.baseUrl ?? process.env[profile.baseUrlEnv ?? ""] ?? "").host; } catch { /* absent configuration */ }
+          return {
+            executionProfileId: profile.executionProfileId,
+            canonicalModel: profile.modelId,
+            protocol: profile.protocols,
+            provider: profile.provider,
+            channel: profile.channelId ?? profile.channel,
+            endpointHost,
+            multiplier: profile.observedBillingMultiplier,
+            effectiveCostStatus: profile.effectiveCostStatus,
+            enabled: profile.enabled,
+            administratorAllowed: profile.administratorAllowed,
+            routingEligible: profile.enabled && profile.administratorAllowed && !["open", "disabled"].includes(String(channel.circuit_state ?? profile.health)),
+            state: channel.circuit_state ?? runtime.circuit_state ?? profile.health,
+            recentSuccessRate: channel.recent_success_rate ?? runtime.recent_success_rate,
+            consecutiveFailures: channel.consecutive_failures ?? runtime.consecutive_failures ?? 0,
+            p50FirstModelEventLatencyMs: aggregate.p50_first_model_event_ms,
+            p95FirstModelEventLatencyMs: aggregate.p95_first_model_event_ms,
+            lastError: channel.error_class ?? runtime.error_class,
+            lastSuccessAt: channel.last_success_at ?? runtime.last_success_at,
+            cooldownUntil: channel.cooldown_until ?? runtime.cooldown_until,
+          };
+        });
+        let supplyInventory: unknown[] = [];
+        try {
+          const discovery = JSON.parse(await readFile(process.env.ACU_PROVIDER_DISCOVERY_FILE ?? "/app/config/provider-channel-model-discovery.json", "utf8")) as { channels?: unknown[] };
+          supplyInventory = discovery.channels ?? [];
+        } catch { /* inventory is optional at runtime */ }
+        return { range, profiles: publicProfiles, history: history.rows, supplyInventory, generatedAt: new Date().toISOString() };
+      },
+      async pause(channelId, durationMinutes, actor) {
+        const profile = serviceConfig.profiles.find((item) => (item.channelId ?? item.channel) === channelId);
+        if (!profile) throw new Error("Unknown Channel");
+        const cooldownUntil = new Date(Date.now() + durationMinutes * 60_000);
+        await database.transaction(async (client) => {
+          await client.query(
+            `INSERT INTO acu_channel_health (channel_id,provider_id,circuit_state,cooldown_until,consecutive_failures,recent_success_rate,error_class,updated_at)
+             VALUES ($1,$2,'open',$3,0,1,'manual_pause',now())
+             ON CONFLICT(channel_id) DO UPDATE SET circuit_state='open',cooldown_until=excluded.cooldown_until,
+               error_class='manual_pause',half_open_probe_in_flight=false,updated_at=now()`,
+            [channelId, profile.provider, cooldownUntil],
+          );
+          await client.query(
+            `INSERT INTO acu_channel_admin_actions(action_id,channel_id,action,duration_minutes,actor,metadata_json)
+             VALUES ($1,$2,'manual_pause',$3,$4,$5::jsonb)`,
+            [`channel_action_${randomUUID()}`, channelId, durationMinutes, actor, JSON.stringify({ provider: profile.provider })],
+          );
+        });
+        return { channelId, state: "open", cooldownUntil: cooldownUntil.toISOString(), recovery: "half_open_probe" };
+      },
     },
     models: profiles.map((item) => item.profile.modelId),
     maxRequestBytes: serviceConfig.maxRequestBytes,

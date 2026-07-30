@@ -1,38 +1,29 @@
 {
   "schemaVersion": "acu-provider-channel-preflight-v1",
-  "capturedAt": "2026-07-29T16:39:29.257Z",
-  "preflightRunId": "founder-economic-alpha-20260729-v1",
+  "capturedAt": "2026-07-30T18:19:14.732Z",
+  "preflightRunId": "supply-expansion-20260731-v1",
   "budgetCny": 1,
   "concurrency": 1,
   "webSearch": false,
-  "actualEstimatedCashCostCny": 0.012043229999999999,
+  "actualEstimatedCashCostCny": 0.0035535799999999998,
   "observations": [
     {
-      "preflightRunId": "founder-economic-alpha-20260729-v1",
-      "executionProfileId": "blackai-codex-mix-low:gpt-5.4-mini:responses",
-      "channelId": "blackai-codex-mix-low",
-      "providerId": "blackai",
-      "routingGroupName": "codex混合渠道--低价1x",
-      "model": "gpt-5.4-mini",
-      "status": "failed",
-      "errorClass": "timeout"
-    },
-    {
-      "preflightRunId": "founder-economic-alpha-20260729-v1",
-      "executionProfileId": "blackai-codex-mix-low:gpt-5.6-luna:responses",
-      "channelId": "blackai-codex-mix-low",
-      "providerId": "blackai",
+      "preflightRunId": "supply-expansion-20260731-v1",
+      "executionProfileId": "lucen-cx004-low-dedicated:gpt-5.6-luna:responses",
+      "channelId": "lucen-cx004-low-dedicated",
+      "providerId": "lucen",
+      "routingGroupName": "cx004-低价独立线路-0.04x",
       "model": "gpt-5.6-luna",
-      "status": "skipped",
-      "skipReason": "sufficient_existing_evidence"
+      "status": "failed",
+      "errorClass": "provider_http_503"
     },
     {
-      "preflightRunId": "founder-economic-alpha-20260729-v1",
-      "executionProfileId": "blackai-codex-mix-low:gpt-5.6-terra:responses",
-      "channelId": "blackai-codex-mix-low",
-      "providerId": "blackai",
-      "routingGroupName": "codex混合渠道--低价1x",
-      "model": "gpt-5.6-terra",
+      "preflightRunId": "supply-expansion-20260731-v1",
+      "executionProfileId": "lucen-cx014-pro-stable:gpt-5.6-luna:responses",
+      "channelId": "lucen-cx014-pro-stable",
+      "providerId": "lucen",
+      "routingGroupName": "cx014-pro-保不断-0.14x",
+      "model": "gpt-5.6-luna",
       "status": "passed",
       "nativePath": "/responses",
       "streaming": true,
@@ -40,53 +31,26 @@
       "hostedWebSearch": false,
       "reasoningEffort": "medium",
       "actualModels": [
-        "gpt-5.6-terra",
-        "gpt-5.6-terra"
+        "gpt-5.6-luna",
+        "gpt-5.6-luna"
       ],
       "usage": {
-        "input": 8904,
+        "input": 8939,
         "cached": 0,
-        "output": 51,
+        "output": 43,
         "reasoning": 15
       },
-      "nominalProviderCostUsd": 0.023025,
-      "effectiveCashCostCny": 0.00345375,
+      "nominalProviderCostUsd": 0.009197,
+      "effectiveCashCostCny": 0.0012875800000000002,
       "activated": true
     },
     {
-      "preflightRunId": "founder-economic-alpha-20260729-v1",
-      "executionProfileId": "blackai-codex-mix-low:gpt-5.6-sol:responses",
-      "channelId": "blackai-codex-mix-low",
-      "providerId": "blackai",
-      "routingGroupName": "codex混合渠道--低价1x",
-      "model": "gpt-5.6-sol",
-      "status": "passed",
-      "nativePath": "/responses",
-      "streaming": true,
-      "toolRoundtrip": true,
-      "hostedWebSearch": false,
-      "reasoningEffort": "medium",
-      "actualModels": [
-        "gpt-5.6-sol",
-        "gpt-5.6-sol"
-      ],
-      "usage": {
-        "input": 8904,
-        "cached": 0,
-        "output": 32,
-        "reasoning": 0
-      },
-      "nominalProviderCostUsd": 0.04548,
-      "effectiveCashCostCny": 0.006822,
-      "activated": true
-    },
-    {
-      "preflightRunId": "founder-economic-alpha-20260729-v1",
-      "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.4-mini:responses",
-      "channelId": "lucen-cx006-value-dynamic",
+      "preflightRunId": "supply-expansion-20260731-v1",
+      "executionProfileId": "lucen-cx025-pro-premium:gpt-5.6-luna:responses",
+      "channelId": "lucen-cx025-pro-premium",
       "providerId": "lucen",
-      "routingGroupName": "cx006-性价比-动态调价-0.06x",
-      "model": "gpt-5.4-mini",
+      "routingGroupName": "cx025-pro-尊享-0.25x",
+      "model": "gpt-5.6-luna",
       "status": "passed",
       "nativePath": "/responses",
       "streaming": true,
@@ -94,8 +58,8 @@
       "hostedWebSearch": false,
       "reasoningEffort": "medium",
       "actualModels": [
-        "gpt-5.4-mini-2026-03-17",
-        "gpt-5.4-mini-2026-03-17"
+        "gpt-5.6-luna",
+        "gpt-5.6-luna"
       ],
       "usage": {
         "input": 8908,
@@ -103,63 +67,9 @@
         "output": 26,
         "reasoning": 0
       },
-      "nominalProviderCostUsd": 0.006798,
-      "effectiveCashCostCny": 0.00040788,
+      "nominalProviderCostUsd": 0.009064,
+      "effectiveCashCostCny": 0.002266,
       "activated": true
-    },
-    {
-      "preflightRunId": "founder-economic-alpha-20260729-v1",
-      "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.6-luna:responses",
-      "channelId": "lucen-cx006-value-dynamic",
-      "providerId": "lucen",
-      "model": "gpt-5.6-luna",
-      "status": "skipped",
-      "skipReason": "sufficient_existing_evidence"
-    },
-    {
-      "preflightRunId": "founder-economic-alpha-20260729-v1",
-      "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.6-terra:responses",
-      "channelId": "lucen-cx006-value-dynamic",
-      "providerId": "lucen",
-      "routingGroupName": "cx006-性价比-动态调价-0.06x",
-      "model": "gpt-5.6-terra",
-      "status": "passed",
-      "nativePath": "/responses",
-      "streaming": true,
-      "toolRoundtrip": true,
-      "hostedWebSearch": false,
-      "reasoningEffort": "medium",
-      "actualModels": [
-        "gpt-5.6-terra",
-        "gpt-5.6-terra"
-      ],
-      "usage": {
-        "input": 8908,
-        "cached": 0,
-        "output": 26,
-        "reasoning": 0
-      },
-      "nominalProviderCostUsd": 0.02266,
-      "effectiveCashCostCny": 0.0013595999999999999,
-      "activated": true
-    },
-    {
-      "preflightRunId": "founder-economic-alpha-20260729-v1",
-      "executionProfileId": "lucen-cx006-plus:gpt-5.6-luna:responses",
-      "channelId": "lucen-cx006-plus",
-      "providerId": "lucen",
-      "model": "gpt-5.6-luna",
-      "status": "skipped",
-      "skipReason": "sufficient_existing_evidence"
-    },
-    {
-      "preflightRunId": "founder-economic-alpha-20260729-v1",
-      "executionProfileId": "lucen-cx008-plus-dedicated:gpt-5.6-luna:responses",
-      "channelId": "lucen-cx008-plus-dedicated",
-      "providerId": "lucen",
-      "model": "gpt-5.6-luna",
-      "status": "skipped",
-      "skipReason": "sufficient_existing_evidence"
     }
   ]
 }

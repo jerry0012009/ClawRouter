@@ -24,6 +24,7 @@ import { buildModelCurve, getAcuModel } from "../acu/catalog.js";
 import { AcuJudgeClientCancelledError, AcuJudgeContextLengthError } from "../acu/judge.js";
 import { cashCnyPerNominalUsd, providerCostBreakdown, type ProviderEconomics } from "./provider-economics.js";
 import {
+  computeFirstModelEventDeadlineMs,
   createRecoveringProviderAdapter,
   type BufferedProviderFailure,
   type ProviderAttemptHandle,
@@ -80,6 +81,7 @@ export type AlphaResolutionContext = {
   judgeCostSource: string;
   judgeProvider?: string;
   judgeModel?: string;
+  judgeLatencyMs?: number;
   requestBytes: number;
   replayed: boolean;
   clientDeclaredWebTool: boolean;
@@ -342,6 +344,8 @@ export function prepareProviderBody(
   envelope: CanonicalEnvelope,
   profile: AlphaExecutionProfile,
 ): { body: Buffer; webToolPruned: boolean; pruneReason?: string } {
+  void envelope;
+  void profile;
   const parsed = JSON.parse(Buffer.from(rawBody).toString("utf8")) as JsonObject;
   const providerModel = typeof parsed.model === "string" ? parsed.model : "";
   if (providerModel === model) {
@@ -1129,6 +1133,7 @@ export class AlphaRequestProcessor {
         explanation: judge.judge.explanation,
         explanationNormalized: judge.judge.explanationNormalized,
         originalExplanationLength: judge.judge.originalExplanationLength,
+        originalExplanationType: judge.judge.originalExplanationType,
         webIntent: judge.webIntentDecision.intent,
         webIntentConfidence: judge.webIntentDecision.confidence,
         webIntentReason: judge.webIntentDecision.reason,
@@ -2048,6 +2053,7 @@ export class AlphaRequestProcessor {
       judgeCostSource: result.judge?.costSource ?? "not_applicable",
       judgeProvider: result.judge?.provider,
       judgeModel: result.judge?.model,
+      judgeLatencyMs: result.judge?.latencyMs ?? 0,
       requestBytes: ingress.rawBody.byteLength,
       replayed: false,
       clientDeclaredWebTool: envelope.clientDeclaredWebTool,
@@ -2089,16 +2095,24 @@ export class AlphaRequestProcessor {
        WHERE attempt_kind='provider' AND status='success' AND execution_profile_id=$1
          AND metadata_json ? 'first_model_event_latency_ms'
          AND CASE WHEN $2::boolean THEN input_tokens>=100000 ELSE input_tokens<100000 END
-       ORDER BY completed_at DESC LIMIT 100`,
+         AND completed_at >= now()-interval '24 hours'
+       ORDER BY completed_at DESC LIMIT 50`,
       [result.profile.executionProfileId, recoveryContextAdmission.estimatedInputTokens >= 100_000],
     );
-    const sortedLatencies = latencySamples.rows.map((row) => Number(row.latency_ms)).filter(Number.isFinite).sort((a, b) => a - b);
-    const p95Latency = sortedLatencies.length >= 10
-      ? sortedLatencies[Math.min(sortedLatencies.length - 1, Math.ceil(sortedLatencies.length * 0.95) - 1)]
-      : undefined;
-    const firstModelEventDeadlineMs = p95Latency === undefined
-      ? recoveryContextAdmission.estimatedInputTokens >= 100_000 ? 75_000 : 45_000
-      : Math.max(30_000, Math.min(90_000, Math.round(p95Latency * 1.5)));
+    const recentOutcomes = await this.options.database.query<{ error_class: string }>(
+      `SELECT COALESCE(metadata_json->>'errorClass',error_category,'') AS error_class
+       FROM acu_attempts WHERE attempt_kind='provider' AND execution_profile_id=$1
+         AND completed_at >= now()-interval '24 hours'
+       ORDER BY completed_at DESC LIMIT 5`,
+      [result.profile.executionProfileId],
+    );
+    const runtimeProfileHealth = await new AlphaRepository(this.options.database).profileHealth(result.profile.executionProfileId);
+    const firstModelEventDeadlineMs = computeFirstModelEventDeadlineMs({
+      estimatedInputTokens: recoveryContextAdmission.estimatedInputTokens,
+      successfulLatenciesMs: latencySamples.rows.map((row) => Number(row.latency_ms)),
+      recentErrorClasses: recentOutcomes.rows.map((row) => row.error_class),
+      profileState: runtimeProfileHealth?.state ?? result.profile.health,
+    });
     const attemptedProfiles = new Set(resolutionContext.attemptedExecutionProfileIds);
     const attemptedChannels = new Set(resolutionContext.attemptedChannelIds);
     const attemptedProviders = new Set(resolutionContext.attemptedProviders);
@@ -2130,13 +2144,21 @@ export class AlphaRequestProcessor {
       hasRecoveryTarget: hasUnattemptedRecovery,
       firstModelEventDeadlineMs: () => firstModelEventDeadlineMs,
       selectRecoveryTarget: (() => {
-        return (current): ProviderRecoveryTarget | undefined => {
+        return (current, failure, error): ProviderRecoveryTarget | undefined => {
           const eligible = recoveryPool.filter((profile) => (
             !attemptedProfiles.has(profile.executionProfileId)
             && !attemptedChannels.has(profile.channelId ?? profile.channel)
           ));
-          const profile = (current.attemptIndex === 1
+          const errorClass = failure?.status === 524
+            ? "provider_edge_timeout"
+            : error instanceof Error ? error.message : undefined;
+          const preferCrossProvider = errorClass === "provider_edge_timeout"
+            || (runtimeProfileHealth?.consecutiveFailures ?? 0) > 0;
+          const profile = (current.attemptIndex === 1 && !preferCrossProvider
             ? eligible.find((candidate) => candidate.provider === current.profile.provider)
+            : undefined)
+            ?? (current.attemptIndex === 1 && preferCrossProvider
+              ? eligible.find((candidate) => candidate.provider !== current.profile.provider)
             : undefined)
             ?? (current.attemptIndex >= 2
             ? eligible.find((candidate) => candidate.provider !== result.profile.provider)
@@ -2304,6 +2326,17 @@ export class AlphaRequestProcessor {
        ORDER BY attempt_index`,
       [input.context.logicalRequestId],
     );
+    const logicalTiming = await this.options.database.query<{ started_at: Date; completed_at: Date | null; status: string }>(
+      "SELECT started_at,completed_at,status FROM acu_logical_requests WHERE logical_request_id=$1",
+      [input.context.logicalRequestId],
+    );
+    const logicalRow = logicalTiming.rows[0];
+    const endToEndLatencyMs = logicalRow?.completed_at
+      ? Math.max(0, logicalRow.completed_at.getTime() - logicalRow.started_at.getTime())
+      : channelAttempts.rows.reduce((total, attempt) => total + Number(attempt.latency_ms ?? 0), 0) + (input.context.judgeLatencyMs ?? 0);
+    const providerLatencyMs = channelAttempts.rows.reduce((total, attempt) => total + Number(attempt.latency_ms ?? 0), 0);
+    const recovered = channelAttempts.rows.some((attempt) => attempt.status === "error")
+      && channelAttempts.rows.some((attempt) => attempt.status === "success");
     const savedRoute = input.context.routeDecisionSnapshot;
     const savedCandidates = Array.isArray(savedRoute?.candidate_estimates_json)
       ? savedRoute.candidate_estimates_json.map(record).filter((item): item is JsonObject => Boolean(item))
@@ -2380,6 +2413,10 @@ export class AlphaRequestProcessor {
       judgeModel: input.context.judgeModel,
       costBreakdown: {
         billing_version: "founder-alpha-actual-cash-v2",
+        logical_request_status: recovered && logicalRow?.status === "completed" ? "completed_with_recovery" : logicalRow?.status,
+        end_to_end_latency_ms: endToEndLatencyMs,
+        judge_latency_ms: input.context.judgeLatencyMs ?? 0,
+        provider_latency_ms: providerLatencyMs,
         requested_model: input.context.requestedModel,
         routed_by_acu: modeForModel(input.context.requestedModel) !== "explicit",
         session_id: input.context.sessionId,

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  computeFirstModelEventDeadlineMs,
   createRecoveringProviderAdapter,
   isRecoverableProviderStatus,
   type ProviderAttemptHandle,
@@ -296,5 +297,25 @@ describe("Alpha Provider attempt recovery", () => {
     });
     expect(await (await adapter.execute(request())).text()).toBe("ok");
     expect(order).toEqual(["primary:0", "primary:1", "second:0"]);
+  });
+});
+
+describe("first model event deadline", () => {
+  it("uses a bounded p95 only for a stable 24-hour sample", () => {
+    expect(computeFirstModelEventDeadlineMs({
+      estimatedInputTokens: 20_000,
+      successfulLatenciesMs: Array.from({ length: 10 }, (_, index) => 20_000 + index * 100),
+      recentErrorClasses: [],
+      profileState: "healthy",
+    })).toBe(31_350);
+  });
+
+  it("does not reward a volatile profile with a longer wait", () => {
+    expect(computeFirstModelEventDeadlineMs({
+      estimatedInputTokens: 20_000,
+      successfulLatenciesMs: [10_000, 10_000, 10_000, 10_000, 10_000, 11_000, 12_000, 20_000, 60_000, 80_000],
+      recentErrorClasses: ["provider_edge_timeout", "slow_first_model_event", "none"],
+      profileState: "degraded",
+    })).toBe(45_000);
   });
 });

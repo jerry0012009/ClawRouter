@@ -51,6 +51,7 @@ services:
       - ../../migrations/acu/0007_rc22_judge_cutover.sql:/migration/0007_rc22_judge_cutover.sql:ro
       - ../../migrations/acu/0008_alpha_final_user_loop.sql:/migration/0008_alpha_final_user_loop.sql:ro
       - ../../migrations/acu/0009_raw_judge_context.sql:/migration/0009_raw_judge_context.sql:ro
+      - ../../migrations/acu/0010_supply_observability.sql:/migration/0010_supply_observability.sql:ro
     networks: [alpha-backend]
     command:
       - /bin/sh
@@ -67,6 +68,7 @@ services:
         psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0007_rc22_judge_cutover.sql
         psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0008_alpha_final_user_loop.sql
         psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0009_raw_judge_context.sql
+        psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0010_supply_observability.sql
 
   newapi-codex-pool-sync:
     image: postgres:16-alpine
@@ -95,7 +97,7 @@ services:
         BUILD_COMMIT_SHA: ${CLAWROUTER_BUILD_COMMIT_SHA:-unknown}
         BUILD_TIME: ${BUILD_TIME:-unknown}
         BUILD_BRANCH: ${CLAWROUTER_BUILD_BRANCH:-unknown}
-        SCHEMA_VERSION: 0009_raw_judge_context
+        SCHEMA_VERSION: 0010_supply_observability
     restart: unless-stopped
     depends_on:
       acu-migrate:
@@ -111,6 +113,7 @@ services:
       ACU_ADMIN_TRACE_TOKEN: ${ACU_ADMIN_TRACE_TOKEN:?set ACU_ADMIN_TRACE_TOKEN}
       NEW_API_INTERNAL_BASE_URL: http://new-api:3000
       ACU_EXECUTION_PROFILES_FILE: /app/config/execution-profiles.json
+      ACU_PROVIDER_DISCOVERY_FILE: /app/config/provider-channel-model-discovery.json
       ACU_PROVIDER_ECONOMICS_FILE: /app/config/provider-economics.json
       ACU_DEMO_ROUTER_ENABLED: "true"
       ACU_JUDGE_API_KEY: ${MIMO_API_KEY:?set MIMO_API_KEY}
@@ -135,6 +138,7 @@ services:
       - ../../.env
     volumes:
       - ./execution-profiles.json:/app/config/execution-profiles.json:ro
+      - ./provider-channel-model-discovery.json:/app/config/provider-channel-model-discovery.json:ro
       - ./provider-economics.json:/app/config/provider-economics.json:ro
       - ./provider-channels.json:/app/config/provider-channels.json:ro
       - ./provider-model-profiles.json:/app/config/provider-model-profiles.json:ro

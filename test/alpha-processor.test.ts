@@ -1,5 +1,6 @@
 import { createServer, type Server } from "node:http";
 import { once } from "node:events";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { AcuJudgeResult } from "../src/acu/types.js";
@@ -47,6 +48,7 @@ function signedHeaders(
   requestId: string,
   userId = "user-auto",
   client: "codex" | "claude-code" = "codex",
+  allowedProfileIds: string[] = [],
 ): Record<string, string> {
   const identity = {
     newapiUserId: userId,
@@ -55,7 +57,8 @@ function signedHeaders(
     requestId,
     routingPolicy: "all_routing_eligible" as const,
     allowedModelIds: [],
-    routingPolicyVersion: "acu-user-policy-v2-0000000000000000",
+    allowedProfileIds,
+    routingPolicyVersion: `acu-user-policy-v2-${createHash("sha256").update(JSON.stringify(allowedProfileIds)).digest("hex").slice(0, 16)}`,
     routingPreference: "balanced" as const,
     timestamp: new Date().toISOString(),
     bodySha256: bodySha256(body),
@@ -409,6 +412,9 @@ run("Alpha PostgreSQL request processor", () => {
       user_charge_cny: null,
       next_status: "completed",
     });
+    judgeCalls = 0;
+    upstreamBodies.length = 0;
+    upstreamCaseCalls.clear();
   });
 
   it("Judges a new auto Task, rewrites only model, and persists the full trace", async () => {
@@ -418,15 +424,16 @@ run("Alpha PostgreSQL request processor", () => {
     expect(upstreamBodies[0].model).toBe("gpt-5.4-mini");
     const counts = await database.query<{ sessions: string; tasks: string; segments: string; judges: string; routes: string; requests: string; attempts: string; payloads: string; usage: string }>(
       `SELECT
-       (SELECT count(*) FROM acu_sessions) sessions,
-       (SELECT count(*) FROM acu_tasks) tasks,
-       (SELECT count(*) FROM acu_segments) segments,
-       (SELECT count(*) FROM acu_judge_evaluations) judges,
-       (SELECT count(*) FROM acu_route_decisions) routes,
-       (SELECT count(*) FROM acu_logical_requests) requests,
-       (SELECT count(*) FROM acu_attempts) attempts,
-       (SELECT count(*) FROM acu_payloads) payloads,
-       (SELECT count(*) FROM acu_usage_reports) usage`,
+       (SELECT count(*) FROM acu_sessions WHERE newapi_user_id='user-auto') sessions,
+       (SELECT count(*) FROM acu_tasks WHERE newapi_user_id='user-auto') tasks,
+       (SELECT count(*) FROM acu_segments WHERE newapi_user_id='user-auto') segments,
+       (SELECT count(*) FROM acu_judge_evaluations WHERE newapi_user_id='user-auto') judges,
+       (SELECT count(*) FROM acu_route_decisions WHERE newapi_user_id='user-auto') routes,
+       (SELECT count(*) FROM acu_logical_requests WHERE newapi_user_id='user-auto') requests,
+       (SELECT count(*) FROM acu_attempts a JOIN acu_logical_requests r USING (logical_request_id)
+        WHERE r.newapi_user_id='user-auto') attempts,
+       (SELECT count(*) FROM acu_payloads WHERE newapi_user_id='user-auto') payloads,
+       (SELECT count(*) FROM acu_usage_reports WHERE newapi_user_id='user-auto') usage`,
     );
     expect(counts.rows[0]).toMatchObject({
       sessions: "1",
@@ -460,7 +467,7 @@ run("Alpha PostgreSQL request processor", () => {
        formula_inputs_json->'excludedProfiles' excluded_profiles,
        formula_inputs_json->>'routingPreference' routing_preference,
        routing_model_version
-       FROM acu_route_decisions LIMIT 1`,
+       FROM acu_route_decisions WHERE newapi_user_id='user-auto' LIMIT 1`,
     );
     expect(routeEvidence.rows[0]).toEqual({
       configured_profiles: "3",
@@ -474,7 +481,7 @@ run("Alpha PostgreSQL request processor", () => {
       routing_model_version: "acu-routing-model-v0.3",
     });
     const payloadKinds = await database.query<{ payload_kind: string }>(
-      "SELECT payload_kind FROM acu_payloads ORDER BY created_at,payload_kind",
+      "SELECT payload_kind FROM acu_payloads WHERE newapi_user_id='user-auto' ORDER BY created_at,payload_kind",
     );
     expect(payloadKinds.rows.map((row) => row.payload_kind).sort()).toEqual([
       "client_request",
@@ -495,10 +502,10 @@ run("Alpha PostgreSQL request processor", () => {
     await send({ model: "acu-auto", input: history, stream: true }, "request-2");
     expect(judgeCalls).toBe(1);
     const counts = await database.query<{ segments: string; judges: string; segment_web_intent: string; segment_web_source: string }>(
-      `SELECT (SELECT count(*) FROM acu_segments) segments,
-       (SELECT count(*) FROM acu_judge_evaluations) judges,
-       (SELECT metadata_json->>'webIntent' FROM acu_segments WHERE status='active') segment_web_intent,
-       (SELECT metadata_json->>'webIntentSource' FROM acu_segments WHERE status='active') segment_web_source`,
+      `SELECT (SELECT count(*) FROM acu_segments WHERE newapi_user_id='user-auto') segments,
+       (SELECT count(*) FROM acu_judge_evaluations WHERE newapi_user_id='user-auto') judges,
+       (SELECT metadata_json->>'webIntent' FROM acu_segments WHERE newapi_user_id='user-auto' AND status='active') segment_web_intent,
+       (SELECT metadata_json->>'webIntentSource' FROM acu_segments WHERE newapi_user_id='user-auto' AND status='active') segment_web_source`,
     );
     expect(counts.rows[0]).toEqual({
       segments: "1",
@@ -518,9 +525,9 @@ run("Alpha PostgreSQL request processor", () => {
     const firstResponse = await send({ model: "acu-auto", input: history, stream: true }, "request-3");
     expect(judgeCalls).toBe(2);
     const counts = await database.query<{ segments: string; active: string; judges: string }>(
-      `SELECT (SELECT count(*) FROM acu_segments) segments,
-       (SELECT count(*) FROM acu_segments WHERE status='active') active,
-       (SELECT count(*) FROM acu_judge_evaluations) judges`,
+      `SELECT (SELECT count(*) FROM acu_segments WHERE newapi_user_id='user-auto') segments,
+       (SELECT count(*) FROM acu_segments WHERE newapi_user_id='user-auto' AND status='active') active,
+       (SELECT count(*) FROM acu_judge_evaluations WHERE newapi_user_id='user-auto') judges`,
     );
     expect(counts.rows[0]).toEqual({ segments: "2", active: "1", judges: "2" });
 
@@ -529,9 +536,10 @@ run("Alpha PostgreSQL request processor", () => {
     expect(replay).toContain('"type":"response.completed"');
     expect(judgeCalls).toBe(2);
     const replayCounts = await database.query<{ attempts: string; requests: string; usage: string }>(
-      `SELECT (SELECT count(*) FROM acu_attempts) attempts,
-       (SELECT count(*) FROM acu_logical_requests) requests,
-       (SELECT count(*) FROM acu_usage_reports) usage`,
+      `SELECT (SELECT count(*) FROM acu_attempts a JOIN acu_logical_requests r USING (logical_request_id)
+        WHERE r.newapi_user_id='user-auto') attempts,
+       (SELECT count(*) FROM acu_logical_requests WHERE newapi_user_id='user-auto') requests,
+       (SELECT count(*) FROM acu_usage_reports WHERE newapi_user_id='user-auto') usage`,
     );
     expect(replayCounts.rows[0]).toEqual({ attempts: "4", requests: "4", usage: "4" });
   });
@@ -852,6 +860,81 @@ run("Alpha PostgreSQL request processor", () => {
       "SELECT count(*) FROM acu_logical_requests WHERE newapi_user_id='user-three-channel'",
     );
     expect(requestCount.rows[0].count).toBe("1");
+  });
+
+  it("never recovers through a Profile outside the Token allowlist", async () => {
+    await database.query("DELETE FROM acu_channel_health WHERE channel_id IN ('test-channel','test-recovery-channel','test-cross-provider-channel')");
+    const body = Buffer.from(JSON.stringify({
+      model: "acu-auto",
+      input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "Do not escape the Profile policy" }] }],
+      stream: true,
+      test_case: "profile-policy-no-recovery",
+      test_failures_before_success: 1,
+      test_failure_status: 502,
+    }));
+    const response = await fetch(`http://127.0.0.1:${gatewayPort}/v1/responses`, {
+      method: "POST",
+      headers: signedHeaders(body, "profile-policy-no-recovery", "user-profile-policy", "codex", [
+        "test:gpt-5.4-mini:responses",
+      ]),
+      body,
+    });
+    expect(response.status).toBe(502);
+    const attempts = await database.query<{ execution_profile_id: string }>(
+      `SELECT execution_profile_id FROM acu_attempts
+       WHERE logical_request_id=(SELECT logical_request_id FROM acu_logical_requests WHERE newapi_user_id='user-profile-policy')`,
+    );
+    expect(attempts.rows).toEqual([{ execution_profile_id: "test:gpt-5.4-mini:responses" }]);
+  });
+
+  it("reuses Judge and only reroutes when the Token Profile policy changes", async () => {
+    await database.query("DELETE FROM acu_channel_health WHERE channel_id IN ('test-channel','test-recovery-channel')");
+    const firstBody = Buffer.from(JSON.stringify({
+      model: "acu-auto",
+      input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "Start Profile policy task" }] }],
+      stream: true,
+    }));
+    const beforeJudge = judgeCalls;
+    const first = await fetch(`http://127.0.0.1:${gatewayPort}/v1/responses`, {
+      method: "POST",
+      headers: signedHeaders(firstBody, "profile-policy-start", "user-profile-refresh", "codex", [
+        "test:gpt-5.4-mini:responses",
+        "test:gpt-5.4-mini:recovery",
+      ]),
+      body: firstBody,
+    });
+    expect(first.status).toBe(200);
+    await first.arrayBuffer();
+    expect(judgeCalls).toBe(beforeJudge + 1);
+
+    const continuationBody = Buffer.from(JSON.stringify({
+      model: "acu-auto",
+      input: [
+        { type: "message", role: "user", content: [{ type: "input_text", text: "Start Profile policy task" }] },
+        { type: "function_call", call_id: "policy-read", name: "read_file", arguments: "{}" },
+        { type: "function_call_output", call_id: "policy-read", output: "continue" },
+      ],
+      stream: true,
+    }));
+    const second = await fetch(`http://127.0.0.1:${gatewayPort}/v1/responses`, {
+      method: "POST",
+      headers: signedHeaders(continuationBody, "profile-policy-refresh", "user-profile-refresh", "codex", [
+        "test:gpt-5.4-mini:recovery",
+      ]),
+      body: continuationBody,
+    });
+    expect(second.status).toBe(200);
+    await second.arrayBuffer();
+    expect(judgeCalls).toBe(beforeJudge + 1);
+    const trace = await database.query<{ metadata_json: Record<string, unknown> }>(
+      `SELECT metadata_json FROM acu_admission_traces WHERE newapi_user_id='user-profile-refresh'
+       ORDER BY created_at DESC LIMIT 1`,
+    );
+    expect(trace.rows[0]?.metadata_json).toMatchObject({
+      judgeCalls: 0,
+      judgeReused: true,
+      routeRefreshReason: "profile_policy_changed",
+    });
   });
 
   it("treats identical bodies with different trusted New API identities as distinct requests", async () => {

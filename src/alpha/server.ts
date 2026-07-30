@@ -251,7 +251,7 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
     networkAdapters: new Map(profiles.map((item) => [item.profile.executionProfileId, item.adapters])),
     judgeRunner,
     judgeEconomics,
-    wakeProbe: () => adaptiveProbe.wake(),
+    wakeProbe: (executionProfileId) => adaptiveProbe.enqueue(executionProfileId),
   });
   adaptiveProbe.start();
   const repository = new AlphaRepository(database);

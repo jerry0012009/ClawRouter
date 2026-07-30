@@ -396,6 +396,72 @@ describe("Alpha current-formula routing", () => {
     expect(result.candidateEstimates).toHaveLength(1);
     expect(result.providerCandidateEstimates[0].executionProfileId).toBe('healthy:gpt-5.4-mini:responses');
   });
+
+  it("hard-filters Token-disallowed Profiles before model aggregation and pricing", () => {
+    const cheap = { ...profiles[0], economics: modelEconomicsFixture(0.03) };
+    const allowed = {
+      ...profiles[0],
+      executionProfileId: "allowed:gpt-5.4-mini:responses",
+      provider: "allowed-provider",
+      channel: "allowed-channel",
+      economics: modelEconomicsFixture(1.2),
+    };
+    const result = routeWithCurrentAcuFormula({
+      judge,
+      judgeCost: 0,
+      inputTokens: 2_000,
+      expectedOutputTokens: 500,
+      effectiveQualityTarget: 70,
+      profiles: [cheap, allowed],
+      requirements: { ...requirements, allowedProfileIds: [allowed.executionProfileId] },
+    });
+    expect(result.candidateEstimates).toHaveLength(1);
+    expect(result.selectedProfile.executionProfileId).toBe(allowed.executionProfileId);
+    expect(result.providerCandidateEstimates).toHaveLength(1);
+    expect(result.excludedProfiles).toContainEqual({
+      executionProfileId: cheap.executionProfileId,
+      reasons: ["profile_policy"],
+    });
+  });
+
+  it("selects the lowest-score allowed Profile for an explicit model", () => {
+    const expensive = { ...profiles[0], economics: modelEconomicsFixture(3) };
+    const cheap = {
+      ...profiles[0],
+      executionProfileId: "cheap:gpt-5.4-mini:responses",
+      provider: "cheap-provider",
+      channel: "cheap-channel",
+      economics: modelEconomicsFixture(0.5),
+    };
+    const selected = resolveExplicitProfile("gpt-5.4-mini", [expensive, cheap], {
+      ...requirements,
+      contextTokens: 2_000,
+      expectedOutputTokens: 500,
+      allowedProfileIds: [expensive.executionProfileId, cheap.executionProfileId],
+    });
+    expect(selected.executionProfileId).toBe(cheap.executionProfileId);
+  });
+
+  it("distinguishes incompatible policy from temporarily unavailable allowed supply", () => {
+    expect(() => routeWithCurrentAcuFormula({
+      judge,
+      judgeCost: 0,
+      inputTokens: 2_000,
+      expectedOutputTokens: 500,
+      effectiveQualityTarget: 70,
+      profiles,
+      requirements: { ...requirements, allowedProfileIds: [profiles[2].executionProfileId] },
+    })).toThrow(/No execution Profile allowed/);
+    expect(() => routeWithCurrentAcuFormula({
+      judge,
+      judgeCost: 0,
+      inputTokens: 2_000,
+      expectedOutputTokens: 500,
+      effectiveQualityTarget: 70,
+      profiles: [{ ...profiles[0], health: "cooldown" }],
+      requirements: { ...requirements, allowedProfileIds: [profiles[0].executionProfileId] },
+    })).toThrow(/temporarily unavailable/);
+  });
 });
 
 function modelEconomicsFixture(observedBillingMultiplier: number) {

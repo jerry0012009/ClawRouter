@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { applyAttemptOutcome, classifyAttemptOutcome, type AttemptOutcome, type HealthSnapshot } from "./channel-health.js";
 import type { AlphaDatabase } from "./database.js";
 import type { NativeProviderAdapter } from "./provider.js";
@@ -24,6 +25,7 @@ export type AdaptiveProbeWorkerOptions = {
 export class AdaptiveProbeWorker {
   private running = false;
   private timer?: NodeJS.Timeout;
+  private readonly workerId = randomUUID();
 
   constructor(private readonly options: AdaptiveProbeWorkerOptions) {}
 
@@ -36,12 +38,31 @@ export class AdaptiveProbeWorker {
     queueMicrotask(() => void this.runOnce());
   }
 
+  enqueue(executionProfileId: string): void {
+    void this.options.database.query(
+      `INSERT INTO acu_profile_probe_queue (execution_profile_id,enqueued_at)
+       VALUES ($1,now()) ON CONFLICT (execution_profile_id) DO UPDATE
+       SET enqueued_at=LEAST(acu_profile_probe_queue.enqueued_at,excluded.enqueued_at)`,
+      [executionProfileId],
+    ).then(() => this.wake()).catch(() => undefined);
+  }
+
   async runOnce(): Promise<void> {
     if (this.running) return;
     this.running = true;
     try {
+      const lease = await this.options.database.query(
+        `UPDATE acu_probe_worker_lease SET holder_id=$1,lease_until=now()+interval '2 minutes',updated_at=now()
+         WHERE singleton=true AND (lease_until<=now() OR holder_id=$1) RETURNING singleton`,
+        [this.workerId],
+      );
+      if (!lease.rowCount) return;
       await this.runEligibleProbe();
     } finally {
+      await this.options.database.query(
+        "UPDATE acu_probe_worker_lease SET lease_until=now(),updated_at=now() WHERE singleton=true AND holder_id=$1",
+        [this.workerId],
+      ).catch(() => undefined);
       this.running = false;
     }
   }
@@ -65,6 +86,10 @@ export class AdaptiveProbeWorker {
       repository.batchChannelHealth(this.options.profiles.map((profile) => profile.channelId ?? profile.channel)),
       repository.batchProfileHealth(this.options.profiles.map((profile) => profile.executionProfileId)),
     ]);
+    const queued = await this.options.database.query<{ execution_profile_id: string }>(
+      "SELECT execution_profile_id FROM acu_profile_probe_queue ORDER BY enqueued_at LIMIT 100",
+    );
+    const queuedOrder = new Map(queued.rows.map((row, index) => [row.execution_profile_id, index]));
     const candidates = this.options.profiles.filter((profile) => {
       if (!profile.enabled || !profile.administratorAllowed || !this.options.adapters.has(profile.executionProfileId)) return false;
       const channel = channels.get(profile.channelId ?? profile.channel);
@@ -75,14 +100,18 @@ export class AdaptiveProbeWorker {
       const lastSuccessAt = runtime?.lastSuccessAt ?? channel?.lastSuccessAt;
       const stale = !lastSuccessAt || Date.now() - lastSuccessAt.getTime() > 120 * 60_000;
       return cooldownExpired || (profile.requiresFreshProbe === true && stale);
-    });
+    }).sort((left, right) => (queuedOrder.get(left.executionProfileId) ?? Number.MAX_SAFE_INTEGER)
+      - (queuedOrder.get(right.executionProfileId) ?? Number.MAX_SAFE_INTEGER));
     for (const profile of candidates) {
       const recent = await this.options.database.query(
         `SELECT 1 FROM acu_attempts WHERE attempt_kind='provider' AND execution_profile_id=$1
           AND status='success' AND started_at>=now()-interval '60 minutes' LIMIT 1`,
         [profile.executionProfileId],
       );
-      if (recent.rowCount) continue;
+      if (recent.rowCount) {
+        await this.options.database.query("DELETE FROM acu_profile_probe_queue WHERE execution_profile_id=$1", [profile.executionProfileId]);
+        continue;
+      }
       const channelId = profile.channelId ?? profile.channel;
       const channel = channels.get(channelId);
       const runtime = runtimes.get(profile.executionProfileId);
@@ -92,6 +121,7 @@ export class AdaptiveProbeWorker {
         && !await repository.claimHalfOpenProbe("profile", profile.executionProfileId)) continue;
       await this.probe(profile, repository, channel ?? { state: "healthy", consecutiveFailures: 0, recentSuccessRate: 1 },
         runtime ?? { state: "healthy", consecutiveFailures: 0, recentSuccessRate: 1 });
+      await this.options.database.query("DELETE FROM acu_profile_probe_queue WHERE execution_profile_id=$1", [profile.executionProfileId]);
       return;
     }
   }

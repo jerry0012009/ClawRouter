@@ -53,6 +53,7 @@ services:
       - ../../migrations/acu/0009_raw_judge_context.sql:/migration/0009_raw_judge_context.sql:ro
       - ../../migrations/acu/0010_supply_observability.sql:/migration/0010_supply_observability.sql:ro
       - ../../migrations/acu/0011_verified_model_pool_probe.sql:/migration/0011_verified_model_pool_probe.sql:ro
+      - ../../migrations/acu/0012_profile_policy_probe_worker.sql:/migration/0012_profile_policy_probe_worker.sql:ro
     networks: [alpha-backend]
     command:
       - /bin/sh
@@ -71,6 +72,7 @@ services:
         psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0009_raw_judge_context.sql
         psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0010_supply_observability.sql
         psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0011_verified_model_pool_probe.sql
+        psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0012_profile_policy_probe_worker.sql
 
   newapi-codex-pool-sync:
     image: postgres:16-alpine
@@ -99,7 +101,7 @@ services:
         BUILD_COMMIT_SHA: ${CLAWROUTER_BUILD_COMMIT_SHA:-unknown}
         BUILD_TIME: ${BUILD_TIME:-unknown}
         BUILD_BRANCH: ${CLAWROUTER_BUILD_BRANCH:-unknown}
-        SCHEMA_VERSION: 0011_verified_model_pool_probe
+        SCHEMA_VERSION: 0012_profile_policy_probe_worker
     restart: unless-stopped
     depends_on:
       acu-migrate:

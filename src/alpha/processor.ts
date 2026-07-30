@@ -53,7 +53,7 @@ export type AlphaProcessorOptions = {
   judgeRunner: AlphaJudgeRunner;
   judgeEconomics?: ProviderEconomics;
   expectedOutputTokens?: number;
-  wakeProbe?: () => void;
+  wakeProbe?: (executionProfileId: string) => void;
 };
 
 export type AlphaResolutionContext = {
@@ -403,7 +403,7 @@ export class AlphaRequestProcessor {
     this.expectedOutputTokens = options.expectedOutputTokens ?? 800;
   }
 
-  private async effectiveProfiles(): Promise<{ profiles: AlphaExecutionProfile[]; probeClaims: Array<{ scope: "channel" | "profile"; id: string }> }> {
+  private async effectiveProfiles(allowedProfileIds: string[] = []): Promise<{ profiles: AlphaExecutionProfile[]; probeClaims: Array<{ scope: "channel" | "profile"; id: string }> }> {
     const repository = new AlphaRepository(this.options.database);
     const channelIds = this.options.profiles.map((profile) => profile.channelId ?? profile.channel);
     const executionProfileIds = this.options.profiles.map((profile) => profile.executionProfileId);
@@ -411,7 +411,8 @@ export class AlphaRequestProcessor {
       repository.batchChannelHealth(channelIds),
       repository.batchProfileHealth(executionProfileIds),
     ]);
-    let shouldWakeProbe = false;
+    let probeCandidateId: string | undefined;
+    const allowed = allowedProfileIds.length > 0 ? new Set(allowedProfileIds) : undefined;
     const profiles = this.options.profiles.map((profile): AlphaExecutionProfile => {
       const channelId = profile.channelId ?? profile.channel;
       const channel = channelHealth.get(channelId);
@@ -419,8 +420,9 @@ export class AlphaRequestProcessor {
       const lastSuccessAt = runtime?.lastSuccessAt ?? channel?.lastSuccessAt;
       const fresh = Boolean(lastSuccessAt && Date.now() - lastSuccessAt.getTime() <= 120 * 60_000);
       const staleFreshnessRequired = profile.requiresFreshProbe === true && !fresh;
-      if (staleFreshnessRequired || channel?.state === "open" || channel?.state === "half_open"
-        || runtime?.state === "open" || runtime?.state === "half_open") shouldWakeProbe = true;
+      if ((!allowed || allowed.has(profile.executionProfileId)) && !probeCandidateId
+        && (staleFreshnessRequired || channel?.state === "open" || channel?.state === "half_open"
+        || runtime?.state === "open" || runtime?.state === "half_open")) probeCandidateId = profile.executionProfileId;
       const unavailable = channel?.state === "disabled" || runtime?.state === "disabled"
         || channel?.state === "open" || channel?.state === "half_open"
         || runtime?.state === "open" || runtime?.state === "half_open"
@@ -446,7 +448,7 @@ export class AlphaRequestProcessor {
           || profile.webSearchFailureReason,
       };
     });
-    if (shouldWakeProbe) this.options.wakeProbe?.();
+    if (probeCandidateId) this.options.wakeProbe?.(probeCandidateId);
     return { profiles, probeClaims: [] };
   }
 
@@ -684,7 +686,10 @@ export class AlphaRequestProcessor {
   }> {
     const repository = new AlphaRepository(this.options.database);
     const contextAdmission = estimateContextAdmission(envelope, this.expectedOutputTokens);
-    const { profiles: effectiveProfiles, probeClaims } = await this.effectiveProfiles();
+    const { profiles: effectiveProfiles, probeClaims } = await this.effectiveProfiles(identity.allowedProfileIds);
+    const recoveryProfiles = identity.allowedProfileIds.length > 0
+      ? effectiveProfiles.filter((profile) => identity.allowedProfileIds.includes(profile.executionProfileId))
+      : effectiveProfiles;
     const storedSegment = await repository.getSegment(state.segmentId, identity.newapiUserId);
     const storedSegmentMetadata = metadata(storedSegment);
     const startAdmissionTrace = async (judgeEvaluationId?: string) => repository.saveAdmissionTrace({
@@ -727,6 +732,8 @@ export class AlphaRequestProcessor {
         requireThinking: envelope.containsThinking,
         reasoningEffort: envelope.reasoningEffort,
         context: contextAdmission,
+        expectedOutputTokens: this.expectedOutputTokens,
+        allowedProfileIds: identity.allowedProfileIds.length > 0 ? identity.allowedProfileIds : undefined,
         clientDeclaredWebTool: envelope.clientDeclaredWebTool,
         webIntent: envelope.webIntent,
         });
@@ -819,6 +826,7 @@ export class AlphaRequestProcessor {
             ...webIntentMetadata(webIntentDecision),
             selectedProfile: profile,
             userRoutingPolicyVersion: identity.routingPolicyVersion,
+            allowedProfileIds: identity.allowedProfileIds,
           },
         });
       } else if (!storedWebIntent) {
@@ -828,17 +836,23 @@ export class AlphaRequestProcessor {
         });
       }
       await this.releaseUnusedProbeClaims(probeClaims, profile);
-      return { profile, recoveryProfiles: effectiveProfiles };
+      return { profile, recoveryProfiles };
     }
 
     const originalStoredProfile = selectedProfileFromSegment(storedSegment, this.options.profiles);
     const storedProfile = selectedProfileFromSegment(storedSegment, effectiveProfiles);
     const previousJudge = record(storedSegmentMetadata.judgeRun) as AlphaJudgeRun | undefined;
     const policyVersionMatches = metadata(storedSegment).userRoutingPolicyVersion === identity.routingPolicyVersion;
+    const storedAllowedProfileIds = Array.isArray(storedSegmentMetadata.allowedProfileIds)
+      ? storedSegmentMetadata.allowedProfileIds.filter((value): value is string => typeof value === "string").sort()
+      : [];
+    const profilePolicyChanged = JSON.stringify(storedAllowedProfileIds)
+      !== JSON.stringify([...identity.allowedProfileIds].sort());
     const reused = storedProfile
       && policyVersionMatches
       && identity.routingPolicy !== "explicit_only"
       && (identity.routingPolicy !== "custom_allowlist" || identity.allowedModelIds.includes(storedProfile.modelId))
+      && (identity.allowedProfileIds.length === 0 || identity.allowedProfileIds.includes(storedProfile.executionProfileId))
       ? storedProfile
       : undefined;
     if (!state.decision.runJudge && reused && reused.health !== "cooldown") {
@@ -852,7 +866,9 @@ export class AlphaRequestProcessor {
         requireThinking: envelope.containsThinking,
         reasoningEffort: envelope.reasoningEffort,
         context: contextAdmission,
+        expectedOutputTokens: this.expectedOutputTokens,
         allowedModelIds: identity.routingPolicy === "custom_allowlist" ? identity.allowedModelIds : undefined,
+        allowedProfileIds: identity.allowedProfileIds.length > 0 ? identity.allowedProfileIds : undefined,
         clientDeclaredWebTool: envelope.clientDeclaredWebTool,
         webIntent: envelope.webIntent,
         });
@@ -887,10 +903,11 @@ export class AlphaRequestProcessor {
         });
       }
       await this.releaseUnusedProbeClaims(probeClaims, compatible);
-      return { profile: compatible, recoveryProfiles: effectiveProfiles };
+      return { profile: compatible, recoveryProfiles };
     }
 
     const reusedJudgeEvaluationId = stringValue(storedSegment?.judge_evaluation_id);
+    const routeRefreshReason = profilePolicyChanged ? "profile_policy_changed" : "profile_health";
     const profileHealthRefresh = !state.decision.runJudge
       && Boolean(reusedJudgeEvaluationId)
       && Boolean(previousJudge)
@@ -917,9 +934,11 @@ export class AlphaRequestProcessor {
             requireThinking: envelope.containsThinking,
             reasoningEffort: envelope.reasoningEffort,
             context: contextAdmission,
+            expectedOutputTokens: this.expectedOutputTokens,
             allowedModelIds: identity.routingPolicy === "all_routing_eligible"
               ? undefined
               : identity.routingPolicy === "custom_allowlist" ? identity.allowedModelIds : [],
+            allowedProfileIds: identity.allowedProfileIds.length > 0 ? identity.allowedProfileIds : undefined,
             clientDeclaredWebTool: envelope.clientDeclaredWebTool,
             webIntent: envelope.webIntent,
           },
@@ -938,7 +957,7 @@ export class AlphaRequestProcessor {
           exclusionCounts: typed?.details.exclusion_counts as Record<string, number> | undefined,
           metadata: {
             trigger: "reuse_route", judgeCalls: 0, judgeReused: true,
-            reusedJudgeEvaluationId, routeRefreshReason: "profile_health",
+            reusedJudgeEvaluationId, routeRefreshReason,
           },
         });
         throw error;
@@ -952,7 +971,7 @@ export class AlphaRequestProcessor {
           .reduce((counts, category) => counts.set(category, (counts.get(category) ?? 0) + 1), new Map<string, number>())),
         metadata: {
           trigger: "reuse_route", judgeCalls: 0, judgeReused: true,
-          reusedJudgeEvaluationId, routeRefreshReason: "profile_health",
+          reusedJudgeEvaluationId, routeRefreshReason,
           selectedProfileId: route.selectedProfile.executionProfileId,
         },
       });
@@ -973,7 +992,7 @@ export class AlphaRequestProcessor {
           judgeCost: 0,
           judgeReused: true,
           reusedJudgeEvaluationId,
-          routeRefreshReason: "profile_health",
+          routeRefreshReason,
           inputTokens: contextAdmission.estimatedInputTokens,
           expectedOutputTokens: this.expectedOutputTokens,
           userRoutingPolicy: identity.routingPolicy,
@@ -981,6 +1000,7 @@ export class AlphaRequestProcessor {
           routingPreferenceParameters: route.preferenceParameters,
           userRoutingPolicyVersion: identity.routingPolicyVersion,
           allowedModelIds: identity.allowedModelIds,
+          allowedProfileIds: identity.allowedProfileIds,
           providerCandidateEstimates: route.providerCandidateEstimates,
           excludedProfiles: route.excludedProfiles,
           costUnit: "CNY",
@@ -989,7 +1009,7 @@ export class AlphaRequestProcessor {
         candidateEstimates: route.candidateEstimates,
         paretoFrontier: route.paretoFrontier,
         selectedProfile: { ...route.selectedProfile },
-        routeExplanation: `Reused Judge Evaluation ${reusedJudgeEvaluationId}; refreshed route for profile health. ${route.recommendation.reason} ${route.providerSelectionReason}`,
+        routeExplanation: `Reused Judge Evaluation ${reusedJudgeEvaluationId}; refreshed route for ${routeRefreshReason}. ${route.recommendation.reason} ${route.providerSelectionReason}`,
       });
       await repository.updateSegmentDecision({
         segmentId: state.segmentId,
@@ -1003,12 +1023,13 @@ export class AlphaRequestProcessor {
           judgeRun: previousJudge,
           selectedProfile: route.selectedProfile,
           userRoutingPolicyVersion: identity.routingPolicyVersion,
+          allowedProfileIds: identity.allowedProfileIds,
           routingPreference: identity.routingPreference,
-          routeRefreshReason: "profile_health",
+          routeRefreshReason,
         },
       });
       await this.releaseUnusedProbeClaims(probeClaims, route.selectedProfile);
-      return { profile: route.selectedProfile, route, recoveryProfiles: effectiveProfiles };
+      return { profile: route.selectedProfile, route, recoveryProfiles };
     }
 
     const context = buildAlphaJudgeContext(envelope, {
@@ -1329,11 +1350,13 @@ export class AlphaRequestProcessor {
         requireThinking: envelope.containsThinking,
         reasoningEffort: envelope.reasoningEffort,
         context: contextAdmission,
+        expectedOutputTokens: this.expectedOutputTokens,
         allowedModelIds: identity.routingPolicy === "all_routing_eligible"
           ? undefined
           : identity.routingPolicy === "custom_allowlist"
             ? identity.allowedModelIds
             : [],
+        allowedProfileIds: identity.allowedProfileIds.length > 0 ? identity.allowedProfileIds : undefined,
         clientDeclaredWebTool: envelope.clientDeclaredWebTool,
         webIntent: envelope.webIntent,
       },
@@ -1455,6 +1478,7 @@ export class AlphaRequestProcessor {
         baseEffectiveQualityTarget: state.effectiveQualityTarget,
         userRoutingPolicyVersion: identity.routingPolicyVersion,
         allowedModelIds: identity.allowedModelIds,
+        allowedProfileIds: identity.allowedProfileIds,
         configuredProfileCount: effectiveProfiles.length,
         protocolProfileCount: effectiveProfiles.filter((profile) => profile.protocols.includes(envelope.protocol)).length,
         initialCandidateModelCount: new Set(
@@ -1494,11 +1518,12 @@ export class AlphaRequestProcessor {
         judgeRun: judge,
         selectedProfile: route.selectedProfile,
         userRoutingPolicyVersion: identity.routingPolicyVersion,
+        allowedProfileIds: identity.allowedProfileIds,
         routingPreference: identity.routingPreference,
       },
     });
     await this.releaseUnusedProbeClaims(probeClaims, route.selectedProfile);
-    return { profile: route.selectedProfile, judge, route, recoveryProfiles: effectiveProfiles };
+    return { profile: route.selectedProfile, judge, route, recoveryProfiles };
   }
 
   private recoveryProfile(

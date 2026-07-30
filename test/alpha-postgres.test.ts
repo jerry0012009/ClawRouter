@@ -40,7 +40,9 @@ run("Alpha PostgreSQL foundation", () => {
       "acu_judge_ledger_entries",
       "acu_logical_requests",
       "acu_payloads",
+      "acu_probe_worker_lease",
       "acu_profile_probe_attempts",
+      "acu_profile_probe_queue",
       "acu_provider_health",
       "acu_provider_model_profile_health",
       "acu_route_decisions",
@@ -317,6 +319,32 @@ run("Alpha PostgreSQL foundation", () => {
     expect(await repository.claimHalfOpenProbe("channel", "channel_probe_test")).toBe(false);
     await repository.releaseHalfOpenProbe("channel", "channel_probe_test");
     expect(await repository.claimHalfOpenProbe("channel", "channel_probe_test")).toBe(true);
+  });
+
+  it("deduplicates the global Probe queue and grants one Worker lease", async () => {
+    await database.query("UPDATE acu_probe_worker_lease SET holder_id=null,lease_until=now()-interval '1 second' WHERE singleton=true");
+    await database.query(
+      `INSERT INTO acu_profile_probe_queue (execution_profile_id) VALUES ('profile_probe_test')
+       ON CONFLICT (execution_profile_id) DO UPDATE SET enqueued_at=excluded.enqueued_at`,
+    );
+    await database.query(
+      `INSERT INTO acu_profile_probe_queue (execution_profile_id) VALUES ('profile_probe_test')
+       ON CONFLICT (execution_profile_id) DO UPDATE SET enqueued_at=excluded.enqueued_at`,
+    );
+    const queue = await database.query<{ count: number }>(
+      "SELECT count(*)::int count FROM acu_profile_probe_queue WHERE execution_profile_id='profile_probe_test'",
+    );
+    expect(queue.rows[0]?.count).toBe(1);
+    const first = await database.query(
+      `UPDATE acu_probe_worker_lease SET holder_id='worker-a',lease_until=now()+interval '2 minutes'
+       WHERE singleton=true AND lease_until<=now() RETURNING singleton`,
+    );
+    const second = await database.query(
+      `UPDATE acu_probe_worker_lease SET holder_id='worker-b',lease_until=now()+interval '2 minutes'
+       WHERE singleton=true AND lease_until<=now() RETURNING singleton`,
+    );
+    expect(first.rowCount).toBe(1);
+    expect(second.rowCount).toBe(0);
   });
 
   it("returns the complete logical request chain only through the explicit admin lookup", async () => {

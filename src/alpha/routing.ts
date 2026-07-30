@@ -85,6 +85,8 @@ export type AlphaRouteRequirements = {
   context?: ContextAdmissionEstimate;
   contextTokens?: number;
   allowedModelIds?: string[];
+  allowedProfileIds?: string[];
+  expectedOutputTokens?: number;
   clientDeclaredWebTool?: boolean;
   webIntent?: WebIntent;
 };
@@ -114,7 +116,7 @@ export function exclusionCategory(reason: string): ExclusionCategory {
   if (reason === "web_search_execution_unverified") return "web";
   if (reason === "thinking_support" || reason.startsWith("reasoning_effort:")) return "thinking";
   if (reason.startsWith("health_") || reason === "provider_cooldown" || reason === "disabled") return "health";
-  if (reason === "administrator_policy" || reason === "model_policy") return "allowlist";
+  if (reason === "administrator_policy" || reason === "model_policy" || reason === "profile_policy") return "allowlist";
   if (reason === "provider_economics" || reason === "usage_untrusted") return "cost";
   return "adapter";
 }
@@ -267,6 +269,9 @@ function exclusionReasons(
   if (profile.economics?.health === "cooldown") reasons.push("provider_cooldown");
   if (profile.usageTrusted === false) reasons.push("usage_untrusted");
   if (requirements.allowedModelIds && !requirements.allowedModelIds.includes(profile.modelId)) reasons.push("model_policy");
+  if (requirements.allowedProfileIds && !requirements.allowedProfileIds.includes(profile.executionProfileId)) {
+    reasons.push("profile_policy");
+  }
   if (input.routeDirection === "hold_or_upgrade" && input.currentProfile) {
     const currentAbility = getAcuModel(input.currentProfile.modelId)?.abilityAnchor;
     const candidateAbility = getAcuModel(profile.modelId)?.abilityAnchor;
@@ -287,6 +292,31 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
   const eligibleModelIds = [...new Set(eligibleProfiles.map((profile) => profile.modelId))];
   if (eligibleModelIds.length === 0) {
     const normalizedExclusionCounts = exclusionCounts(excludedProfiles);
+    if (input.requirements.allowedProfileIds) {
+      const allowed = new Set(input.requirements.allowedProfileIds);
+      const allowedEvaluations = input.profiles.filter((profile) => allowed.has(profile.executionProfileId)).map((profile) => ({
+        profile,
+        reasons: exclusionReasons(profile, { ...input.requirements, allowedProfileIds: undefined }, input),
+      }));
+      const temporaryReasons = new Set(["provider_cooldown", "usage_untrusted"]);
+      const hasTemporarilyUnavailableCompatibleProfile = allowedEvaluations.some(({ reasons }) => (
+        reasons.length > 0 && reasons.every((reason) => reason.startsWith("health_") || temporaryReasons.has(reason))
+      ));
+      if (hasTemporarilyUnavailableCompatibleProfile) {
+        throw new AlphaAdmissionError(
+          "allowed_profiles_temporarily_unavailable",
+          "All compatible execution Profiles allowed by this API Token are temporarily unavailable.",
+          503,
+          { exclusion_counts: normalizedExclusionCounts },
+        );
+      }
+      throw new AlphaAdmissionError(
+        "no_profile_satisfies_token_supply_policy",
+        "No execution Profile allowed by this API Token satisfies the request protocol and capabilities.",
+        400,
+        { exclusion_counts: normalizedExclusionCounts },
+      );
+    }
     const contextBlockedProfiles = excludedProfiles.filter((profile) => (
       profile.reasons.length > 0 && profile.reasons.every((reason) => reason === "context_window")
     ));
@@ -448,7 +478,19 @@ export function resolveExplicitProfile(
     executionProfileId: candidate.executionProfileId,
     reasons,
   })));
-  const profile = evaluated.find((item) => item.reasons.length === 0)?.candidate;
+  const profile = evaluated
+    .filter((item) => item.reasons.length === 0)
+    .sort((left, right) => effectiveProviderSelectionScore(
+      left.candidate,
+      requirements,
+      requirements.context?.estimatedInputTokens ?? requirements.contextTokens ?? 0,
+      requirements.expectedOutputTokens ?? 0,
+    ) - effectiveProviderSelectionScore(
+      right.candidate,
+      requirements,
+      requirements.context?.estimatedInputTokens ?? requirements.contextTokens ?? 0,
+      requirements.expectedOutputTokens ?? 0,
+    ))[0]?.candidate;
   if (profile) return profile;
   const contextOnly = evaluated.length > 0 && evaluated.every((item) => (
     item.reasons.length > 0 && item.reasons.every((reason) => reason === "context_window")
@@ -479,6 +521,26 @@ export function resolveExplicitProfile(
         required_tool_types: requirements.requiredToolTypes ?? [],
         exclusion_counts: normalizedExclusionCounts,
       },
+    );
+  }
+  if (requirements.allowedProfileIds) {
+    const allowed = new Set(requirements.allowedProfileIds);
+    const allowedEvaluations = evaluated.filter(({ candidate }) => allowed.has(candidate.executionProfileId));
+    const temporaryReasons = new Set(["provider_cooldown", "usage_untrusted"]);
+    if (allowedEvaluations.some(({ reasons }) => reasons.length > 0
+      && reasons.every((reason) => reason.startsWith("health_") || temporaryReasons.has(reason)))) {
+      throw new AlphaAdmissionError(
+        "allowed_profiles_temporarily_unavailable",
+        "All compatible execution Profiles allowed by this API Token are temporarily unavailable.",
+        503,
+        { exclusion_counts: normalizedExclusionCounts },
+      );
+    }
+    throw new AlphaAdmissionError(
+      "no_profile_satisfies_token_supply_policy",
+      "No execution Profile allowed by this API Token satisfies the explicit model request.",
+      400,
+      { exclusion_counts: normalizedExclusionCounts },
     );
   }
   throw new Error(`Explicit model ${requestedModel} has no compatible execution profile`);

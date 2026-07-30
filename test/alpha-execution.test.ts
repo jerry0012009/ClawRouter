@@ -173,9 +173,99 @@ describe("Alpha Provider attempt recovery", () => {
     expect(retries).toBe(0);
   });
 
-  it("classifies only P0 transient HTTP statuses as recoverable", () => {
-    expect([429, 500, 502, 503, 504].every(isRecoverableProviderStatus)).toBe(true);
+  it("classifies rate limits and all Provider 5xx statuses as recoverable", () => {
+    expect([429, 500, 502, 503, 504, 520, 524, 527].every(isRecoverableProviderStatus)).toBe(true);
     expect([200, 400, 401, 403, 404, 422].some(isRecoverableProviderStatus)).toBe(false);
+  });
+
+  it("recovers from a 524 HTML response without treating error bytes as model output", async () => {
+    let calls = 0;
+    let failure: Parameters<NonNullable<Parameters<typeof createRecoveringProviderAdapter>[0]["recordFailedAttempt"]>>[0] | undefined;
+    const handle = (attemptIndex: number): ProviderAttemptHandle => ({
+      attemptId: `attempt-${attemptIndex}`, attemptIndex, profile,
+      adapter: { async execute() {
+        calls += 1;
+        return calls === 1
+          ? new Response("<html>cloudflare timeout</html>", { status: 524, headers: { "content-type": "text/html", "cf-ray": "fixture" } })
+          : new Response("ok", { status: 200 });
+      } },
+    });
+    const adapter = createRecoveringProviderAdapter({
+      initial: handle(1), maxAttempts: 3,
+      selectRecoveryProfile: () => profile,
+      async startRetry(_profile, index) { return handle(index); },
+      async recordFailedAttempt(input) { failure = input; },
+    });
+    expect(await (await adapter.execute(request())).text()).toBe("ok");
+    expect(failure?.response?.observation).toMatchObject({ rawResponseBytes: 31, modelVisibleOutputBytes: 0 });
+  });
+
+  it("uses the first-model-event watchdog only when a recovery target exists", async () => {
+    let calls = 0;
+    const slow = (attemptIndex: number): ProviderAttemptHandle => ({
+      attemptId: `attempt-${attemptIndex}`, attemptIndex, profile,
+      adapter: { async execute(input) {
+        calls += 1;
+        if (calls > 1) return new Response("data: {\"type\":\"response.output_text.delta\",\"delta\":\"ok\"}\n\n", { status: 200, headers: { "content-type": "text/event-stream" } });
+        return new Promise<Response>((_resolve, reject) => input.signal.addEventListener("abort", () => reject(input.signal.reason), { once: true }));
+      } },
+    });
+    const adapter = createRecoveringProviderAdapter({
+      initial: slow(1), maxAttempts: 2, hasRecoveryTarget: () => true, firstModelEventDeadlineMs: () => 10,
+      selectRecoveryProfile: () => profile,
+      async startRetry(_profile, index) { return slow(index); },
+      async recordFailedAttempt(input) { expect((input.error as Error).message).toBe("slow_first_model_event"); },
+    });
+    const response = await adapter.execute(request());
+    expect(await response.text()).toContain("output_text.delta");
+    expect(calls).toBe(2);
+  });
+
+  it("does not arm the first-model-event watchdog without a healthy recovery target", async () => {
+    let aborted = false;
+    const adapter = createRecoveringProviderAdapter({
+      initial: {
+        attemptId: "attempt-1", attemptIndex: 1, profile,
+        adapter: { async execute(input) {
+          input.signal.addEventListener("abort", () => { aborted = true; }, { once: true });
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          return new Response("ok", { status: 200 });
+        } },
+      },
+      hasRecoveryTarget: () => false,
+      firstModelEventDeadlineMs: () => 5,
+      async startRetry() { throw new Error("must not retry"); },
+      async recordFailedAttempt() { throw new Error("must not record a failure"); },
+    });
+    expect(await (await adapter.execute(request())).text()).toBe("ok");
+    expect(aborted).toBe(false);
+  });
+
+  it("disarms the watchdog after the first valid model event", async () => {
+    let retries = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        controller.enqueue(Buffer.from("data: {\"type\":\"response.output_text.delta\",\"delta\":\"first\"}\n\n"));
+        await new Promise((resolve) => setTimeout(resolve, 25));
+        controller.enqueue(Buffer.from("data: {\"type\":\"response.output_text.delta\",\"delta\":\"second\"}\n\n"));
+        controller.close();
+      },
+    });
+    const adapter = createRecoveringProviderAdapter({
+      initial: {
+        attemptId: "attempt-1", attemptIndex: 1, profile,
+        adapter: { async execute() { return new Response(stream, { status: 200, headers: { "content-type": "text/event-stream" } }); } },
+      },
+      hasRecoveryTarget: () => true,
+      firstModelEventDeadlineMs: () => 10,
+      selectRecoveryProfile: () => profile,
+      async startRetry() { retries += 1; throw new Error("must not retry"); },
+      async recordFailedAttempt() { throw new Error("must not record a failure"); },
+    });
+    const body = await (await adapter.execute(request())).text();
+    expect(body).toContain("first");
+    expect(body).toContain("second");
+    expect(retries).toBe(0);
   });
 
   it("uses a network endpoint fallback before another Channel of the same model", async () => {

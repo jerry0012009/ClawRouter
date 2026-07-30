@@ -20,7 +20,8 @@ describe("Provider Channel circuit breaker", () => {
     expect(classifyAttemptOutcome({ success: false, errorCode: "model_not_found" }, 0)).toMatchObject({ scope: "profile", permanent: true });
     expect(classifyAttemptOutcome({ success: false, errorMessage: "unsupported tool schema" }, 0)).toMatchObject({ scope: "profile", errorClass: "tool_incompatible" });
     expect(classifyAttemptOutcome({ success: false, httpStatus: 502 }, 0)).toMatchObject({ scope: "channel", errorClass: "provider_5xx" });
-    expect(classifyAttemptOutcome({ success: false, httpStatus: 500 }, 0)).toMatchObject({ scope: "profile", errorClass: "provider_5xx" });
+    expect(classifyAttemptOutcome({ success: false, httpStatus: 500 }, 0)).toMatchObject({ scope: "channel", errorClass: "provider_5xx" });
+    expect(classifyAttemptOutcome({ success: false, httpStatus: 524 }, 0)).toMatchObject({ scope: "channel", errorClass: "provider_edge_timeout", recoverableBeforeModelOutput: true });
   });
 
   it("does not penalize client cancellation", () => {

@@ -1,6 +1,7 @@
 import type { ServerResponse } from "node:http";
 import { isHopByHopHeader } from "./provider.js";
 import { inspectWebSearchEvidence, WebSearchStreamObserver, type WebSearchEvidence } from "./web-search.js";
+import { getResponseObservation, ModelOutputObserver } from "./model-output.js";
 
 export type RelayResult = {
   body: Buffer;
@@ -8,7 +9,10 @@ export type RelayResult = {
   responseHeaders: Record<string, string>;
   complete: boolean;
   clientCancelled: boolean;
-  visibleOutputBytes: number;
+  rawResponseBytes: number;
+  modelVisibleOutputBytes: number;
+  firstModelEventAt?: string;
+  firstModelEventLatencyMs?: number;
   responseStarted: boolean;
   webSearch: WebSearchEvidence;
 };
@@ -31,7 +35,8 @@ export async function relayProviderResponse(upstream: Response, response: Server
   copyResponseHeaders(upstream, response);
   response.flushHeaders();
   const chunks: Buffer[] = [];
-  let visibleOutputBytes = 0;
+  const preObserved = getResponseObservation(upstream);
+  const modelObserver = new ModelOutputObserver(Date.now() - (preObserved?.firstModelEventLatencyMs ?? 0));
   let complete = true;
   let clientCancelled = false;
   const contentType = upstream.headers.get("content-type") ?? "application/octet-stream";
@@ -47,7 +52,7 @@ export async function relayProviderResponse(upstream: Response, response: Server
         const chunk = Buffer.from(item.value);
         chunks.push(chunk);
         webObserver?.observe(chunk);
-        visibleOutputBytes += chunk.length;
+        modelObserver.observe(chunk);
         if (response.destroyed || !response.write(chunk)) {
           if (response.destroyed) {
             complete = false;
@@ -65,13 +70,17 @@ export async function relayProviderResponse(upstream: Response, response: Server
     }
   }
   const body = Buffer.concat(chunks);
+  const observed = modelObserver.result();
   return {
     body,
     httpStatus: upstream.status,
     responseHeaders: decodedResponseHeaders(upstream),
     complete,
     clientCancelled,
-    visibleOutputBytes,
+    rawResponseBytes: observed.rawResponseBytes,
+    modelVisibleOutputBytes: observed.modelVisibleOutputBytes,
+    firstModelEventAt: preObserved?.firstModelEventAt?.toISOString() ?? observed.firstModelEventAt?.toISOString(),
+    firstModelEventLatencyMs: preObserved?.firstModelEventLatencyMs ?? observed.firstModelEventLatencyMs,
     responseStarted: response.headersSent,
     webSearch: webObserver?.evidence() ?? inspectWebSearchEvidence(body, contentType),
   };

@@ -1542,7 +1542,7 @@ export class AlphaRequestProcessor {
     return adapter ? [{ endpoint: "primary", adapter }] : [];
   }
 
-  private async recordRuntimeHealth(profile: AlphaExecutionProfile, protocol: AlphaProtocol, outcome: AttemptOutcome): Promise<void> {
+  private async recordRuntimeHealth(profile: AlphaExecutionProfile, protocol: AlphaProtocol, outcome: AttemptOutcome): Promise<{ errorClass: string; cooldownUntil?: Date }> {
     const repository = new AlphaRepository(this.options.database);
     const channelId = profile.channelId ?? profile.channel;
     const classified = classifyAttemptOutcome(outcome, (await repository.channelHealth(channelId))?.consecutiveFailures ?? 0);
@@ -1567,6 +1567,10 @@ export class AlphaRequestProcessor {
         healthReason: classified.errorClass,
       });
     }
+    const persisted = classified.scope === "profile"
+      ? await repository.profileHealth(profile.executionProfileId)
+      : await repository.channelHealth(channelId);
+    return { errorClass: classified.errorClass, cooldownUntil: persisted?.cooldownUntil };
   }
 
   private async recordProviderFailure(input: {
@@ -1590,6 +1594,17 @@ export class AlphaRequestProcessor {
       requestedModel: input.attempt.profile.modelId,
       requestBytes: input.requestBytes,
     }) : undefined;
+    const responseText = input.response?.body.toString("utf8") ?? "";
+    const retryAfterSeconds = input.response?.headers["retry-after"] ? Number(input.response.headers["retry-after"]) : undefined;
+    const health = input.webFailure ? undefined : await this.recordRuntimeHealth(input.attempt.profile, input.protocol, {
+      success: false,
+      httpStatus: input.response?.status,
+      errorCode: input.error instanceof Error ? input.error.name : undefined,
+      errorMessage: input.error instanceof Error ? input.error.message : responseText.slice(0, 512),
+      retryAfterSeconds: Number.isFinite(retryAfterSeconds) ? retryAfterSeconds : undefined,
+      firstTokenLatencyMs: input.response?.observation?.firstModelEventLatencyMs,
+      totalLatencyMs: input.latencyMs,
+    });
     if (input.response) {
       await repository.savePayload({
         payloadId: alphaId("payload"),
@@ -1620,9 +1635,21 @@ export class AlphaRequestProcessor {
       usageSource: usage?.usageSource,
       actualCostUsd: "0.0000000000",
       latencyMs: input.latencyMs,
+      visibleOutputBytes: input.response?.observation?.modelVisibleOutputBytes ?? 0,
       metadata: {
         error: input.error instanceof Error ? input.error.message : undefined,
         webFailure: input.webFailure === true,
+        normalized_error_signature: sha256(`${health?.errorClass ?? "web_search_failed"}\n${input.response?.status ?? 0}\n${input.attempt.profile.provider}\n${input.attempt.profile.channel}`),
+        errorClass: health?.errorClass,
+        endpoint: input.attempt.networkEndpoint,
+        cfRay: input.response?.headers["cf-ray"],
+        contentType,
+        retryAfterSeconds: Number.isFinite(retryAfterSeconds) ? retryAfterSeconds : undefined,
+        raw_response_bytes: input.response?.observation?.rawResponseBytes ?? input.response?.body.byteLength ?? 0,
+        model_visible_output_bytes: input.response?.observation?.modelVisibleOutputBytes ?? 0,
+        first_model_event_at: input.response?.observation?.firstModelEventAt?.toISOString(),
+        first_model_event_latency_ms: input.response?.observation?.firstModelEventLatencyMs,
+        cooldown_until: health?.cooldownUntil?.toISOString(),
       },
     });
     if (input.webFailure) {
@@ -1643,14 +1670,6 @@ export class AlphaRequestProcessor {
           webSearchFailureReason: "web_search_provider_error",
         },
       });
-    } else {
-      await this.recordRuntimeHealth(input.attempt.profile, input.protocol, {
-        success: false,
-        httpStatus: input.response?.status,
-        errorMessage: input.error instanceof Error ? input.error.message : input.response?.body.toString("utf8", 0, 512),
-        retryAfterSeconds: input.response?.headers["retry-after"] ? Number(input.response.headers["retry-after"]) : undefined,
-        totalLatencyMs: input.latencyMs,
-      });
     }
     await repository.insertEvent({
       eventId: alphaId("evt"),
@@ -1668,6 +1687,9 @@ export class AlphaRequestProcessor {
         provider: input.attempt.profile.provider,
         channel: input.attempt.profile.channel,
         httpStatus: input.response?.status,
+        errorClass: health?.errorClass,
+        cooldownUntil: health?.cooldownUntil?.toISOString(),
+        recoveryEligible: (input.response?.observation?.modelVisibleOutputBytes ?? 0) === 0,
       },
     });
   }
@@ -2061,37 +2083,53 @@ export class AlphaRequestProcessor {
       ),
     };
     const recoveryContextAdmission = estimateContextAdmission(envelope, this.expectedOutputTokens);
+    const latencySamples = await this.options.database.query<{ latency_ms: number }>(
+      `SELECT (metadata_json->>'first_model_event_latency_ms')::double precision AS latency_ms
+       FROM acu_attempts
+       WHERE attempt_kind='provider' AND status='success' AND execution_profile_id=$1
+         AND metadata_json ? 'first_model_event_latency_ms'
+         AND CASE WHEN $2::boolean THEN input_tokens>=100000 ELSE input_tokens<100000 END
+       ORDER BY completed_at DESC LIMIT 100`,
+      [result.profile.executionProfileId, recoveryContextAdmission.estimatedInputTokens >= 100_000],
+    );
+    const sortedLatencies = latencySamples.rows.map((row) => Number(row.latency_ms)).filter(Number.isFinite).sort((a, b) => a - b);
+    const p95Latency = sortedLatencies.length >= 10
+      ? sortedLatencies[Math.min(sortedLatencies.length - 1, Math.ceil(sortedLatencies.length * 0.95) - 1)]
+      : undefined;
+    const firstModelEventDeadlineMs = p95Latency === undefined
+      ? recoveryContextAdmission.estimatedInputTokens >= 100_000 ? 75_000 : 45_000
+      : Math.max(30_000, Math.min(90_000, Math.round(p95Latency * 1.5)));
+    const attemptedProfiles = new Set(resolutionContext.attemptedExecutionProfileIds);
+    const attemptedChannels = new Set(resolutionContext.attemptedChannelIds);
+    const attemptedProviders = new Set(resolutionContext.attemptedProviders);
+    const attemptedEndpoints = new Set(resolutionContext.attemptedNetworkEndpoints);
+    const routeProfiles = (result.route?.providerCandidateEstimates ?? [])
+      .filter((candidate) => candidate.health === "healthy" && candidate.usageTrusted)
+      .map((candidate) => this.options.profiles.find((profile) => profile.executionProfileId === candidate.executionProfileId))
+      .filter((profile): profile is AlphaExecutionProfile => Boolean(profile));
+    const recoveryPool = [...routeProfiles, ...result.recoveryProfiles].filter((profile, index, all) => (
+      all.findIndex((candidate) => candidate.executionProfileId === profile.executionProfileId) === index
+      && profile.modelId === result.profile.modelId && profile.enabled && profile.administratorAllowed
+      && profile.health === "healthy" && profile.usageTrusted !== false
+      && (!profile.economics || (profile.economics.enabled && profile.economics.health === "healthy"))
+      && profile.protocols.includes(envelope.protocol)
+      && (!envelope.requiredToolTypes.length || profile.toolCallSupport)
+      && envelope.requiredToolTypes.every((toolType) => profile.supportedToolTypes?.includes(toolType))
+      && (envelope.webIntent !== "required" || profile.webSearchExecutionVerified === true)
+      && (!envelope.containsThinking || profile.thinkingSupport)
+      && effectiveContextCeiling(profile) >= recoveryContextAdmission.requiredTotalContextTokens
+      && this.options.adapters.has(profile.executionProfileId)
+    ));
+    const hasUnattemptedRecovery = (current: ProviderAttemptHandle): boolean => recoveryPool.some((profile) => (
+      !attemptedProfiles.has(profile.executionProfileId) && !attemptedChannels.has(profile.channelId ?? profile.channel)
+    )) || this.endpoints(current.profile).some((item) => !attemptedEndpoints.has(item.endpoint));
     const adapter = createRecoveringProviderAdapter({
       initial: initialAttempt,
       maxAttempts: maxProviderAttempts,
       isRecoverableResponse: (response) => isWebSearchProviderError(response, envelope.webIntent),
+      hasRecoveryTarget: hasUnattemptedRecovery,
+      firstModelEventDeadlineMs: () => firstModelEventDeadlineMs,
       selectRecoveryTarget: (() => {
-        const attemptedProfiles = new Set(resolutionContext.attemptedExecutionProfileIds);
-        const attemptedChannels = new Set(resolutionContext.attemptedChannelIds);
-        const attemptedProviders = new Set(resolutionContext.attemptedProviders);
-        const attemptedEndpoints = new Set(resolutionContext.attemptedNetworkEndpoints);
-        const routeProfiles = (result.route?.providerCandidateEstimates ?? [])
-          .filter((candidate) => candidate.health === "healthy" && candidate.usageTrusted)
-          .map((candidate) => this.options.profiles.find((profile) => (
-            profile.executionProfileId === candidate.executionProfileId
-          )))
-          .filter((profile): profile is AlphaExecutionProfile => Boolean(profile));
-        const recoveryPool = [...routeProfiles, ...result.recoveryProfiles].filter((profile, index, all) => (
-          all.findIndex((candidate) => candidate.executionProfileId === profile.executionProfileId) === index
-          && profile.modelId === result.profile.modelId
-          && profile.enabled
-          && profile.administratorAllowed
-          && profile.health === "healthy"
-          && profile.usageTrusted !== false
-          && (!profile.economics || (profile.economics.enabled && profile.economics.health === "healthy"))
-          && profile.protocols.includes(envelope.protocol)
-          && (!envelope.requiredToolTypes.length || profile.toolCallSupport)
-          && envelope.requiredToolTypes.every((toolType) => profile.supportedToolTypes?.includes(toolType))
-          && (envelope.webIntent !== "required" || profile.webSearchExecutionVerified === true)
-          && (!envelope.containsThinking || profile.thinkingSupport)
-          && effectiveContextCeiling(profile) >= recoveryContextAdmission.requiredTotalContextTokens
-          && this.options.adapters.has(profile.executionProfileId)
-        ));
         return (current): ProviderRecoveryTarget | undefined => {
           const eligible = recoveryPool.filter((profile) => (
             !attemptedProfiles.has(profile.executionProfileId)
@@ -2258,9 +2296,10 @@ export class AlphaRequestProcessor {
       started_at: Date;
       completed_at: Date | null;
       actual_cost_usd: string;
+      metadata_json: Record<string, unknown>;
     }>(
       `SELECT attempt_index,provider,channel,execution_profile_id,status,error_category,http_status,
-              latency_ms,started_at,completed_at,actual_cost_usd
+              latency_ms,started_at,completed_at,actual_cost_usd,metadata_json
        FROM acu_attempts WHERE logical_request_id=$1 AND attempt_kind='provider'
        ORDER BY attempt_index`,
       [input.context.logicalRequestId],
@@ -2413,6 +2452,14 @@ export class AlphaRequestProcessor {
           started_at: attempt.started_at,
           completed_at: attempt.completed_at,
           nominal_cost_usd: Number(attempt.actual_cost_usd),
+          raw_response_bytes: optionalNumber(attempt.metadata_json?.raw_response_bytes),
+          model_visible_output_bytes: optionalNumber(attempt.metadata_json?.model_visible_output_bytes),
+          first_model_event_at: stringValue(attempt.metadata_json?.first_model_event_at),
+          first_model_event_latency_ms: optionalNumber(attempt.metadata_json?.first_model_event_latency_ms),
+          normalized_error_signature: stringValue(attempt.metadata_json?.normalized_error_signature),
+          error_class: stringValue(attempt.metadata_json?.errorClass),
+          cooldown_until: stringValue(attempt.metadata_json?.cooldown_until),
+          cf_ray: stringValue(attempt.metadata_json?.cfRay),
         })),
         client_declared_web_tool: input.context.clientDeclaredWebTool,
         web_intent: input.context.webIntent,
@@ -2619,7 +2666,7 @@ export class AlphaRequestProcessor {
       usageSource: usage.usageSource,
       actualCostUsd: transportSuccess ? usage.providerCostUsd : "0.0000000000",
       providerBilled: transportSuccess ? true : undefined,
-      visibleOutputBytes: relay.visibleOutputBytes,
+      visibleOutputBytes: relay.modelVisibleOutputBytes,
       metadata: {
         complete: relay.complete,
         clientCancelled: relay.clientCancelled,
@@ -2634,6 +2681,10 @@ export class AlphaRequestProcessor {
         webFallbackChain: context.webFallbackChain,
         webToolPruned: context.webToolPruned,
         webToolPruneReason: context.webToolPruneReason,
+        raw_response_bytes: relay.rawResponseBytes,
+        model_visible_output_bytes: relay.modelVisibleOutputBytes,
+        first_model_event_at: relay.firstModelEventAt,
+        first_model_event_latency_ms: relay.firstModelEventLatencyMs,
       },
     });
     const canonicalModel = canonicalActualModel(context.selectedProfile, usage.actualModel);
@@ -2643,6 +2694,7 @@ export class AlphaRequestProcessor {
       httpStatus: relay.httpStatus,
       actualModelMismatch: Boolean(usage.actualModel && canonicalModel !== context.selectedProfile.modelId),
       usageTrusted: transportSuccess ? usage.usageSource === "provider_usage" : undefined,
+      firstTokenLatencyMs: relay.firstModelEventLatencyMs,
     });
     if (transportSuccess || relay.webSearch.actuallyInvoked || webRequiredFailure) {
       await repository.saveProfileWebHealth({

@@ -23,6 +23,7 @@ export type AlphaIngressContext = {
   path: string;
   query: string;
   rawBody: Uint8Array;
+  signal: AbortSignal;
 };
 
 export type AlphaGatewayTrace = {
@@ -214,6 +215,7 @@ export function createAlphaGatewayServer(options: AlphaGatewayOptions): Server {
         path: url.pathname,
         query: url.search,
         rawBody: body,
+        signal: abortController.signal,
       });
       trace = { requestBody: body, envelope, identity, resolution, status: "started" };
       await options.onTrace?.(trace);

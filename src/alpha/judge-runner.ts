@@ -1,4 +1,4 @@
-import { AcuJudgeAttemptError, AcuJudgeClient, AcuJudgeContextLengthError, judgeNominalCostUsd, type JudgeRequestResult, type RawNativeJudgeContext } from "../acu/judge.js";
+import { AcuJudgeAttemptError, AcuJudgeClient, AcuJudgeClientCancelledError, AcuJudgeContextLengthError, judgeNominalCostUsd, type JudgeRequestResult, type RawNativeJudgeContext } from "../acu/judge.js";
 import { normalizedEntropy } from "../acu/math.js";
 import { rulesFallbackJudge } from "../acu/strategy.js";
 import type { AcuRuntimeConfig } from "../acu/config.js";
@@ -89,6 +89,7 @@ export type AlphaJudgeInput = {
   recentEvaluation?: AlphaJudgeRun;
   webIntentFallbackInput: WebIntentFallbackInput;
   rawNative: RawNativeJudgeContext;
+  signal?: AbortSignal;
 };
 
 export type AlphaJudgeRunner = {
@@ -233,17 +234,18 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
     async run(input) {
       const attempts: AlphaJudgeAttempt[] = [];
       try {
-        const result = await client.judge(input.messages, [], false, input.rawNative);
+        const result = await client.judge(input.messages, [], false, input.rawNative, input.signal);
         if (result.status === "live") attempts.push(successfulAttempt(result, 1, "primary"));
         return completeRun(result, attempts, result.status);
       } catch (error) {
+        if (error instanceof AcuJudgeClientCancelledError) throw error;
         if (error instanceof AcuJudgeContextLengthError) throw error;
         if (error instanceof AcuJudgeAttemptError) attempts.push(failedAttempt(error, 1, "primary"));
         const primaryContextError = error instanceof AcuJudgeAttemptError
           && error.attempt.errorCategory === "context_length_exceeded";
         if (error instanceof AcuJudgeAttemptError && error.attempt.backupEligible && backupClient) {
           try {
-            const backup = await backupClient.judge(input.messages, [], false, input.rawNative);
+            const backup = await backupClient.judge(input.messages, [], false, input.rawNative, input.signal);
             if (backup.status === "live") attempts.push(successfulAttempt(backup, 2, "backup"));
             return completeRun(backup, attempts, backup.status === "cache_hit" ? "cache_hit" : "backup_live");
           } catch (backupError) {

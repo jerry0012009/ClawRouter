@@ -70,6 +70,13 @@ export class AcuJudgeContextLengthError extends Error {
   }
 }
 
+export class AcuJudgeClientCancelledError extends Error {
+  constructor() {
+    super("Judge request cancelled by the client");
+    this.name = "AcuJudgeClientCancelledError";
+  }
+}
+
 export type JudgeAttemptFailure = {
   provider: string;
   model: string;
@@ -441,6 +448,7 @@ export class AcuJudgeClient {
     tools: unknown[] = [],
     forceRefresh = false,
     rawNative?: RawNativeJudgeContext,
+    clientSignal?: AbortSignal,
   ): Promise<JudgeRequestResult> {
     if (!this.config.apiKey) throw new Error("ACU Judge API key is not configured");
     if (this.config.promptVersion !== fewShotData.promptVersion) throw new Error("ACU Judge prompt version does not match frozen few-shot data");
@@ -506,7 +514,7 @@ export class AcuJudgeClient {
             temperature: 0, max_tokens: Math.min(300, this.config.maxOutputTokens), response_format: { type: "json_object" },
             thinking: { type: "disabled" }, stream: false,
           }),
-          signal: controller.signal,
+          signal: clientSignal ? AbortSignal.any([controller.signal, clientSignal]) : controller.signal,
         });
         if (firstByteTimeout) clearTimeout(firstByteTimeout);
         rawResponseBody = await response.text();
@@ -562,6 +570,7 @@ export class AcuJudgeClient {
       };
       } catch (error) {
         if (error instanceof AcuJudgeAttemptError) throw error;
+        if (clientSignal?.aborted) throw new AcuJudgeClientCancelledError();
         const promptTokens = payload?.usage?.prompt_tokens ?? 0;
         const cachedPromptTokens = payload?.usage?.prompt_tokens_details?.cached_tokens ?? 0;
         const completionTokens = payload?.usage?.completion_tokens ?? 0;

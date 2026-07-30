@@ -21,7 +21,7 @@ import type { NativeProviderAdapter } from "./provider.js";
 import type { TrustedNewApiIdentity } from "./trusted-identity.js";
 import { parseProviderUsage } from "./usage.js";
 import { buildModelCurve, getAcuModel } from "../acu/catalog.js";
-import { AcuJudgeContextLengthError } from "../acu/judge.js";
+import { AcuJudgeClientCancelledError, AcuJudgeContextLengthError } from "../acu/judge.js";
 import { cashCnyPerNominalUsd, providerCostBreakdown, type ProviderEconomics } from "./provider-economics.js";
 import {
   createRecoveringProviderAdapter,
@@ -1046,6 +1046,7 @@ export class AlphaRequestProcessor {
         recentEvaluation: previousJudge,
         webIntentFallbackInput,
         rawNative,
+        signal: ingress.signal,
       });
     } catch (error) {
       if (error instanceof AcuJudgeContextLengthError) {
@@ -1901,6 +1902,15 @@ export class AlphaRequestProcessor {
     try {
       result = await this.judgeAndRoute(envelope, identity, state, logical.logicalRequestId, ingress);
     } catch (error) {
+      if (ingress.signal.aborted || error instanceof AcuJudgeClientCancelledError) {
+        await repository.completeLogicalRequest({
+          logicalRequestId: logical.logicalRequestId,
+          newapiUserId: identity.newapiUserId,
+          status: "cancelled",
+          errorCategory: "client_cancelled",
+        });
+        throw error;
+      }
       if (error instanceof AlphaAdmissionError) {
         await repository.updateLogicalRequestMetadata(logical.logicalRequestId, identity.newapiUserId, {
           admissionErrorType: error.errorType,

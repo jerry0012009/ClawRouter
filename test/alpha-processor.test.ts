@@ -75,6 +75,8 @@ run("Alpha PostgreSQL request processor", () => {
   let gateway: Server;
   let gatewayPort: number;
   let judgeCalls = 0;
+  let cancelledJudgeStarted: (() => void) | undefined;
+  let releaseCancelledJudge: (() => void) | undefined;
   const upstreamBodies: Array<Record<string, unknown>> = [];
   const upstreamCaseCalls = new Map<string, number>();
 
@@ -233,6 +235,13 @@ run("Alpha PostgreSQL request processor", () => {
       async run(input) {
         judgeCalls += 1;
         const visible = JSON.stringify(input.messages);
+        if (visible.includes("CLIENT_CANCEL_DURING_JUDGE")) {
+          cancelledJudgeStarted?.();
+          await new Promise<void>((resolve, reject) => {
+            releaseCancelledJudge = resolve;
+            input.signal?.addEventListener("abort", () => reject(input.signal?.reason), { once: true });
+          });
+        }
         const required = visible.includes("再查一下最新官方文档") || visible.includes("Use web search for the current UTC date");
         return {
           judge: {
@@ -331,6 +340,76 @@ run("Alpha PostgreSQL request processor", () => {
     expect(response.status).toBe(200);
     return response.text();
   }
+
+  it("settles a request cancelled during Judge and immediately accepts a new request", async () => {
+    const userId = "user-client-cancel";
+    const cancelledBody = Buffer.from(JSON.stringify({
+      model: "acu-auto",
+      input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "CLIENT_CANCEL_DURING_JUDGE" }] }],
+      stream: true,
+    }));
+    let markJudgeStarted: (() => void) | undefined;
+    const judgeStarted = new Promise<void>((resolve) => { markJudgeStarted = resolve; });
+    cancelledJudgeStarted = markJudgeStarted;
+    const controller = new AbortController();
+    const cancelledRequest = fetch(`http://127.0.0.1:${gatewayPort}/v1/responses`, {
+      method: "POST",
+      headers: signedHeaders(cancelledBody, "client-cancel-1", userId),
+      body: cancelledBody,
+      signal: controller.signal,
+    });
+    await judgeStarted;
+    controller.abort(new Error("fixture client cancellation"));
+    await expect(cancelledRequest).rejects.toThrow();
+
+    const nextResponse = await send({
+      model: "acu-auto",
+      input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "normal request after cancellation" }] }],
+      stream: true,
+    }, "client-cancel-2", userId);
+    expect(nextResponse).not.toContain("request_in_progress");
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    const beforeRelease = await database.query<{ status: string; lease_active: boolean }>(
+      `SELECT status,processing_lease_expires_at IS NOT NULL lease_active
+       FROM acu_logical_requests WHERE newapi_log_id='log-client-cancel-1'`,
+    );
+    releaseCancelledJudge?.();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    cancelledJudgeStarted = undefined;
+    releaseCancelledJudge = undefined;
+
+    const result = await database.query<{
+      status: string;
+      lease_active: boolean;
+      provider_attempts: string;
+      judge_attempts: string;
+      backup_attempts: string;
+      usage_reports: string;
+      user_charge_cny: string | null;
+      next_status: string;
+    }>(
+      `SELECT r.status,r.processing_lease_expires_at IS NOT NULL lease_active,
+       (SELECT count(*) FROM acu_attempts a WHERE a.logical_request_id=r.logical_request_id) provider_attempts,
+       (SELECT count(*) FROM acu_judge_attempts j WHERE j.logical_request_id=r.logical_request_id) judge_attempts,
+       (SELECT count(*) FROM acu_judge_attempts j WHERE j.logical_request_id=r.logical_request_id AND j.attempt_role='backup') backup_attempts,
+       (SELECT count(*) FROM acu_usage_reports u WHERE u.logical_request_id=r.logical_request_id) usage_reports,
+       (SELECT user_charge_cny::text FROM acu_usage_reports u WHERE u.logical_request_id=r.logical_request_id) user_charge_cny,
+       (SELECT status FROM acu_logical_requests n WHERE n.newapi_log_id='log-client-cancel-2') next_status
+       FROM acu_logical_requests r WHERE r.newapi_log_id='log-client-cancel-1'`,
+    );
+    expect(beforeRelease.rows[0]).toEqual({ status: "cancelled", lease_active: false });
+    expect(result.rows[0]).toEqual({
+      status: "cancelled",
+      lease_active: false,
+      provider_attempts: "0",
+      judge_attempts: "0",
+      backup_attempts: "0",
+      usage_reports: "0",
+      user_charge_cny: null,
+      next_status: "completed",
+    });
+  });
 
   it("Judges a new auto Task, rewrites only model, and persists the full trace", async () => {
     const history = [{ type: "message", role: "user", content: [{ type: "input_text", text: "Fix the bug" }] }];

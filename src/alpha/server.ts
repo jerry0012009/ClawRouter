@@ -15,6 +15,7 @@ import { cashCnyPerNominalUsd, readProviderEconomicsCatalog, type ProviderEconom
 import { UsageOutboxWorker } from "./usage-outbox.js";
 import { canonicalAdvertisedContextWindow } from "./context-admission.js";
 import { ACU_ROUTING_MODEL_VERSION } from "../acu/config.js";
+import { combinedMonitorState, mergeSupplyInventory, monitorRangeSpec, monitorRoutingStatus, type MonitorRange } from "./channel-monitor.js";
 
 export type ConfiguredExecutionProfile = AlphaExecutionProfile & {
   baseUrl?: string;
@@ -81,14 +82,7 @@ function validateProfile(value: unknown, index: number): ConfiguredExecutionProf
     throw new Error(`Execution profile ${index} must be an object`);
   }
   const profile = value as Partial<ConfiguredExecutionProfile>;
-  const requiredStrings: Array<keyof ConfiguredExecutionProfile> = [
-    "executionProfileId",
-    "modelId",
-    "provider",
-    "channel",
-    "apiKeyEnv",
-    "authMode",
-  ];
+  const requiredStrings: Array<keyof ConfiguredExecutionProfile> = ["executionProfileId", "modelId", "provider", "channel", "apiKeyEnv", "authMode"];
   for (const key of requiredStrings) {
     if (typeof profile[key] !== "string" || !profile[key]) {
       throw new Error(`Execution profile ${index} is missing ${key}`);
@@ -107,7 +101,7 @@ async function configuredProfiles(): Promise<ConfiguredExecutionProfile[]> {
   const inline = process.env.ACU_EXECUTION_PROFILES_JSON?.trim();
   const file = process.env.ACU_EXECUTION_PROFILES_FILE?.trim();
   if (!inline && !file) throw new Error("ACU_EXECUTION_PROFILES_JSON or ACU_EXECUTION_PROFILES_FILE is required");
-  const parsed = JSON.parse(inline ?? await readFile(file!, "utf8")) as unknown;
+  const parsed = JSON.parse(inline ?? (await readFile(file!, "utf8"))) as unknown;
   if (!Array.isArray(parsed) || parsed.length === 0) throw new Error("At least one execution profile is required");
   return parsed.map(validateProfile);
 }
@@ -142,15 +136,13 @@ function rulesFallbackDecision(): RoutingDecision {
 }
 
 export async function startAlphaService(config?: AlphaServiceConfig): Promise<void> {
-  const serviceConfig = config ?? await readAlphaServiceConfig();
+  const serviceConfig = config ?? (await readAlphaServiceConfig());
   const database = new AlphaDatabase({ connectionString: serviceConfig.databaseUrl });
   await database.query("SELECT 1");
   const profiles = serviceConfig.profiles.map((profile) => {
     const baseUrl = profile.baseUrl ?? requiredEnvironment(profile.baseUrlEnv!);
     const apiKey = requiredEnvironment(profile.apiKeyEnv);
-    const economics = serviceConfig.providerEconomics.find((item) => (
-      item.providerId === (profile.economicsProviderId ?? profile.provider)
-    ));
+    const economics = serviceConfig.providerEconomics.find((item) => item.providerId === (profile.economicsProviderId ?? profile.provider));
     if (!economics) throw new Error(`No Provider Economics for ${profile.provider}`);
     if (!profile.channelId && economics.apiKeyEnv !== profile.apiKeyEnv) {
       throw new Error(`Provider Economics environment mismatch for ${profile.executionProfileId}`);
@@ -172,8 +164,7 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
       thinkingSupport: profile.thinkingSupport,
       supportedReasoningEfforts: profile.supportedReasoningEfforts,
       contextWindow: profile.contextWindow,
-      canonicalAdvertisedContextWindow: profile.canonicalAdvertisedContextWindow
-        ?? canonicalAdvertisedContextWindow(profile.modelId),
+      canonicalAdvertisedContextWindow: profile.canonicalAdvertisedContextWindow ?? canonicalAdvertisedContextWindow(profile.modelId),
       providerDeclaredContextWindow: profile.providerDeclaredContextWindow ?? null,
       observedSuccessfulInputTokens: profile.observedSuccessfulInputTokens ?? 0,
       providerHardContextCap: profile.providerHardContextCap ?? null,
@@ -196,10 +187,13 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
       webSearchLastVerifiedAt: profile.webSearchLastVerifiedAt,
       webSearchFailureReason: profile.webSearchFailureReason,
     };
-    const endpoints = [{ endpoint: new URL(baseUrl).host, baseUrl }, ...(profile.networkFallbackBaseUrlEnvs ?? []).map((name) => {
-      const fallbackBaseUrl = requiredEnvironment(name);
-      return { endpoint: new URL(fallbackBaseUrl).host, baseUrl: fallbackBaseUrl };
-    })];
+    const endpoints = [
+      { endpoint: new URL(baseUrl).host, baseUrl },
+      ...(profile.networkFallbackBaseUrlEnvs ?? []).map((name) => {
+        const fallbackBaseUrl = requiredEnvironment(name);
+        return { endpoint: new URL(fallbackBaseUrl).host, baseUrl: fallbackBaseUrl };
+      }),
+    ];
     const adapters = endpoints.map((endpoint) => ({
       endpoint: endpoint.endpoint,
       adapter: createNativeProviderAdapter({
@@ -219,9 +213,7 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
     };
   });
   const judgeConfig = readAcuRuntimeConfig();
-  const judgeEconomics = serviceConfig.judgeEconomicsProviderId
-    ? serviceConfig.providerEconomics.find((item) => item.providerId === serviceConfig.judgeEconomicsProviderId)
-    : undefined;
+  const judgeEconomics = serviceConfig.judgeEconomicsProviderId ? serviceConfig.providerEconomics.find((item) => item.providerId === serviceConfig.judgeEconomicsProviderId) : undefined;
   if (serviceConfig.judgeEconomicsProviderId && !judgeEconomics) {
     throw new Error(`No Provider Economics for Judge ${serviceConfig.judgeEconomicsProviderId}`);
   }
@@ -252,9 +244,51 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
     },
     adminChannelMonitor: {
       token: serviceConfig.adminTraceToken,
-      async load(range) {
-        const interval = range === "7d" ? "7 days" : range === "24h" ? "24 hours" : "1 hour";
-        const [channels, profileHealth, attempts, history] = await Promise.all([
+      async load(requestedRange) {
+        const range: MonitorRange = ["1h", "6h", "24h", "7d"].includes(requestedRange) ? requestedRange : "1h";
+        const { interval, bucket } = monitorRangeSpec(range);
+        const catalogValues: unknown[] = [];
+        const catalogRows = serviceConfig.profiles
+          .map((profile, index) => {
+            const offset = index * 4 + 3;
+            catalogValues.push(profile.executionProfileId, profile.modelId, profile.provider, profile.channelId ?? profile.channel);
+            return `($${offset},$${offset + 1},$${offset + 2},$${offset + 3})`;
+          })
+          .join(",");
+        const historySql = `WITH profile_catalog(execution_profile_id,canonical_model,provider_id,channel_id) AS (
+            VALUES ${catalogRows}
+          ), base AS (
+            SELECT date_bin($2::interval,a.started_at,timestamptz '2000-01-01') bucket,
+              a.execution_profile_id,coalesce(c.canonical_model,a.actual_model,a.requested_model) canonical_model,
+              coalesce(a.provider,c.provider_id) provider,coalesce(a.channel_id,a.channel,c.channel_id) channel,
+              a.status,a.http_status,a.error_category,a.attempt_index,a.metadata_json
+            FROM acu_attempts a LEFT JOIN profile_catalog c USING(execution_profile_id)
+            WHERE a.attempt_kind='provider' AND a.started_at>=now()-$1::interval
+          )
+          SELECT bucket,
+            CASE WHEN grouping(execution_profile_id)=0 THEN 'profile'
+              WHEN grouping(canonical_model)=0 THEN 'channel_model' ELSE 'channel' END scope_type,
+            CASE WHEN grouping(execution_profile_id)=0 THEN execution_profile_id
+              WHEN grouping(canonical_model)=0 THEN channel||':'||canonical_model ELSE channel END scope_id,
+            CASE WHEN grouping(execution_profile_id)=0 THEN execution_profile_id END execution_profile_id,
+            CASE WHEN grouping(canonical_model)=0 THEN canonical_model END canonical_model,
+            provider,channel,count(*)::int request_count,
+            count(*) FILTER (WHERE status='success')::int success_count,
+            count(*) FILTER (WHERE status<>'success')::int error_count,
+            count(*) FILTER (WHERE http_status=429)::int rate_limited_count,
+            count(*) FILTER (WHERE http_status BETWEEN 500 AND 599)::int server_error_count,
+            count(*) FILTER (WHERE error_category='slow_first_model_event' OR metadata_json->>'errorClass'='slow_first_model_event')::int watchdog_count,
+            count(*) FILTER (WHERE attempt_index>1 AND status='success')::int recovery_count,
+            percentile_cont(.5) WITHIN GROUP (ORDER BY (metadata_json->>'first_model_event_latency_ms')::double precision)
+              FILTER (WHERE metadata_json ? 'first_model_event_latency_ms') p50_first_model_event_ms,
+            percentile_cont(.95) WITHIN GROUP (ORDER BY (metadata_json->>'first_model_event_latency_ms')::double precision)
+              FILTER (WHERE metadata_json ? 'first_model_event_latency_ms') p95_first_model_event_ms
+          FROM base GROUP BY GROUPING SETS (
+            (bucket,provider,channel),
+            (bucket,provider,channel,canonical_model),
+            (bucket,provider,channel,canonical_model,execution_profile_id)
+          ) ORDER BY bucket,scope_type,scope_id`;
+        const [channels, profileHealth, attempts, history, cooldowns, adminPauses] = await Promise.all([
           database.query<Record<string, unknown>>("SELECT * FROM acu_channel_health ORDER BY provider_id,channel_id"),
           database.query<Record<string, unknown>>("SELECT * FROM acu_provider_model_profile_health ORDER BY canonical_model_id,provider_id,channel_id"),
           database.query<Record<string, unknown>>(
@@ -269,20 +303,27 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
               percentile_cont(.95) WITHIN GROUP (ORDER BY (metadata_json->>'first_model_event_latency_ms')::double precision)
                 FILTER (WHERE metadata_json ? 'first_model_event_latency_ms') p95_first_model_event_ms
              FROM acu_attempts WHERE attempt_kind='provider' AND started_at>=now()-$1::interval
-             GROUP BY execution_profile_id`, [interval]),
+             GROUP BY execution_profile_id`,
+            [interval],
+          ),
+          database.query<Record<string, unknown>>(historySql, [interval, bucket, ...catalogValues]),
           database.query<Record<string, unknown>>(
-            `SELECT date_trunc('hour',started_at) bucket,execution_profile_id,count(*)::int request_count,
-              count(*) FILTER (WHERE status='success')::int success_count,
-              count(*) FILTER (WHERE http_status=429)::int rate_limited_count,
-              count(*) FILTER (WHERE http_status BETWEEN 500 AND 599)::int server_error_count,
-              count(*) FILTER (WHERE metadata_json->>'errorClass'='slow_first_model_event')::int watchdog_count,
-              count(*) FILTER (WHERE attempt_index>1 AND status='success')::int recovery_count,
-              percentile_cont(.5) WITHIN GROUP (ORDER BY (metadata_json->>'first_model_event_latency_ms')::double precision)
-                FILTER (WHERE metadata_json ? 'first_model_event_latency_ms') p50_first_model_event_ms,
-              percentile_cont(.95) WITHIN GROUP (ORDER BY (metadata_json->>'first_model_event_latency_ms')::double precision)
-                FILTER (WHERE metadata_json ? 'first_model_event_latency_ms') p95_first_model_event_ms
+            `SELECT coalesce(channel_id,channel) channel,provider,execution_profile_id,started_at,
+              (metadata_json->>'cooldown_until')::timestamptz ended_at,
+              coalesce(metadata_json->>'errorClass',error_category,'provider_error') reason,
+              coalesce(metadata_json->>'errorClass',error_category) error_class,false manual_pause,false half_open_probe,
+              null::text probe_result
              FROM acu_attempts WHERE attempt_kind='provider' AND started_at>=now()-$1::interval
-             GROUP BY bucket,execution_profile_id ORDER BY bucket`, [interval]),
+               AND metadata_json ? 'cooldown_until'`,
+            [interval],
+          ),
+          database.query<Record<string, unknown>>(
+            `SELECT channel_id channel,null::text provider,null::text execution_profile_id,created_at started_at,
+              created_at+(duration_minutes||' minutes')::interval ended_at,'manual_pause' reason,
+              'manual_pause' error_class,true manual_pause,false half_open_probe,null::text probe_result
+             FROM acu_channel_admin_actions WHERE created_at>=now()-$1::interval`,
+            [interval],
+          ),
         ]);
         const healthByChannel = new Map(channels.rows.map((row) => [String(row.channel_id), row]));
         const healthByProfile = new Map(profileHealth.rows.map((row) => [String(row.execution_profile_id), row]));
@@ -291,8 +332,13 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
           const channel = healthByChannel.get(profile.channelId ?? profile.channel) ?? {};
           const runtime = healthByProfile.get(profile.executionProfileId) ?? {};
           const aggregate = aggregateByProfile.get(profile.executionProfileId) ?? {};
+          const routingEligibility = monitorRoutingStatus(profile, channel, runtime);
           let endpointHost = "";
-          try { endpointHost = new URL(profile.baseUrl ?? process.env[profile.baseUrlEnv ?? ""] ?? "").host; } catch { /* absent configuration */ }
+          try {
+            endpointHost = new URL(profile.baseUrl ?? process.env[profile.baseUrlEnv ?? ""] ?? "").host;
+          } catch {
+            /* absent configuration */
+          }
           return {
             executionProfileId: profile.executionProfileId,
             canonicalModel: profile.modelId,
@@ -304,8 +350,12 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
             effectiveCostStatus: profile.effectiveCostStatus,
             enabled: profile.enabled,
             administratorAllowed: profile.administratorAllowed,
-            routingEligible: profile.enabled && profile.administratorAllowed && !["open", "disabled"].includes(String(channel.circuit_state ?? profile.health)),
-            state: channel.circuit_state ?? runtime.circuit_state ?? profile.health,
+            routingEligible: routingEligibility === "eligible",
+            routingEligibility,
+            state: combinedMonitorState(profile, channel, runtime),
+            channelState: channel.circuit_state ?? "healthy",
+            profileState: runtime.circuit_state ?? profile.health,
+            usageTrusted: runtime.usage_trusted ?? profile.usageTrusted,
             recentSuccessRate: channel.recent_success_rate ?? runtime.recent_success_rate,
             consecutiveFailures: channel.consecutive_failures ?? runtime.consecutive_failures ?? 0,
             p50FirstModelEventLatencyMs: aggregate.p50_first_model_event_ms,
@@ -315,12 +365,42 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
             cooldownUntil: channel.cooldown_until ?? runtime.cooldown_until,
           };
         });
-        let supplyInventory: unknown[] = [];
+        let supplyInventory: Array<Record<string, unknown>> = [];
         try {
-          const discovery = JSON.parse(await readFile(process.env.ACU_PROVIDER_DISCOVERY_FILE ?? "/app/config/provider-channel-model-discovery.json", "utf8")) as { channels?: unknown[] };
-          supplyInventory = discovery.channels ?? [];
-        } catch { /* inventory is optional at runtime */ }
-        return { range, profiles: publicProfiles, history: history.rows, supplyInventory, generatedAt: new Date().toISOString() };
+          const [discovery, preflight] = await Promise.all([
+            readFile(process.env.ACU_PROVIDER_DISCOVERY_FILE ?? "/app/config/provider-channel-model-discovery.json", "utf8").then((value) => JSON.parse(value) as { channels?: [] }),
+            readFile(process.env.ACU_PROVIDER_PREFLIGHT_FILE ?? "/app/config/provider-channel-preflight-observations.json", "utf8").then((value) => JSON.parse(value) as { observations?: [] }),
+          ]);
+          supplyInventory = mergeSupplyInventory(discovery.channels ?? [], serviceConfig.profiles, preflight.observations ?? []);
+        } catch {
+          /* inventory is optional at runtime */
+        }
+        const activeStateIntervals = channels.rows.flatMap((channel) => {
+          const state = String(channel.circuit_state ?? "");
+          if (state !== "open" && state !== "half_open") return [];
+          return [
+            {
+              channel: channel.channel_id,
+              provider: channel.provider_id,
+              execution_profile_id: null,
+              started_at: channel.last_failure_at ?? channel.updated_at,
+              ended_at: channel.cooldown_until ?? new Date().toISOString(),
+              reason: state === "half_open" ? "half_open_probe" : channel.error_class,
+              error_class: channel.error_class,
+              manual_pause: channel.error_class === "manual_pause",
+              half_open_probe: state === "half_open",
+              probe_result: channel.half_open_probe_in_flight ? "in_flight" : "available",
+            },
+          ];
+        });
+        return {
+          range,
+          profiles: publicProfiles,
+          history: history.rows,
+          cooldownIntervals: [...cooldowns.rows, ...adminPauses.rows, ...activeStateIntervals],
+          supplyInventory,
+          generatedAt: new Date().toISOString(),
+        };
       },
       async pause(channelId, durationMinutes, actor) {
         const profile = serviceConfig.profiles.find((item) => (item.channelId ?? item.channel) === channelId);
@@ -340,7 +420,12 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
             [`channel_action_${randomUUID()}`, channelId, durationMinutes, actor, JSON.stringify({ provider: profile.provider })],
           );
         });
-        return { channelId, state: "open", cooldownUntil: cooldownUntil.toISOString(), recovery: "half_open_probe" };
+        return {
+          channelId,
+          state: "open",
+          cooldownUntil: cooldownUntil.toISOString(),
+          recovery: "half_open_probe",
+        };
       },
     },
     models: profiles.map((item) => item.profile.modelId),
@@ -356,9 +441,7 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
     },
     async healthCheck() {
       await database.query("SELECT 1 FROM acu_sessions LIMIT 1");
-      const migration = await database.query<{ migration_version: string }>(
-        "SELECT migration_version FROM acu_schema_migrations ORDER BY migration_version DESC LIMIT 1",
-      );
+      const migration = await database.query<{ migration_version: string }>("SELECT migration_version FROM acu_schema_migrations ORDER BY migration_version DESC LIMIT 1");
       return {
         postgres: "ok",
         runningCommit: process.env.BUILD_COMMIT_SHA ?? "unknown",
@@ -383,8 +466,12 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
     await usageOutbox.stop();
     await database.close();
   };
-  process.once("SIGTERM", () => { void shutdown("SIGTERM"); });
-  process.once("SIGINT", () => { void shutdown("SIGINT"); });
+  process.once("SIGTERM", () => {
+    void shutdown("SIGTERM");
+  });
+  process.once("SIGINT", () => {
+    void shutdown("SIGINT");
+  });
 }
 
 const entry = process.argv[1] ? pathToFileURL(process.argv[1]).href : "";

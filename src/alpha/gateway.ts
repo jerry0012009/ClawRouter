@@ -7,6 +7,7 @@ import type { NativeProviderAdapter } from "./provider.js";
 import { relayProviderResponse, type RelayResult } from "./stream-relay.js";
 import { verifyTrustedIdentity, type TrustedNewApiIdentity } from "./trusted-identity.js";
 import { AlphaAdmissionError } from "./routing.js";
+import type { MonitorRange } from "./channel-monitor.js";
 
 export type AlphaExecutionResolution = {
   adapter: NativeProviderAdapter;
@@ -44,17 +45,13 @@ export type AlphaGatewayOptions = {
   };
   adminChannelMonitor?: {
     token: string;
-    load(range: "1h" | "24h" | "7d"): Promise<Record<string, unknown>>;
+    load(range: MonitorRange): Promise<Record<string, unknown>>;
     pause(channelId: string, durationMinutes: 30 | 120, actor: string): Promise<Record<string, unknown>>;
   };
   models?: string[];
   requirePrivateNetwork?: boolean;
   healthCheck?(): Promise<Record<string, unknown>>;
-  resolveExecution(
-    envelope: CanonicalEnvelope,
-    identity: TrustedNewApiIdentity,
-    ingress: AlphaIngressContext,
-  ): Promise<AlphaExecutionResolution>;
+  resolveExecution(envelope: CanonicalEnvelope, identity: TrustedNewApiIdentity, ingress: AlphaIngressContext): Promise<AlphaExecutionResolution>;
   onTrace?(trace: AlphaGatewayTrace): Promise<void> | void;
   onTraceError?(error: unknown, trace: AlphaGatewayTrace): Promise<void> | void;
   maxRequestBytes?: number;
@@ -87,20 +84,27 @@ async function readRequestBody(request: IncomingMessage, maxBytes: number): Prom
   return Buffer.concat(chunks);
 }
 
-function jsonError(
-  response: ServerResponse,
-  status: number,
-  message: string,
-  protocol?: "responses" | "messages",
-  error?: unknown,
-): void {
+function jsonError(response: ServerResponse, status: number, message: string, protocol?: "responses" | "messages", error?: unknown): void {
   if (response.headersSent || response.destroyed) return;
   response.statusCode = status;
   response.setHeader("content-type", "application/json");
   const admission = error instanceof AlphaAdmissionError ? error : undefined;
-  response.end(JSON.stringify(protocol === "messages"
-    ? { type: "error", error: { type: admission?.errorType ?? "api_error", message, ...admission?.details } }
-    : { error: { type: admission?.errorType ?? "acu_gateway_error", message, ...admission?.details } }));
+  response.end(
+    JSON.stringify(
+      protocol === "messages"
+        ? {
+            type: "error",
+            error: { type: admission?.errorType ?? "api_error", message, ...admission?.details },
+          }
+        : {
+            error: {
+              type: admission?.errorType ?? "acu_gateway_error",
+              message,
+              ...admission?.details,
+            },
+          },
+    ),
+  );
 }
 
 function executionErrorStatus(error: unknown): number {
@@ -129,7 +133,7 @@ export function createAlphaGatewayServer(options: AlphaGatewayOptions): Server {
     const url = new URL(request.url ?? "/", "http://acu.internal");
     if (request.method === "GET" && url.pathname === "/internal/health") {
       try {
-        const details = await options.healthCheck?.() ?? {};
+        const details = (await options.healthCheck?.()) ?? {};
         response.setHeader("content-type", "application/json");
         response.end(JSON.stringify({ status: "ok", ...details }));
       } catch {
@@ -152,14 +156,15 @@ export function createAlphaGatewayServer(options: AlphaGatewayOptions): Server {
         return;
       }
       try {
-        const result = request.method === "GET"
-          ? await options.adminChannelMonitor.load((url.searchParams.get("range") as "1h" | "24h" | "7d") || "1h")
-          : await (async () => {
-            const body = JSON.parse((await readRequestBody(request, 16 * 1024)).toString("utf8")) as Record<string, unknown>;
-            const durationMinutes = Number(body.durationMinutes);
-            if (typeof body.channelId !== "string" || ![30, 120].includes(durationMinutes)) throw new Error("Invalid Channel pause request");
-            return options.adminChannelMonitor!.pause(body.channelId, durationMinutes as 30 | 120, String(body.actor || "new-api-admin"));
-          })();
+        const result =
+          request.method === "GET"
+            ? await options.adminChannelMonitor.load((url.searchParams.get("range") as MonitorRange) || "1h")
+            : await (async () => {
+                const body = JSON.parse((await readRequestBody(request, 16 * 1024)).toString("utf8")) as Record<string, unknown>;
+                const durationMinutes = Number(body.durationMinutes);
+                if (typeof body.channelId !== "string" || ![30, 120].includes(durationMinutes)) throw new Error("Invalid Channel pause request");
+                return options.adminChannelMonitor!.pause(body.channelId, durationMinutes as 30 | 120, String(body.actor || "new-api-admin"));
+              })();
         response.setHeader("cache-control", "no-store");
         response.setHeader("content-type", "application/json");
         response.end(JSON.stringify(result));
@@ -205,10 +210,12 @@ export function createAlphaGatewayServer(options: AlphaGatewayOptions): Server {
         });
         const modelIds = [...new Set(["acu-auto", "acu-high", ...(options.models ?? [])])];
         response.setHeader("content-type", "application/json");
-        response.end(JSON.stringify({
-          object: "list",
-          data: modelIds.map((id) => ({ id, object: "model", created: 0, owned_by: "acu" })),
-        }));
+        response.end(
+          JSON.stringify({
+            object: "list",
+            data: modelIds.map((id) => ({ id, object: "model", created: 0, owned_by: "acu" })),
+          }),
+        );
       } catch (error) {
         jsonError(response, 401, error instanceof Error ? error.message : "Untrusted ACU identity");
       }
@@ -237,10 +244,10 @@ export function createAlphaGatewayServer(options: AlphaGatewayOptions): Server {
       });
       stage = "protocol";
       const parsed = JSON.parse(body.toString("utf8")) as unknown;
-      const envelope = protocol === "responses"
-        ? normalizeResponsesRequest(parsed, request.headers)
-        : normalizeMessagesRequest(parsed, request.headers,
-          identity.clientVersion === "unknown" ? undefined : identity.clientVersion);
+      const envelope =
+        protocol === "responses"
+          ? normalizeResponsesRequest(parsed, request.headers)
+          : normalizeMessagesRequest(parsed, request.headers, identity.clientVersion === "unknown" ? undefined : identity.clientVersion);
       stage = "execution";
       const resolution = await options.resolveExecution(envelope, identity, {
         headers: request.headers,

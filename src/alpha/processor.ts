@@ -30,7 +30,6 @@ import {
   type ProviderRecoveryTarget,
 } from "./execution.js";
 import { applyAttemptOutcome, classifyAttemptOutcome, type AttemptOutcome, type HealthSnapshot } from "./channel-health.js";
-import { verifyWritableWorkspace } from "./workspace-gate.js";
 import { estimateContextAdmission, effectiveContextCeiling } from "./context-admission.js";
 import {
   classifyWebIntentFallback,
@@ -338,21 +337,13 @@ export function prepareProviderBody(
   profile: AlphaExecutionProfile,
 ): { body: Buffer; webToolPruned: boolean; pruneReason?: string } {
   const parsed = JSON.parse(Buffer.from(rawBody).toString("utf8")) as JsonObject;
-  let webToolPruned = false;
-  if (envelope.clientDeclaredWebTool && envelope.webIntent !== "required"
-    && profile.webToolDeclarationAccepted !== true && Array.isArray(parsed.tools)) {
-    const tools = parsed.tools.filter((tool) => !isHostedWebTool(tool));
-    webToolPruned = tools.length !== parsed.tools.length;
-    parsed.tools = tools;
-  }
   const providerModel = typeof parsed.model === "string" ? parsed.model : "";
-  if (!webToolPruned && providerModel === model) {
+  if (providerModel === model) {
     return { body: Buffer.from(rawBody), webToolPruned: false };
   }
   return {
     body: Buffer.from(JSON.stringify({ ...parsed, model })),
-    webToolPruned,
-    pruneReason: webToolPruned ? "hosted_web_tool_not_required_and_profile_declaration_unverified" : undefined,
+    webToolPruned: false,
   };
 }
 
@@ -1113,7 +1104,9 @@ export class AlphaRequestProcessor {
         rawRequestTokenEstimate: BigInt(judge.rawRequestTokenEstimate),
         judgeContextLimit: BigInt(judge.judgeContextLimit),
         judgeContextSource: judge.judgeContextSource,
-        curveCalibrationEligible: !judge.contextTruncated && judge.judgeContextSource === "raw_native_request_v1",
+        curveCalibrationEligible: !judge.terminalError
+          && !judge.contextTruncated && judge.judgeContextSource === "raw_native_request_v1",
+        curveCalibrationExclusionReason: judge.terminalError ? "judge_context_length_exceeded" : undefined,
         difficultyScoreRaw: judge.judge.difficultyScoreRaw,
         difficultyIndex: judge.judge.difficultyIndex,
         factors: { ...judge.judge.factors },
@@ -1166,8 +1159,9 @@ export class AlphaRequestProcessor {
         },
       });
       for (const attempt of judge.attempts) {
+        const judgeAttemptId = alphaId("att");
         await transactional.saveJudgeAttempt({
-          judgeAttemptId: alphaId("att"),
+          judgeAttemptId,
           judgeEvaluationId: storedJudge.judgeEvaluationId,
           logicalRequestId,
           attemptIndex: attempt.attemptIndex,
@@ -1191,6 +1185,41 @@ export class AlphaRequestProcessor {
           costSource: attempt.costSource,
           usageStatus: attempt.usageStatus,
         });
+        if (attempt.status === "error") {
+          await transactional.savePayload({
+            payloadId: alphaId("payload"),
+            newapiUserId: identity.newapiUserId,
+            logicalRequestId,
+            payloadKind: "judge_attempt_error_response",
+            protocol: envelope.protocol,
+            contentType: attempt.responseHeaders?.["content-type"] ?? "application/octet-stream",
+            headers: attempt.responseHeaders,
+            body: attempt.rawResponseBody ?? "",
+            isComplete: true,
+            metadata: {
+              judgeAttemptId,
+              judgeEvaluationId: storedJudge.judgeEvaluationId,
+              attemptIndex: attempt.attemptIndex,
+              attemptRole: attempt.role,
+              provider: attempt.provider,
+              model: attempt.model,
+              endpointHost: attempt.endpointHost,
+              httpStatus: attempt.httpStatus,
+              upstreamRequestId: attempt.upstreamRequestId,
+              errorCategory: attempt.errorCategory,
+              parserExceptionType: attempt.parserExceptionType,
+              parserExceptionMessage: attempt.parserExceptionMessage,
+              promptTokens: attempt.promptTokens,
+              cachedPromptTokens: attempt.cachedPromptTokens,
+              completionTokens: attempt.completionTokens,
+              latencyMs: attempt.latencyMs,
+              backupEligible: attempt.backupEligible,
+              backupTriggered: attempt.role === "primary"
+                && judge.attempts.some((candidate) => candidate.role === "backup"),
+              backupReason: attempt.backupReason,
+            },
+          });
+        }
       }
       await transactional.saveJudgeLedgerEntry({
         judgeLedgerEntryId: alphaId("ledger"),
@@ -1211,6 +1240,69 @@ export class AlphaRequestProcessor {
       });
       return { storedJudge, storedAdmission };
     });
+    const storedJudge = persisted.storedJudge;
+    if (storedJudge.inserted) {
+      const inputPayloadId = alphaId("payload");
+      const outputPayloadId = alphaId("payload");
+      await repository.savePayload({
+        payloadId: inputPayloadId,
+        newapiUserId: identity.newapiUserId,
+        payloadKind: "judge_request",
+        protocol: envelope.protocol,
+        contentType: "application/json",
+        body: {
+          stateMetadata: rawNative.stateMetadata,
+          rawNativeApiRequest: rawNative.rawRequest,
+          rawRequestSha256: sha256(rawNative.rawRequest),
+          trigger: state.decision.reason,
+          contextHash: judge.contextHash,
+          judgeContextSource: judge.judgeContextSource,
+          contextTruncated: judge.contextTruncated,
+        },
+        isComplete: true,
+      });
+      await repository.savePayload({
+        payloadId: outputPayloadId,
+        newapiUserId: identity.newapiUserId,
+        payloadKind: "judge_response",
+        protocol: envelope.protocol,
+        contentType: "application/json",
+        body: judge,
+        isComplete: true,
+      });
+      await repository.attachJudgePayloads({
+        judgeEvaluationId: storedJudge.judgeEvaluationId,
+        newapiUserId: identity.newapiUserId,
+        inputPayloadId,
+        outputPayloadId,
+      });
+    }
+    if (judge.terminalError) {
+      await repository.completeAdmissionTrace({
+        admissionTraceId: persisted.storedAdmission.admissionTraceId,
+        status: "rejected",
+        errorType: judge.terminalError.type,
+        httpStatus: 400,
+        metadata: {
+          message: judge.terminalError.message,
+          upstreamErrorCategory: judge.errorCategory,
+          contextTruncated: false,
+        },
+      });
+      throw new AlphaAdmissionError(
+        judge.terminalError.type,
+        judge.terminalError.message,
+        400,
+        {
+          judge_context_token_estimate: judge.rawRequestTokenEstimate,
+          judge_primary_context_tokens: judge.terminalError.primaryContextTokens,
+          context_truncated: false,
+          judge_context_source: judge.judgeContextSource,
+          admission_trace_id: persisted.storedAdmission.admissionTraceId,
+          judge_evaluation_id: storedJudge.judgeEvaluationId,
+        },
+      );
+    }
     let route: AlphaRouteDecision;
     try {
       route = routeWithCurrentAcuFormula({
@@ -1260,43 +1352,6 @@ export class AlphaRequestProcessor {
         admission.details.judge_model = judge.model;
       }
       throw error;
-    }
-    const storedJudge = persisted.storedJudge;
-    if (storedJudge.inserted) {
-      const inputPayloadId = alphaId("payload");
-      const outputPayloadId = alphaId("payload");
-      await repository.savePayload({
-        payloadId: inputPayloadId,
-        newapiUserId: identity.newapiUserId,
-        payloadKind: "judge_request",
-        protocol: envelope.protocol,
-        contentType: "application/json",
-        body: {
-          stateMetadata: rawNative.stateMetadata,
-          rawNativeApiRequest: rawNative.rawRequest,
-          rawRequestSha256: sha256(rawNative.rawRequest),
-          trigger: state.decision.reason,
-          contextHash: judge.contextHash,
-          judgeContextSource: judge.judgeContextSource,
-          contextTruncated: judge.contextTruncated,
-        },
-        isComplete: true,
-      });
-      await repository.savePayload({
-        payloadId: outputPayloadId,
-        newapiUserId: identity.newapiUserId,
-        payloadKind: "judge_response",
-        protocol: envelope.protocol,
-        contentType: "application/json",
-        body: judge,
-        isComplete: true,
-      });
-      await repository.attachJudgePayloads({
-        judgeEvaluationId: storedJudge.judgeEvaluationId,
-        newapiUserId: identity.newapiUserId,
-        inputPayloadId,
-        outputPayloadId,
-      });
     }
     await repository.completeAdmissionTrace({
       admissionTraceId: persisted.storedAdmission.admissionTraceId,
@@ -1709,7 +1764,6 @@ export class AlphaRequestProcessor {
     identity: TrustedNewApiIdentity,
     ingress: AlphaIngressContext,
   ): Promise<AlphaExecutionResolution> {
-    await verifyWritableWorkspace(envelope);
     const mode = modeForModel(envelope.requestedModel);
     const state = await this.prepareState(envelope, identity, ingress, mode);
     const repository = new AlphaRepository(this.options.database);

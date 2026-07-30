@@ -27,7 +27,7 @@ describe("Responses Web Search evidence", () => {
     expect(evidence.actuallyInvoked).toBe(false);
   });
 
-  it("prunes only an unneeded hosted Web Tool for an incompatible Profile", () => {
+  it("does not prune a user-declared hosted Web Tool based on Router intent", () => {
     const raw = Buffer.from(JSON.stringify({
       model: "acu-auto",
       input: "Modify one file and run check.sh",
@@ -56,8 +56,9 @@ describe("Responses Web Search evidence", () => {
     };
     const prepared = prepareProviderBody(raw, profile.modelId, envelope, profile);
     const tools = (JSON.parse(prepared.body.toString("utf8")) as { tools: Array<{ type: string; name?: string }> }).tools;
-    expect(prepared.webToolPruned).toBe(true);
+    expect(prepared.webToolPruned).toBe(false);
     expect(tools).toEqual([
+      { type: "web_search" },
       { type: "function", name: "exec_command" },
       { type: "function", name: "apply_patch" },
       { type: "local_shell" },

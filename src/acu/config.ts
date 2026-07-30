@@ -1,11 +1,13 @@
 export const ACU_PROMPT_VERSION = "acu-tier-requirement-v4";
 export const ACU_DIFFICULTY_METHOD_VERSION = "acu-difficulty-index-v1" as const;
 export const ACU_ROUTING_MODEL_VERSION = "acu-routing-model-v0.3";
-export const ACU_DEFAULT_JUDGE_MODEL = "deepseek-v4-flash";
-export const ACU_DEFAULT_JUDGE_BASE_URL = "https://api.deepseek.com";
+export const ACU_DEFAULT_JUDGE_MODEL = "mimo-v2.5-pro";
+export const ACU_DEFAULT_JUDGE_BASE_URL = "https://token-plan-cn.xiaomimimo.com/v1";
 export const ACU_DEFAULT_JUDGE_MODE = "non-thinking" as const;
-export const ACU_DEFAULT_JUDGE_TIMEOUT_MS = 8_000;
-export const ACU_DEFAULT_MAX_CONTEXT_TOKENS = 262_144;
+export const ACU_DEFAULT_JUDGE_FIRST_BYTE_TIMEOUT_MS = 0;
+export const ACU_DEFAULT_JUDGE_TOTAL_TIMEOUT_MS = 0;
+export const ACU_DEFAULT_MAX_CONTEXT_TOKENS = 1_000_000;
+export const ACU_DEFAULT_BACKUP_MAX_CONTEXT_TOKENS = 1_000_000;
 export const ACU_DEFAULT_MAX_OUTPUT_TOKENS = 300;
 export const ACU_DEFAULT_QUALITY_TARGET = 0.8;
 export const ACU_DEFAULT_SWITCH_COST_USD = 0.0002;
@@ -39,6 +41,11 @@ function positiveInteger(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function nonNegativeInteger(value: string | undefined, fallback: number): number {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
 function booleanValue(value: string | undefined, fallback = false): boolean {
   if (value === undefined) return fallback;
   return value.trim().toLowerCase() === "true";
@@ -50,6 +57,7 @@ export type AcuRuntimeConfig = {
   judgeBaseUrl: string;
   judgeMode: "non-thinking";
   promptVersion: string;
+  firstByteTimeoutMs: number;
   timeoutMs: number;
   maxContextTokens: number;
   maxOutputTokens: number;
@@ -59,6 +67,7 @@ export type AcuRuntimeConfig = {
   backupJudgeBaseUrl?: string;
   backupApiKey?: string;
   backupJudgeProvider?: string;
+  backupMaxContextTokens: number;
   cachePath?: string;
   allowMock: boolean;
   shadowMode: boolean;
@@ -75,18 +84,29 @@ export function readAcuRuntimeConfig(overrides: Partial<AcuRuntimeConfig> = {}):
     judgeBaseUrl: process.env.ACU_JUDGE_BASE_URL?.trim() || ACU_DEFAULT_JUDGE_BASE_URL,
     judgeMode: ACU_DEFAULT_JUDGE_MODE,
     promptVersion: process.env.ACU_JUDGE_PROMPT_VERSION?.trim() || ACU_PROMPT_VERSION,
-    timeoutMs: positiveInteger(process.env.ACU_JUDGE_TIMEOUT_MS, ACU_DEFAULT_JUDGE_TIMEOUT_MS),
+    firstByteTimeoutMs: nonNegativeInteger(
+      process.env.ACU_JUDGE_FIRST_BYTE_TIMEOUT_MS,
+      ACU_DEFAULT_JUDGE_FIRST_BYTE_TIMEOUT_MS,
+    ),
+    timeoutMs: nonNegativeInteger(
+      process.env.ACU_JUDGE_TOTAL_TIMEOUT_MS,
+      ACU_DEFAULT_JUDGE_TOTAL_TIMEOUT_MS,
+    ),
     maxContextTokens: positiveInteger(
       process.env.ACU_JUDGE_MAX_CONTEXT_TOKENS,
       ACU_DEFAULT_MAX_CONTEXT_TOKENS,
     ),
     maxOutputTokens: ACU_DEFAULT_MAX_OUTPUT_TOKENS,
-    apiKey: process.env.ACU_JUDGE_API_KEY?.trim() || process.env.DEEPSEEK_API_KEY?.trim(),
+    apiKey: process.env.ACU_JUDGE_API_KEY?.trim(),
     judgeProvider: process.env.ACU_JUDGE_PROVIDER?.trim() || "openai_compatible",
     backupJudgeModel: process.env.ACU_JUDGE_BACKUP_MODEL?.trim() || undefined,
     backupJudgeBaseUrl: process.env.ACU_JUDGE_BACKUP_BASE_URL?.trim() || undefined,
     backupApiKey: process.env.ACU_JUDGE_BACKUP_API_KEY?.trim() || undefined,
     backupJudgeProvider: process.env.ACU_JUDGE_BACKUP_PROVIDER?.trim() || undefined,
+    backupMaxContextTokens: positiveInteger(
+      process.env.ACU_JUDGE_BACKUP_MAX_CONTEXT_TOKENS,
+      ACU_DEFAULT_BACKUP_MAX_CONTEXT_TOKENS,
+    ),
     cachePath: process.env.ACU_JUDGE_CACHE_PATH?.trim(),
     allowMock: booleanValue(process.env.ACU_ALLOW_MOCK),
     shadowMode: booleanValue(process.env.ACU_SHADOW_MODE, true),
@@ -105,6 +125,7 @@ export function readAcuRuntimeConfig(overrides: Partial<AcuRuntimeConfig> = {}):
       judgeBaseUrl: config.backupJudgeBaseUrl,
       apiKey: config.backupApiKey,
       judgeProvider: config.backupJudgeProvider ?? "openai_compatible",
+      maxContextTokens: config.backupMaxContextTokens,
       backupJudgeModel: undefined,
       backupJudgeBaseUrl: undefined,
       backupApiKey: undefined,

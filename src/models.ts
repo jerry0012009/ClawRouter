@@ -98,7 +98,7 @@ export const BLOCKRUN_MODELS: ExtendedModelDefinition[] = [
 
   // ── DeepSeek (via proxy) ──
   { id: "deepseek-v4-flash", name: "DeepSeek V4 Flash", upstream: "proxy", reasoning: false, input: ["text"],
-    cost: { input: 0.15, output: 0.3, cacheRead: 0.07, cacheWrite: 0.15 }, contextWindow: 163_840, maxTokens: 163_840 },
+    cost: { input: 0.15, output: 0.3, cacheRead: 0.07, cacheWrite: 0.15 }, contextWindow: 1_000_000, maxTokens: 384_000 },
   { id: "deepseek-v4-pro", name: "DeepSeek V4 Pro", upstream: "proxy", reasoning: true, input: ["text"],
     cost: { input: 1.8, output: 3.6, cacheRead: 0.9, cacheWrite: 1.8 }, contextWindow: 163_840, maxTokens: 163_840 },
   { id: "deepseek-v3.2", name: "DeepSeek V3.2", upstream: "proxy", reasoning: false, input: ["text"],

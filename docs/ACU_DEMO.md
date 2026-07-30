@@ -11,19 +11,24 @@ ACU Demo 把一次 OpenAI-compatible API 请求的完整可见上下文转换为
 ```bash
 export ACU_DEMO_ROUTER_ENABLED=true
 export ACU_JUDGE_API_KEY='...'
-export ACU_JUDGE_MODEL=deepseek-v4-flash
-export ACU_JUDGE_BASE_URL=https://api.deepseek.com
+export ACU_JUDGE_MODEL=mimo-v2.5-pro
+export ACU_JUDGE_PROVIDER=xiaomi_mimo
+export ACU_JUDGE_BASE_URL=https://token-plan-cn.xiaomimimo.com/v1
+export ACU_JUDGE_BACKUP_MODEL=deepseek-v4-flash
+export ACU_JUDGE_BACKUP_PROVIDER=closeai
 export ACU_JUDGE_MODE=non-thinking
-export ACU_JUDGE_PROMPT_VERSION=acu-tier-requirement-v2
-export ACU_JUDGE_TIMEOUT_MS=8000
-export ACU_JUDGE_MAX_CONTEXT_TOKENS=6000
+export ACU_JUDGE_PROMPT_VERSION=acu-tier-requirement-v4
+export ACU_JUDGE_FIRST_BYTE_TIMEOUT_MS=0 # 0 disables a local first-byte deadline
+export ACU_JUDGE_TOTAL_TIMEOUT_MS=0      # 0 disables a local total deadline
+export ACU_JUDGE_MAX_CONTEXT_TOKENS=1000000
+export ACU_JUDGE_BACKUP_MAX_CONTEXT_TOKENS=1000000
 export ACU_SHADOW_MODE=false # isolated Dev actual-routing deployment only
 export ACU_ALLOW_MOCK=false
 export ACU_DATABASE_PATH=/var/lib/clawrouter-dev/acu-routing.db
 npm run build
 ```
 
-密钥只从 `ACU_JUDGE_API_KEY` 或 `DEEPSEEK_API_KEY` 读取。Judge 请求最大输出 300 tokens，关闭 thinking，并要求 JSON object。v2 缓存默认位于 `~/.claw-router/acu-judge-cache-v2.json`；旧 v1 文件不会被复用。缓存只保存上下文 SHA-256、版本、结果、usage 和来源证明，不保存完整请求或密钥。
+密钥只从环境读取。Judge 请求最大输出 300 tokens，关闭 thinking，并要求 JSON object。Judge 接收完整 Raw Native Request；本地 Token 估算只用于观测，不再作为提前拒绝条件。Primary 和 Backup 的 Context 能力分别配置。缓存只保存版本化结果和来源证明，不保存密钥。
 
 启动 ClawRouter 后访问：
 

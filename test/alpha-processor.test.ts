@@ -841,7 +841,7 @@ run("Alpha PostgreSQL request processor", () => {
     });
   });
 
-  it("rejects a file modification before Judge or Provider when the workspace is read-only", async () => {
+  it("preserves native Codex sandbox semantics instead of enforcing workspace-write", async () => {
     const beforeJudge = judgeCalls;
     const beforeProvider = upstreamBodies.length;
     const body = Buffer.from(JSON.stringify({
@@ -858,10 +858,10 @@ run("Alpha PostgreSQL request processor", () => {
       headers: signedHeaders(body, "workspace-read-only", "user-workspace", "codex"),
       body,
     });
-    expect(response.status).toBe(422);
-    expect(await response.text()).toContain("Codex sandbox must be workspace-write");
-    expect(judgeCalls).toBe(beforeJudge);
-    expect(upstreamBodies.length).toBe(beforeProvider);
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain("response.completed");
+    expect(judgeCalls).toBe(beforeJudge + 1);
+    expect(upstreamBodies.length).toBe(beforeProvider + 1);
   });
 
   it("persists Judge cost and returns one stable 400 when Context admission fails", async () => {

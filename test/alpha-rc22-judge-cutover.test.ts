@@ -164,6 +164,64 @@ describe("RC2.2 Judge cutover", () => {
     expect(result.judgeContextSource).toBe("raw_native_request_v1");
   });
 
+  it("observes but does not locally reject a roughly 700k-token native request", async () => {
+    const rawRequest = JSON.stringify({ model: "acu-auto", input: `EARLY_${"a".repeat(2_800_000)}_LATEST` });
+    let posted = "";
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+      posted = String(init?.body);
+      return judgeResponse();
+    });
+    const result = await new AcuJudgeClient(config(), fetchMock).judge([], [], true, {
+      stateMetadata: { sessionId: "session-700k", phase: "execution", trigger: "new_task" },
+      rawRequest,
+    });
+    const messages = (JSON.parse(posted) as { messages: Array<{ content: string }> }).messages;
+    expect(messages[1].content.split("[RAW_NATIVE_API_REQUEST]\n")[1]).toBe(rawRequest);
+    expect(result.rawRequestTokenEstimate).toBeGreaterThanOrEqual(700_000);
+    expect(result.contextTruncated).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves an upstream context error and does not call an unverified-larger Backup", async () => {
+    const upstreamBody = JSON.stringify({
+      error: { type: "context_length_exceeded", message: "Maximum context length exceeded by 17 tokens" },
+    });
+    const primaryFetch = vi.fn<typeof fetch>().mockResolvedValue(new Response(upstreamBody, {
+      status: 400,
+      headers: { "content-type": "application/json", "x-request-id": "mimo-context-fixture" },
+    }));
+    const backupFetch = vi.fn<typeof fetch>();
+    const result = await runner(primaryFetch, backupFetch).run(runInput);
+    expect(backupFetch).not.toHaveBeenCalled();
+    expect(result.terminalError?.type).toBe("judge_context_length_exceeded");
+    expect(result.errorCategory).toBe("context_length_exceeded");
+    expect(result.attempts[0]).toMatchObject({
+      errorCategory: "context_length_exceeded",
+      rawResponseBody: upstreamBody,
+      backupEligible: false,
+      backupReason: "backup_context_not_verified_larger_than_primary",
+      upstreamRequestId: "mimo-context-fixture",
+    });
+  });
+
+  it("preserves the raw HTTP 200 body and exact JSON parser error before one Backup", async () => {
+    const raw = "not-json from fixture";
+    const backupFetch = vi.fn<typeof fetch>().mockResolvedValue(judgeResponse({ model: "deepseek-v4-flash" }));
+    const result = await runner(
+      vi.fn<typeof fetch>().mockResolvedValue(new Response(raw, { status: 200, headers: { "x-request-id": "bad-json" } })),
+      backupFetch,
+    ).run(runInput);
+    expect(backupFetch).toHaveBeenCalledTimes(1);
+    expect(result.attempts[0]).toMatchObject({
+      errorCategory: "invalid_response",
+      rawResponseBody: raw,
+      parserExceptionType: "SyntaxError",
+      backupEligible: true,
+      backupReason: "primary_schema_or_json_invalid",
+    });
+    expect(result.attempts[0].parserExceptionMessage).toMatch(/JSON/);
+  });
+
   it.each([
     ["non_json", () => new Response("not-json", { status: 200 })],
     ["http_429", () => new Response("rate limited", { status: 429 })],

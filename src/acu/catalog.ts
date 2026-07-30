@@ -14,14 +14,23 @@ export type AcuCatalogConfig = {
   distributionCounts: { low: number; mid: number; mid_high: number; high: number };
   judge: {
     model: string;
+    provider: string;
     baseUrl: string;
     mode: string;
     promptVersion: string;
-    timeoutMs: number;
+    firstByteTimeoutMs: number;
+    totalTimeoutMs: number;
     maxContextTokens: number;
+    contextCapabilitySource: string;
     maxOutputTokens: number;
+    backup: {
+      model: string;
+      provider: string;
+      maxContextTokens: number;
+      contextCapabilitySource: string;
+    };
   };
-  cost: { judgeInputTokens: number; judgeOutputTokens: number; switchCostUsd: number };
+  cost: { judgeInputTokens: number | null; judgeInputTokensSource: string; judgeOutputTokens: number; switchCostUsd: number };
 };
 
 export type AcuModelCatalog = {

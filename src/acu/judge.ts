@@ -83,6 +83,16 @@ export type JudgeAttemptFailure = {
   errorCategory: string;
   httpStatus?: number;
   backupEligible: boolean;
+  backupReason: string;
+  responseHeaders: Record<string, string>;
+  rawResponseBody: string;
+  parserExceptionType?: string;
+  parserExceptionMessage?: string;
+  contextSha256: string;
+  contextTokenEstimate: number;
+  rawRequestBytes: number;
+  rawRequestTokenEstimate: number;
+  judgeContextLimit: number;
 };
 
 export class AcuJudgeAttemptError extends Error {
@@ -222,12 +232,12 @@ export function buildJudgeSystemPrompt(): string {
     "tool_dependency衡量工具调用、代码执行、检索、多轮Agent行为和环境状态依赖；verification_burden越难通过JSON、测试或明确答案验证则越高；context_burden衡量上下文长度、分散程度和历史依赖。",
     "不要为了简洁默认使用5的倍数。请分别判断各能力需求因子，总难度由后端计算；只有真实判断恰好落在整数或5的倍数时才可输出该值。",
     "概率表达分类不确定性；除极其明确外不要机械输出单档100%，相邻档存在合理可能时应给软概率。原始总分与主要档位应大体一致，但不要求等于概率期望。",
-    "四档概率必须在0到1且总和为1；signals最多5个；explanation必须是字符串，长度由整体 Judge max output tokens 控制。",
+    "四档概率必须在0到1且总和为1；signals必须是字符串数组；explanation必须是字符串，长度由整体 Judge max output tokens 控制。",
     "在同一次判断中输出 Web Intent。required 表示完成当前真实目标必须取得实时或外部 Web 信息；likely 表示可能有帮助但不能作为硬条件；not_required 表示当前 Segment 可完全依赖本地工作区、已给上下文和普通工具完成。",
     "Web 判断必须综合当前真实用户目标、最近用户输入、Task/Goal、Plan、Routing Segment 状态和确定性 Web 线索。客户端声明 Web Tool 只表示能力可用，不能直接判为 required。",
     "单独出现 current、latest、today、当前、最新、今天不得判为 required。代码标识符、变量名、文件名、本地日志、Git 分支和本地测试内容中的这些词应判为 not_required。",
     "例如：‘修改 currentUser 函数’、‘更新 latestVersion 变量’、‘查看今天生成的本地日志’均为 not_required；‘查询今天 BTC 价格’、‘搜索最新 Codex 官方文档’为 required。",
-    "webIntentConfidence 必须在0到1；webIntentReason必须是字符串；webIntentEvidence最多8项，只列可审计的简短证据标签。",
+    "webIntentConfidence 必须在0到1；webIntentReason必须是字符串；webIntentEvidence必须是字符串数组，只列可审计的简短证据标签。",
     "以下示例只包含当时可见上下文，不含未来消息：",
     examples,
   ].join("\n\n");
@@ -305,8 +315,8 @@ export function parseJudgeResult(text: string): AcuJudgeResult {
   const probabilities = normalizeProbabilities({
     pLow: Number(parsed.p_low), pMid: Number(parsed.p_mid), pMidHigh: Number(parsed.p_mid_high), pHigh: Number(parsed.p_high), confidence: Number(parsed.confidence),
   });
-  if (!Array.isArray(parsed.signals) || parsed.signals.length > 5 || parsed.signals.some((signal) => typeof signal !== "string")) {
-    throw new Error("Judge signals must contain at most five strings");
+  if (!Array.isArray(parsed.signals) || parsed.signals.some((signal) => typeof signal !== "string")) {
+    throw new Error("Judge signals must be an array of strings");
   }
   if (typeof parsed.explanation !== "string") throw new Error("Judge explanation must be a string");
   const originalExplanationLength = Array.from(parsed.explanation).length;
@@ -320,9 +330,9 @@ export function parseJudgeResult(text: string): AcuJudgeResult {
     throw new Error("Judge webIntentConfidence must be finite and in [0, 1]");
   }
   if (typeof parsed.webIntentReason !== "string") throw new Error("Judge webIntentReason must be a string");
-  if (!Array.isArray(parsed.webIntentEvidence) || parsed.webIntentEvidence.length > 8
+  if (!Array.isArray(parsed.webIntentEvidence)
     || parsed.webIntentEvidence.some((item) => typeof item !== "string")) {
-    throw new Error("Judge webIntentEvidence must contain at most eight strings");
+    throw new Error("Judge webIntentEvidence must be an array of strings");
   }
   return {
     ...probabilities,
@@ -376,6 +386,49 @@ function endpointMetadata(baseUrl: string, provider: string): { host: string; pr
   return { host, provider };
 }
 
+function responseHeaders(headers: Headers): Record<string, string> {
+  return Object.fromEntries([...headers.entries()].filter(([name]) => ![
+    "authorization", "cookie", "proxy-authorization", "set-cookie", "x-api-key", "api-key",
+  ].includes(name.toLowerCase())));
+}
+
+function upstreamContextError(status: number, body: string): boolean {
+  if (status !== 400 && status !== 413 && status !== 422) return false;
+  return /context[_ -]?(?:length|window)|maximum context|too many tokens|token limit/i.test(body);
+}
+
+function errorResponseMetadata(body: string): {
+  id?: string;
+  promptTokens: number;
+  cachedPromptTokens: number;
+  completionTokens: number;
+  usageStatus: "reported" | "usage_missing";
+} {
+  try {
+    const value = JSON.parse(body) as {
+      id?: unknown;
+      request_id?: unknown;
+      usage?: {
+        prompt_tokens?: unknown;
+        completion_tokens?: unknown;
+        prompt_tokens_details?: { cached_tokens?: unknown };
+      };
+    };
+    const promptTokens = Number(value.usage?.prompt_tokens);
+    const completionTokens = Number(value.usage?.completion_tokens);
+    return {
+      id: typeof value.id === "string" ? value.id : typeof value.request_id === "string" ? value.request_id : undefined,
+      promptTokens: Number.isFinite(promptTokens) ? promptTokens : 0,
+      cachedPromptTokens: Number.isFinite(Number(value.usage?.prompt_tokens_details?.cached_tokens))
+        ? Number(value.usage?.prompt_tokens_details?.cached_tokens) : 0,
+      completionTokens: Number.isFinite(completionTokens) ? completionTokens : 0,
+      usageStatus: Number.isFinite(promptTokens) && Number.isFinite(completionTokens) ? "reported" : "usage_missing",
+    };
+  } catch {
+    return { promptTokens: 0, cachedPromptTokens: 0, completionTokens: 0, usageStatus: "usage_missing" };
+  }
+}
+
 export class AcuJudgeClient {
   constructor(private readonly config: AcuRuntimeConfig, private readonly fetchImplementation: typeof fetch = fetch) {
     if (fetchImplementation !== fetch && process.env.NODE_ENV !== "test" && !config.allowMock) {
@@ -397,12 +450,8 @@ export class AcuJudgeClient {
       ? `[ACU_STATE_METADATA]\n${stableJson(rawNative.stateMetadata)}\n[RAW_NATIVE_API_REQUEST]\n${rawNative.rawRequest}`
       : serializeVisibleContext(messages, tools);
     const contextSha256 = createHash("sha256").update(visible).digest("hex");
-    const systemTokens = estimateVisibleTokens(buildJudgeSystemPrompt());
-    const judgeContextLimit = Math.max(0, this.config.maxContextTokens - systemTokens - this.config.maxOutputTokens - 2_048);
+    const judgeContextLimit = this.config.maxContextTokens;
     const contextTokenEstimate = estimateVisibleTokens(visible);
-    if (contextTokenEstimate > judgeContextLimit) {
-      throw new AcuJudgeContextLengthError(contextTokenEstimate, judgeContextLimit);
-    }
     const truncated = { text: visible, tokenEstimate: contextTokenEstimate, truncated: false };
     const key = createHash("sha256").update(`${this.config.promptVersion}\n${this.config.judgeModel}\n${contextSha256}`).digest("hex");
     const path = cachePath(this.config);
@@ -424,7 +473,12 @@ export class AcuJudgeClient {
 
     const metadata = endpointMetadata(this.config.judgeBaseUrl, this.config.judgeProvider);
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.config.timeoutMs);
+    const firstByteTimeout = this.config.firstByteTimeoutMs > 0
+      ? setTimeout(() => controller.abort(new Error("Judge first-byte timeout")), this.config.firstByteTimeoutMs)
+      : undefined;
+    const totalTimeout = this.config.timeoutMs > 0
+      ? setTimeout(() => controller.abort(new Error("Judge total timeout")), this.config.timeoutMs)
+      : undefined;
     const started = Date.now();
     try {
       let payload: {
@@ -438,6 +492,7 @@ export class AcuJudgeClient {
         };
       } | undefined;
       let response: Response | undefined;
+      let rawResponseBody = "";
       try {
         response = await this.fetchImplementation(`${this.config.judgeBaseUrl.replace(/\/$/, "")}/chat/completions`, {
           method: "POST",
@@ -453,16 +508,28 @@ export class AcuJudgeClient {
           }),
           signal: controller.signal,
         });
+        if (firstByteTimeout) clearTimeout(firstByteTimeout);
+        rawResponseBody = await response.text();
         if (!response.ok) {
+          const isContextError = upstreamContextError(response.status, rawResponseBody);
+          const errorMetadata = errorResponseMetadata(rawResponseBody);
           throw new AcuJudgeAttemptError(`ACU Judge HTTP ${response.status}`, {
             provider: metadata.provider, model: this.config.judgeModel, endpointHost: metadata.host,
-            upstreamRequestId: response.headers.get("x-request-id"), latencyMs: Date.now() - started,
-            promptTokens: 0, cachedPromptTokens: 0, completionTokens: 0, usageStatus: "usage_missing",
-            errorCategory: `http_${response.status}`, httpStatus: response.status,
-            backupEligible: response.status === 429 || response.status >= 500,
+            upstreamRequestId: response.headers.get("x-request-id") ?? errorMetadata.id ?? null,
+            latencyMs: Date.now() - started,
+            promptTokens: errorMetadata.promptTokens, cachedPromptTokens: errorMetadata.cachedPromptTokens,
+            completionTokens: errorMetadata.completionTokens, usageStatus: errorMetadata.usageStatus,
+            errorCategory: isContextError ? "context_length_exceeded" : `http_${response.status}`,
+            httpStatus: response.status,
+            backupEligible: !isContextError && (response.status === 429 || response.status >= 500),
+            backupReason: isContextError ? "backup_context_not_verified_larger_than_primary" :
+              response.status === 429 ? "primary_rate_limited" : response.status >= 500
+                ? "primary_server_error" : "http_status_not_backup_eligible",
+            responseHeaders: responseHeaders(response.headers), rawResponseBody,
+            contextSha256, contextTokenEstimate, rawRequestBytes, rawRequestTokenEstimate, judgeContextLimit,
           });
         }
-        payload = await response.json() as NonNullable<typeof payload>;
+        payload = JSON.parse(rawResponseBody) as NonNullable<typeof payload>;
         if (!payload) throw new Error("ACU Judge returned an invalid JSON payload");
         if (payload?.model && payload.model !== this.config.judgeModel) {
           throw new Error(`ACU Judge actual model mismatch: ${payload.model}`);
@@ -509,10 +576,18 @@ export class AcuJudgeClient {
             ? "reported" : "usage_missing",
           errorCategory: controller.signal.aborted ? "timeout" : networkFailure ? "network_error" : "invalid_response",
           backupEligible: networkFailure || invalidSuccessfulResponse,
+          backupReason: controller.signal.aborted ? "primary_timeout" : networkFailure
+            ? "primary_network_error" : invalidSuccessfulResponse ? "primary_schema_or_json_invalid" : "not_backup_eligible",
+          responseHeaders: response ? responseHeaders(response.headers) : {},
+          rawResponseBody,
+          parserExceptionType: error instanceof Error ? error.name : typeof error,
+          parserExceptionMessage: message,
+          contextSha256, contextTokenEstimate, rawRequestBytes, rawRequestTokenEstimate, judgeContextLimit,
         });
       }
     } finally {
-      clearTimeout(timeout);
+      if (firstByteTimeout) clearTimeout(firstByteTimeout);
+      if (totalTimeout) clearTimeout(totalTimeout);
     }
   }
 }

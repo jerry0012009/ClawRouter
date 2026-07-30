@@ -32,16 +32,26 @@
       "high": 170
     },
     "judge": {
-      "model": "deepseek-v4-flash",
-      "baseUrl": "https://api.deepseek.com",
+      "model": "mimo-v2.5-pro",
+      "provider": "xiaomi_mimo",
+      "baseUrl": "https://token-plan-cn.xiaomimimo.com/v1",
       "mode": "non-thinking",
       "promptVersion": "acu-tier-requirement-v4",
-      "timeoutMs": 8000,
-      "maxContextTokens": 262144,
-      "maxOutputTokens": 300
+      "firstByteTimeoutMs": 0,
+      "totalTimeoutMs": 0,
+      "maxContextTokens": 1000000,
+      "contextCapabilitySource": "xiaomi_official_mimo_v2_5_pro_model_spec_20260730",
+      "maxOutputTokens": 300,
+      "backup": {
+        "model": "deepseek-v4-flash",
+        "provider": "closeai",
+        "maxContextTokens": 1000000,
+        "contextCapabilitySource": "deepseek_official_v4_model_spec_20260730; closeai_long_context_not_verified"
+      }
     },
     "cost": {
-      "judgeInputTokens": 6000,
+      "judgeInputTokens": null,
+      "judgeInputTokensSource": "actual_usage",
       "judgeOutputTokens": 300,
       "switchCostUsd": 0.0002
     },
@@ -418,8 +428,8 @@
       "outputPricePerMillion": 0.3,
       "cachedInputPricePerMillion": 0.07,
       "cacheWritePricePerMillion": 0.15,
-      "contextWindow": 163840,
-      "maxOutputTokens": 163840,
+      "contextWindow": 1000000,
+      "maxOutputTokens": 384000,
       "toolCallSupport": true,
       "visionSupport": false,
       "provider": "DeepSeek",

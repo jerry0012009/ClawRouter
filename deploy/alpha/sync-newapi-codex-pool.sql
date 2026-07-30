@@ -1,5 +1,6 @@
 UPDATE channels
-SET models = 'acu-auto,gpt-5.4-mini,gpt-5.6-luna,gpt-5.6-terra,gpt-5.5,gpt-5.6-sol'
+SET models = 'acu-auto,gpt-5.4-mini,gpt-5.6-luna,gpt-5.6-terra,gpt-5.5,gpt-5.6-sol',
+    header_override = '{"*":""}'
 WHERE id = 1 AND name = 'ACU Responses Alpha';
 
 INSERT INTO abilities ("group", model, channel_id, enabled, priority, weight, tag)

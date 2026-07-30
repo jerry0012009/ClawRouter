@@ -4,6 +4,7 @@ type AcuRuntimeConfig = {
     judgeBaseUrl: string;
     judgeMode: "non-thinking";
     promptVersion: string;
+    firstByteTimeoutMs: number;
     timeoutMs: number;
     maxContextTokens: number;
     maxOutputTokens: number;
@@ -13,6 +14,7 @@ type AcuRuntimeConfig = {
     backupJudgeBaseUrl?: string;
     backupApiKey?: string;
     backupJudgeProvider?: string;
+    backupMaxContextTokens: number;
     cachePath?: string;
     allowMock: boolean;
     shadowMode: boolean;
@@ -1101,15 +1103,25 @@ type AcuCatalogConfig = {
     };
     judge: {
         model: string;
+        provider: string;
         baseUrl: string;
         mode: string;
         promptVersion: string;
-        timeoutMs: number;
+        firstByteTimeoutMs: number;
+        totalTimeoutMs: number;
         maxContextTokens: number;
+        contextCapabilitySource: string;
         maxOutputTokens: number;
+        backup: {
+            model: string;
+            provider: string;
+            maxContextTokens: number;
+            contextCapabilitySource: string;
+        };
     };
     cost: {
-        judgeInputTokens: number;
+        judgeInputTokens: number | null;
+        judgeInputTokensSource: string;
         judgeOutputTokens: number;
         switchCostUsd: number;
     };

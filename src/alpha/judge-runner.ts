@@ -38,6 +38,12 @@ export type AlphaJudgeRun = {
   attempts: AlphaJudgeAttempt[];
   entropy: number;
   errorCategory?: string;
+  terminalError?: {
+    type: "judge_context_length_exceeded";
+    message: string;
+    requiredTokensEstimate: number;
+    primaryContextTokens: number;
+  };
   webIntentDecision: WebIntentDecision;
 };
 
@@ -62,6 +68,17 @@ export type AlphaJudgeAttempt = {
   usageStatus: "reported" | "usage_missing";
   errorCategory?: string;
   httpStatus?: number;
+  backupEligible?: boolean;
+  backupReason?: string;
+  responseHeaders?: Record<string, string>;
+  rawResponseBody?: string;
+  parserExceptionType?: string;
+  parserExceptionMessage?: string;
+  contextSha256?: string;
+  contextTokenEstimate?: number;
+  rawRequestBytes?: number;
+  rawRequestTokenEstimate?: number;
+  judgeContextLimit?: number;
 };
 
 export type AlphaJudgeInput = {
@@ -222,6 +239,8 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
       } catch (error) {
         if (error instanceof AcuJudgeContextLengthError) throw error;
         if (error instanceof AcuJudgeAttemptError) attempts.push(failedAttempt(error, 1, "primary"));
+        const primaryContextError = error instanceof AcuJudgeAttemptError
+          && error.attempt.errorCategory === "context_length_exceeded";
         if (error instanceof AcuJudgeAttemptError && error.attempt.backupEligible && backupClient) {
           try {
             const backup = await backupClient.judge(input.messages, [], false, input.rawNative);
@@ -229,8 +248,13 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
             return completeRun(backup, attempts, backup.status === "cache_hit" ? "cache_hit" : "backup_live");
           } catch (backupError) {
             if (backupError instanceof AcuJudgeAttemptError) attempts.push(failedAttempt(backupError, 2, "backup"));
+            if (backupError instanceof AcuJudgeAttemptError
+              && backupError.attempt.errorCategory === "context_length_exceeded") {
+              return terminalContextFailure(backupError.attempt.model, attempts, input);
+            }
           }
         }
+        if (primaryContextError) return terminalContextFailure(error.attempt.model, attempts, input);
         const fallback = withWebIntentSource(
           classifyWebIntentFallback(input.webIntentFallbackInput),
           "heuristic_fallback",
@@ -285,4 +309,57 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
       }
     },
   };
+
+  function terminalContextFailure(
+    model: string,
+    attempts: AlphaJudgeAttempt[],
+    input: AlphaJudgeInput,
+  ): AlphaJudgeRun {
+    const judge = rulesFallbackJudge(options.rulesDecision);
+    const failed = attempts.at(-1);
+    const rawRequestBytes = failed?.rawRequestBytes ?? Buffer.byteLength(input.rawNative.rawRequest, "utf8");
+    const rawRequestTokenEstimate = failed?.rawRequestTokenEstimate ?? Math.ceil(rawRequestBytes / 4);
+    return {
+      judge,
+      status: "rules_fallback",
+      resultSource: "rules_strategy",
+      model,
+      provider: attemptsProvider(attempts),
+      promptVersion: options.config.promptVersion,
+      policyVersion,
+      contextHash: failed?.contextSha256 ?? input.contextHash,
+      contextTokenEstimate: failed?.contextTokenEstimate ?? rawRequestTokenEstimate,
+      contextTruncated: false,
+      rawRequestBytes,
+      rawRequestTokenEstimate,
+      judgeContextLimit: failed?.judgeContextLimit ?? (model === options.config.judgeModel
+        ? options.config.maxContextTokens : options.config.backupMaxContextTokens),
+      judgeContextSource: "raw_native_request_v1",
+      promptTokens: attempts.reduce((sum, attempt) => sum + attempt.promptTokens, 0),
+      completionTokens: attempts.reduce((sum, attempt) => sum + attempt.completionTokens, 0),
+      latencyMs: attempts.reduce((sum, attempt) => sum + attempt.latencyMs, 0),
+      costUsd: attempts.reduce((sum, attempt) => sum + Number(attempt.nominalCostUsd), 0).toFixed(10),
+      costCny: attempts.reduce((sum, attempt) => sum + Number(attempt.effectiveCostCny), 0).toFixed(10),
+      officialPaygEquivalentCostCny: attempts.reduce((sum, attempt) => sum + Number(attempt.officialPaygEquivalentCostCny), 0).toFixed(10),
+      costCurrency: "CNY",
+      costStatus: aggregateCostStatus(attempts),
+      costSource: [...new Set(attempts.map((attempt) => attempt.costSource))].join("+") || "not_applicable",
+      attempts,
+      entropy: normalizedEntropy(judge),
+      errorCategory: "context_length_exceeded",
+      terminalError: {
+        type: "judge_context_length_exceeded",
+        message: "The Judge provider rejected the complete native request as exceeding its context window.",
+        requiredTokensEstimate: rawRequestTokenEstimate,
+        primaryContextTokens: options.config.maxContextTokens,
+      },
+      webIntentDecision: withWebIntentSource({
+        intent: "likely", confidence: 0, reason: "Judge context admission failed upstream.", evidence: [],
+      }, "heuristic_fallback"),
+    };
+  }
+}
+
+function attemptsProvider(attempts: AlphaJudgeAttempt[]): string {
+  return attempts.at(-1)?.provider ?? "judge_provider";
 }

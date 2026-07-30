@@ -55,6 +55,8 @@ export type AlphaGatewayOptions = {
   now?: () => Date;
 };
 
+const DEFAULT_MAX_REQUEST_BYTES = 128 * 1024 * 1024;
+
 function adminBearerToken(request: IncomingMessage): string | undefined {
   const authorization = request.headers.authorization;
   if (typeof authorization !== "string") return undefined;
@@ -194,7 +196,7 @@ export function createAlphaGatewayServer(options: AlphaGatewayOptions): Server {
     let trace: AlphaGatewayTrace | undefined;
     let stage: "body" | "identity" | "protocol" | "execution" = "body";
     try {
-      const body = await readRequestBody(request, options.maxRequestBytes ?? 32 * 1024 * 1024);
+      const body = await readRequestBody(request, options.maxRequestBytes ?? DEFAULT_MAX_REQUEST_BYTES);
       stage = "identity";
       const identity = verifyTrustedIdentity(request.headers, body, {
         sharedSecret: options.trustedIdentitySecret,

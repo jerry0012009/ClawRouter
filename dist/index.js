@@ -1924,8 +1924,8 @@ var BLOCKRUN_MODELS = [
     reasoning: false,
     input: ["text"],
     cost: { input: 0.15, output: 0.3, cacheRead: 0.07, cacheWrite: 0.15 },
-    contextWindow: 163840,
-    maxTokens: 163840
+    contextWindow: 1e6,
+    maxTokens: 384e3
   },
   {
     id: "deepseek-v4-pro",
@@ -4195,11 +4195,13 @@ import { createHash as createHash5, randomUUID } from "crypto";
 var ACU_PROMPT_VERSION = "acu-tier-requirement-v4";
 var ACU_DIFFICULTY_METHOD_VERSION = "acu-difficulty-index-v1";
 var ACU_ROUTING_MODEL_VERSION = "acu-routing-model-v0.3";
-var ACU_DEFAULT_JUDGE_MODEL = "deepseek-v4-flash";
-var ACU_DEFAULT_JUDGE_BASE_URL = "https://api.deepseek.com";
+var ACU_DEFAULT_JUDGE_MODEL = "mimo-v2.5-pro";
+var ACU_DEFAULT_JUDGE_BASE_URL = "https://token-plan-cn.xiaomimimo.com/v1";
 var ACU_DEFAULT_JUDGE_MODE = "non-thinking";
-var ACU_DEFAULT_JUDGE_TIMEOUT_MS = 8e3;
-var ACU_DEFAULT_MAX_CONTEXT_TOKENS = 262144;
+var ACU_DEFAULT_JUDGE_FIRST_BYTE_TIMEOUT_MS = 0;
+var ACU_DEFAULT_JUDGE_TOTAL_TIMEOUT_MS = 0;
+var ACU_DEFAULT_MAX_CONTEXT_TOKENS = 1e6;
+var ACU_DEFAULT_BACKUP_MAX_CONTEXT_TOKENS = 1e6;
 var ACU_DEFAULT_MAX_OUTPUT_TOKENS = 300;
 var ACU_DEFAULT_QUALITY_TARGET = 0.8;
 var ACU_DEFAULT_SWITCH_COST_USD = 2e-4;
@@ -4225,6 +4227,10 @@ function positiveInteger(value, fallback) {
   const parsed = Number.parseInt(value ?? "", 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
+function nonNegativeInteger(value, fallback) {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
 function booleanValue(value, fallback = false) {
   if (value === void 0) return fallback;
   return value.trim().toLowerCase() === "true";
@@ -4237,18 +4243,29 @@ function readAcuRuntimeConfig(overrides = {}) {
     judgeBaseUrl: process.env.ACU_JUDGE_BASE_URL?.trim() || ACU_DEFAULT_JUDGE_BASE_URL,
     judgeMode: ACU_DEFAULT_JUDGE_MODE,
     promptVersion: process.env.ACU_JUDGE_PROMPT_VERSION?.trim() || ACU_PROMPT_VERSION,
-    timeoutMs: positiveInteger(process.env.ACU_JUDGE_TIMEOUT_MS, ACU_DEFAULT_JUDGE_TIMEOUT_MS),
+    firstByteTimeoutMs: nonNegativeInteger(
+      process.env.ACU_JUDGE_FIRST_BYTE_TIMEOUT_MS,
+      ACU_DEFAULT_JUDGE_FIRST_BYTE_TIMEOUT_MS
+    ),
+    timeoutMs: nonNegativeInteger(
+      process.env.ACU_JUDGE_TOTAL_TIMEOUT_MS,
+      ACU_DEFAULT_JUDGE_TOTAL_TIMEOUT_MS
+    ),
     maxContextTokens: positiveInteger(
       process.env.ACU_JUDGE_MAX_CONTEXT_TOKENS,
       ACU_DEFAULT_MAX_CONTEXT_TOKENS
     ),
     maxOutputTokens: ACU_DEFAULT_MAX_OUTPUT_TOKENS,
-    apiKey: process.env.ACU_JUDGE_API_KEY?.trim() || process.env.DEEPSEEK_API_KEY?.trim(),
+    apiKey: process.env.ACU_JUDGE_API_KEY?.trim(),
     judgeProvider: process.env.ACU_JUDGE_PROVIDER?.trim() || "openai_compatible",
     backupJudgeModel: process.env.ACU_JUDGE_BACKUP_MODEL?.trim() || void 0,
     backupJudgeBaseUrl: process.env.ACU_JUDGE_BACKUP_BASE_URL?.trim() || void 0,
     backupApiKey: process.env.ACU_JUDGE_BACKUP_API_KEY?.trim() || void 0,
     backupJudgeProvider: process.env.ACU_JUDGE_BACKUP_PROVIDER?.trim() || void 0,
+    backupMaxContextTokens: positiveInteger(
+      process.env.ACU_JUDGE_BACKUP_MAX_CONTEXT_TOKENS,
+      ACU_DEFAULT_BACKUP_MAX_CONTEXT_TOKENS
+    ),
     cachePath: process.env.ACU_JUDGE_CACHE_PATH?.trim(),
     allowMock: booleanValue(process.env.ACU_ALLOW_MOCK),
     shadowMode: booleanValue(process.env.ACU_SHADOW_MODE, true),
@@ -4264,6 +4281,7 @@ function readAcuRuntimeConfig(overrides = {}) {
       judgeBaseUrl: config.backupJudgeBaseUrl,
       apiKey: config.backupApiKey,
       judgeProvider: config.backupJudgeProvider ?? "openai_compatible",
+      maxContextTokens: config.backupMaxContextTokens,
       backupJudgeModel: void 0,
       backupJudgeBaseUrl: void 0,
       backupApiKey: void 0,
@@ -4401,16 +4419,26 @@ var model_catalog_default = {
       high: 170
     },
     judge: {
-      model: "deepseek-v4-flash",
-      baseUrl: "https://api.deepseek.com",
+      model: "mimo-v2.5-pro",
+      provider: "xiaomi_mimo",
+      baseUrl: "https://token-plan-cn.xiaomimimo.com/v1",
       mode: "non-thinking",
       promptVersion: "acu-tier-requirement-v4",
-      timeoutMs: 8e3,
-      maxContextTokens: 262144,
-      maxOutputTokens: 300
+      firstByteTimeoutMs: 0,
+      totalTimeoutMs: 0,
+      maxContextTokens: 1e6,
+      contextCapabilitySource: "xiaomi_official_mimo_v2_5_pro_model_spec_20260730",
+      maxOutputTokens: 300,
+      backup: {
+        model: "deepseek-v4-flash",
+        provider: "closeai",
+        maxContextTokens: 1e6,
+        contextCapabilitySource: "deepseek_official_v4_model_spec_20260730; closeai_long_context_not_verified"
+      }
     },
     cost: {
-      judgeInputTokens: 6e3,
+      judgeInputTokens: null,
+      judgeInputTokensSource: "actual_usage",
       judgeOutputTokens: 300,
       switchCostUsd: 2e-4
     },
@@ -4787,8 +4815,8 @@ var model_catalog_default = {
       outputPricePerMillion: 0.3,
       cachedInputPricePerMillion: 0.07,
       cacheWritePricePerMillion: 0.15,
-      contextWindow: 163840,
-      maxOutputTokens: 163840,
+      contextWindow: 1e6,
+      maxOutputTokens: 384e3,
       toolCallSupport: true,
       visionSupport: false,
       provider: "DeepSeek",
@@ -6467,16 +6495,6 @@ var twin_few_shots_default = {
 };
 
 // src/acu/judge.ts
-var AcuJudgeContextLengthError = class extends Error {
-  constructor(requiredTokens, contextLimit) {
-    super(`Judge raw request requires ${requiredTokens} tokens but only ${contextLimit} are available`);
-    this.requiredTokens = requiredTokens;
-    this.contextLimit = contextLimit;
-    this.name = "AcuJudgeContextLengthError";
-  }
-  requiredTokens;
-  contextLimit;
-};
 var AcuJudgeAttemptError = class extends Error {
   constructor(message, attempt) {
     super(message);
@@ -6605,12 +6623,12 @@ function buildJudgeSystemPrompt() {
     "tool_dependency\u8861\u91CF\u5DE5\u5177\u8C03\u7528\u3001\u4EE3\u7801\u6267\u884C\u3001\u68C0\u7D22\u3001\u591A\u8F6EAgent\u884C\u4E3A\u548C\u73AF\u5883\u72B6\u6001\u4F9D\u8D56\uFF1Bverification_burden\u8D8A\u96BE\u901A\u8FC7JSON\u3001\u6D4B\u8BD5\u6216\u660E\u786E\u7B54\u6848\u9A8C\u8BC1\u5219\u8D8A\u9AD8\uFF1Bcontext_burden\u8861\u91CF\u4E0A\u4E0B\u6587\u957F\u5EA6\u3001\u5206\u6563\u7A0B\u5EA6\u548C\u5386\u53F2\u4F9D\u8D56\u3002",
     "\u4E0D\u8981\u4E3A\u4E86\u7B80\u6D01\u9ED8\u8BA4\u4F7F\u75285\u7684\u500D\u6570\u3002\u8BF7\u5206\u522B\u5224\u65AD\u5404\u80FD\u529B\u9700\u6C42\u56E0\u5B50\uFF0C\u603B\u96BE\u5EA6\u7531\u540E\u7AEF\u8BA1\u7B97\uFF1B\u53EA\u6709\u771F\u5B9E\u5224\u65AD\u6070\u597D\u843D\u5728\u6574\u6570\u62165\u7684\u500D\u6570\u65F6\u624D\u53EF\u8F93\u51FA\u8BE5\u503C\u3002",
     "\u6982\u7387\u8868\u8FBE\u5206\u7C7B\u4E0D\u786E\u5B9A\u6027\uFF1B\u9664\u6781\u5176\u660E\u786E\u5916\u4E0D\u8981\u673A\u68B0\u8F93\u51FA\u5355\u6863100%\uFF0C\u76F8\u90BB\u6863\u5B58\u5728\u5408\u7406\u53EF\u80FD\u65F6\u5E94\u7ED9\u8F6F\u6982\u7387\u3002\u539F\u59CB\u603B\u5206\u4E0E\u4E3B\u8981\u6863\u4F4D\u5E94\u5927\u4F53\u4E00\u81F4\uFF0C\u4F46\u4E0D\u8981\u6C42\u7B49\u4E8E\u6982\u7387\u671F\u671B\u3002",
-    "\u56DB\u6863\u6982\u7387\u5FC5\u987B\u57280\u52301\u4E14\u603B\u548C\u4E3A1\uFF1Bsignals\u6700\u591A5\u4E2A\uFF1Bexplanation\u5FC5\u987B\u662F\u5B57\u7B26\u4E32\uFF0C\u957F\u5EA6\u7531\u6574\u4F53 Judge max output tokens \u63A7\u5236\u3002",
+    "\u56DB\u6863\u6982\u7387\u5FC5\u987B\u57280\u52301\u4E14\u603B\u548C\u4E3A1\uFF1Bsignals\u5FC5\u987B\u662F\u5B57\u7B26\u4E32\u6570\u7EC4\uFF1Bexplanation\u5FC5\u987B\u662F\u5B57\u7B26\u4E32\uFF0C\u957F\u5EA6\u7531\u6574\u4F53 Judge max output tokens \u63A7\u5236\u3002",
     "\u5728\u540C\u4E00\u6B21\u5224\u65AD\u4E2D\u8F93\u51FA Web Intent\u3002required \u8868\u793A\u5B8C\u6210\u5F53\u524D\u771F\u5B9E\u76EE\u6807\u5FC5\u987B\u53D6\u5F97\u5B9E\u65F6\u6216\u5916\u90E8 Web \u4FE1\u606F\uFF1Blikely \u8868\u793A\u53EF\u80FD\u6709\u5E2E\u52A9\u4F46\u4E0D\u80FD\u4F5C\u4E3A\u786C\u6761\u4EF6\uFF1Bnot_required \u8868\u793A\u5F53\u524D Segment \u53EF\u5B8C\u5168\u4F9D\u8D56\u672C\u5730\u5DE5\u4F5C\u533A\u3001\u5DF2\u7ED9\u4E0A\u4E0B\u6587\u548C\u666E\u901A\u5DE5\u5177\u5B8C\u6210\u3002",
     "Web \u5224\u65AD\u5FC5\u987B\u7EFC\u5408\u5F53\u524D\u771F\u5B9E\u7528\u6237\u76EE\u6807\u3001\u6700\u8FD1\u7528\u6237\u8F93\u5165\u3001Task/Goal\u3001Plan\u3001Routing Segment \u72B6\u6001\u548C\u786E\u5B9A\u6027 Web \u7EBF\u7D22\u3002\u5BA2\u6237\u7AEF\u58F0\u660E Web Tool \u53EA\u8868\u793A\u80FD\u529B\u53EF\u7528\uFF0C\u4E0D\u80FD\u76F4\u63A5\u5224\u4E3A required\u3002",
     "\u5355\u72EC\u51FA\u73B0 current\u3001latest\u3001today\u3001\u5F53\u524D\u3001\u6700\u65B0\u3001\u4ECA\u5929\u4E0D\u5F97\u5224\u4E3A required\u3002\u4EE3\u7801\u6807\u8BC6\u7B26\u3001\u53D8\u91CF\u540D\u3001\u6587\u4EF6\u540D\u3001\u672C\u5730\u65E5\u5FD7\u3001Git \u5206\u652F\u548C\u672C\u5730\u6D4B\u8BD5\u5185\u5BB9\u4E2D\u7684\u8FD9\u4E9B\u8BCD\u5E94\u5224\u4E3A not_required\u3002",
     "\u4F8B\u5982\uFF1A\u2018\u4FEE\u6539 currentUser \u51FD\u6570\u2019\u3001\u2018\u66F4\u65B0 latestVersion \u53D8\u91CF\u2019\u3001\u2018\u67E5\u770B\u4ECA\u5929\u751F\u6210\u7684\u672C\u5730\u65E5\u5FD7\u2019\u5747\u4E3A not_required\uFF1B\u2018\u67E5\u8BE2\u4ECA\u5929 BTC \u4EF7\u683C\u2019\u3001\u2018\u641C\u7D22\u6700\u65B0 Codex \u5B98\u65B9\u6587\u6863\u2019\u4E3A required\u3002",
-    "webIntentConfidence \u5FC5\u987B\u57280\u52301\uFF1BwebIntentReason\u5FC5\u987B\u662F\u5B57\u7B26\u4E32\uFF1BwebIntentEvidence\u6700\u591A8\u9879\uFF0C\u53EA\u5217\u53EF\u5BA1\u8BA1\u7684\u7B80\u77ED\u8BC1\u636E\u6807\u7B7E\u3002",
+    "webIntentConfidence \u5FC5\u987B\u57280\u52301\uFF1BwebIntentReason\u5FC5\u987B\u662F\u5B57\u7B26\u4E32\uFF1BwebIntentEvidence\u5FC5\u987B\u662F\u5B57\u7B26\u4E32\u6570\u7EC4\uFF0C\u53EA\u5217\u53EF\u5BA1\u8BA1\u7684\u7B80\u77ED\u8BC1\u636E\u6807\u7B7E\u3002",
     "\u4EE5\u4E0B\u793A\u4F8B\u53EA\u5305\u542B\u5F53\u65F6\u53EF\u89C1\u4E0A\u4E0B\u6587\uFF0C\u4E0D\u542B\u672A\u6765\u6D88\u606F\uFF1A",
     examples
   ].join("\n\n");
@@ -6674,8 +6692,8 @@ function parseJudgeResult(text) {
     pHigh: Number(parsed.p_high),
     confidence: Number(parsed.confidence)
   });
-  if (!Array.isArray(parsed.signals) || parsed.signals.length > 5 || parsed.signals.some((signal) => typeof signal !== "string")) {
-    throw new Error("Judge signals must contain at most five strings");
+  if (!Array.isArray(parsed.signals) || parsed.signals.some((signal) => typeof signal !== "string")) {
+    throw new Error("Judge signals must be an array of strings");
   }
   if (typeof parsed.explanation !== "string") throw new Error("Judge explanation must be a string");
   const originalExplanationLength = Array.from(parsed.explanation).length;
@@ -6689,8 +6707,8 @@ function parseJudgeResult(text) {
     throw new Error("Judge webIntentConfidence must be finite and in [0, 1]");
   }
   if (typeof parsed.webIntentReason !== "string") throw new Error("Judge webIntentReason must be a string");
-  if (!Array.isArray(parsed.webIntentEvidence) || parsed.webIntentEvidence.length > 8 || parsed.webIntentEvidence.some((item) => typeof item !== "string")) {
-    throw new Error("Judge webIntentEvidence must contain at most eight strings");
+  if (!Array.isArray(parsed.webIntentEvidence) || parsed.webIntentEvidence.some((item) => typeof item !== "string")) {
+    throw new Error("Judge webIntentEvidence must be an array of strings");
   }
   return {
     ...probabilities,
@@ -6741,6 +6759,36 @@ function endpointMetadata(baseUrl, provider) {
   const host = new URL(baseUrl).host;
   return { host, provider };
 }
+function responseHeaders(headers) {
+  return Object.fromEntries([...headers.entries()].filter(([name]) => ![
+    "authorization",
+    "cookie",
+    "proxy-authorization",
+    "set-cookie",
+    "x-api-key",
+    "api-key"
+  ].includes(name.toLowerCase())));
+}
+function upstreamContextError(status, body) {
+  if (status !== 400 && status !== 413 && status !== 422) return false;
+  return /context[_ -]?(?:length|window)|maximum context|too many tokens|token limit/i.test(body);
+}
+function errorResponseMetadata(body) {
+  try {
+    const value = JSON.parse(body);
+    const promptTokens = Number(value.usage?.prompt_tokens);
+    const completionTokens = Number(value.usage?.completion_tokens);
+    return {
+      id: typeof value.id === "string" ? value.id : typeof value.request_id === "string" ? value.request_id : void 0,
+      promptTokens: Number.isFinite(promptTokens) ? promptTokens : 0,
+      cachedPromptTokens: Number.isFinite(Number(value.usage?.prompt_tokens_details?.cached_tokens)) ? Number(value.usage?.prompt_tokens_details?.cached_tokens) : 0,
+      completionTokens: Number.isFinite(completionTokens) ? completionTokens : 0,
+      usageStatus: Number.isFinite(promptTokens) && Number.isFinite(completionTokens) ? "reported" : "usage_missing"
+    };
+  } catch {
+    return { promptTokens: 0, cachedPromptTokens: 0, completionTokens: 0, usageStatus: "usage_missing" };
+  }
+}
 var AcuJudgeClient = class {
   constructor(config, fetchImplementation = fetch) {
     this.config = config;
@@ -6761,12 +6809,8 @@ ${stableJson(rawNative.stateMetadata)}
 [RAW_NATIVE_API_REQUEST]
 ${rawNative.rawRequest}` : serializeVisibleContext(messages, tools);
     const contextSha256 = createHash4("sha256").update(visible).digest("hex");
-    const systemTokens = estimateVisibleTokens(buildJudgeSystemPrompt());
-    const judgeContextLimit = Math.max(0, this.config.maxContextTokens - systemTokens - this.config.maxOutputTokens - 2048);
+    const judgeContextLimit = this.config.maxContextTokens;
     const contextTokenEstimate = estimateVisibleTokens(visible);
-    if (contextTokenEstimate > judgeContextLimit) {
-      throw new AcuJudgeContextLengthError(contextTokenEstimate, judgeContextLimit);
-    }
     const truncated = { text: visible, tokenEstimate: contextTokenEstimate, truncated: false };
     const key = createHash4("sha256").update(`${this.config.promptVersion}
 ${this.config.judgeModel}
@@ -6802,11 +6846,13 @@ ${contextSha256}`).digest("hex");
     }
     const metadata = endpointMetadata(this.config.judgeBaseUrl, this.config.judgeProvider);
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.config.timeoutMs);
+    const firstByteTimeout = this.config.firstByteTimeoutMs > 0 ? setTimeout(() => controller.abort(new Error("Judge first-byte timeout")), this.config.firstByteTimeoutMs) : void 0;
+    const totalTimeout = this.config.timeoutMs > 0 ? setTimeout(() => controller.abort(new Error("Judge total timeout")), this.config.timeoutMs) : void 0;
     const started = Date.now();
     try {
       let payload;
       let response;
+      let rawResponseBody = "";
       try {
         response = await this.fetchImplementation(`${this.config.judgeBaseUrl.replace(/\/$/, "")}/chat/completions`, {
           method: "POST",
@@ -6826,23 +6872,35 @@ ${truncated.text}` }
           }),
           signal: controller.signal
         });
+        if (firstByteTimeout) clearTimeout(firstByteTimeout);
+        rawResponseBody = await response.text();
         if (!response.ok) {
+          const isContextError = upstreamContextError(response.status, rawResponseBody);
+          const errorMetadata = errorResponseMetadata(rawResponseBody);
           throw new AcuJudgeAttemptError(`ACU Judge HTTP ${response.status}`, {
             provider: metadata.provider,
             model: this.config.judgeModel,
             endpointHost: metadata.host,
-            upstreamRequestId: response.headers.get("x-request-id"),
+            upstreamRequestId: response.headers.get("x-request-id") ?? errorMetadata.id ?? null,
             latencyMs: Date.now() - started,
-            promptTokens: 0,
-            cachedPromptTokens: 0,
-            completionTokens: 0,
-            usageStatus: "usage_missing",
-            errorCategory: `http_${response.status}`,
+            promptTokens: errorMetadata.promptTokens,
+            cachedPromptTokens: errorMetadata.cachedPromptTokens,
+            completionTokens: errorMetadata.completionTokens,
+            usageStatus: errorMetadata.usageStatus,
+            errorCategory: isContextError ? "context_length_exceeded" : `http_${response.status}`,
             httpStatus: response.status,
-            backupEligible: response.status === 429 || response.status >= 500
+            backupEligible: !isContextError && (response.status === 429 || response.status >= 500),
+            backupReason: isContextError ? "backup_context_not_verified_larger_than_primary" : response.status === 429 ? "primary_rate_limited" : response.status >= 500 ? "primary_server_error" : "http_status_not_backup_eligible",
+            responseHeaders: responseHeaders(response.headers),
+            rawResponseBody,
+            contextSha256,
+            contextTokenEstimate,
+            rawRequestBytes,
+            rawRequestTokenEstimate,
+            judgeContextLimit
           });
         }
-        payload = await response.json();
+        payload = JSON.parse(rawResponseBody);
         if (!payload) throw new Error("ACU Judge returned an invalid JSON payload");
         if (payload?.model && payload.model !== this.config.judgeModel) {
           throw new Error(`ACU Judge actual model mismatch: ${payload.model}`);
@@ -6914,11 +6972,22 @@ ${truncated.text}` }
           completionTokens,
           usageStatus: payload?.usage?.prompt_tokens !== void 0 && payload.usage?.completion_tokens !== void 0 ? "reported" : "usage_missing",
           errorCategory: controller.signal.aborted ? "timeout" : networkFailure ? "network_error" : "invalid_response",
-          backupEligible: networkFailure || invalidSuccessfulResponse
+          backupEligible: networkFailure || invalidSuccessfulResponse,
+          backupReason: controller.signal.aborted ? "primary_timeout" : networkFailure ? "primary_network_error" : invalidSuccessfulResponse ? "primary_schema_or_json_invalid" : "not_backup_eligible",
+          responseHeaders: response ? responseHeaders(response.headers) : {},
+          rawResponseBody,
+          parserExceptionType: error instanceof Error ? error.name : typeof error,
+          parserExceptionMessage: message,
+          contextSha256,
+          contextTokenEstimate,
+          rawRequestBytes,
+          rawRequestTokenEstimate,
+          judgeContextLimit
         });
       }
     } finally {
-      clearTimeout(timeout);
+      if (firstByteTimeout) clearTimeout(firstByteTimeout);
+      if (totalTimeout) clearTimeout(totalTimeout);
     }
   }
 };

@@ -279,6 +279,57 @@ describe("Alpha native protocol gateway", () => {
     expect(traces.at(-1)?.response?.body.toString()).toBe(expected);
   });
 
+  it("keeps relaying a stream while valid chunks continue", async () => {
+    const upstreamPort = await listen(createServer(async (_request, response) => {
+      response.setHeader("content-type", "text/event-stream");
+      response.flushHeaders();
+      for (let index = 0; index < 5; index += 1) {
+        response.write(`data: chunk-${index}\n\n`);
+        await new Promise((resolve) => setTimeout(resolve, 30));
+      }
+      response.end("data: [DONE]\n\n");
+    }));
+    const adapter = createNativeProviderAdapter({
+      provider: "test", channel: "test", baseUrl: `http://127.0.0.1:${upstreamPort}`,
+      apiKey: "test-key", authMode: "bearer",
+    });
+    const gatewayPort = await listen(createAlphaGatewayServer({
+      trustedIdentitySecret: sharedSecret,
+      async resolveExecution(envelope) {
+        return { adapter, requestedModel: envelope.requestedModel, actualModel: envelope.requestedModel, provider: "test", channel: "test" };
+      },
+    }));
+    const body = Buffer.from('{"model":"gpt-test","input":"long stream","stream":true}');
+    const response = await fetch(`http://127.0.0.1:${gatewayPort}/v1/responses`, {
+      method: "POST", headers: signedHeaders(body), body,
+    });
+    const text = await response.text();
+    expect(text).toContain("chunk-0");
+    expect(text).toContain("chunk-4");
+    expect(text).toContain("[DONE]");
+  });
+
+  it("accepts a request larger than the removed 32 MiB Router default", async () => {
+    const input = "a".repeat(33 * 1024 * 1024);
+    const body = Buffer.from(JSON.stringify({ model: "gpt-test", input, stream: false }));
+    const gatewayPort = await listen(createAlphaGatewayServer({
+      trustedIdentitySecret: sharedSecret,
+      async resolveExecution(envelope) {
+        return {
+          adapter: { async execute() { return new Response('{"id":"large-fixture","output":[]}'); } },
+          requestedModel: envelope.requestedModel,
+          actualModel: envelope.requestedModel,
+          provider: "fixture",
+          channel: "fixture",
+        };
+      },
+    }));
+    const response = await fetch(`http://127.0.0.1:${gatewayPort}/v1/responses`, {
+      method: "POST", headers: signedHeaders(body), body,
+    });
+    expect(response.status).toBe(200);
+  }, 20_000);
+
   it("preserves Messages tool_use and thinking signature bytes", async () => {
     const expected = "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"content_block\":{\"type\":\"thinking\",\"signature\":\"sig-1\"}}\n\n"
       + "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"content_block\":{\"type\":\"tool_use\",\"id\":\"tool-1\"}}\n\n";

@@ -56,6 +56,7 @@ export type AlphaServiceConfig = {
   profiles: ConfiguredExecutionProfile[];
   providerEconomics: ProviderEconomics[];
   judgeEconomicsProviderId?: string;
+  maxRequestBytes: number;
 };
 
 function requiredEnvironment(name: string): string {
@@ -67,6 +68,11 @@ function requiredEnvironment(name: string): string {
 function positivePort(value: string | undefined): number {
   const parsed = Number.parseInt(value ?? "", 10);
   return Number.isInteger(parsed) && parsed > 0 && parsed <= 65_535 ? parsed : 8403;
+}
+
+function requestBodyBytes(value: string | undefined): number {
+  const megabytes = Number.parseInt(value ?? "", 10);
+  return (Number.isInteger(megabytes) && megabytes > 0 ? megabytes : 128) * 1024 * 1024;
 }
 
 function validateProfile(value: unknown, index: number): ConfiguredExecutionProfile {
@@ -117,6 +123,7 @@ export async function readAlphaServiceConfig(): Promise<AlphaServiceConfig> {
     profiles: await configuredProfiles(),
     providerEconomics: (await readProviderEconomicsCatalog(economicsPath)).providers,
     judgeEconomicsProviderId: process.env.ACU_JUDGE_ECONOMICS_PROVIDER_ID?.trim() || undefined,
+    maxRequestBytes: requestBodyBytes(process.env.ACU_MAX_REQUEST_BODY_MB),
   };
 }
 
@@ -243,6 +250,7 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
       load: (logicalRequestId) => repository.getAdminLogicalRequestTrace(logicalRequestId),
     },
     models: profiles.map((item) => item.profile.modelId),
+    maxRequestBytes: serviceConfig.maxRequestBytes,
     resolveExecution: processor.resolveExecution.bind(processor),
     onTrace: processor.handleTrace.bind(processor),
     onTraceError(error, trace) {

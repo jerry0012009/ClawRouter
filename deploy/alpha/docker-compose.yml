@@ -52,6 +52,7 @@ services:
       - ../../migrations/acu/0008_alpha_final_user_loop.sql:/migration/0008_alpha_final_user_loop.sql:ro
       - ../../migrations/acu/0009_raw_judge_context.sql:/migration/0009_raw_judge_context.sql:ro
       - ../../migrations/acu/0010_supply_observability.sql:/migration/0010_supply_observability.sql:ro
+      - ../../migrations/acu/0011_verified_model_pool_probe.sql:/migration/0011_verified_model_pool_probe.sql:ro
     networks: [alpha-backend]
     command:
       - /bin/sh
@@ -69,6 +70,7 @@ services:
         psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0008_alpha_final_user_loop.sql
         psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0009_raw_judge_context.sql
         psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0010_supply_observability.sql
+        psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0011_verified_model_pool_probe.sql
 
   newapi-codex-pool-sync:
     image: postgres:16-alpine
@@ -97,7 +99,7 @@ services:
         BUILD_COMMIT_SHA: ${CLAWROUTER_BUILD_COMMIT_SHA:-unknown}
         BUILD_TIME: ${BUILD_TIME:-unknown}
         BUILD_BRANCH: ${CLAWROUTER_BUILD_BRANCH:-unknown}
-        SCHEMA_VERSION: 0010_supply_observability
+        SCHEMA_VERSION: 0011_verified_model_pool_probe
     restart: unless-stopped
     depends_on:
       acu-migrate:
@@ -117,6 +119,7 @@ services:
       ACU_PROVIDER_PREFLIGHT_FILE: /app/config/provider-channel-preflight-observations.json
       ACU_PROVIDER_ECONOMICS_FILE: /app/config/provider-economics.json
       ACU_DEMO_ROUTER_ENABLED: "true"
+      ACU_PROBE_DAILY_BUDGET_CNY: ${ACU_PROBE_DAILY_BUDGET_CNY:-0.05}
       ACU_JUDGE_API_KEY: ${MIMO_API_KEY:?set MIMO_API_KEY}
       ACU_JUDGE_MODEL: mimo-v2.5-pro
       ACU_JUDGE_PROVIDER: xiaomi_mimo

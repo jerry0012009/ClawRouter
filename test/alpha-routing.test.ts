@@ -338,4 +338,84 @@ describe("Alpha current-formula routing", () => {
     expect(resolveExplicitProfile("gpt-5.4-mini", profiles, requirements).modelId).toBe("gpt-5.4-mini");
     expect(() => resolveExplicitProfile("acu-auto", profiles, requirements)).toThrow(/no compatible/);
   });
+
+  it("keeps ten Profiles as one model candidate and selects the cheapest healthy Profile", () => {
+    const modelProfiles = Array.from({ length: 10 }, (_, index) => ({
+      ...profiles[0],
+      executionProfileId: `provider-${index}:gpt-5.4-mini:responses`,
+      provider: `provider-${index}`,
+      channel: `channel-${index}`,
+      economics: {
+        providerId: `provider-${index}`,
+        displayName: `Provider ${index}`,
+        protocol: "responses",
+        baseUrlEnv: `BASE_${index}`,
+        apiKeyEnv: `KEY_${index}`,
+        balanceCurrency: "USD-denominated credits" as const,
+        rechargeCashCny: 1,
+        creditsReceivedUsd: 1,
+        observedBillingMultiplier: index === 0 ? 0.01 : index + 1,
+        priceSource: "fixture",
+        priceObservedAt: "2026-01-01",
+        health: "healthy" as const,
+        priority: index,
+        enabled: true,
+        effectiveCostStatus: "verified" as const,
+        effectiveCostSource: "fixture",
+        effectiveCostVersion: "test-v1",
+      },
+    }));
+    const result = routeWithCurrentAcuFormula({
+      judge,
+      judgeCost: 0,
+      inputTokens: 2_000,
+      expectedOutputTokens: 500,
+      effectiveQualityTarget: 70,
+      profiles: modelProfiles,
+      requirements,
+    });
+    expect(result.candidateEstimates).toHaveLength(1);
+    expect(result.selectedProfile.executionProfileId).toBe('provider-0:gpt-5.4-mini:responses');
+    expect(result.providerCandidateEstimates).toHaveLength(10);
+  });
+
+  it("does not let an unhealthy cheap Profile represent its model", () => {
+    const modelProfiles = [
+      { ...profiles[0], economics: { ...modelEconomicsFixture(0.01) }, health: "cooldown" as const },
+      { ...profiles[0], executionProfileId: "healthy:gpt-5.4-mini:responses", channel: "healthy", economics: { ...modelEconomicsFixture(2) }, health: "healthy" as const },
+    ];
+    const result = routeWithCurrentAcuFormula({
+      judge,
+      judgeCost: 0,
+      inputTokens: 2_000,
+      expectedOutputTokens: 500,
+      effectiveQualityTarget: 70,
+      profiles: modelProfiles,
+      requirements,
+    });
+    expect(result.candidateEstimates).toHaveLength(1);
+    expect(result.providerCandidateEstimates[0].executionProfileId).toBe('healthy:gpt-5.4-mini:responses');
+  });
 });
+
+function modelEconomicsFixture(observedBillingMultiplier: number) {
+  return {
+    providerId: "fixture",
+    displayName: "Fixture",
+    protocol: "responses",
+    baseUrlEnv: "BASE",
+    apiKeyEnv: "KEY",
+    balanceCurrency: "USD-denominated credits" as const,
+    rechargeCashCny: 1,
+    creditsReceivedUsd: 1,
+    observedBillingMultiplier,
+    priceSource: "fixture",
+    priceObservedAt: "2026-01-01",
+    health: "healthy" as const,
+    priority: 1,
+    enabled: true,
+    effectiveCostStatus: "verified" as const,
+    effectiveCostSource: "fixture",
+    effectiveCostVersion: "test-v1",
+  };
+}

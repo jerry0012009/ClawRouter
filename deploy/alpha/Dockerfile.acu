@@ -11,7 +11,7 @@ FROM node:22-alpine
 ARG BUILD_COMMIT_SHA=unknown
 ARG BUILD_TIME=unknown
 ARG BUILD_BRANCH=unknown
-ARG SCHEMA_VERSION=0010_supply_observability
+ARG SCHEMA_VERSION=0011_verified_model_pool_probe
 
 LABEL org.opencontainers.image.revision=$BUILD_COMMIT_SHA \
       org.opencontainers.image.created=$BUILD_TIME

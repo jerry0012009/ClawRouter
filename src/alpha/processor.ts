@@ -53,6 +53,7 @@ export type AlphaProcessorOptions = {
   judgeRunner: AlphaJudgeRunner;
   judgeEconomics?: ProviderEconomics;
   expectedOutputTokens?: number;
+  wakeProbe?: () => void;
 };
 
 export type AlphaResolutionContext = {
@@ -404,33 +405,28 @@ export class AlphaRequestProcessor {
 
   private async effectiveProfiles(): Promise<{ profiles: AlphaExecutionProfile[]; probeClaims: Array<{ scope: "channel" | "profile"; id: string }> }> {
     const repository = new AlphaRepository(this.options.database);
-    const probeClaims: Array<{ scope: "channel" | "profile"; id: string }> = [];
-    const claimedChannels = new Set<string>();
-    const profiles: AlphaExecutionProfile[] = [];
-    for (const profile of this.options.profiles) {
+    const channelIds = this.options.profiles.map((profile) => profile.channelId ?? profile.channel);
+    const executionProfileIds = this.options.profiles.map((profile) => profile.executionProfileId);
+    const [channelHealth, profileHealth] = await Promise.all([
+      repository.batchChannelHealth(channelIds),
+      repository.batchProfileHealth(executionProfileIds),
+    ]);
+    let shouldWakeProbe = false;
+    const profiles = this.options.profiles.map((profile): AlphaExecutionProfile => {
       const channelId = profile.channelId ?? profile.channel;
-      const [channel, runtime] = await Promise.all([
-        repository.channelHealth(channelId),
-        repository.profileHealth(profile.executionProfileId),
-      ]);
-      let channelProbe = false;
-      let profileProbe = false;
-      if (channel && (channel.state === "open" || channel.state === "half_open")) {
-        channelProbe = claimedChannels.has(channelId) || await repository.claimHalfOpenProbe("channel", channelId);
-        if (channelProbe && !claimedChannels.has(channelId)) {
-          claimedChannels.add(channelId);
-          probeClaims.push({ scope: "channel", id: channelId });
-        }
-      }
-      if (runtime && (runtime.state === "open" || runtime.state === "half_open")) {
-        profileProbe = await repository.claimHalfOpenProbe("profile", profile.executionProfileId);
-        if (profileProbe) probeClaims.push({ scope: "profile", id: profile.executionProfileId });
-      }
+      const channel = channelHealth.get(channelId);
+      const runtime = profileHealth.get(profile.executionProfileId);
+      const lastSuccessAt = runtime?.lastSuccessAt ?? channel?.lastSuccessAt;
+      const fresh = Boolean(lastSuccessAt && Date.now() - lastSuccessAt.getTime() <= 120 * 60_000);
+      const staleFreshnessRequired = profile.requiresFreshProbe === true && !fresh;
+      if (staleFreshnessRequired || channel?.state === "open" || channel?.state === "half_open"
+        || runtime?.state === "open" || runtime?.state === "half_open") shouldWakeProbe = true;
       const unavailable = channel?.state === "disabled" || runtime?.state === "disabled"
-        || ((channel?.state === "open" || channel?.state === "half_open") && !channelProbe)
-        || ((runtime?.state === "open" || runtime?.state === "half_open") && !profileProbe);
-      const degraded = channelProbe || profileProbe || [channel?.state, runtime?.state].some((state) => state === "degraded");
-      profiles.push({
+        || channel?.state === "open" || channel?.state === "half_open"
+        || runtime?.state === "open" || runtime?.state === "half_open"
+        || staleFreshnessRequired;
+      const degraded = [channel?.state, runtime?.state].some((state) => state === "degraded");
+      return {
         ...profile,
         health: unavailable ? "cooldown" as const : degraded ? "degraded" as const : profile.health,
         usageTrusted: runtime?.usageTrusted ?? profile.usageTrusted,
@@ -448,9 +444,10 @@ export class AlphaRequestProcessor {
           || profile.webSearchLastVerifiedAt,
         webSearchFailureReason: stringValue(runtime?.metadata?.webSearchFailureReason)
           || profile.webSearchFailureReason,
-      });
-    }
-    return { profiles, probeClaims };
+      };
+    });
+    if (shouldWakeProbe) this.options.wakeProbe?.();
+    return { profiles, probeClaims: [] };
   }
 
   private async releaseUnusedProbeClaims(

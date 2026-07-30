@@ -68,6 +68,12 @@ export type AlphaExecutionProfile = {
   webSearchObservedLatencyMs?: number;
   webSearchLastVerifiedAt?: string;
   webSearchFailureReason?: string;
+  modelVendor?: string;
+  modelCategory?: "text_agent" | "image" | "audio" | "realtime" | "unsupported";
+  capabilityTier?: "LUNA" | "TERRA" | "SOL" | "FRONTIER";
+  verificationStatus?: "discovered" | "verified_provisional" | "verified" | "rejected";
+  autoRouteEnabled?: boolean;
+  requiresFreshProbe?: boolean;
 };
 
 export type AlphaRouteRequirements = {
@@ -234,6 +240,11 @@ function exclusionReasons(
 ): string[] {
   const reasons: string[] = [];
   if (!profile.enabled) reasons.push("disabled");
+  if (profile.autoRouteEnabled === false) reasons.push("auto_route_disabled");
+  if (profile.modelCategory && profile.modelCategory !== "text_agent") reasons.push("model_category");
+  if (profile.verificationStatus && !["verified", "verified_provisional"].includes(profile.verificationStatus)) {
+    reasons.push("model_unverified");
+  }
   if (!profile.administratorAllowed) reasons.push("administrator_policy");
   if (!profile.protocols.includes(requirements.protocol)) reasons.push("native_protocol");
   if (requirements.requireTools && !profile.toolCallSupport) reasons.push("tool_call_support");

@@ -115,7 +115,7 @@ export type AttemptRecord = {
   attemptId: string;
   logicalRequestId: string;
   attemptIndex: number;
-  attemptKind: "provider" | "judge";
+  attemptKind: "provider" | "judge" | "probe";
   retryOwner: string;
   provider: string;
   status: string;
@@ -974,6 +974,15 @@ export class AlphaRepository {
     return result.rows[0] ? healthSnapshot(result.rows[0]) : undefined;
   }
 
+  async batchChannelHealth(channelIds: string[]): Promise<Map<string, HealthSnapshot>> {
+    if (channelIds.length === 0) return new Map();
+    const result = await this.database.query<Record<string, unknown>>(
+      "SELECT * FROM acu_channel_health WHERE channel_id=ANY($1::text[])",
+      [[...new Set(channelIds)]],
+    );
+    return new Map(result.rows.map((row) => [String(row.channel_id), healthSnapshot(row)]));
+  }
+
   async profileHealth(executionProfileId: string): Promise<(HealthSnapshot & {
     usageTrusted?: boolean;
     actualModelVerified?: boolean;
@@ -991,6 +1000,26 @@ export class AlphaRepository {
       metadata: row.metadata_json as Record<string, unknown> | undefined,
       observedSuccessfulInputTokens: Number(row.observed_successful_input_tokens ?? 0),
     } : undefined;
+  }
+
+  async batchProfileHealth(executionProfileIds: string[]): Promise<Map<string, HealthSnapshot & {
+    usageTrusted?: boolean;
+    actualModelVerified?: boolean;
+    metadata?: Record<string, unknown>;
+    observedSuccessfulInputTokens?: number;
+  }>> {
+    if (executionProfileIds.length === 0) return new Map();
+    const result = await this.database.query<Record<string, unknown>>(
+      "SELECT * FROM acu_provider_model_profile_health WHERE execution_profile_id=ANY($1::text[])",
+      [[...new Set(executionProfileIds)]],
+    );
+    return new Map(result.rows.map((row) => [String(row.execution_profile_id), {
+      ...healthSnapshot(row),
+      usageTrusted: row.usage_trusted === true,
+      actualModelVerified: row.actual_model_verified === true,
+      metadata: row.metadata_json as Record<string, unknown> | undefined,
+      observedSuccessfulInputTokens: Number(row.observed_successful_input_tokens ?? 0),
+    }]));
   }
 
   async claimHalfOpenProbe(scope: "channel" | "profile", id: string): Promise<boolean> {

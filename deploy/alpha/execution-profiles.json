@@ -166,6 +166,7 @@
     "channel": "lucen-cx006-value-dynamic",
     "channelId": "lucen-cx006-value-dynamic",
     "routingGroupName": "cx006-性价比-动态调价-0.06x",
+    "requiresFreshProbe": true,
     "protocols": [
       "responses"
     ],
@@ -218,6 +219,7 @@
     "channel": "lucen-cx006-value-dynamic",
     "channelId": "lucen-cx006-value-dynamic",
     "routingGroupName": "cx006-性价比-动态调价-0.06x",
+    "requiresFreshProbe": true,
     "protocols": [
       "responses"
     ],
@@ -270,6 +272,7 @@
     "channel": "lucen-cx006-value-dynamic",
     "channelId": "lucen-cx006-value-dynamic",
     "routingGroupName": "cx006-性价比-动态调价-0.06x",
+    "requiresFreshProbe": true,
     "protocols": [
       "responses"
     ],

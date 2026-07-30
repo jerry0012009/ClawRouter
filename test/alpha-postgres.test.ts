@@ -32,6 +32,7 @@ run("Alpha PostgreSQL foundation", () => {
     expect(result.rows.map((row) => row.table_name)).toEqual([
       "acu_admission_traces",
       "acu_attempts",
+      "acu_channel_admin_actions",
       "acu_channel_health",
       "acu_events",
       "acu_judge_attempts",
@@ -39,6 +40,7 @@ run("Alpha PostgreSQL foundation", () => {
       "acu_judge_ledger_entries",
       "acu_logical_requests",
       "acu_payloads",
+      "acu_profile_probe_attempts",
       "acu_provider_health",
       "acu_provider_model_profile_health",
       "acu_route_decisions",

@@ -15,7 +15,9 @@ import { cashCnyPerNominalUsd, readProviderEconomicsCatalog, type ProviderEconom
 import { UsageOutboxWorker } from "./usage-outbox.js";
 import { canonicalAdvertisedContextWindow } from "./context-admission.js";
 import { ACU_ROUTING_MODEL_VERSION } from "../acu/config.js";
+import { getAcuModel } from "../acu/catalog.js";
 import { combinedMonitorState, mergeSupplyInventory, monitorRangeSpec, monitorRoutingStatus, type MonitorRange } from "./channel-monitor.js";
+import { AdaptiveProbeWorker } from "./adaptive-probe.js";
 
 export type ConfiguredExecutionProfile = AlphaExecutionProfile & {
   baseUrl?: string;
@@ -75,6 +77,13 @@ function positivePort(value: string | undefined): number {
 function requestBodyBytes(value: string | undefined): number {
   const megabytes = Number.parseInt(value ?? "", 10);
   return (Number.isInteger(megabytes) && megabytes > 0 ? megabytes : 128) * 1024 * 1024;
+}
+
+function capabilityTier(modelId: string): "LUNA" | "TERRA" | "SOL" | "FRONTIER" {
+  if (modelId.includes("terra") || modelId.includes("sonnet")) return "TERRA";
+  if (modelId.includes("sol")) return "SOL";
+  if (modelId.includes("5.5") || modelId.includes("opus")) return "FRONTIER";
+  return "LUNA";
 }
 
 function validateProfile(value: unknown, index: number): ConfiguredExecutionProfile {
@@ -186,6 +195,12 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
       webSearchObservedLatencyMs: profile.webSearchObservedLatencyMs,
       webSearchLastVerifiedAt: profile.webSearchLastVerifiedAt,
       webSearchFailureReason: profile.webSearchFailureReason,
+      modelVendor: profile.modelVendor ?? getAcuModel(profile.modelId)?.provider,
+      modelCategory: profile.modelCategory ?? "text_agent",
+      capabilityTier: profile.capabilityTier ?? "LUNA",
+      verificationStatus: profile.verificationStatus ?? "verified",
+      autoRouteEnabled: profile.autoRouteEnabled ?? true,
+      requiresFreshProbe: profile.requiresFreshProbe ?? false,
     };
     const endpoints = [
       { endpoint: new URL(baseUrl).host, baseUrl },
@@ -222,14 +237,23 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
     rulesDecision: rulesFallbackDecision(),
     backupCashCnyPerNominalUsd: judgeEconomics ? cashCnyPerNominalUsd(judgeEconomics) : undefined,
   });
+  const adapterMap = new Map(profiles.map((item) => [item.profile.executionProfileId, item.adapter]));
+  const adaptiveProbe = new AdaptiveProbeWorker({
+    database,
+    profiles: profiles.map((item) => item.profile),
+    adapters: adapterMap,
+    dailyBudgetCny: Number(process.env.ACU_PROBE_DAILY_BUDGET_CNY ?? "0.05"),
+  });
   const processor = new AlphaRequestProcessor({
     database,
     profiles: profiles.map((item) => item.profile),
-    adapters: new Map(profiles.map((item) => [item.profile.executionProfileId, item.adapter])),
+    adapters: adapterMap,
     networkAdapters: new Map(profiles.map((item) => [item.profile.executionProfileId, item.adapters])),
     judgeRunner,
     judgeEconomics,
+    wakeProbe: () => adaptiveProbe.wake(),
   });
+  adaptiveProbe.start();
   const repository = new AlphaRepository(database);
   const usageOutbox = new UsageOutboxWorker({
     repository,
@@ -288,7 +312,7 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
             (bucket,provider,channel,canonical_model),
             (bucket,provider,channel,canonical_model,execution_profile_id)
           ) ORDER BY bucket,scope_type,scope_id`;
-        const [channels, profileHealth, attempts, history, cooldowns, adminPauses] = await Promise.all([
+        const [channels, profileHealth, attempts, history, cooldowns, adminPauses, probes] = await Promise.all([
           database.query<Record<string, unknown>>("SELECT * FROM acu_channel_health ORDER BY provider_id,channel_id"),
           database.query<Record<string, unknown>>("SELECT * FROM acu_provider_model_profile_health ORDER BY canonical_model_id,provider_id,channel_id"),
           database.query<Record<string, unknown>>(
@@ -324,14 +348,28 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
              FROM acu_channel_admin_actions WHERE created_at>=now()-$1::interval`,
             [interval],
           ),
+          database.query<Record<string, unknown>>(
+            `WITH latest AS (
+               SELECT DISTINCT ON (execution_profile_id) execution_profile_id,started_at,status,latency_ms,cost_cny
+               FROM acu_profile_probe_attempts ORDER BY execution_profile_id,started_at DESC
+             ), daily AS (
+               SELECT execution_profile_id,sum(cost_cny) daily_spend,
+                 count(*)::int probe_count,count(*) FILTER (WHERE status='success')::int probe_success_count
+               FROM acu_profile_probe_attempts WHERE started_at>=date_trunc('day',now()) GROUP BY execution_profile_id
+             ) SELECT latest.*,coalesce(daily.daily_spend,0) daily_spend,
+               coalesce(daily.probe_count,0) probe_count,coalesce(daily.probe_success_count,0) probe_success_count
+             FROM latest LEFT JOIN daily USING(execution_profile_id)`,
+          ),
         ]);
         const healthByChannel = new Map(channels.rows.map((row) => [String(row.channel_id), row]));
         const healthByProfile = new Map(profileHealth.rows.map((row) => [String(row.execution_profile_id), row]));
         const aggregateByProfile = new Map(attempts.rows.map((row) => [String(row.execution_profile_id), row]));
+        const probeByProfile = new Map(probes.rows.map((row) => [String(row.execution_profile_id), row]));
         const publicProfiles = serviceConfig.profiles.map((profile) => {
           const channel = healthByChannel.get(profile.channelId ?? profile.channel) ?? {};
           const runtime = healthByProfile.get(profile.executionProfileId) ?? {};
           const aggregate = aggregateByProfile.get(profile.executionProfileId) ?? {};
+          const probe = probeByProfile.get(profile.executionProfileId) ?? {};
           const routingEligibility = monitorRoutingStatus(profile, channel, runtime);
           let endpointHost = "";
           try {
@@ -363,8 +401,50 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
             lastError: channel.error_class ?? runtime.error_class,
             lastSuccessAt: channel.last_success_at ?? runtime.last_success_at,
             cooldownUntil: channel.cooldown_until ?? runtime.cooldown_until,
+            requiresFreshProbe: profile.requiresFreshProbe === true,
+            lastProbeAt: probe.started_at,
+            probeStatus: probe.status,
+            probeLatencyMs: probe.latency_ms,
+            probeCostCny: probe.cost_cny,
+            probeDailySpendCny: probe.daily_spend ?? 0,
+            probeSuccessRate: Number(probe.probe_count ?? 0) > 0
+              ? Number(probe.probe_success_count ?? 0) / Number(probe.probe_count) : null,
+            probeFreshness: profile.requiresFreshProbe
+              ? probe.started_at && Date.now() - new Date(String(probe.started_at)).getTime() <= 120 * 60_000 ? "fresh" : "stale"
+              : "not_required",
+            nextEligibleProbeAt: probe.started_at
+              ? new Date(new Date(String(probe.started_at)).getTime() + 120 * 60_000).toISOString() : null,
           };
         });
+        const activeModelPool = [...new Set(serviceConfig.profiles.map((profile) => profile.modelId))]
+          .map((modelId) => {
+            const catalog = getAcuModel(modelId);
+            const modelProfiles = publicProfiles.filter((profile) => profile.canonicalModel === modelId);
+            const activeProfiles = modelProfiles.filter((profile) => profile.enabled && profile.administratorAllowed);
+            const healthyProfiles = activeProfiles.filter((profile) => profile.routingEligibility === "eligible");
+            const ordered = [...healthyProfiles].sort((left, right) =>
+              Number(left.multiplier ?? Number.POSITIVE_INFINITY) - Number(right.multiplier ?? Number.POSITIVE_INFINITY));
+            const best = ordered[0];
+            const backup = ordered.find((profile) => profile.provider !== best?.provider) ?? ordered[1];
+            return {
+              modelId,
+              vendor: catalog?.provider ?? "Unknown",
+              modelCategory: "text_agent",
+              capabilityTier: capabilityTier(modelId),
+              protocols: [...new Set(activeProfiles.flatMap((profile) => profile.protocol))],
+              verificationStatus: activeProfiles.length > 0 ? "verified" : "discovered",
+              activeProfileCount: activeProfiles.length,
+              healthyProfileCount: healthyProfiles.length,
+              independentProviderCount: new Set(activeProfiles.map((profile) => profile.provider)).size,
+              currentBestChannel: best?.channel ?? null,
+              currentMultiplier: best?.multiplier ?? null,
+              backupChannel: backup?.channel ?? null,
+              autoRouteEnabled: activeProfiles.length > 0,
+              exclusionReason: healthyProfiles.length > 0
+                ? null : [...new Set(activeProfiles.map((profile) => profile.routingEligibility))].join(",") || "no_active_profile",
+              profiles: modelProfiles,
+            };
+          });
         let supplyInventory: Array<Record<string, unknown>> = [];
         try {
           const [discovery, preflight] = await Promise.all([
@@ -375,6 +455,34 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
         } catch {
           /* inventory is optional at runtime */
         }
+        const activeModelIds = new Set(activeModelPool.map((model) => model.modelId));
+        const discoveredModelIds = [...new Set(supplyInventory
+          .map((row) => String(row.canonicalModel ?? ""))
+          .filter(Boolean))];
+        const modelPool = [
+          ...activeModelPool,
+          ...discoveredModelIds.filter((modelId) => !activeModelIds.has(modelId)).map((modelId) => {
+            const catalog = getAcuModel(modelId);
+            const discovered = supplyInventory.filter((row) => row.canonicalModel === modelId);
+            return {
+              modelId,
+              vendor: catalog?.provider ?? "Unknown",
+              modelCategory: "text_agent",
+              capabilityTier: "LUNA",
+              protocols: [...new Set(discovered.map((row) => String(row.protocol ?? "")).filter(Boolean))],
+              verificationStatus: "rejected",
+              activeProfileCount: 0,
+              healthyProfileCount: 0,
+              independentProviderCount: new Set(discovered.map((row) => String(row.providerId ?? ""))).size,
+              currentBestChannel: null,
+              currentMultiplier: null,
+              backupChannel: null,
+              autoRouteEnabled: false,
+              exclusionReason: "minimum_validation_not_passed",
+              profiles: [],
+            };
+          }),
+        ];
         const activeStateIntervals = channels.rows.flatMap((channel) => {
           const state = String(channel.circuit_state ?? "");
           if (state !== "open" && state !== "half_open") return [];
@@ -399,6 +507,7 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
           history: history.rows,
           cooldownIntervals: [...cooldowns.rows, ...adminPauses.rows, ...activeStateIntervals],
           supplyInventory,
+          modelPool,
           generatedAt: new Date().toISOString(),
         };
       },

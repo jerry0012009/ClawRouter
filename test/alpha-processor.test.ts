@@ -220,6 +220,14 @@ run("Alpha PostgreSQL request processor", () => {
       ...profile,
       executionProfileId: "test:gpt-5.4-mini:recovery",
       channel: "test-recovery-channel",
+      provider: "lucen",
+    };
+    profile.provider = "lucen";
+    const crossProviderRecoveryProfile: AlphaExecutionProfile = {
+      ...profile,
+      executionProfileId: "test:gpt-5.4-mini:cross-provider-recovery",
+      channel: "test-cross-provider-channel",
+      provider: "blackai",
     };
     const judgeRunner: AlphaJudgeRunner = {
       async run(input) {
@@ -270,10 +278,11 @@ run("Alpha PostgreSQL request processor", () => {
     };
     const processor = new AlphaRequestProcessor({
       database,
-      profiles: [profile, recoveryProfile],
+      profiles: [profile, recoveryProfile, crossProviderRecoveryProfile],
       adapters: new Map([
         [profile.executionProfileId, adapter],
         [recoveryProfile.executionProfileId, adapter],
+        [crossProviderRecoveryProfile.executionProfileId, adapter],
       ]),
       judgeRunner,
     });
@@ -371,10 +380,10 @@ run("Alpha PostgreSQL request processor", () => {
        FROM acu_route_decisions LIMIT 1`,
     );
     expect(routeEvidence.rows[0]).toEqual({
-      configured_profiles: "2",
-      protocol_profiles: "2",
+      configured_profiles: "3",
+      protocol_profiles: "3",
       initial_models: "1",
-      filtered_profiles: "2",
+      filtered_profiles: "3",
       filtered_models: "1",
       pareto_models: "1",
       excluded_profiles: [],
@@ -416,7 +425,7 @@ run("Alpha PostgreSQL request processor", () => {
     });
   });
 
-  it("creates a new Segment and Judges the human message '继续' with full history", async () => {
+  it("creates a new Segment for '继续' and treats a new trusted request identity as a new execution", async () => {
     const history = [
       { type: "message", role: "user", content: [{ type: "input_text", text: "Fix the bug" }] },
       { type: "function_call", call_id: "call-1", name: "exec_command", arguments: "{\"cmd\":\"pwd\"}" },
@@ -433,14 +442,15 @@ run("Alpha PostgreSQL request processor", () => {
     expect(counts.rows[0]).toEqual({ segments: "2", active: "1", judges: "2" });
 
     const replay = await send({ model: "acu-auto", input: history, stream: true }, "request-3-replayed");
-    expect(replay).toBe(firstResponse);
+    expect(replay).not.toBe(firstResponse);
+    expect(replay).toContain('"type":"response.completed"');
     expect(judgeCalls).toBe(2);
     const replayCounts = await database.query<{ attempts: string; requests: string; usage: string }>(
       `SELECT (SELECT count(*) FROM acu_attempts) attempts,
        (SELECT count(*) FROM acu_logical_requests) requests,
        (SELECT count(*) FROM acu_usage_reports) usage`,
     );
-    expect(replayCounts.rows[0]).toEqual({ attempts: "3", requests: "3", usage: "3" });
+    expect(replayCounts.rows[0]).toEqual({ attempts: "4", requests: "4", usage: "4" });
   });
 
   it("executes an explicit model with Judge=0 and no model substitution", async () => {
@@ -695,6 +705,59 @@ run("Alpha PostgreSQL request processor", () => {
     const retriedBodies = upstreamBodies.filter((item) => item.test_case === "retry-once");
     expect(retriedBodies).toHaveLength(2);
     expect(retriedBodies[0]).toEqual(retriedBodies[1]);
+  });
+
+  it("uses a different Provider for the third same-model Channel after two Lucen failures", async () => {
+    await database.query("DELETE FROM acu_channel_health WHERE channel_id IN ('test-channel','test-recovery-channel','test-cross-provider-channel')");
+    await database.query(
+      "DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id IN ('test:gpt-5.4-mini:responses','test:gpt-5.4-mini:recovery','test:gpt-5.4-mini:cross-provider-recovery')",
+    );
+    const beforeJudge = judgeCalls;
+    await send({
+      model: "acu-auto",
+      input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "Three channel recovery" }] }],
+      stream: true,
+      test_case: "retry-twice",
+      test_failures_before_success: 2,
+      test_failure_status: 502,
+    }, "retry-three-channel", "user-three-channel");
+    expect(judgeCalls).toBe(beforeJudge + 1);
+    const attempts = await database.query<{
+      attempt_index: number; provider: string; channel: string; status: string;
+    }>(
+      `SELECT attempt_index,provider,channel,status FROM acu_attempts
+       WHERE logical_request_id=(SELECT logical_request_id FROM acu_logical_requests WHERE newapi_user_id='user-three-channel')
+       ORDER BY attempt_index`,
+    );
+    expect(attempts.rows).toEqual([
+      { attempt_index: 1, provider: "lucen", channel: "test-channel", status: "error" },
+      { attempt_index: 2, provider: "lucen", channel: "test-recovery-channel", status: "error" },
+      { attempt_index: 3, provider: "blackai", channel: "test-cross-provider-channel", status: "success" },
+    ]);
+    const requestCount = await database.query<{ count: string }>(
+      "SELECT count(*) FROM acu_logical_requests WHERE newapi_user_id='user-three-channel'",
+    );
+    expect(requestCount.rows[0].count).toBe("1");
+  });
+
+  it("treats identical bodies with different trusted New API identities as distinct requests", async () => {
+    const userId = "user-distinct-request-identity";
+    const body = {
+      model: "acu-auto",
+      input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "Same body, new user action" }] }],
+      stream: true,
+    };
+    await send(body, "distinct-request-1", userId);
+    await send(body, "distinct-request-2", userId);
+    const requests = await database.query<{ count: string; logs: string[] }>(
+      `SELECT count(*)::text count,array_agg(newapi_log_id ORDER BY newapi_log_id) logs
+       FROM acu_logical_requests WHERE newapi_user_id=$1`,
+      [userId],
+    );
+    expect(requests.rows[0]).toEqual({
+      count: "2",
+      logs: ["log-distinct-request-1", "log-distinct-request-2"],
+    });
   });
 
   it("keeps a Web-specific 422 out of normal Profile health and falls back within the same model", async () => {

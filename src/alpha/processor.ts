@@ -20,7 +20,7 @@ import type { AlphaGatewayTrace, AlphaIngressContext, AlphaExecutionResolution }
 import type { NativeProviderAdapter } from "./provider.js";
 import type { TrustedNewApiIdentity } from "./trusted-identity.js";
 import { parseProviderUsage } from "./usage.js";
-import { getAcuModel } from "../acu/catalog.js";
+import { buildModelCurve, getAcuModel } from "../acu/catalog.js";
 import { cashCnyPerNominalUsd, providerCostBreakdown, type ProviderEconomics } from "./provider-economics.js";
 import {
   createRecoveringProviderAdapter,
@@ -105,6 +105,9 @@ export type AlphaResolutionContext = {
     providerSelectionReason?: string;
     selectedProvider?: string;
   };
+  phase?: string;
+  judgeExplanation?: string;
+  routeDecisionSnapshot?: JsonObject;
 };
 
 type PreparedState = {
@@ -1161,6 +1164,13 @@ export class AlphaRequestProcessor {
           exclusionReason: null,
         };
       }),
+      curves: Object.fromEntries(route.candidateEstimates.flatMap((candidate) => {
+        const model = getAcuModel(candidate.modelId);
+        return model ? [[candidate.modelId, buildModelCurve(model).map((point) => ({
+          difficulty: point.difficultyScore,
+          estimatedQuality: point.estimatedQuality * 100,
+        }))]] : [];
+      })),
       excludedProfiles: route.excludedProfiles.map((profile) => ({
         executionProfileId: profile.executionProfileId,
         exclusionReason: exclusionCategory(profile.reasons[0] ?? "adapter"),
@@ -1531,13 +1541,18 @@ export class AlphaRequestProcessor {
     const repository = new AlphaRepository(this.options.database);
     const ingressIdempotencyKey = sha256([
       identity.newapiUserId,
-      state.sessionId,
-      envelope.protocol,
-      envelope.historyHash,
-      envelope.requestedModel,
+      identity.newapiLogId,
+      identity.requestId,
     ].join("\n"));
+    await repository.abandonStaleLogicalRequest(identity.newapiUserId, ingressIdempotencyKey);
     const requestedLogicalRequestId = alphaId("req");
-    const logical = await repository.createLogicalRequest({
+    const replayableLogical = await repository.getReplayableLogicalRequest(
+      identity.newapiUserId,
+      ingressIdempotencyKey,
+    );
+    const logical = replayableLogical
+      ? { logicalRequestId: String(replayableLogical.logical_request_id), inserted: false }
+      : await repository.createLogicalRequest({
       logicalRequestId: requestedLogicalRequestId,
       newapiUserId: identity.newapiUserId,
       newapiTokenId: identity.newapiTokenId,
@@ -1552,6 +1567,9 @@ export class AlphaRequestProcessor {
       hadTools: envelope.tools.length > 0,
       metadata: {
         requestId: identity.requestId,
+        newapiLogId: identity.newapiLogId,
+        requestBodySha256: identity.bodySha256,
+        requestIdentityVersion: "trusted-request-instance-v1",
         reasoningEffort: envelope.reasoningEffort,
         clientDeclaredWebTool: envelope.clientDeclaredWebTool,
         webIntent: envelope.webIntent,
@@ -1561,8 +1579,9 @@ export class AlphaRequestProcessor {
         webIntentSource: envelope.webIntentSource,
         webActuallyInvoked: false,
       },
-    });
-    const logicalRow = await repository.getLogicalRequest(logical.logicalRequestId, identity.newapiUserId);
+      });
+    const logicalRow = replayableLogical
+      ?? await repository.getLogicalRequest(logical.logicalRequestId, identity.newapiUserId);
     if (!logical.inserted && logicalRow?.status === "completed" && stringValue(logicalRow.response_payload_id)) {
       const payload = await repository.getPayload(String(logicalRow.response_payload_id), identity.newapiUserId);
       if (payload) {
@@ -1612,6 +1631,8 @@ export class AlphaRequestProcessor {
             webSearchEventStatus: [],
             webToolPruned: false,
             webFallbackChain: [],
+            phase: stringValue(replaySegment?.phase),
+            routeDecisionSnapshot: replayStoredRoute,
             routeSummary: routeDisplaySummary(
               envelope.requestedModel,
               replayProfile.modelId,
@@ -1682,9 +1703,7 @@ export class AlphaRequestProcessor {
       ? await repository.getRouteDecision(routeDecisionId, identity.newapiUserId)
       : undefined;
     const attemptIndex = await repository.nextProviderAttemptIndex(logical.logicalRequestId);
-    const maxProviderAttempts = Math.max(2, Math.min(8,
-      this.options.profiles.filter((profile) => profile.modelId === result.profile.modelId).length
-      + this.endpoints(result.profile).length - 1));
+    const maxProviderAttempts = 3;
     if (attemptIndex > maxProviderAttempts) throw new Error("Provider Attempt budget exhausted for logical request");
     let requestPayloadId: string | undefined;
     if (logical.inserted) {
@@ -1761,6 +1780,9 @@ export class AlphaRequestProcessor {
       webToolPruned: prepared.webToolPruned,
       webToolPruneReason: prepared.pruneReason,
       webFallbackChain: [],
+      phase: state.decision.phase,
+      judgeExplanation: result.judge?.judge.explanation,
+      routeDecisionSnapshot: storedRoute,
       routeSummary: routeDisplaySummary(
         envelope.requestedModel,
         result.profile.modelId,
@@ -1776,14 +1798,32 @@ export class AlphaRequestProcessor {
       isRecoverableResponse: (response) => isWebSearchProviderError(response, envelope.webIntent),
       selectRecoveryTarget: (() => {
         const attemptedProfiles = new Set([result.profile.executionProfileId]);
+        const attemptedProviders = [result.profile.provider];
+        const recoveryPool = (result.route?.providerCandidateEstimates ?? [])
+          .filter((candidate) => candidate.health === "healthy" && candidate.usageTrusted)
+          .map((candidate) => this.options.profiles.find((profile) => (
+            profile.executionProfileId === candidate.executionProfileId
+          )))
+          .filter((profile): profile is AlphaExecutionProfile => Boolean(profile));
         return (current): ProviderRecoveryTarget | undefined => {
           const nextEndpoint = (current.networkEndpointIndex ?? 0) + 1;
           if (nextEndpoint < this.endpoints(current.profile).length) {
             return { profile: current.profile, networkEndpointIndex: nextEndpoint, reason: "network_endpoint_fallback" };
           }
-          const profile = this.recoveryProfile(current.profile, envelope, mode, attemptedProfiles);
+          const preferDifferentProvider = current.attemptIndex >= 2
+            && attemptedProviders.every((provider) => provider === attemptedProviders[0]);
+          const eligible = recoveryPool.filter((profile) => !attemptedProfiles.has(profile.executionProfileId));
+          const profile = (current.attemptIndex === 1
+            ? eligible.find((candidate) => candidate.provider === current.profile.provider)
+            : undefined)
+            ?? (preferDifferentProvider
+            ? eligible.find((candidate) => candidate.provider !== attemptedProviders[0])
+            : undefined)
+            ?? eligible[0]
+            ?? this.recoveryProfile(current.profile, envelope, mode, attemptedProfiles);
           if (!profile) return undefined;
           attemptedProfiles.add(profile.executionProfileId);
+          attemptedProviders.push(profile.provider);
           return { profile, networkEndpointIndex: 0, reason: "same_model_channel_fallback" };
         };
       })(),
@@ -1894,6 +1934,48 @@ export class AlphaRequestProcessor {
          AND provider_billed=true AND actual_cost_usd>0`,
       [input.context.logicalRequestId],
     );
+    const channelAttempts = await this.options.database.query<{
+      attempt_index: number;
+      provider: string;
+      channel: string | null;
+      execution_profile_id: string | null;
+      status: string;
+      error_category: string | null;
+      http_status: number | null;
+      latency_ms: number | null;
+      started_at: Date;
+      completed_at: Date | null;
+      actual_cost_usd: string;
+    }>(
+      `SELECT attempt_index,provider,channel,execution_profile_id,status,error_category,http_status,
+              latency_ms,started_at,completed_at,actual_cost_usd
+       FROM acu_attempts WHERE logical_request_id=$1 AND attempt_kind='provider'
+       ORDER BY attempt_index`,
+      [input.context.logicalRequestId],
+    );
+    const savedRoute = input.context.routeDecisionSnapshot;
+    const savedCandidates = Array.isArray(savedRoute?.candidate_estimates_json)
+      ? savedRoute.candidate_estimates_json.map(record).filter((item): item is JsonObject => Boolean(item))
+      : [];
+    const savedFormulaInputs = record(savedRoute?.formula_inputs_json);
+    const savedDecisionSnapshot = record(savedFormulaInputs?.decisionSnapshot);
+    const routeDecisionView = savedRoute ? {
+      route_decision_id: savedRoute.route_decision_id,
+      phase: input.context.phase,
+      curve_version: savedRoute.quality_curve_version,
+      price_version: savedRoute.price_version,
+      routing_formula_version: savedRoute.routing_model_version,
+      difficulty: input.context.routeSummary.difficulty,
+      routing_preference: input.context.routeSummary.routingPreference,
+      effective_quality_target: savedRoute.effective_quality_target,
+      candidate_estimates: savedCandidates,
+      pareto_frontier: savedRoute.pareto_frontier_json,
+      selected_profile: savedRoute.selected_profile_json,
+      route_explanation: savedRoute.route_explanation,
+      excluded_profiles: savedFormulaInputs?.excludedProfiles,
+      decision_snapshot: savedDecisionSnapshot,
+      curves: savedDecisionSnapshot?.curves,
+    } : undefined;
     const failedBilledCostUsd = failedAttempts.rows
       .reduce((total, attempt) => total + Number(attempt.actual_cost_usd), 0);
     const failedAttemptCashCostCny = failedAttempts.rows.reduce((total, attempt) => {
@@ -1994,6 +2076,22 @@ export class AlphaRequestProcessor {
         fallback_chain: input.context.routeSummary.providerSelectionReason?.includes("fallback")
           ? input.context.routeSummary.providerSelectionReason
           : undefined,
+        phase: input.context.phase,
+        judge_explanation: input.context.judgeExplanation,
+        route_decision: routeDecisionView,
+        channel_attempts: channelAttempts.rows.map((attempt) => ({
+          attempt_index: attempt.attempt_index,
+          provider: attempt.provider,
+          channel: attempt.channel,
+          execution_profile_id: attempt.execution_profile_id,
+          status: attempt.status,
+          error_category: attempt.error_category,
+          http_status: attempt.http_status,
+          latency_ms: attempt.latency_ms,
+          started_at: attempt.started_at,
+          completed_at: attempt.completed_at,
+          nominal_cost_usd: Number(attempt.actual_cost_usd),
+        })),
         client_declared_web_tool: input.context.clientDeclaredWebTool,
         web_intent: input.context.webIntent,
         web_intent_confidence: input.context.webIntentConfidence,

@@ -549,9 +549,10 @@ export class AlphaRepository {
       `INSERT INTO acu_logical_requests
        (logical_request_id,newapi_user_id,newapi_token_id,newapi_log_id,session_id,task_id,segment_id,
         ingress_idempotency_key,request_protocol,requested_model,request_payload_id,selected_profile_id,
-        status,had_tools,streaming,started_at,metadata_json)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,now(),$16)
-       ON CONFLICT (newapi_user_id,ingress_idempotency_key) DO NOTHING RETURNING logical_request_id`,
+        status,had_tools,streaming,started_at,updated_at,processing_lease_expires_at,metadata_json)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,now(),now(),now()+interval '10 minutes',$16)
+       ON CONFLICT (newapi_user_id,ingress_idempotency_key) WHERE status='pending'
+       DO NOTHING RETURNING logical_request_id`,
       [input.logicalRequestId, input.newapiUserId, input.newapiTokenId ?? null,
         input.newapiLogId ?? null, input.sessionId, input.taskId, input.segmentId,
         input.ingressIdempotencyKey, input.requestProtocol, input.requestedModel,
@@ -560,10 +561,47 @@ export class AlphaRepository {
     );
     if (result.rowCount === 1) return { logicalRequestId: input.logicalRequestId, inserted: true };
     const existing = await this.database.query<{ logical_request_id: string }>(
-      "SELECT logical_request_id FROM acu_logical_requests WHERE newapi_user_id=$1 AND ingress_idempotency_key=$2",
+      `SELECT logical_request_id FROM acu_logical_requests
+       WHERE newapi_user_id=$1 AND ingress_idempotency_key=$2 AND status='pending'
+       ORDER BY started_at DESC LIMIT 1`,
       [input.newapiUserId, input.ingressIdempotencyKey],
     );
     return { logicalRequestId: existing.rows[0].logical_request_id, inserted: false };
+  }
+
+  async abandonStaleLogicalRequest(newapiUserId: string, ingressIdempotencyKey: string): Promise<string | undefined> {
+    const result = await this.database.query<{ logical_request_id: string }>(
+      `UPDATE acu_logical_requests r
+       SET status='abandoned',completed_at=now(),updated_at=now(),abandoned_at=now(),
+           error_category='stale_processing',
+           metadata_json=r.metadata_json || jsonb_build_object(
+             'staleProcessingRecovered',true,
+             'staleProcessingRecoveredAt',now(),
+             'staleProcessingRecoveryVersion','active-request-lease-v1')
+       WHERE r.newapi_user_id=$1 AND r.ingress_idempotency_key=$2 AND r.status='pending'
+         AND r.processing_lease_expires_at <= now()
+         AND NOT EXISTS (
+           SELECT 1 FROM acu_attempts a
+           WHERE a.logical_request_id=r.logical_request_id AND a.status='started')
+       RETURNING r.logical_request_id`,
+      [newapiUserId, ingressIdempotencyKey],
+    );
+    return result.rows[0]?.logical_request_id;
+  }
+
+  async getReplayableLogicalRequest(
+    newapiUserId: string,
+    ingressIdempotencyKey: string,
+  ): Promise<Record<string, unknown> | undefined> {
+    const result = await this.database.query(
+      `SELECT * FROM acu_logical_requests
+       WHERE newapi_user_id=$1 AND ingress_idempotency_key=$2
+         AND (status='completed'
+           OR (status='failed' AND metadata_json ? 'admissionErrorType'))
+       ORDER BY started_at DESC LIMIT 1`,
+      [newapiUserId, ingressIdempotencyKey],
+    );
+    return result.rows[0];
   }
 
   async getLogicalRequest(logicalRequestId: string, newapiUserId: string): Promise<Record<string, unknown> | undefined> {
@@ -576,7 +614,7 @@ export class AlphaRepository {
     value: Record<string, unknown>,
   ): Promise<void> {
     const result = await this.database.query(
-      `UPDATE acu_logical_requests SET metadata_json=metadata_json || $3::jsonb
+      `UPDATE acu_logical_requests SET metadata_json=metadata_json || $3::jsonb,updated_at=now()
        WHERE logical_request_id=$1 AND newapi_user_id=$2`,
       [logicalRequestId, newapiUserId, json(value)],
     );
@@ -679,7 +717,7 @@ export class AlphaRepository {
 
   async attachRequestPayload(logicalRequestId: string, newapiUserId: string, payloadId: string): Promise<void> {
     const result = await this.database.query(
-      `UPDATE acu_logical_requests SET request_payload_id=$3
+      `UPDATE acu_logical_requests SET request_payload_id=$3,updated_at=now()
        WHERE logical_request_id=$1 AND newapi_user_id=$2`,
       [logicalRequestId, newapiUserId, payloadId],
     );
@@ -696,7 +734,8 @@ export class AlphaRepository {
   }): Promise<void> {
     const result = await this.database.query(
       `UPDATE acu_logical_requests SET status=$3,accepted_attempt_id=$4,response_payload_id=$5,
-       error_category=$6,completed_at=now() WHERE logical_request_id=$1 AND newapi_user_id=$2`,
+       error_category=$6,completed_at=now(),updated_at=now(),processing_lease_expires_at=NULL
+       WHERE logical_request_id=$1 AND newapi_user_id=$2`,
       [input.logicalRequestId, input.newapiUserId, input.status, input.acceptedAttemptId ?? null,
         input.responsePayloadId ?? null, input.errorCategory ?? null],
     );

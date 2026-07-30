@@ -102,18 +102,18 @@ describe("RC2.2 Judge cutover", () => {
     }
   });
 
-  it.each([79, 81, 256])("accepts an explanation of %i Unicode code points", (length) => {
+  it.each([79, 81, 256, 4096])("accepts an explanation of %i Unicode code points", (length) => {
     const result = parseJudgeResult(JSON.stringify({ ...validJudgePayload, explanation: "x".repeat(length) }));
     expect(Array.from(result.explanation)).toHaveLength(length);
     expect(result.explanationNormalized).toBe(false);
     expect(result.originalExplanationLength).toBe(length);
   });
 
-  it("truncates explanation beyond 256 without invalidating routing fields", () => {
-    const result = parseJudgeResult(JSON.stringify({ ...validJudgePayload, explanation: "界".repeat(300) }));
-    expect(Array.from(result.explanation)).toHaveLength(256);
-    expect(result.explanationNormalized).toBe(true);
-    expect(result.originalExplanationLength).toBe(300);
+  it("preserves a long explanation without invalidating routing fields", () => {
+    const result = parseJudgeResult(JSON.stringify({ ...validJudgePayload, explanation: "界".repeat(4096) }));
+    expect(Array.from(result.explanation)).toHaveLength(4096);
+    expect(result.explanationNormalized).toBe(false);
+    expect(result.originalExplanationLength).toBe(4096);
     expect(result.difficultyIndex).toBeGreaterThan(0);
     expect(result.webIntent).toBe("not_required");
   });

@@ -57,6 +57,7 @@ run("Alpha PostgreSQL foundation", () => {
     );
     expect(versions.rows.map((row) => row.migration_version)).toContain("0006_rc21_cost_semantics");
     expect(versions.rows.map((row) => row.migration_version)).toContain("0007_rc22_judge_cutover");
+    expect(versions.rows.map((row) => row.migration_version)).toContain("0008_alpha_final_user_loop");
     const columns = await database.query<{ column_name: string }>(
       `SELECT column_name FROM information_schema.columns
        WHERE table_schema='public' AND table_name='acu_usage_reports'`,
@@ -146,6 +147,35 @@ run("Alpha PostgreSQL foundation", () => {
     expect(await repository.createLogicalRequest(request)).toEqual({ logicalRequestId: "req_a_1", inserted: true });
     expect(await repository.createLogicalRequest({ ...request, logicalRequestId: "req_a_2" }))
       .toEqual({ logicalRequestId: "req_a_1", inserted: false });
+  });
+
+  it("releases an expired inactive request lease while preserving active idempotency", async () => {
+    await database.query(
+      "UPDATE acu_logical_requests SET processing_lease_expires_at=now()-interval '1 minute' WHERE logical_request_id='req_a_1'",
+    );
+    expect(await repository.abandonStaleLogicalRequest("user_a", "ingress-1")).toBe("req_a_1");
+    const replacement = {
+      logicalRequestId: "req_a_3",
+      newapiUserId: "user_a",
+      sessionId: "ses_user_a",
+      taskId: "task_user_a",
+      segmentId: "seg_user_a_1",
+      ingressIdempotencyKey: "ingress-1",
+      requestProtocol: "responses" as const,
+      requestedModel: "acu-auto",
+      streaming: true,
+    };
+    expect(await repository.createLogicalRequest(replacement))
+      .toEqual({ logicalRequestId: "req_a_3", inserted: true });
+    expect(await repository.createLogicalRequest({ ...replacement, logicalRequestId: "req_a_4" }))
+      .toEqual({ logicalRequestId: "req_a_3", inserted: false });
+    const states = await database.query<{ logical_request_id: string; status: string }>(
+      "SELECT logical_request_id,status FROM acu_logical_requests WHERE ingress_idempotency_key='ingress-1' ORDER BY started_at,logical_request_id",
+    );
+    expect(states.rows).toEqual([
+      { logical_request_id: "req_a_1", status: "abandoned" },
+      { logical_request_id: "req_a_3", status: "pending" },
+    ]);
   });
 
   it("removes secrets before payload persistence", async () => {

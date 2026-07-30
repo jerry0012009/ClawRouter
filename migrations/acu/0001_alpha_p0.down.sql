@@ -2,6 +2,7 @@ BEGIN;
 
 DROP VIEW IF EXISTS acu_provider_health;
 DROP TABLE IF EXISTS acu_judge_attempts;
+DROP INDEX IF EXISTS uq_acu_active_trusted_request;
 DROP TABLE IF EXISTS acu_judge_ledger_entries;
 DROP TABLE IF EXISTS acu_admission_traces;
 DROP TABLE IF EXISTS acu_provider_model_profile_health;

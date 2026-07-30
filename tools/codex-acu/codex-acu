@@ -77,6 +77,10 @@ case "${1:-}" in
     test "$(stat -c '%a' "$credential_file")" = "600" || { echo "invalid credential permissions" >&2; exit 1; }
     grep -q '^model = "acu-auto"$' "$acu_home/config.toml"
     grep -q '^model_context_window = 1050000$' "$acu_home/config.toml"
+    grep -q '^model_auto_compact_token_limit = 900000$' "$acu_home/config.toml"
+    catalog_file=$(sed -n 's/^model_catalog_json = "\([^"]*\)"$/\1/p' "$acu_home/config.toml")
+    test -r "$catalog_file" || { echo "model catalog is not readable" >&2; exit 1; }
+    grep -q '"slug": "acu-auto"' "$catalog_file" || { echo "acu-auto model metadata is missing" >&2; exit 1; }
     base_url=$(sed -n 's/^base_url = "\(https:\/\/.*\/v1\)"$/\1/p' "$acu_home/config.toml")
     test -n "$base_url" || { echo "invalid Base URL" >&2; exit 1; }
     provider=$(sed -n 's/^model_provider = "\([^"]*\)"$/\1/p' "$acu_home/config.toml")
@@ -97,6 +101,7 @@ case "${1:-}" in
     echo "base_url: $base_url"
     echo "model_provider: $provider"
     echo "effective model: acu-auto"
+    echo "model catalog: $catalog_file"
     echo "reasoning effort: medium"
     echo "credential loaded: yes"
     echo "native ~/.codex unchanged: $native_unchanged"

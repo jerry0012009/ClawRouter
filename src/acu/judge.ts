@@ -225,7 +225,7 @@ export function buildJudgeSystemPrompt(): string {
     "tool_dependency衡量工具调用、代码执行、检索、多轮Agent行为和环境状态依赖；verification_burden越难通过JSON、测试或明确答案验证则越高；context_burden衡量上下文长度、分散程度和历史依赖。",
     "不要为了简洁默认使用5的倍数。请分别判断各能力需求因子，总难度由后端计算；只有真实判断恰好落在整数或5的倍数时才可输出该值。",
     "概率表达分类不确定性；除极其明确外不要机械输出单档100%，相邻档存在合理可能时应给软概率。原始总分与主要档位应大体一致，但不要求等于概率期望。",
-    "四档概率必须在0到1且总和为1；signals最多5个；explanation不超过256个 Unicode code points。",
+    "四档概率必须在0到1且总和为1；signals最多5个；explanation必须是字符串，长度由整体 Judge max output tokens 控制。",
     "在同一次判断中输出 Web Intent。required 表示完成当前真实目标必须取得实时或外部 Web 信息；likely 表示可能有帮助但不能作为硬条件；not_required 表示当前 Segment 可完全依赖本地工作区、已给上下文和普通工具完成。",
     "Web 判断必须综合当前真实用户目标、最近用户输入、Task/Goal、Plan、Routing Segment 状态和确定性 Web 线索。客户端声明 Web Tool 只表示能力可用，不能直接判为 required。",
     "单独出现 current、latest、today、当前、最新、今天不得判为 required。代码标识符、变量名、文件名、本地日志、Git 分支和本地测试内容中的这些词应判为 not_required。",
@@ -313,10 +313,8 @@ export function parseJudgeResult(text: string): AcuJudgeResult {
   }
   if (typeof parsed.explanation !== "string") throw new Error("Judge explanation must be a string");
   const originalExplanationLength = Array.from(parsed.explanation).length;
-  const explanationNormalized = originalExplanationLength > 256;
-  const explanation = explanationNormalized
-    ? Array.from(parsed.explanation).slice(0, 256).join("")
-    : parsed.explanation;
+  const explanationNormalized = false;
+  const explanation = parsed.explanation;
   if (!["required", "likely", "not_required"].includes(String(parsed.webIntent))) {
     throw new Error("Judge webIntent must be required, likely, or not_required");
   }

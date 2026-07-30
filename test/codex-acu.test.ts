@@ -26,6 +26,9 @@ describe("codex-acu isolated launcher", () => {
     const config = await readFile(join(acuHome, "config.toml"), "utf8");
     expect(config).toContain('model = "acu-auto"');
     expect(config).toContain("model_context_window = 1050000");
+    expect(config).toContain("model_auto_compact_token_limit = 900000");
+    expect(config).toContain(`model_catalog_json = "${acuHome}/model-catalog.json"`);
+    expect(await readFile(join(acuHome, "model-catalog.json"), "utf8")).toContain('"slug": "acu-auto"');
     expect(config).toContain('base_url = "https://acu.example.test/v1"');
     expect(config).toContain('env_key = "ACU_API_KEY"');
     expect(config).not.toContain("test-only-key");

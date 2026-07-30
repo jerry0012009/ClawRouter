@@ -4231,7 +4231,7 @@ function booleanValue(value, fallback = false) {
 }
 function readAcuRuntimeConfig(overrides = {}) {
   const enabled = booleanValue(process.env.ACU_DEMO_ROUTER_ENABLED);
-  return {
+  const config = {
     enabled,
     judgeModel: process.env.ACU_JUDGE_MODEL?.trim() || ACU_DEFAULT_JUDGE_MODEL,
     judgeBaseUrl: process.env.ACU_JUDGE_BASE_URL?.trim() || ACU_DEFAULT_JUDGE_BASE_URL,
@@ -4257,6 +4257,20 @@ function readAcuRuntimeConfig(overrides = {}) {
     judgeEntropyPenalty: Number.isFinite(Number(process.env.ACU_JUDGE_ENTROPY_PENALTY)) ? Math.max(0, Number(process.env.ACU_JUDGE_ENTROPY_PENALTY)) : ACU_DEFAULT_JUDGE_ENTROPY_PENALTY,
     ...overrides
   };
+  if (booleanValue(process.env.ACU_JUDGE_ROLLBACK_TO_BACKUP) && config.backupJudgeModel && config.backupJudgeBaseUrl && config.backupApiKey) {
+    return {
+      ...config,
+      judgeModel: config.backupJudgeModel,
+      judgeBaseUrl: config.backupJudgeBaseUrl,
+      apiKey: config.backupApiKey,
+      judgeProvider: config.backupJudgeProvider ?? "openai_compatible",
+      backupJudgeModel: void 0,
+      backupJudgeBaseUrl: void 0,
+      backupApiKey: void 0,
+      backupJudgeProvider: void 0
+    };
+  }
+  return config;
 }
 
 // src/acu/math.ts
@@ -6599,7 +6613,7 @@ function buildJudgeSystemPrompt() {
     "tool_dependency\u8861\u91CF\u5DE5\u5177\u8C03\u7528\u3001\u4EE3\u7801\u6267\u884C\u3001\u68C0\u7D22\u3001\u591A\u8F6EAgent\u884C\u4E3A\u548C\u73AF\u5883\u72B6\u6001\u4F9D\u8D56\uFF1Bverification_burden\u8D8A\u96BE\u901A\u8FC7JSON\u3001\u6D4B\u8BD5\u6216\u660E\u786E\u7B54\u6848\u9A8C\u8BC1\u5219\u8D8A\u9AD8\uFF1Bcontext_burden\u8861\u91CF\u4E0A\u4E0B\u6587\u957F\u5EA6\u3001\u5206\u6563\u7A0B\u5EA6\u548C\u5386\u53F2\u4F9D\u8D56\u3002",
     "\u4E0D\u8981\u4E3A\u4E86\u7B80\u6D01\u9ED8\u8BA4\u4F7F\u75285\u7684\u500D\u6570\u3002\u8BF7\u5206\u522B\u5224\u65AD\u5404\u80FD\u529B\u9700\u6C42\u56E0\u5B50\uFF0C\u603B\u96BE\u5EA6\u7531\u540E\u7AEF\u8BA1\u7B97\uFF1B\u53EA\u6709\u771F\u5B9E\u5224\u65AD\u6070\u597D\u843D\u5728\u6574\u6570\u62165\u7684\u500D\u6570\u65F6\u624D\u53EF\u8F93\u51FA\u8BE5\u503C\u3002",
     "\u6982\u7387\u8868\u8FBE\u5206\u7C7B\u4E0D\u786E\u5B9A\u6027\uFF1B\u9664\u6781\u5176\u660E\u786E\u5916\u4E0D\u8981\u673A\u68B0\u8F93\u51FA\u5355\u6863100%\uFF0C\u76F8\u90BB\u6863\u5B58\u5728\u5408\u7406\u53EF\u80FD\u65F6\u5E94\u7ED9\u8F6F\u6982\u7387\u3002\u539F\u59CB\u603B\u5206\u4E0E\u4E3B\u8981\u6863\u4F4D\u5E94\u5927\u4F53\u4E00\u81F4\uFF0C\u4F46\u4E0D\u8981\u6C42\u7B49\u4E8E\u6982\u7387\u671F\u671B\u3002",
-    "\u56DB\u6863\u6982\u7387\u5FC5\u987B\u57280\u52301\u4E14\u603B\u548C\u4E3A1\uFF1Bsignals\u6700\u591A5\u4E2A\uFF1Bexplanation\u4E0D\u8D85\u8FC7256\u4E2A Unicode code points\u3002",
+    "\u56DB\u6863\u6982\u7387\u5FC5\u987B\u57280\u52301\u4E14\u603B\u548C\u4E3A1\uFF1Bsignals\u6700\u591A5\u4E2A\uFF1Bexplanation\u5FC5\u987B\u662F\u5B57\u7B26\u4E32\uFF0C\u957F\u5EA6\u7531\u6574\u4F53 Judge max output tokens \u63A7\u5236\u3002",
     "\u5728\u540C\u4E00\u6B21\u5224\u65AD\u4E2D\u8F93\u51FA Web Intent\u3002required \u8868\u793A\u5B8C\u6210\u5F53\u524D\u771F\u5B9E\u76EE\u6807\u5FC5\u987B\u53D6\u5F97\u5B9E\u65F6\u6216\u5916\u90E8 Web \u4FE1\u606F\uFF1Blikely \u8868\u793A\u53EF\u80FD\u6709\u5E2E\u52A9\u4F46\u4E0D\u80FD\u4F5C\u4E3A\u786C\u6761\u4EF6\uFF1Bnot_required \u8868\u793A\u5F53\u524D Segment \u53EF\u5B8C\u5168\u4F9D\u8D56\u672C\u5730\u5DE5\u4F5C\u533A\u3001\u5DF2\u7ED9\u4E0A\u4E0B\u6587\u548C\u666E\u901A\u5DE5\u5177\u5B8C\u6210\u3002",
     "Web \u5224\u65AD\u5FC5\u987B\u7EFC\u5408\u5F53\u524D\u771F\u5B9E\u7528\u6237\u76EE\u6807\u3001\u6700\u8FD1\u7528\u6237\u8F93\u5165\u3001Task/Goal\u3001Plan\u3001Routing Segment \u72B6\u6001\u548C\u786E\u5B9A\u6027 Web \u7EBF\u7D22\u3002\u5BA2\u6237\u7AEF\u58F0\u660E Web Tool \u53EA\u8868\u793A\u80FD\u529B\u53EF\u7528\uFF0C\u4E0D\u80FD\u76F4\u63A5\u5224\u4E3A required\u3002",
     "\u5355\u72EC\u51FA\u73B0 current\u3001latest\u3001today\u3001\u5F53\u524D\u3001\u6700\u65B0\u3001\u4ECA\u5929\u4E0D\u5F97\u5224\u4E3A required\u3002\u4EE3\u7801\u6807\u8BC6\u7B26\u3001\u53D8\u91CF\u540D\u3001\u6587\u4EF6\u540D\u3001\u672C\u5730\u65E5\u5FD7\u3001Git \u5206\u652F\u548C\u672C\u5730\u6D4B\u8BD5\u5185\u5BB9\u4E2D\u7684\u8FD9\u4E9B\u8BCD\u5E94\u5224\u4E3A not_required\u3002",
@@ -6673,8 +6687,8 @@ function parseJudgeResult(text) {
   }
   if (typeof parsed.explanation !== "string") throw new Error("Judge explanation must be a string");
   const originalExplanationLength = Array.from(parsed.explanation).length;
-  const explanationNormalized = originalExplanationLength > 256;
-  const explanation = explanationNormalized ? Array.from(parsed.explanation).slice(0, 256).join("") : parsed.explanation;
+  const explanationNormalized = false;
+  const explanation = parsed.explanation;
   if (!["required", "likely", "not_required"].includes(String(parsed.webIntent))) {
     throw new Error("Judge webIntent must be required, likely, or not_required");
   }

@@ -28,12 +28,16 @@ chmod 700 "$acu_home"
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 cp "$script_dir/codex-acu" "$bin_dir/codex-acu"
 chmod 755 "$bin_dir/codex-acu"
+cp "$script_dir/model-catalog.json" "$acu_home/model-catalog.json"
+chmod 600 "$acu_home/model-catalog.json"
 config_tmp="$acu_home/config.toml.tmp"
 cat >"$config_tmp" <<EOF
 model = "acu-auto"
 model_provider = "acu-founder-alpha"
 model_reasoning_effort = "medium"
 model_context_window = 1050000
+model_auto_compact_token_limit = 900000
+model_catalog_json = "$acu_home/model-catalog.json"
 
 [model_providers.acu-founder-alpha]
 name = "ACU Router Founder Alpha"

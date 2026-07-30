@@ -1,0 +1,36 @@
+{
+  "models": [
+    {
+      "slug": "acu-auto",
+      "display_name": "ACU Auto",
+      "description": "Founder Alpha value router with canonical model and channel failover.",
+      "context_window": 1050000,
+      "max_context_window": 1050000,
+      "auto_compact_token_limit": 900000,
+      "default_reasoning_level": "medium",
+      "supported_reasoning_levels": [
+        {
+          "effort": "medium",
+          "description": "Balanced reasoning for ACU routing and execution"
+        }
+      ],
+      "default_reasoning_summary": "auto",
+      "reasoning_summary_format": "experimental",
+      "shell_type": "shell_command",
+      "apply_patch_tool_type": "freeform",
+      "web_search_tool_type": "text",
+      "truncation_policy": {
+        "mode": "tokens",
+        "limit": 10000
+      },
+      "supports_parallel_tool_calls": true,
+      "input_modalities": [
+        "text",
+        "image"
+      ],
+      "visibility": "list",
+      "supported_in_api": true,
+      "priority": 1
+    }
+  ]
+}

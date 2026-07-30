@@ -40,4 +40,4 @@ codex-acu doctor
 codex-acu workspace [path]
 ```
 
-Before every normal launch, the wrapper verifies that the selected workspace is owned by the current user, writable, accepts a create/delete probe, and is a Git work tree. It then forces Codex sandbox mode to `workspace-write`. A failed workspace gate exits locally before any ACU or Provider request.
+Normal launches preserve native Codex workspace behavior: non-Git directories are allowed, no write probe is created, and the launcher does not force a sandbox mode. Native `-s`/`--sandbox` options pass through unchanged. The optional `codex-acu workspace [path]` command remains available as an explicit writable Git workspace diagnostic.

@@ -28,8 +28,8 @@ afterEach(async () => {
   await Promise.all(paths.splice(0).map((path) => rm(path, { recursive: true, force: true })));
 });
 
-describe("codex-acu local workspace gate", () => {
-  it("forces workspace-write and reaches Codex only for a writable Git repository", async () => {
+describe("codex-acu native workspace behavior", () => {
+  it("starts in a writable Git repository without forcing a sandbox", async () => {
     const value = await fixture();
     const workspace = join(value.root, "work");
     await mkdir(workspace);
@@ -37,16 +37,19 @@ describe("codex-acu local workspace gate", () => {
     await execFileAsync(launcher, ["-C", workspace, "read one file"], {
       env: { ...process.env, CODEX_ACU_HOME: value.acuHome, PATH: `${value.bin}:${process.env.PATH}` },
     });
-    expect(await import("node:fs/promises").then(({ readFile }) => readFile(value.marker, "utf8"))).toContain("--sandbox workspace-write");
+    const argumentsPassed = await import("node:fs/promises").then(({ readFile }) => readFile(value.marker, "utf8"));
+    expect(argumentsPassed).not.toContain("--sandbox");
+    expect(argumentsPassed).toContain(`-C ${workspace}`);
   });
 
-  it("does not invoke Codex for a non-Git workspace", async () => {
+  it("starts in a non-Git directory and passes through the native sandbox option", async () => {
     const value = await fixture();
     const workspace = join(value.root, "not-git");
     await mkdir(workspace);
-    await expect(execFileAsync(launcher, ["-C", workspace, "modify one file"], {
+    await execFileAsync(launcher, ["-C", workspace, "--sandbox", "read-only", "read one file"], {
       env: { ...process.env, CODEX_ACU_HOME: value.acuHome, PATH: `${value.bin}:${process.env.PATH}` },
-    })).rejects.toThrow("directory is not a Git repository");
-    await expect(import("node:fs/promises").then(({ stat }) => stat(value.marker))).rejects.toThrow();
+    });
+    const argumentsPassed = await import("node:fs/promises").then(({ readFile }) => readFile(value.marker, "utf8"));
+    expect(argumentsPassed).toContain(`-C ${workspace} --sandbox read-only`);
   });
 });

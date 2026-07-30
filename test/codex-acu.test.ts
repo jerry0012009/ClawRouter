@@ -56,7 +56,8 @@ describe("codex-acu isolated launcher", () => {
     });
     expect(effective.status).toBe(0);
     expect(effective.stdout).toContain('-m acu-auto -c model_provider="acu-founder-alpha"');
-    expect(effective.stdout).toContain('-c model_reasoning_effort="medium" --sandbox workspace-write exec hello');
+    expect(effective.stdout).toContain('-c model_reasoning_effort="medium" exec hello');
+    expect(effective.stdout).not.toContain("--sandbox workspace-write");
     const override = spawnSync(join(installBin, "codex-acu"), ["-m", "gpt-5.6-sol"], {
       env: { ...env, CODEX_ACU_HOME: acuHome },
       encoding: "utf8",

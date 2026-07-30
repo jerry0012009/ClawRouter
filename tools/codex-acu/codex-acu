@@ -115,27 +115,12 @@ case "$ACU_API_KEY" in sk-?*) ;; *) echo "invalid ACU credential" >&2; exit 1 ;;
 
 export CODEX_HOME="$acu_home"
 export ACU_API_KEY
-workspace_dir=$PWD
-expect_workspace_dir=no
 for argument in "$@"; do
-  if [ "$expect_workspace_dir" = yes ]; then
-    workspace_dir=$argument
-    expect_workspace_dir=no
-    continue
-  fi
   case "$argument" in
-    -C|--cd) expect_workspace_dir=yes ;;
-    -C=*|--cd=*) workspace_dir=${argument#*=} ;;
     -m|--model|--model=*|model=*|model_provider=*)
       echo "codex-acu fixes model=acu-auto and provider=acu-founder-alpha; explicit model overrides are not allowed" >&2
       exit 2
       ;;
-    -s|--sandbox|--sandbox=*)
-      echo "codex-acu fixes sandbox=workspace-write; sandbox overrides are not allowed" >&2
-      exit 2
-      ;;
   esac
 done
-test "$expect_workspace_dir" = no || { echo "codex-acu: -C/--cd requires a directory" >&2; exit 2; }
-workspace_gate "$workspace_dir"
-exec codex -m acu-auto -c 'model_provider="acu-founder-alpha"' -c 'model_reasoning_effort="medium"' --sandbox workspace-write "$@"
+exec codex -m acu-auto -c 'model_provider="acu-founder-alpha"' -c 'model_reasoning_effort="medium"' "$@"

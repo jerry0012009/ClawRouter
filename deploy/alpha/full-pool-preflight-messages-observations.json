@@ -1,0 +1,593 @@
+{
+  "schemaVersion": "acu-full-pool-preflight-v1",
+  "runId": "full-pool-preflight-messages-corrected-20260731-v1",
+  "capturedAt": "2026-07-31T06:46:47.375Z",
+  "concurrency": 1,
+  "budgetCny": 0.2,
+  "candidateCount": 31,
+  "passedCount": 17,
+  "failedCount": 14,
+  "skippedCount": 0,
+  "actualEstimatedCashCostCny": 0.023808074999999998,
+  "observations": [
+    {
+      "runId": "full-pool-preflight-messages-corrected-20260731-v1",
+      "executionProfileId": "blackai-claude-reverse:claude-opus-4-8:messages",
+      "channelId": "blackai-claude-reverse",
+      "providerId": "blackai",
+      "model": "claude-opus-4-8",
+      "protocol": "messages",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "claude-opus-4-8",
+        "claude-opus-4-8"
+      ],
+      "usage": {
+        "input": 634,
+        "cached": 12722,
+        "output": 25,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.006986,
+      "effectiveCashCostCny": 0.0010479,
+      "latencyMs": 3160
+    },
+    {
+      "runId": "full-pool-preflight-messages-corrected-20260731-v1",
+      "executionProfileId": "blackai-claude-reverse:claude-sonnet-5:messages",
+      "channelId": "blackai-claude-reverse",
+      "providerId": "blackai",
+      "model": "claude-sonnet-5",
+      "protocol": "messages",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "claude-sonnet-5",
+        "claude-sonnet-5"
+      ],
+      "usage": {
+        "input": 629,
+        "cached": 12625,
+        "output": 18,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.0040575,
+      "effectiveCashCostCny": 0.000608625,
+      "latencyMs": 3280
+    },
+    {
+      "runId": "full-pool-preflight-messages-corrected-20260731-v1",
+      "executionProfileId": "lucen-claude-clone-020:claude-opus-4-8:messages",
+      "channelId": "lucen-claude-clone-020",
+      "providerId": "lucen",
+      "model": "claude-opus-4-8",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "provider_http_503",
+      "latencyMs": 217
+    },
+    {
+      "runId": "full-pool-preflight-messages-corrected-20260731-v1",
+      "executionProfileId": "lucen-claude-clone-020:claude-sonnet-5:messages",
+      "channelId": "lucen-claude-clone-020",
+      "providerId": "lucen",
+      "model": "claude-sonnet-5",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "provider_http_503",
+      "latencyMs": 200
+    },
+    {
+      "runId": "full-pool-preflight-messages-corrected-20260731-v1",
+      "executionProfileId": "lucen-claude-cursor-reverse-030:claude-opus-4-8:messages",
+      "channelId": "lucen-claude-cursor-reverse-030",
+      "providerId": "lucen",
+      "model": "claude-opus-4-8",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "provider_http_502",
+      "latencyMs": 5969
+    },
+    {
+      "runId": "full-pool-preflight-messages-corrected-20260731-v1",
+      "executionProfileId": "lucen-claude-cursor-reverse-030:claude-sonnet-5:messages",
+      "channelId": "lucen-claude-cursor-reverse-030",
+      "providerId": "lucen",
+      "model": "claude-sonnet-5",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "provider_http_502",
+      "latencyMs": 5570
+    },
+    {
+      "runId": "full-pool-preflight-messages-corrected-20260731-v1",
+      "executionProfileId": "lucen-claude-aws-reverse-040:claude-opus-4-8:messages",
+      "channelId": "lucen-claude-aws-reverse-040",
+      "providerId": "lucen",
+      "model": "claude-opus-4-8",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "provider_http_502",
+      "latencyMs": 1848
+    },
+    {
+      "runId": "full-pool-preflight-messages-corrected-20260731-v1",
+      "executionProfileId": "lucen-claude-max-090:claude-opus-4-8:messages",
+      "channelId": "lucen-claude-max-090",
+      "providerId": "lucen",
+      "model": "claude-opus-4-8",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "timeout",
+      "latencyMs": 25010
+    },
+    {
+      "runId": "full-pool-preflight-messages-corrected-20260731-v1",
+      "executionProfileId": "lucen-claude-max-090:claude-sonnet-5:messages",
+      "channelId": "lucen-claude-max-090",
+      "providerId": "lucen",
+      "model": "claude-sonnet-5",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "timeout",
+      "latencyMs": 25006
+    },
+    {
+      "runId": "full-pool-preflight-messages-corrected-20260731-v1",
+      "executionProfileId": "lucen-claude-antigravity-reverse-040:claude-opus-4-8:messages",
+      "channelId": "lucen-claude-antigravity-reverse-040",
+      "providerId": "lucen",
+      "model": "claude-opus-4-8",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "provider_http_502",
+      "latencyMs": 390
+    },
+    {
+      "runId": "full-pool-preflight-messages-corrected-20260731-v1",
+      "executionProfileId": "lucen-mainstream-cn-claude-030:claude-opus-4-8:messages",
+      "channelId": "lucen-mainstream-cn-claude-030",
+      "providerId": "lucen",
+      "model": "claude-opus-4-8",
+      "protocol": "messages",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "claude-opus-4-8",
+        "claude-opus-4-8"
+      ],
+      "usage": {
+        "input": 360,
+        "cached": 0,
+        "output": 79,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.003775,
+      "effectiveCashCostCny": 0.0011325,
+      "latencyMs": 11983
+    },
+    {
+      "runId": "full-pool-preflight-messages-corrected-20260731-v1",
+      "executionProfileId": "lucen-mainstream-cn-claude-030:deepseek-v4-flash:messages",
+      "channelId": "lucen-mainstream-cn-claude-030",
+      "providerId": "lucen",
+      "model": "deepseek-v4-flash",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "provider_http_502",
+      "latencyMs": 233
+    },
+    {
+      "runId": "full-pool-preflight-messages-corrected-20260731-v1",
+      "executionProfileId": "lucen-mainstream-cn-claude-030:deepseek-v4-pro:messages",
+      "channelId": "lucen-mainstream-cn-claude-030",
+      "providerId": "lucen",
+      "model": "deepseek-v4-pro",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "provider_http_502",
+      "latencyMs": 188
+    },
+    {
+      "runId": "full-pool-preflight-messages-corrected-20260731-v1",
+      "executionProfileId": "lucen-mainstream-cn-claude-030:glm-5.1:messages",
+      "channelId": "lucen-mainstream-cn-claude-030",
+      "providerId": "lucen",
+      "model": "glm-5.1",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "actual_model_mismatch:glm-5.2,glm-5.2",
+      "latencyMs": 10975
+    },
+    {
+      "runId": "full-pool-preflight-messages-corrected-20260731-v1",
+      "executionProfileId": "lucen-mainstream-cn-claude-030:glm-5.2:messages",
+      "channelId": "lucen-mainstream-cn-claude-030",
+      "providerId": "lucen",
+      "model": "glm-5.2",
+      "protocol": "messages",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "glm-5.2",
+        "glm-5.2"
+      ],
+      "usage": {
+        "input": 360,
+        "cached": 0,
+        "output": 77,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.0007554,
+      "effectiveCashCostCny": 0.00022662,
+      "latencyMs": 13027
+    },
+    {
+      "runId": "full-pool-preflight-messages-corrected-20260731-v1",
+      "executionProfileId": "lucen-mainstream-cn-claude-030:kimi-k2.6:messages",
+      "channelId": "lucen-mainstream-cn-claude-030",
+      "providerId": "lucen",
+      "model": "kimi-k2.6",
+      "protocol": "messages",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "kimi-k2.6",
+        "kimi-k2.6"
+      ],
+      "usage": {
+        "input": 174,
+        "cached": 0,
+        "output": 118,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.0006373,
+      "effectiveCashCostCny": 0.00019119000000000002,
+      "latencyMs": 5560
+    },
+    {
+      "runId": "full-pool-preflight-messages-corrected-20260731-v1",
+      "executionProfileId": "lucen-mainstream-cn-claude-030:kimi-k2.7-code:messages",
+      "channelId": "lucen-mainstream-cn-claude-030",
+      "providerId": "lucen",
+      "model": "kimi-k2.7-code",
+      "protocol": "messages",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "kimi-k2.7-code",
+        "kimi-k2.7-code"
+      ],
+      "usage": {
+        "input": 174,
+        "cached": 0,
+        "output": 104,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.0005813,
+      "effectiveCashCostCny": 0.00017439,
+      "latencyMs": 5133
+    },
+    {
+      "runId": "full-pool-preflight-messages-corrected-20260731-v1",
+      "executionProfileId": "lucen-kiro-cache-claude-015:claude-opus-4-8:messages",
+      "channelId": "lucen-kiro-cache-claude-015",
+      "providerId": "lucen",
+      "model": "claude-opus-4-8",
+      "protocol": "messages",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "claude-opus-4-8",
+        "claude-opus-4-8"
+      ],
+      "usage": {
+        "input": 840,
+        "cached": 10747,
+        "output": 26,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.0060235,
+      "effectiveCashCostCny": 0.000903525,
+      "latencyMs": 4306
+    },
+    {
+      "runId": "full-pool-preflight-messages-corrected-20260731-v1",
+      "executionProfileId": "lucen-kiro-cache-claude-015:claude-sonnet-5:messages",
+      "channelId": "lucen-kiro-cache-claude-015",
+      "providerId": "lucen",
+      "model": "claude-sonnet-5",
+      "protocol": "messages",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "claude-sonnet-5",
+        "claude-sonnet-5"
+      ],
+      "usage": {
+        "input": 845,
+        "cached": 10828,
+        "output": 8,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.0033684,
+      "effectiveCashCostCny": 0.00050526,
+      "latencyMs": 3885
+    },
+    {
+      "runId": "full-pool-preflight-messages-corrected-20260731-v1",
+      "executionProfileId": "lucen-glm-official-claude-030:claude-opus-4-8:messages",
+      "channelId": "lucen-glm-official-claude-030",
+      "providerId": "lucen",
+      "model": "claude-opus-4-8",
+      "protocol": "messages",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "claude-opus-4-8",
+        "claude-opus-4-8"
+      ],
+      "usage": {
+        "input": 360,
+        "cached": 0,
+        "output": 70,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.00355,
+      "effectiveCashCostCny": 0.001065,
+      "latencyMs": 10510
+    },
+    {
+      "runId": "full-pool-preflight-messages-corrected-20260731-v1",
+      "executionProfileId": "lucen-glm-official-claude-030:glm-5.1:messages",
+      "channelId": "lucen-glm-official-claude-030",
+      "providerId": "lucen",
+      "model": "glm-5.1",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "actual_model_mismatch:glm-5.2,glm-5.2",
+      "latencyMs": 10521
+    },
+    {
+      "runId": "full-pool-preflight-messages-corrected-20260731-v1",
+      "executionProfileId": "lucen-glm-official-claude-030:glm-5.2:messages",
+      "channelId": "lucen-glm-official-claude-030",
+      "providerId": "lucen",
+      "model": "glm-5.2",
+      "protocol": "messages",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "glm-5.2",
+        "glm-5.2"
+      ],
+      "usage": {
+        "input": 360,
+        "cached": 0,
+        "output": 84,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.0007848,
+      "effectiveCashCostCny": 0.00023543999999999998,
+      "latencyMs": 10969
+    },
+    {
+      "runId": "full-pool-preflight-messages-corrected-20260731-v1",
+      "executionProfileId": "lucen-qwen-official-claude-010:qwen3.7-max:messages",
+      "channelId": "lucen-qwen-official-claude-010",
+      "providerId": "lucen",
+      "model": "qwen3.7-max",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "provider_http_400",
+      "latencyMs": 3281
+    },
+    {
+      "runId": "full-pool-preflight-messages-corrected-20260731-v1",
+      "executionProfileId": "lucen-deepseek-claude-050:deepseek-v4-flash:messages",
+      "channelId": "lucen-deepseek-claude-050",
+      "providerId": "lucen",
+      "model": "deepseek-v4-flash",
+      "protocol": "messages",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "deepseek-v4-flash",
+        "deepseek-v4-flash"
+      ],
+      "usage": {
+        "input": 853,
+        "cached": 0,
+        "output": 73,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.00014985,
+      "effectiveCashCostCny": 0.000074925,
+      "latencyMs": 2884
+    },
+    {
+      "runId": "full-pool-preflight-messages-corrected-20260731-v1",
+      "executionProfileId": "lucen-deepseek-claude-050:deepseek-v4-pro:messages",
+      "channelId": "lucen-deepseek-claude-050",
+      "providerId": "lucen",
+      "model": "deepseek-v4-pro",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "invalid_tool_input_json",
+      "latencyMs": 2314
+    },
+    {
+      "runId": "full-pool-preflight-messages-corrected-20260731-v1",
+      "executionProfileId": "lucen-kiro-cache90-claude-006:claude-opus-4-8:messages",
+      "channelId": "lucen-kiro-cache90-claude-006",
+      "providerId": "lucen",
+      "model": "claude-opus-4-8",
+      "protocol": "messages",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "claude-opus-4-8",
+        "claude-opus-4-8"
+      ],
+      "usage": {
+        "input": 52,
+        "cached": 344,
+        "output": 89,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.002397,
+      "effectiveCashCostCny": 0.00014382,
+      "latencyMs": 5566
+    },
+    {
+      "runId": "full-pool-preflight-messages-corrected-20260731-v1",
+      "executionProfileId": "lucen-kiro-cache90-claude-006:claude-sonnet-5:messages",
+      "channelId": "lucen-kiro-cache90-claude-006",
+      "providerId": "lucen",
+      "model": "claude-sonnet-5",
+      "protocol": "messages",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "claude-sonnet-5",
+        "claude-sonnet-5"
+      ],
+      "usage": {
+        "input": 52,
+        "cached": 344,
+        "output": 87,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.0014082,
+      "effectiveCashCostCny": 0.000084492,
+      "latencyMs": 5671
+    },
+    {
+      "runId": "full-pool-preflight-messages-corrected-20260731-v1",
+      "executionProfileId": "lucen-kiro-cache70-claude-006:claude-opus-4-8:messages",
+      "channelId": "lucen-kiro-cache70-claude-006",
+      "providerId": "lucen",
+      "model": "claude-opus-4-8",
+      "protocol": "messages",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "claude-opus-4-8",
+        "claude-opus-4-8"
+      ],
+      "usage": {
+        "input": 1670,
+        "cached": 7579,
+        "output": 14,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.0041395,
+      "effectiveCashCostCny": 0.00024837,
+      "latencyMs": 5269
+    },
+    {
+      "runId": "full-pool-preflight-messages-corrected-20260731-v1",
+      "executionProfileId": "lucen-kiro-cache70-claude-006:claude-sonnet-5:messages",
+      "channelId": "lucen-kiro-cache70-claude-006",
+      "providerId": "lucen",
+      "model": "claude-sonnet-5",
+      "protocol": "messages",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "claude-sonnet-5",
+        "claude-sonnet-5"
+      ],
+      "usage": {
+        "input": 1682,
+        "cached": 16301,
+        "output": 14,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.0051003,
+      "effectiveCashCostCny": 0.000306018,
+      "latencyMs": 4370
+    },
+    {
+      "runId": "full-pool-preflight-messages-corrected-20260731-v1",
+      "executionProfileId": "lucen-claude-max-unlimited-100:claude-opus-4-8:messages",
+      "channelId": "lucen-claude-max-unlimited-100",
+      "providerId": "lucen",
+      "model": "claude-opus-4-8",
+      "protocol": "messages",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "claude-opus-4-8",
+        "claude-opus-4-8"
+      ],
+      "usage": {
+        "input": 1700,
+        "cached": 0,
+        "output": 53,
+        "reasoning": 9
+      },
+      "nominalCostUsd": 0.009825,
+      "effectiveCashCostCny": 0.009825,
+      "latencyMs": 6405
+    },
+    {
+      "runId": "full-pool-preflight-messages-corrected-20260731-v1",
+      "executionProfileId": "lucen-claude-max-unlimited-100:claude-sonnet-5:messages",
+      "channelId": "lucen-claude-max-unlimited-100",
+      "providerId": "lucen",
+      "model": "claude-sonnet-5",
+      "protocol": "messages",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "claude-sonnet-5",
+        "claude-sonnet-5"
+      ],
+      "usage": {
+        "input": 2160,
+        "cached": 0,
+        "output": 37,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.007035,
+      "effectiveCashCostCny": 0.007035,
+      "latencyMs": 7400
+    }
+  ]
+}

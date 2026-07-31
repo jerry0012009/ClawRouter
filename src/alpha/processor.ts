@@ -53,7 +53,7 @@ export type AlphaProcessorOptions = {
   judgeRunner: AlphaJudgeRunner;
   judgeEconomics?: ProviderEconomics;
   expectedOutputTokens?: number;
-  wakeProbe?: (executionProfileId: string) => void;
+  wakeProbe?: (executionProfileId?: string) => void;
 };
 
 export type AlphaResolutionContext = {
@@ -1864,6 +1864,7 @@ export class AlphaRequestProcessor {
         webActuallyInvoked: false,
       },
       });
+    if (logical.inserted) this.options.wakeProbe?.();
     const logicalRow = replayableLogical
       ?? await repository.getLogicalRequest(logical.logicalRequestId, identity.newapiUserId);
     if (!logical.inserted && logicalRow?.status === "completed" && stringValue(logicalRow.response_payload_id)) {

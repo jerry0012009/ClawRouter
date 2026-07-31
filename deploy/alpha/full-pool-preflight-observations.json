@@ -1,0 +1,1834 @@
+{
+  "schemaVersion": "acu-full-pool-preflight-v1",
+  "runId": "full-pool-preflight-20260731-v1",
+  "capturedAt": "2026-07-31T06:41:44.507Z",
+  "concurrency": 1,
+  "budgetCny": 0.2,
+  "candidateCount": 112,
+  "passedCount": 42,
+  "failedCount": 70,
+  "skippedCount": 0,
+  "actualEstimatedCashCostCny": 0.15307077900000002,
+  "observations": [
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "blackai-codex-mix-low:gpt-5.4-mini:responses",
+      "channelId": "blackai-codex-mix-low",
+      "providerId": "blackai",
+      "model": "gpt-5.4-mini",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.4-mini-2026-03-17",
+        "gpt-5.4-mini"
+      ],
+      "usage": {
+        "input": 9196,
+        "cached": 0,
+        "output": 26,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.007014,
+      "effectiveCashCostCny": 0.0010521,
+      "latencyMs": 5701
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "blackai-codex-mix-low:gpt-5.5:responses",
+      "channelId": "blackai-codex-mix-low",
+      "providerId": "blackai",
+      "model": "gpt-5.5",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.5",
+        "gpt-5.5"
+      ],
+      "usage": {
+        "input": 9492,
+        "cached": 0,
+        "output": 36,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.04854,
+      "effectiveCashCostCny": 0.007280999999999999,
+      "latencyMs": 5772
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "blackai-codex-mix-low:gpt-5.6-luna:responses",
+      "channelId": "blackai-codex-mix-low",
+      "providerId": "blackai",
+      "model": "gpt-5.6-luna",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.6-luna",
+        "gpt-5.6-luna"
+      ],
+      "usage": {
+        "input": 9492,
+        "cached": 0,
+        "output": 26,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.009648,
+      "effectiveCashCostCny": 0.0014472,
+      "latencyMs": 7511
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "blackai-codex-mix-low:gpt-5.6-sol:responses",
+      "channelId": "blackai-codex-mix-low",
+      "providerId": "blackai",
+      "model": "gpt-5.6-sol",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.6-sol",
+        "gpt-5.6-sol"
+      ],
+      "usage": {
+        "input": 9492,
+        "cached": 0,
+        "output": 26,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.04824,
+      "effectiveCashCostCny": 0.007235999999999999,
+      "latencyMs": 5575
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "blackai-codex-mix-low:gpt-5.6-terra:responses",
+      "channelId": "blackai-codex-mix-low",
+      "providerId": "blackai",
+      "model": "gpt-5.6-terra",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.6-terra",
+        "gpt-5.6-terra"
+      ],
+      "usage": {
+        "input": 8900,
+        "cached": 0,
+        "output": 26,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.02264,
+      "effectiveCashCostCny": 0.003396,
+      "latencyMs": 4350
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "blackai-pro-1-4:gpt-5.4-mini:responses",
+      "channelId": "blackai-pro-1-4",
+      "providerId": "blackai",
+      "model": "gpt-5.4-mini",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "tool_result_no_message",
+      "latencyMs": 2755
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "blackai-pro-1-4:gpt-5.5:responses",
+      "channelId": "blackai-pro-1-4",
+      "providerId": "blackai",
+      "model": "gpt-5.5",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.5",
+        "gpt-5.5"
+      ],
+      "usage": {
+        "input": 8900,
+        "cached": 0,
+        "output": 35,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.04555,
+      "effectiveCashCostCny": 0.0095655,
+      "latencyMs": 8146
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "blackai-pro-1-4:gpt-5.6-luna:responses",
+      "channelId": "blackai-pro-1-4",
+      "providerId": "blackai",
+      "model": "gpt-5.6-luna",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.6-luna",
+        "gpt-5.6-luna"
+      ],
+      "usage": {
+        "input": 8900,
+        "cached": 3584,
+        "output": 26,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.0058304,
+      "effectiveCashCostCny": 0.001224384,
+      "latencyMs": 6750
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "blackai-pro-1-4:gpt-5.6-sol:responses",
+      "channelId": "blackai-pro-1-4",
+      "providerId": "blackai",
+      "model": "gpt-5.6-sol",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.6-sol",
+        "gpt-5.6-sol"
+      ],
+      "usage": {
+        "input": 8900,
+        "cached": 0,
+        "output": 26,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.04528,
+      "effectiveCashCostCny": 0.0095088,
+      "latencyMs": 4258
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "blackai-pro-1-4:gpt-5.6-terra:responses",
+      "channelId": "blackai-pro-1-4",
+      "providerId": "blackai",
+      "model": "gpt-5.6-terra",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "tool_result_no_message",
+      "latencyMs": 2857
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "blackai-claude-reverse:claude-opus-4-8:messages",
+      "channelId": "blackai-claude-reverse",
+      "providerId": "blackai",
+      "model": "claude-opus-4-8",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "invalid_sse_content_type",
+      "latencyMs": 110
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "blackai-claude-reverse:claude-sonnet-5:messages",
+      "channelId": "blackai-claude-reverse",
+      "providerId": "blackai",
+      "model": "claude-sonnet-5",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "invalid_sse_content_type",
+      "latencyMs": 103
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "blackai-codex-mix-pro-fallback:gpt-5.4-mini:responses",
+      "channelId": "blackai-codex-mix-pro-fallback",
+      "providerId": "blackai",
+      "model": "gpt-5.4-mini",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.4-mini-2026-03-17",
+        "gpt-5.4-mini-2026-03-17"
+      ],
+      "usage": {
+        "input": 8900,
+        "cached": 0,
+        "output": 25,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.0067875,
+      "effectiveCashCostCny": 0.001018125,
+      "latencyMs": 3502
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "blackai-codex-mix-pro-fallback:gpt-5.5:responses",
+      "channelId": "blackai-codex-mix-pro-fallback",
+      "providerId": "blackai",
+      "model": "gpt-5.5",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.5",
+        "gpt-5.5"
+      ],
+      "usage": {
+        "input": 8900,
+        "cached": 0,
+        "output": 35,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.04555,
+      "effectiveCashCostCny": 0.0068325,
+      "latencyMs": 10393
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "blackai-codex-mix-pro-fallback:gpt-5.6-luna:responses",
+      "channelId": "blackai-codex-mix-pro-fallback",
+      "providerId": "blackai",
+      "model": "gpt-5.6-luna",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.6-luna",
+        "gpt-5.6-luna"
+      ],
+      "usage": {
+        "input": 8900,
+        "cached": 0,
+        "output": 26,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.009056,
+      "effectiveCashCostCny": 0.0013583999999999998,
+      "latencyMs": 6866
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "blackai-codex-mix-pro-fallback:gpt-5.6-sol:responses",
+      "channelId": "blackai-codex-mix-pro-fallback",
+      "providerId": "blackai",
+      "model": "gpt-5.6-sol",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.6-sol",
+        "gpt-5.6-sol"
+      ],
+      "usage": {
+        "input": 8900,
+        "cached": 0,
+        "output": 26,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.04528,
+      "effectiveCashCostCny": 0.006792,
+      "latencyMs": 5429
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "blackai-codex-mix-pro-fallback:gpt-5.6-terra:responses",
+      "channelId": "blackai-codex-mix-pro-fallback",
+      "providerId": "blackai",
+      "model": "gpt-5.6-terra",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.6-terra",
+        "gpt-5.6-terra"
+      ],
+      "usage": {
+        "input": 8900,
+        "cached": 0,
+        "output": 26,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.02264,
+      "effectiveCashCostCny": 0.003396,
+      "latencyMs": 3010
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cn-models-k3-015:glm-5.2:responses",
+      "channelId": "lucen-cn-models-k3-015",
+      "providerId": "lucen",
+      "model": "glm-5.2",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "timeout",
+      "latencyMs": 25007
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-claude-clone-020:claude-opus-4-8:messages",
+      "channelId": "lucen-claude-clone-020",
+      "providerId": "lucen",
+      "model": "claude-opus-4-8",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "invalid_sse_content_type",
+      "latencyMs": 557
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-claude-clone-020:claude-sonnet-5:messages",
+      "channelId": "lucen-claude-clone-020",
+      "providerId": "lucen",
+      "model": "claude-sonnet-5",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "invalid_sse_content_type",
+      "latencyMs": 813
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-claude-cursor-reverse-030:claude-opus-4-8:messages",
+      "channelId": "lucen-claude-cursor-reverse-030",
+      "providerId": "lucen",
+      "model": "claude-opus-4-8",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "invalid_sse_content_type",
+      "latencyMs": 187
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-claude-cursor-reverse-030:claude-sonnet-5:messages",
+      "channelId": "lucen-claude-cursor-reverse-030",
+      "providerId": "lucen",
+      "model": "claude-sonnet-5",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "invalid_sse_content_type",
+      "latencyMs": 183
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx003-low:gpt-5.5:responses",
+      "channelId": "lucen-cx003-low",
+      "providerId": "lucen",
+      "model": "gpt-5.5",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "provider_http_502",
+      "latencyMs": 6056
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx003-low:gpt-5.6-luna:responses",
+      "channelId": "lucen-cx003-low",
+      "providerId": "lucen",
+      "model": "gpt-5.6-luna",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "provider_http_502",
+      "latencyMs": 532
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx003-low:gpt-5.6-sol:responses",
+      "channelId": "lucen-cx003-low",
+      "providerId": "lucen",
+      "model": "gpt-5.6-sol",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "provider_http_502",
+      "latencyMs": 191
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx003-low:gpt-5.6-terra:responses",
+      "channelId": "lucen-cx003-low",
+      "providerId": "lucen",
+      "model": "gpt-5.6-terra",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "provider_http_502",
+      "latencyMs": 5971
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx004-low-dedicated:gpt-5.4-mini:responses",
+      "channelId": "lucen-cx004-low-dedicated",
+      "providerId": "lucen",
+      "model": "gpt-5.4-mini",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "provider_http_503",
+      "latencyMs": 211
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx004-low-dedicated:gpt-5.5:responses",
+      "channelId": "lucen-cx004-low-dedicated",
+      "providerId": "lucen",
+      "model": "gpt-5.5",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "provider_http_502",
+      "latencyMs": 199
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx004-low-dedicated:gpt-5.6-luna:responses",
+      "channelId": "lucen-cx004-low-dedicated",
+      "providerId": "lucen",
+      "model": "gpt-5.6-luna",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "provider_http_503",
+      "latencyMs": 178
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx004-low-dedicated:gpt-5.6-sol:responses",
+      "channelId": "lucen-cx004-low-dedicated",
+      "providerId": "lucen",
+      "model": "gpt-5.6-sol",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "provider_http_502",
+      "latencyMs": 193
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx004-low-dedicated:gpt-5.6-terra:responses",
+      "channelId": "lucen-cx004-low-dedicated",
+      "providerId": "lucen",
+      "model": "gpt-5.6-terra",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "provider_http_502",
+      "latencyMs": 185
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.4-mini:responses",
+      "channelId": "lucen-cx006-value-dynamic",
+      "providerId": "lucen",
+      "model": "gpt-5.4-mini",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.4-mini-2026-03-17",
+        "gpt-5.4-mini-2026-03-17"
+      ],
+      "usage": {
+        "input": 8904,
+        "cached": 0,
+        "output": 38,
+        "reasoning": 11
+      },
+      "nominalCostUsd": 0.006849,
+      "effectiveCashCostCny": 0.00041094,
+      "latencyMs": 3545
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.5:responses",
+      "channelId": "lucen-cx006-value-dynamic",
+      "providerId": "lucen",
+      "model": "gpt-5.5",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.5",
+        "gpt-5.5"
+      ],
+      "usage": {
+        "input": 9200,
+        "cached": 0,
+        "output": 26,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.04678,
+      "effectiveCashCostCny": 0.0028068,
+      "latencyMs": 5360
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.6-luna:responses",
+      "channelId": "lucen-cx006-value-dynamic",
+      "providerId": "lucen",
+      "model": "gpt-5.6-luna",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "timeout",
+      "latencyMs": 25004
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.6-sol:responses",
+      "channelId": "lucen-cx006-value-dynamic",
+      "providerId": "lucen",
+      "model": "gpt-5.6-sol",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "timeout",
+      "latencyMs": 25003
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.6-terra:responses",
+      "channelId": "lucen-cx006-value-dynamic",
+      "providerId": "lucen",
+      "model": "gpt-5.6-terra",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "timeout",
+      "latencyMs": 25001
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx006-plus:gpt-5.4-mini:responses",
+      "channelId": "lucen-cx006-plus",
+      "providerId": "lucen",
+      "model": "gpt-5.4-mini",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.4-mini-2026-03-17",
+        "gpt-5.4-mini-2026-03-17"
+      ],
+      "usage": {
+        "input": 8904,
+        "cached": 0,
+        "output": 25,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.0067905,
+      "effectiveCashCostCny": 0.00040742999999999997,
+      "latencyMs": 19056
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx006-plus:gpt-5.5:responses",
+      "channelId": "lucen-cx006-plus",
+      "providerId": "lucen",
+      "model": "gpt-5.5",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.5",
+        "gpt-5.5"
+      ],
+      "usage": {
+        "input": 8904,
+        "cached": 0,
+        "output": 36,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.0456,
+      "effectiveCashCostCny": 0.002736,
+      "latencyMs": 14947
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx006-plus:gpt-5.6-luna:responses",
+      "channelId": "lucen-cx006-plus",
+      "providerId": "lucen",
+      "model": "gpt-5.6-luna",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.6-luna",
+        "gpt-5.6-luna"
+      ],
+      "usage": {
+        "input": 8904,
+        "cached": 0,
+        "output": 26,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.00906,
+      "effectiveCashCostCny": 0.0005436,
+      "latencyMs": 11116
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx006-plus:gpt-5.6-sol:responses",
+      "channelId": "lucen-cx006-plus",
+      "providerId": "lucen",
+      "model": "gpt-5.6-sol",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.6-sol",
+        "gpt-5.6-sol"
+      ],
+      "usage": {
+        "input": 8904,
+        "cached": 0,
+        "output": 26,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.0453,
+      "effectiveCashCostCny": 0.002718,
+      "latencyMs": 12002
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx006-plus:gpt-5.6-terra:responses",
+      "channelId": "lucen-cx006-plus",
+      "providerId": "lucen",
+      "model": "gpt-5.6-terra",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "tool_result_no_message",
+      "latencyMs": 8903
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx008-plus-dedicated:gpt-5.4-mini:responses",
+      "channelId": "lucen-cx008-plus-dedicated",
+      "providerId": "lucen",
+      "model": "gpt-5.4-mini",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "timeout",
+      "latencyMs": 25002
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx008-plus-dedicated:gpt-5.5:responses",
+      "channelId": "lucen-cx008-plus-dedicated",
+      "providerId": "lucen",
+      "model": "gpt-5.5",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "timeout",
+      "latencyMs": 25001
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx008-plus-dedicated:gpt-5.6-luna:responses",
+      "channelId": "lucen-cx008-plus-dedicated",
+      "providerId": "lucen",
+      "model": "gpt-5.6-luna",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "timeout",
+      "latencyMs": 25005
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx008-plus-dedicated:gpt-5.6-sol:responses",
+      "channelId": "lucen-cx008-plus-dedicated",
+      "providerId": "lucen",
+      "model": "gpt-5.6-sol",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.6-sol",
+        "gpt-5.6-sol"
+      ],
+      "usage": {
+        "input": 9250,
+        "cached": 4352,
+        "output": 25,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.027416,
+      "effectiveCashCostCny": 0.00219328,
+      "latencyMs": 31948
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx008-plus-dedicated:gpt-5.6-terra:responses",
+      "channelId": "lucen-cx008-plus-dedicated",
+      "providerId": "lucen",
+      "model": "gpt-5.6-terra",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "timeout",
+      "latencyMs": 37493
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx010-plus-fast:gpt-5.4-mini:responses",
+      "channelId": "lucen-cx010-plus-fast",
+      "providerId": "lucen",
+      "model": "gpt-5.4-mini",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.4-mini-2026-03-17",
+        "gpt-5.4-mini-2026-03-17"
+      ],
+      "usage": {
+        "input": 8904,
+        "cached": 8064,
+        "output": 67,
+        "reasoning": 40
+      },
+      "nominalCostUsd": 0.0039555,
+      "effectiveCashCostCny": 0.00039555,
+      "latencyMs": 5898
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx010-plus-fast:gpt-5.5:responses",
+      "channelId": "lucen-cx010-plus-fast",
+      "providerId": "lucen",
+      "model": "gpt-5.5",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.5",
+        "gpt-5.5"
+      ],
+      "usage": {
+        "input": 9200,
+        "cached": 8064,
+        "output": 26,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.02662,
+      "effectiveCashCostCny": 0.0026620000000000003,
+      "latencyMs": 6552
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx010-plus-fast:gpt-5.6-luna:responses",
+      "channelId": "lucen-cx010-plus-fast",
+      "providerId": "lucen",
+      "model": "gpt-5.6-luna",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.6-luna",
+        "gpt-5.6-luna"
+      ],
+      "usage": {
+        "input": 8904,
+        "cached": 0,
+        "output": 25,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.009054,
+      "effectiveCashCostCny": 0.0009054,
+      "latencyMs": 3191
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx010-plus-fast:gpt-5.6-sol:responses",
+      "channelId": "lucen-cx010-plus-fast",
+      "providerId": "lucen",
+      "model": "gpt-5.6-sol",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.6-sol",
+        "gpt-5.6-sol"
+      ],
+      "usage": {
+        "input": 9200,
+        "cached": 0,
+        "output": 26,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.04678,
+      "effectiveCashCostCny": 0.004678000000000001,
+      "latencyMs": 13514
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx010-plus-fast:gpt-5.6-terra:responses",
+      "channelId": "lucen-cx010-plus-fast",
+      "providerId": "lucen",
+      "model": "gpt-5.6-terra",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "timeout",
+      "latencyMs": 25002
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx012-pro:gpt-5.4-mini:responses",
+      "channelId": "lucen-cx012-pro",
+      "providerId": "lucen",
+      "model": "gpt-5.4-mini",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "timeout",
+      "latencyMs": 25004
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx012-pro:gpt-5.5:responses",
+      "channelId": "lucen-cx012-pro",
+      "providerId": "lucen",
+      "model": "gpt-5.5",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "timeout",
+      "latencyMs": 25005
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx012-pro:gpt-5.6-luna:responses",
+      "channelId": "lucen-cx012-pro",
+      "providerId": "lucen",
+      "model": "gpt-5.6-luna",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "timeout",
+      "latencyMs": 25007
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx012-pro:gpt-5.6-sol:responses",
+      "channelId": "lucen-cx012-pro",
+      "providerId": "lucen",
+      "model": "gpt-5.6-sol",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "timeout",
+      "latencyMs": 25002
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx012-pro:gpt-5.6-terra:responses",
+      "channelId": "lucen-cx012-pro",
+      "providerId": "lucen",
+      "model": "gpt-5.6-terra",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "timeout",
+      "latencyMs": 25002
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx014-pro-stable:gpt-5.4-mini:responses",
+      "channelId": "lucen-cx014-pro-stable",
+      "providerId": "lucen",
+      "model": "gpt-5.4-mini",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.4-mini-2026-03-17",
+        "gpt-5.4-mini-2026-03-17"
+      ],
+      "usage": {
+        "input": 8935,
+        "cached": 0,
+        "output": 26,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.00681825,
+      "effectiveCashCostCny": 0.000954555,
+      "latencyMs": 3649
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx014-pro-stable:gpt-5.5:responses",
+      "channelId": "lucen-cx014-pro-stable",
+      "providerId": "lucen",
+      "model": "gpt-5.5",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.5",
+        "gpt-5.5"
+      ],
+      "usage": {
+        "input": 8935,
+        "cached": 3584,
+        "output": 61,
+        "reasoning": 23
+      },
+      "nominalCostUsd": 0.037545,
+      "effectiveCashCostCny": 0.005256300000000001,
+      "latencyMs": 5179
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx014-pro-stable:gpt-5.6-luna:responses",
+      "channelId": "lucen-cx014-pro-stable",
+      "providerId": "lucen",
+      "model": "gpt-5.6-luna",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.6-luna",
+        "gpt-5.6-luna"
+      ],
+      "usage": {
+        "input": 8935,
+        "cached": 0,
+        "output": 44,
+        "reasoning": 16
+      },
+      "nominalCostUsd": 0.009199,
+      "effectiveCashCostCny": 0.0012878600000000003,
+      "latencyMs": 2991
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx014-pro-stable:gpt-5.6-sol:responses",
+      "channelId": "lucen-cx014-pro-stable",
+      "providerId": "lucen",
+      "model": "gpt-5.6-sol",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.6-sol",
+        "gpt-5.6-sol"
+      ],
+      "usage": {
+        "input": 8935,
+        "cached": 0,
+        "output": 26,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.045455,
+      "effectiveCashCostCny": 0.006363700000000001,
+      "latencyMs": 4515
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx014-pro-stable:gpt-5.6-terra:responses",
+      "channelId": "lucen-cx014-pro-stable",
+      "providerId": "lucen",
+      "model": "gpt-5.6-terra",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "tool_result_no_message",
+      "latencyMs": 4386
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx017-pro-first-token:gpt-5.4-mini:responses",
+      "channelId": "lucen-cx017-pro-first-token",
+      "providerId": "lucen",
+      "model": "gpt-5.4-mini",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.4-mini-2026-03-17",
+        "gpt-5.4-mini-2026-03-17"
+      ],
+      "usage": {
+        "input": 8904,
+        "cached": 0,
+        "output": 26,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.006795,
+      "effectiveCashCostCny": 0.00115515,
+      "latencyMs": 9940
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx017-pro-first-token:gpt-5.5:responses",
+      "channelId": "lucen-cx017-pro-first-token",
+      "providerId": "lucen",
+      "model": "gpt-5.5",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.5",
+        "gpt-5.5"
+      ],
+      "usage": {
+        "input": 8904,
+        "cached": 3584,
+        "output": 35,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.03661,
+      "effectiveCashCostCny": 0.0062236999999999995,
+      "latencyMs": 11781
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx017-pro-first-token:gpt-5.6-luna:responses",
+      "channelId": "lucen-cx017-pro-first-token",
+      "providerId": "lucen",
+      "model": "gpt-5.6-luna",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.6-luna",
+        "gpt-5.6-luna"
+      ],
+      "usage": {
+        "input": 8904,
+        "cached": 0,
+        "output": 26,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.00906,
+      "effectiveCashCostCny": 0.0015402000000000002,
+      "latencyMs": 7817
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx017-pro-first-token:gpt-5.6-sol:responses",
+      "channelId": "lucen-cx017-pro-first-token",
+      "providerId": "lucen",
+      "model": "gpt-5.6-sol",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.6-sol",
+        "gpt-5.6-sol"
+      ],
+      "usage": {
+        "input": 8904,
+        "cached": 0,
+        "output": 26,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.0453,
+      "effectiveCashCostCny": 0.007701,
+      "latencyMs": 16250
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx017-pro-first-token:gpt-5.6-terra:responses",
+      "channelId": "lucen-cx017-pro-first-token",
+      "providerId": "lucen",
+      "model": "gpt-5.6-terra",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.6-terra",
+        "gpt-5.6-terra"
+      ],
+      "usage": {
+        "input": 8904,
+        "cached": 0,
+        "output": 26,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.02265,
+      "effectiveCashCostCny": 0.0038505,
+      "latencyMs": 9655
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx025-pro-premium:gpt-5.4-mini:responses",
+      "channelId": "lucen-cx025-pro-premium",
+      "providerId": "lucen",
+      "model": "gpt-5.4-mini",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.4-mini-2026-03-17",
+        "gpt-5.4-mini-2026-03-17"
+      ],
+      "usage": {
+        "input": 8904,
+        "cached": 3968,
+        "output": 25,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.0053025,
+      "effectiveCashCostCny": 0.001325625,
+      "latencyMs": 6757
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx025-pro-premium:gpt-5.5:responses",
+      "channelId": "lucen-cx025-pro-premium",
+      "providerId": "lucen",
+      "model": "gpt-5.5",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.5",
+        "gpt-5.5"
+      ],
+      "usage": {
+        "input": 8904,
+        "cached": 3584,
+        "output": 35,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.03661,
+      "effectiveCashCostCny": 0.0091525,
+      "latencyMs": 12718
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx025-pro-premium:gpt-5.6-luna:responses",
+      "channelId": "lucen-cx025-pro-premium",
+      "providerId": "lucen",
+      "model": "gpt-5.6-luna",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.6-luna",
+        "gpt-5.6-luna"
+      ],
+      "usage": {
+        "input": 8904,
+        "cached": 3456,
+        "output": 26,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.0059496,
+      "effectiveCashCostCny": 0.0014874,
+      "latencyMs": 7185
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx025-pro-premium:gpt-5.6-sol:responses",
+      "channelId": "lucen-cx025-pro-premium",
+      "providerId": "lucen",
+      "model": "gpt-5.6-sol",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.6-sol",
+        "gpt-5.6-sol"
+      ],
+      "usage": {
+        "input": 8904,
+        "cached": 0,
+        "output": 26,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.0453,
+      "effectiveCashCostCny": 0.011325,
+      "latencyMs": 5909
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-cx025-pro-premium:gpt-5.6-terra:responses",
+      "channelId": "lucen-cx025-pro-premium",
+      "providerId": "lucen",
+      "model": "gpt-5.6-terra",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.6-terra",
+        "gpt-5.6-terra"
+      ],
+      "usage": {
+        "input": 8904,
+        "cached": 3456,
+        "output": 26,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.014874,
+      "effectiveCashCostCny": 0.0037185,
+      "latencyMs": 6027
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-claude-aws-reverse-040:claude-opus-4-8:messages",
+      "channelId": "lucen-claude-aws-reverse-040",
+      "providerId": "lucen",
+      "model": "claude-opus-4-8",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "invalid_sse_content_type",
+      "latencyMs": 331
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-claude-max-090:claude-opus-4-8:messages",
+      "channelId": "lucen-claude-max-090",
+      "providerId": "lucen",
+      "model": "claude-opus-4-8",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "invalid_sse_content_type",
+      "latencyMs": 189
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-claude-max-090:claude-sonnet-5:messages",
+      "channelId": "lucen-claude-max-090",
+      "providerId": "lucen",
+      "model": "claude-sonnet-5",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "invalid_sse_content_type",
+      "latencyMs": 187
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-claude-antigravity-reverse-040:claude-opus-4-8:messages",
+      "channelId": "lucen-claude-antigravity-reverse-040",
+      "providerId": "lucen",
+      "model": "claude-opus-4-8",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "invalid_sse_content_type",
+      "latencyMs": 183
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-gemini-openai-030:gemini-2.5-flash:responses",
+      "channelId": "lucen-gemini-openai-030",
+      "providerId": "lucen",
+      "model": "gemini-2.5-flash",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gemini-2.5-flash",
+        "gemini-2.5-flash"
+      ],
+      "usage": {
+        "input": 9580,
+        "cached": 0,
+        "output": 36,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.0014586,
+      "effectiveCashCostCny": 0.00043757999999999997,
+      "latencyMs": 2282
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-gemini-openai-030:gemini-3.5-flash:responses",
+      "channelId": "lucen-gemini-openai-030",
+      "providerId": "lucen",
+      "model": "gemini-3.5-flash",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "actual_model_mismatch:gemini-3-flash-agent,gemini-3-flash-agent",
+      "latencyMs": 3148
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-mainstream-cn-claude-030:claude-opus-4-8:messages",
+      "channelId": "lucen-mainstream-cn-claude-030",
+      "providerId": "lucen",
+      "model": "claude-opus-4-8",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "invalid_sse_content_type",
+      "latencyMs": 333
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-mainstream-cn-claude-030:deepseek-v4-flash:messages",
+      "channelId": "lucen-mainstream-cn-claude-030",
+      "providerId": "lucen",
+      "model": "deepseek-v4-flash",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "invalid_sse_content_type",
+      "latencyMs": 181
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-mainstream-cn-claude-030:deepseek-v4-pro:messages",
+      "channelId": "lucen-mainstream-cn-claude-030",
+      "providerId": "lucen",
+      "model": "deepseek-v4-pro",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "invalid_sse_content_type",
+      "latencyMs": 184
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-mainstream-cn-claude-030:glm-5.1:messages",
+      "channelId": "lucen-mainstream-cn-claude-030",
+      "providerId": "lucen",
+      "model": "glm-5.1",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "invalid_sse_content_type",
+      "latencyMs": 183
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-mainstream-cn-claude-030:glm-5.2:messages",
+      "channelId": "lucen-mainstream-cn-claude-030",
+      "providerId": "lucen",
+      "model": "glm-5.2",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "invalid_sse_content_type",
+      "latencyMs": 182
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-mainstream-cn-claude-030:kimi-k2.6:messages",
+      "channelId": "lucen-mainstream-cn-claude-030",
+      "providerId": "lucen",
+      "model": "kimi-k2.6",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "invalid_sse_content_type",
+      "latencyMs": 183
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-mainstream-cn-claude-030:kimi-k2.7-code:messages",
+      "channelId": "lucen-mainstream-cn-claude-030",
+      "providerId": "lucen",
+      "model": "kimi-k2.7-code",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "invalid_sse_content_type",
+      "latencyMs": 180
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-kiro-cache-claude-015:claude-opus-4-8:messages",
+      "channelId": "lucen-kiro-cache-claude-015",
+      "providerId": "lucen",
+      "model": "claude-opus-4-8",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "invalid_sse_content_type",
+      "latencyMs": 178
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-kiro-cache-claude-015:claude-sonnet-5:messages",
+      "channelId": "lucen-kiro-cache-claude-015",
+      "providerId": "lucen",
+      "model": "claude-sonnet-5",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "invalid_sse_content_type",
+      "latencyMs": 179
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-glm-official-claude-030:claude-opus-4-8:messages",
+      "channelId": "lucen-glm-official-claude-030",
+      "providerId": "lucen",
+      "model": "claude-opus-4-8",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "invalid_sse_content_type",
+      "latencyMs": 179
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-glm-official-claude-030:glm-5.1:messages",
+      "channelId": "lucen-glm-official-claude-030",
+      "providerId": "lucen",
+      "model": "glm-5.1",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "invalid_sse_content_type",
+      "latencyMs": 181
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-glm-official-claude-030:glm-5.2:messages",
+      "channelId": "lucen-glm-official-claude-030",
+      "providerId": "lucen",
+      "model": "glm-5.2",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "invalid_sse_content_type",
+      "latencyMs": 183
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-glm-official-openai-030:glm-5.1:responses",
+      "channelId": "lucen-glm-official-openai-030",
+      "providerId": "lucen",
+      "model": "glm-5.1",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "glm-5.1",
+        "glm-5.1"
+      ],
+      "usage": {
+        "input": 9154,
+        "cached": 4544,
+        "output": 28,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.0062918,
+      "effectiveCashCostCny": 0.00188754,
+      "latencyMs": 8638
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-glm-official-openai-030:glm-5.2:responses",
+      "channelId": "lucen-glm-official-openai-030",
+      "providerId": "lucen",
+      "model": "glm-5.2",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "glm-5.2",
+        "glm-5.2"
+      ],
+      "usage": {
+        "input": 9154,
+        "cached": 9088,
+        "output": 31,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.0056622,
+      "effectiveCashCostCny": 0.00169866,
+      "latencyMs": 7913
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-glm-official-openai-030:gpt-5.5:responses",
+      "channelId": "lucen-glm-official-openai-030",
+      "providerId": "lucen",
+      "model": "gpt-5.5",
+      "protocol": "responses",
+      "status": "passed",
+      "sse": true,
+      "toolRoundtrip": true,
+      "reasoningAccepted": true,
+      "actualModels": [
+        "gpt-5.5",
+        "gpt-5.5"
+      ],
+      "usage": {
+        "input": 9154,
+        "cached": 9088,
+        "output": 25,
+        "reasoning": 0
+      },
+      "nominalCostUsd": 0.0238,
+      "effectiveCashCostCny": 0.0071400000000000005,
+      "latencyMs": 9734
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-qwen-official-claude-010:qwen3.7-max:messages",
+      "channelId": "lucen-qwen-official-claude-010",
+      "providerId": "lucen",
+      "model": "qwen3.7-max",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "invalid_sse_content_type",
+      "latencyMs": 880
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-qwen-official-openai-010:qwen3.7-max:responses",
+      "channelId": "lucen-qwen-official-openai-010",
+      "providerId": "lucen",
+      "model": "qwen3.7-max",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "provider_http_502",
+      "latencyMs": 937
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-grok-006:claude-opus-4-8:responses",
+      "channelId": "lucen-grok-006",
+      "providerId": "lucen",
+      "model": "claude-opus-4-8",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "provider_http_503",
+      "latencyMs": 184
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-grok-006:claude-sonnet-5:responses",
+      "channelId": "lucen-grok-006",
+      "providerId": "lucen",
+      "model": "claude-sonnet-5",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "provider_http_503",
+      "latencyMs": 179
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-deepseek-openai-050:deepseek-v4-flash:responses",
+      "channelId": "lucen-deepseek-openai-050",
+      "providerId": "lucen",
+      "model": "deepseek-v4-flash",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "provider_http_502",
+      "latencyMs": 10777
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-deepseek-openai-050:deepseek-v4-pro:responses",
+      "channelId": "lucen-deepseek-openai-050",
+      "providerId": "lucen",
+      "model": "deepseek-v4-pro",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "provider_http_502",
+      "latencyMs": 11588
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-deepseek-openai-050:glm-5.1:responses",
+      "channelId": "lucen-deepseek-openai-050",
+      "providerId": "lucen",
+      "model": "glm-5.1",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "provider_http_502",
+      "latencyMs": 10939
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-deepseek-openai-050:glm-5.2:responses",
+      "channelId": "lucen-deepseek-openai-050",
+      "providerId": "lucen",
+      "model": "glm-5.2",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "provider_http_502",
+      "latencyMs": 9404
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-deepseek-openai-050:kimi-k2.6:responses",
+      "channelId": "lucen-deepseek-openai-050",
+      "providerId": "lucen",
+      "model": "kimi-k2.6",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "provider_http_502",
+      "latencyMs": 10392
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-deepseek-openai-050:kimi-k2.7-code:responses",
+      "channelId": "lucen-deepseek-openai-050",
+      "providerId": "lucen",
+      "model": "kimi-k2.7-code",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "provider_http_502",
+      "latencyMs": 9366
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-deepseek-openai-050:qwen3.6-plus:responses",
+      "channelId": "lucen-deepseek-openai-050",
+      "providerId": "lucen",
+      "model": "qwen3.6-plus",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "provider_http_502",
+      "latencyMs": 10170
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-deepseek-openai-050:qwen3.7-max:responses",
+      "channelId": "lucen-deepseek-openai-050",
+      "providerId": "lucen",
+      "model": "qwen3.7-max",
+      "protocol": "responses",
+      "status": "failed",
+      "errorClass": "provider_http_502",
+      "latencyMs": 14601
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-deepseek-claude-050:deepseek-v4-flash:messages",
+      "channelId": "lucen-deepseek-claude-050",
+      "providerId": "lucen",
+      "model": "deepseek-v4-flash",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "invalid_sse_content_type",
+      "latencyMs": 528
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-deepseek-claude-050:deepseek-v4-pro:messages",
+      "channelId": "lucen-deepseek-claude-050",
+      "providerId": "lucen",
+      "model": "deepseek-v4-pro",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "invalid_sse_content_type",
+      "latencyMs": 480
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-kiro-cache90-claude-006:claude-opus-4-8:messages",
+      "channelId": "lucen-kiro-cache90-claude-006",
+      "providerId": "lucen",
+      "model": "claude-opus-4-8",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "invalid_sse_content_type",
+      "latencyMs": 323
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-kiro-cache90-claude-006:claude-sonnet-5:messages",
+      "channelId": "lucen-kiro-cache90-claude-006",
+      "providerId": "lucen",
+      "model": "claude-sonnet-5",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "invalid_sse_content_type",
+      "latencyMs": 201
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-kiro-cache70-claude-006:claude-opus-4-8:messages",
+      "channelId": "lucen-kiro-cache70-claude-006",
+      "providerId": "lucen",
+      "model": "claude-opus-4-8",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "invalid_sse_content_type",
+      "latencyMs": 174
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-kiro-cache70-claude-006:claude-sonnet-5:messages",
+      "channelId": "lucen-kiro-cache70-claude-006",
+      "providerId": "lucen",
+      "model": "claude-sonnet-5",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "invalid_sse_content_type",
+      "latencyMs": 173
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-claude-max-unlimited-100:claude-opus-4-8:messages",
+      "channelId": "lucen-claude-max-unlimited-100",
+      "providerId": "lucen",
+      "model": "claude-opus-4-8",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "invalid_sse_content_type",
+      "latencyMs": 179
+    },
+    {
+      "runId": "full-pool-preflight-20260731-v1",
+      "executionProfileId": "lucen-claude-max-unlimited-100:claude-sonnet-5:messages",
+      "channelId": "lucen-claude-max-unlimited-100",
+      "providerId": "lucen",
+      "model": "claude-sonnet-5",
+      "protocol": "messages",
+      "status": "failed",
+      "errorClass": "invalid_sse_content_type",
+      "latencyMs": 178
+    }
+  ]
+}

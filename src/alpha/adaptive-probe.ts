@@ -7,11 +7,27 @@ import type { AlphaExecutionProfile } from "./routing.js";
 import { AlphaRepository, alphaId } from "./repository.js";
 import { parseProviderUsage } from "./usage.js";
 
+type Json = Record<string, unknown>;
+
 export function adaptiveProbeIntervalMinutes(userRequestsLast30Minutes: number): number | null {
   if (userRequestsLast30Minutes <= 0) return null;
   if (userRequestsLast30Minutes <= 5) return 60;
   if (userRequestsLast30Minutes <= 20) return 30;
   return 15;
+}
+
+export function fullPoolProbeDue(input: {
+  manual: boolean;
+  lastCompletedAt?: Date;
+  userRequestsLastSixHours: number;
+  now?: number;
+  intervalMs?: number;
+}): boolean {
+  if (input.manual) return true;
+  const now = input.now ?? Date.now();
+  const intervalMs = input.intervalMs ?? 6 * 60 * 60_000;
+  if (input.lastCompletedAt && now - input.lastCompletedAt.getTime() < intervalMs) return false;
+  return input.userRequestsLastSixHours > 0;
 }
 
 export type AdaptiveProbeWorkerOptions = {
@@ -20,7 +36,10 @@ export type AdaptiveProbeWorkerOptions = {
   adapters: Map<string, NativeProviderAdapter>;
   dailyBudgetCny: number;
   timeoutMs?: number;
+  fullPoolIntervalMs?: number;
 };
+
+const MANUAL_FULL_POOL_QUEUE_ID = "__full_pool__";
 
 export class AdaptiveProbeWorker {
   private running = false;
@@ -68,6 +87,7 @@ export class AdaptiveProbeWorker {
   }
 
   private async runEligibleProbe(): Promise<void> {
+    if (await this.runFullPoolIfEligible()) return;
     const activity = await this.options.database.query<{ request_count: number }>(
       "SELECT count(*)::int request_count FROM acu_logical_requests WHERE started_at>=now()-interval '30 minutes'",
     );
@@ -126,12 +146,108 @@ export class AdaptiveProbeWorker {
     }
   }
 
+  private async runFullPoolIfEligible(): Promise<boolean> {
+    const requested = await this.options.database.query(
+      "SELECT 1 FROM acu_profile_probe_queue WHERE execution_profile_id=$1",
+      [MANUAL_FULL_POOL_QUEUE_ID],
+    );
+    const manual = Boolean(requested.rowCount);
+    const intervalMs = this.options.fullPoolIntervalMs ?? 6 * 60 * 60_000;
+    const latest = await this.options.database.query<{ started_at: Date | null }>(
+      "SELECT max(started_at) started_at FROM acu_full_pool_probe_runs",
+    );
+    const lastRunAt = latest.rows[0]?.started_at;
+    const activity = manual ? { rowCount: 0 } : await this.options.database.query(
+      "SELECT 1 FROM acu_logical_requests WHERE started_at>=now()-interval '6 hours' LIMIT 1",
+    );
+    if (!fullPoolProbeDue({
+      manual,
+      lastCompletedAt: lastRunAt ? new Date(lastRunAt) : undefined,
+      userRequestsLastSixHours: activity.rowCount ?? 0,
+      intervalMs,
+    })) return false;
+    const budget = await this.options.database.query<{ spend: string }>(
+      `SELECT coalesce(sum(cost_cny) FILTER (WHERE started_at>=date_trunc('day',now())),0)::text spend
+       FROM acu_profile_probe_attempts`,
+    );
+    if (Number(budget.rows[0]?.spend ?? 0) >= this.options.dailyBudgetCny) return false;
+    const runId = `full_pool_${randomUUID().replaceAll("-", "")}`;
+    const profiles = this.options.profiles.filter((profile) => profile.enabled && profile.administratorAllowed
+      && this.options.adapters.has(profile.executionProfileId));
+    await this.options.database.query(
+      `INSERT INTO acu_full_pool_probe_runs
+        (full_pool_probe_run_id,status,trigger,profile_count,metadata_json)
+       VALUES ($1,'running',$2,$3,$4::jsonb)`,
+      [runId, manual ? "manual" : "scheduled_activity", profiles.length,
+        JSON.stringify({ intervalHours: intervalMs / 3_600_000, userActivityRequired: !manual })],
+    );
+    let attempted = 0;
+    let success = 0;
+    let failed = 0;
+    let costCny = 0;
+    let status = "completed";
+    try {
+      const repository = new AlphaRepository(this.options.database);
+      for (const profile of profiles) {
+        const currentSpend = Number(budget.rows[0]?.spend ?? 0) + costCny;
+        if (currentSpend >= this.options.dailyBudgetCny) {
+          status = "budget_exhausted";
+          break;
+        }
+        await this.options.database.query(
+          `UPDATE acu_probe_worker_lease SET lease_until=now()+interval '2 minutes',updated_at=now()
+           WHERE singleton=true AND holder_id=$1`,
+          [this.workerId],
+        );
+        const [channels, runtimes] = await Promise.all([
+          repository.batchChannelHealth([profile.channelId ?? profile.channel]),
+          repository.batchProfileHealth([profile.executionProfileId]),
+        ]);
+        const result = await this.probe(
+          profile,
+          repository,
+          channels.get(profile.channelId ?? profile.channel) ?? { state: "healthy", consecutiveFailures: 0, recentSuccessRate: 1 },
+          runtimes.get(profile.executionProfileId) ?? { state: "healthy", consecutiveFailures: 0, recentSuccessRate: 1 },
+          { probeMode: "full_pool", fullPoolProbeRunId: runId, trigger: manual ? "manual" : "scheduled_activity" },
+        );
+        attempted += 1;
+        costCny += result.costCny;
+        if (result.success) success += 1;
+        else failed += 1;
+        await this.options.database.query(
+          `UPDATE acu_full_pool_probe_runs SET attempted_count=$2,success_count=$3,failed_count=$4,cost_cny=$5
+           WHERE full_pool_probe_run_id=$1`,
+          [runId, attempted, success, failed, costCny.toFixed(10)],
+        );
+      }
+    } catch (error) {
+      status = "failed";
+      await this.options.database.query(
+        `UPDATE acu_full_pool_probe_runs SET metadata_json=metadata_json||$2::jsonb
+         WHERE full_pool_probe_run_id=$1`,
+        [runId, JSON.stringify({ error: error instanceof Error ? error.message : String(error) })],
+      );
+    }
+    await Promise.all([
+      this.options.database.query(
+        `UPDATE acu_full_pool_probe_runs SET status=$2,attempted_count=$3,success_count=$4,failed_count=$5,
+          cost_cny=$6,completed_at=now() WHERE full_pool_probe_run_id=$1`,
+        [runId, status, attempted, success, failed, costCny.toFixed(10)],
+      ),
+      manual
+        ? this.options.database.query("DELETE FROM acu_profile_probe_queue WHERE execution_profile_id=$1", [MANUAL_FULL_POOL_QUEUE_ID])
+        : Promise.resolve(),
+    ]);
+    return true;
+  }
+
   private async probe(
     profile: AlphaExecutionProfile,
     repository: AlphaRepository,
     channelHealth: HealthSnapshot,
     profileHealth: HealthSnapshot,
-  ): Promise<void> {
+    probeMetadata: Json = {},
+  ): Promise<{ success: boolean; costCny: number }> {
     const protocol = profile.protocols.includes("responses") ? "responses" : profile.protocols[0];
     const providerModel = profile.providerModelId ?? profile.modelId;
     const payload = protocol === "messages"
@@ -145,9 +261,12 @@ export class AdaptiveProbeWorker {
     let outcome: AttemptOutcome;
     let usageTrusted = false;
     let inputTokens = 0n;
+    let cachedInputTokens = 0n;
     let outputTokens = 0n;
+    let reasoningTokens = 0n;
     let actualModel: string | undefined;
     let costCny = 0;
+    let costBreakdown: Json = {};
     try {
       response = await this.options.adapters.get(profile.executionProfileId)!.execute({
         protocol,
@@ -166,7 +285,9 @@ export class AdaptiveProbeWorker {
         requestBytes: body.byteLength,
       });
       inputTokens = usage.inputTokens;
+      cachedInputTokens = usage.cachedInputTokens;
       outputTokens = usage.outputTokens;
+      reasoningTokens = usage.reasoningTokens;
       actualModel = usage.actualModel;
       usageTrusted = usage.usageSource === "provider_usage";
       const acceptedModels = new Set([profile.modelId, providerModel, ...(profile.actualModelAliases ?? [])]);
@@ -183,7 +304,19 @@ export class AdaptiveProbeWorker {
         totalLatencyMs: Date.now() - startedAt.getTime(),
       };
       if (profile.economics) {
-        costCny = providerCostBreakdown(profile.economics, Number(usage.providerCostUsd)).effectiveCashCostCny;
+        const breakdown = providerCostBreakdown(profile.economics, Number(usage.providerCostUsd));
+        costCny = breakdown.effectiveCashCostCny;
+        costBreakdown = {
+          catalogNominalCostUsd: breakdown.nominalProviderCostUsd,
+          billingMultiplier: profile.economics.observedBillingMultiplier,
+          providerBalanceCharge: breakdown.providerBalanceCharge,
+          providerBalanceCurrency: breakdown.providerBalanceCurrency,
+          providerCreditCashCostCny: breakdown.providerCreditCashCostCny,
+          effectiveCashCostCny: breakdown.effectiveCashCostCny,
+          effectiveCostStatus: breakdown.effectiveCostStatus,
+          effectiveCostSource: breakdown.effectiveCostSource,
+          effectiveCostVersion: breakdown.effectiveCostVersion,
+        };
       }
     } catch (error) {
       outcome = {
@@ -227,8 +360,18 @@ export class AdaptiveProbeWorker {
         [probeAttemptId, profile.executionProfileId, profile.channelId ?? profile.channel, profile.provider,
           profile.modelId, protocol, validProbe ? "success" : "failed", response?.status ?? null,
           classified.errorClass, outcome.totalLatencyMs ?? null, inputTokens.toString(), outputTokens.toString(),
-          actualModel ?? null, usageTrusted, costCny.toFixed(10), JSON.stringify({ rawResponseBytes: responseBody.byteLength }), startedAt],
+          actualModel ?? null, usageTrusted, costCny.toFixed(10), JSON.stringify({
+            rawResponseBytes: responseBody.byteLength,
+            inputTokens: inputTokens.toString(),
+            cachedInputTokens: cachedInputTokens.toString(),
+            outputTokens: outputTokens.toString(),
+            reasoningTokens: reasoningTokens.toString(),
+            actualModel: actualModel ?? null,
+            costBreakdown,
+            ...probeMetadata,
+          }), startedAt],
       ),
     ]);
+    return { success: validProbe, costCny };
   }
 }

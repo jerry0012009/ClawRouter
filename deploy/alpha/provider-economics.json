@@ -9,8 +9,8 @@
       "baseUrlEnv": "LUCEN_BASE_URL",
       "apiKeyEnv": "LUCEN_API_KEY",
       "balanceCurrency": "USD-denominated credits",
-      "rechargeCashCny": 500,
-      "creditsReceivedUsd": 500,
+      "rechargeCashCny": 100,
+      "creditsReceivedUsd": 100,
       "observedBillingMultiplier": 0.06,
       "priceSource": "Lucen authenticated /v1/usage nominal token charge; canonical catalog prices",
       "priceObservedAt": "2026-07-29T00:00:00Z",
@@ -18,8 +18,8 @@
       "priority": 10,
       "enabled": true,
       "effectiveCostStatus": "verified",
-      "effectiveCostSource": "founder recharge batch CNY 500 for 500 USD-denominated credits; current observed group multiplier 0.06",
-      "effectiveCostVersion": "lucen-founder-batch-20260730-v2"
+      "effectiveCostSource": "founder-confirmed recharge batch CNY 100 for 100 USD-denominated credits; execution-profile group multiplier applied separately",
+      "effectiveCostVersion": "lucen-founder-batch-20260731-v3"
     },
     {
       "providerId": "blackai",

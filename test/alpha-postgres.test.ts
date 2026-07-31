@@ -1,7 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AlphaDatabase } from "../src/alpha/database.js";
+import { AdaptiveProbeWorker } from "../src/alpha/adaptive-probe.js";
 import { AlphaRepository } from "../src/alpha/repository.js";
+import type { NativeProviderAdapter } from "../src/alpha/provider.js";
+import type { AlphaExecutionProfile } from "../src/alpha/routing.js";
 
 const databaseUrl = process.env.ACU_TEST_DATABASE_URL;
 const run = databaseUrl ? describe : describe.skip;
@@ -35,6 +38,7 @@ run("Alpha PostgreSQL foundation", () => {
       "acu_channel_admin_actions",
       "acu_channel_health",
       "acu_events",
+      "acu_full_pool_probe_runs",
       "acu_judge_attempts",
       "acu_judge_evaluations",
       "acu_judge_ledger_entries",
@@ -345,6 +349,92 @@ run("Alpha PostgreSQL foundation", () => {
     );
     expect(first.rowCount).toBe(1);
     expect(second.rowCount).toBe(0);
+  });
+
+  it("runs one full-pool Probe serially and records reproducible cost metadata", async () => {
+    await database.query("TRUNCATE acu_full_pool_probe_runs,acu_profile_probe_attempts,acu_profile_probe_queue");
+    await database.query(
+      "UPDATE acu_probe_worker_lease SET holder_id=null,lease_until=now()-interval '1 second' WHERE singleton=true",
+    );
+    await database.query("INSERT INTO acu_profile_probe_queue (execution_profile_id) VALUES ('__full_pool__')");
+    const economics = {
+      providerId: "lucen", displayName: "Lucen", protocol: "openai_responses",
+      baseUrlEnv: "LUCEN_BASE_URL", apiKeyEnv: "LUCEN_API_KEY",
+      balanceCurrency: "USD-denominated credits" as const,
+      rechargeCashCny: 100, creditsReceivedUsd: 100, observedBillingMultiplier: 0.25,
+      priceSource: "fixture", priceObservedAt: "2026-07-31T00:00:00Z",
+      health: "healthy" as const, priority: 1, enabled: true,
+      effectiveCostStatus: "verified" as const, effectiveCostSource: "fixture", effectiveCostVersion: "fixture-v1",
+    };
+    const profiles: AlphaExecutionProfile[] = [1, 2].map((index) => ({
+      executionProfileId: `full-pool-profile-${index}`,
+      modelId: "gpt-5.4-mini",
+      providerModelId: "gpt-5.4-mini",
+      provider: "lucen",
+      channel: `full-pool-channel-${index}`,
+      channelId: `full-pool-channel-${index}`,
+      protocols: ["responses"],
+      toolCallSupport: true,
+      thinkingSupport: true,
+      contextWindow: 128_000,
+      health: "healthy",
+      enabled: true,
+      administratorAllowed: true,
+      usageTrusted: true,
+      economics,
+    }));
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const adapter: NativeProviderAdapter = {
+      async execute() {
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await Promise.resolve();
+        inFlight -= 1;
+        return new Response(
+          'data: {"type":"response.completed","response":{"model":"gpt-5.4-mini","usage":{"input_tokens":10,"output_tokens":1}}}\n\n',
+          { status: 200, headers: { "content-type": "text/event-stream" } },
+        );
+      },
+    };
+    const worker = new AdaptiveProbeWorker({
+      database,
+      profiles,
+      adapters: new Map(profiles.map((profile) => [profile.executionProfileId, adapter])),
+      dailyBudgetCny: 1,
+    });
+
+    await worker.runOnce();
+    await worker.runOnce();
+
+    const runs = await database.query<{
+      status: string; profile_count: number; attempted_count: number; success_count: number; cost_cny: string;
+    }>("SELECT status,profile_count,attempted_count,success_count,cost_cny::text FROM acu_full_pool_probe_runs");
+    expect(runs.rows).toEqual([expect.objectContaining({
+      status: "completed", profile_count: 2, attempted_count: 2, success_count: 2,
+    })]);
+    expect(Number(runs.rows[0]?.cost_cny)).toBeGreaterThan(0);
+    expect(maxInFlight).toBe(1);
+    const attempts = await database.query<{ metadata_json: Record<string, unknown> }>(
+      "SELECT metadata_json FROM acu_profile_probe_attempts ORDER BY execution_profile_id",
+    );
+    expect(attempts.rows).toHaveLength(2);
+    for (const row of attempts.rows) {
+      expect(row.metadata_json).toMatchObject({
+        probeMode: "full_pool",
+        trigger: "manual",
+        inputTokens: "10",
+        outputTokens: "1",
+        actualModel: "gpt-5.4-mini",
+        costBreakdown: {
+          billingMultiplier: 0.25,
+          providerCreditCashCostCny: 1,
+        },
+      });
+      expect(row.metadata_json.fullPoolProbeRunId).toBeTypeOf("string");
+    }
+    const marker = await database.query("SELECT 1 FROM acu_profile_probe_queue WHERE execution_profile_id='__full_pool__'");
+    expect(marker.rowCount).toBe(0);
   });
 
   it("returns the complete logical request chain only through the explicit admin lookup", async () => {

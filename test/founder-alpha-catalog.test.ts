@@ -9,7 +9,11 @@ describe("Founder Alpha New API catalog export", () => {
       readFile("deploy/alpha/execution-profiles.json", "utf8").then(JSON.parse),
     ]);
     expect(exported.sourceCatalogVersion).toBe(source.schemaVersion);
-    expect(exported.responses).toHaveLength(5);
+    const routingModels = new Set(profiles.filter((profile: {
+      enabled?: boolean; administratorAllowed?: boolean; autoRouteEnabled?: boolean;
+    }) => profile.enabled === true && profile.administratorAllowed === true
+      && profile.autoRouteEnabled !== false).map((profile: { modelId: string }) => profile.modelId));
+    expect(new Set(exported.responses.map((item: { modelId: string }) => item.modelId))).toEqual(routingModels);
     for (const item of exported.responses) {
       const catalogModel = source.models.find((model: { modelId: string }) => model.modelId === item.modelId);
       expect(catalogModel).toMatchObject({
@@ -18,9 +22,10 @@ describe("Founder Alpha New API catalog export", () => {
         outputPricePerMillion: item.outputPricePerMillion,
         cachedInputPricePerMillion: item.cachedInputPricePerMillion,
       });
-      expect(profiles.some((profile: { modelId: string; protocols: string[] }) => (
-        profile.modelId === item.modelId && profile.protocols.includes("responses")
-      ))).toBe(true);
+      const protocols = new Set(profiles.filter((profile: { modelId: string }) => profile.modelId === item.modelId)
+        .flatMap((profile: { protocols: string[] }) => profile.protocols));
+      expect(item.protocol).toBe([...protocols].sort()
+        .map((protocol) => protocol === "responses" ? "Responses" : "Messages").join(" + "));
     }
     expect(new Set(exported.curveModelStatuses.map((item: { modelId: string }) => item.modelId)))
       .toEqual(new Set(source.models.map((item: { modelId: string }) => item.modelId)));
@@ -33,8 +38,9 @@ describe("Founder Alpha New API catalog export", () => {
       readFile("deploy/alpha/docker-compose.yml", "utf8"),
     ]);
     const expected = [
-      "acu-auto", "gpt-5.4-mini", "gpt-5.6-luna",
-      "gpt-5.6-terra", "gpt-5.5", "gpt-5.6-sol",
+      "acu-auto", "claude-opus-4-8", "claude-sonnet-5", "deepseek-v4-flash",
+      "gemini-2.5-flash", "glm-5.1", "glm-5.2", "gpt-5.4-mini", "gpt-5.5",
+      "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "kimi-k2.6", "kimi-k2.7-code",
     ];
     expect([exported.auto.modelId, ...exported.responses.map((item: { modelId: string }) => item.modelId)])
       .toEqual(expected);

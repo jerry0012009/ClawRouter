@@ -12,54 +12,122 @@
   },
   "responses": [
     {
+      "modelId": "claude-opus-4-8",
+      "role": "Verified",
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 25,
+      "cachedInputPricePerMillion": 0.5,
+      "protocol": "Messages",
+      "toolCall": true,
+      "reasoning": true,
+      "activeInAcuAuto": true,
+      "provider": "Multi-provider",
+      "status": "routing_active",
+      "healthyChannelCount": 8,
+      "effectiveCostStatuses": [
+        "estimated",
+        "verified"
+      ]
+    },
+    {
+      "modelId": "claude-sonnet-5",
+      "role": "Verified",
+      "inputPricePerMillion": 3,
+      "outputPricePerMillion": 15,
+      "cachedInputPricePerMillion": 0.3,
+      "protocol": "Messages",
+      "toolCall": true,
+      "reasoning": true,
+      "activeInAcuAuto": true,
+      "provider": "Multi-provider",
+      "status": "routing_active",
+      "healthyChannelCount": 6,
+      "effectiveCostStatuses": [
+        "estimated",
+        "verified"
+      ]
+    },
+    {
+      "modelId": "deepseek-v4-flash",
+      "role": "Verified",
+      "inputPricePerMillion": 0.15,
+      "outputPricePerMillion": 0.3,
+      "cachedInputPricePerMillion": 0.07,
+      "protocol": "Messages",
+      "toolCall": true,
+      "reasoning": true,
+      "activeInAcuAuto": true,
+      "provider": "Lucen",
+      "status": "routing_active",
+      "healthyChannelCount": 1,
+      "effectiveCostStatuses": [
+        "estimated"
+      ]
+    },
+    {
+      "modelId": "gemini-2.5-flash",
+      "role": "Verified",
+      "inputPricePerMillion": 0.15,
+      "outputPricePerMillion": 0.6,
+      "cachedInputPricePerMillion": 0.0375,
+      "protocol": "Responses",
+      "toolCall": true,
+      "reasoning": true,
+      "activeInAcuAuto": true,
+      "provider": "Lucen",
+      "status": "routing_active",
+      "healthyChannelCount": 1,
+      "effectiveCostStatuses": [
+        "estimated"
+      ]
+    },
+    {
+      "modelId": "glm-5.1",
+      "role": "Verified",
+      "inputPricePerMillion": 0.9,
+      "outputPricePerMillion": 3.5,
+      "cachedInputPricePerMillion": 0.45,
+      "protocol": "Responses",
+      "toolCall": true,
+      "reasoning": true,
+      "activeInAcuAuto": true,
+      "provider": "Lucen",
+      "status": "routing_active",
+      "healthyChannelCount": 1,
+      "effectiveCostStatuses": [
+        "estimated"
+      ]
+    },
+    {
+      "modelId": "glm-5.2",
+      "role": "Verified",
+      "inputPricePerMillion": 1.2,
+      "outputPricePerMillion": 4.2,
+      "cachedInputPricePerMillion": 0.6,
+      "protocol": "Messages + Responses",
+      "toolCall": true,
+      "reasoning": true,
+      "activeInAcuAuto": true,
+      "provider": "Lucen",
+      "status": "routing_active",
+      "healthyChannelCount": 3,
+      "effectiveCostStatuses": [
+        "estimated"
+      ]
+    },
+    {
       "modelId": "gpt-5.4-mini",
       "role": "Economy",
       "inputPricePerMillion": 0.75,
       "outputPricePerMillion": 4.5,
       "cachedInputPricePerMillion": 0.375,
-      "protocol": "Responses",
-      "toolCall": true,
-      "reasoning": true,
-      "activeInAcuAuto": true,
-      "provider": "CloseAI",
-      "status": "healthy",
-      "healthyChannelCount": 2,
-      "effectiveCostStatuses": [
-        "estimated",
-        "verified"
-      ]
-    },
-    {
-      "modelId": "gpt-5.6-luna",
-      "role": "Value",
-      "inputPricePerMillion": 1,
-      "outputPricePerMillion": 6,
-      "cachedInputPricePerMillion": 0.1,
-      "protocol": "Responses",
+      "protocol": "Messages + Responses",
       "toolCall": true,
       "reasoning": true,
       "activeInAcuAuto": true,
       "provider": "Multi-provider",
-      "status": "healthy",
-      "healthyChannelCount": 5,
-      "effectiveCostStatuses": [
-        "estimated",
-        "verified"
-      ]
-    },
-    {
-      "modelId": "gpt-5.6-terra",
-      "role": "Strong",
-      "inputPricePerMillion": 2.5,
-      "outputPricePerMillion": 15,
-      "cachedInputPricePerMillion": 0.25,
-      "protocol": "Responses",
-      "toolCall": true,
-      "reasoning": true,
-      "activeInAcuAuto": true,
-      "provider": "CloseAI",
-      "status": "healthy",
-      "healthyChannelCount": 3,
+      "status": "routing_active",
+      "healthyChannelCount": 10,
       "effectiveCostStatuses": [
         "estimated",
         "verified"
@@ -71,14 +139,33 @@
       "inputPricePerMillion": 5,
       "outputPricePerMillion": 30,
       "cachedInputPricePerMillion": 2.5,
-      "protocol": "Responses",
+      "protocol": "Messages + Responses",
       "toolCall": true,
       "reasoning": true,
       "activeInAcuAuto": true,
-      "provider": "CloseAI",
-      "status": "healthy",
-      "healthyChannelCount": 1,
+      "provider": "Multi-provider",
+      "status": "routing_active",
+      "healthyChannelCount": 12,
       "effectiveCostStatuses": [
+        "estimated",
+        "verified"
+      ]
+    },
+    {
+      "modelId": "gpt-5.6-luna",
+      "role": "Value",
+      "inputPricePerMillion": 1,
+      "outputPricePerMillion": 6,
+      "cachedInputPricePerMillion": 0.1,
+      "protocol": "Messages + Responses",
+      "toolCall": true,
+      "reasoning": true,
+      "activeInAcuAuto": true,
+      "provider": "Multi-provider",
+      "status": "routing_active",
+      "healthyChannelCount": 12,
+      "effectiveCostStatuses": [
+        "estimated",
         "verified"
       ]
     },
@@ -92,12 +179,64 @@
       "toolCall": true,
       "reasoning": true,
       "activeInAcuAuto": true,
-      "provider": "CloseAI",
-      "status": "healthy",
-      "healthyChannelCount": 2,
+      "provider": "Multi-provider",
+      "status": "routing_active",
+      "healthyChannelCount": 10,
       "effectiveCostStatuses": [
         "estimated",
         "verified"
+      ]
+    },
+    {
+      "modelId": "gpt-5.6-terra",
+      "role": "Strong",
+      "inputPricePerMillion": 2.5,
+      "outputPricePerMillion": 15,
+      "cachedInputPricePerMillion": 0.25,
+      "protocol": "Messages + Responses",
+      "toolCall": true,
+      "reasoning": true,
+      "activeInAcuAuto": true,
+      "provider": "Multi-provider",
+      "status": "routing_active",
+      "healthyChannelCount": 7,
+      "effectiveCostStatuses": [
+        "estimated",
+        "verified"
+      ]
+    },
+    {
+      "modelId": "kimi-k2.6",
+      "role": "Verified",
+      "inputPricePerMillion": 0.95,
+      "outputPricePerMillion": 4,
+      "cachedInputPricePerMillion": 0.475,
+      "protocol": "Messages",
+      "toolCall": true,
+      "reasoning": true,
+      "activeInAcuAuto": true,
+      "provider": "Lucen",
+      "status": "routing_active",
+      "healthyChannelCount": 1,
+      "effectiveCostStatuses": [
+        "estimated"
+      ]
+    },
+    {
+      "modelId": "kimi-k2.7-code",
+      "role": "Verified",
+      "inputPricePerMillion": 0.95,
+      "outputPricePerMillion": 4,
+      "cachedInputPricePerMillion": 0.475,
+      "protocol": "Messages",
+      "toolCall": true,
+      "reasoning": true,
+      "activeInAcuAuto": true,
+      "provider": "Lucen",
+      "status": "routing_active",
+      "healthyChannelCount": 1,
+      "effectiveCostStatuses": [
+        "estimated"
       ]
     }
   ],
@@ -108,9 +247,10 @@
         "active_responses",
         "active_messages"
       ],
-      "healthyChannelCount": 1,
+      "healthyChannelCount": 11,
       "temporarilyUnavailableReason": null,
       "effectiveCostStatuses": [
+        "estimated",
         "verified"
       ]
     },
@@ -120,7 +260,7 @@
         "active_responses",
         "active_messages"
       ],
-      "healthyChannelCount": 2,
+      "healthyChannelCount": 9,
       "temporarilyUnavailableReason": null,
       "effectiveCostStatuses": [
         "estimated",
@@ -132,9 +272,10 @@
       "statuses": [
         "active_messages"
       ],
-      "healthyChannelCount": 1,
+      "healthyChannelCount": 8,
       "temporarilyUnavailableReason": null,
       "effectiveCostStatuses": [
+        "estimated",
         "verified"
       ]
     },
@@ -143,9 +284,10 @@
       "statuses": [
         "active_messages"
       ],
-      "healthyChannelCount": 1,
+      "healthyChannelCount": 6,
       "temporarilyUnavailableReason": null,
       "effectiveCostStatuses": [
+        "estimated",
         "verified"
       ]
     },
@@ -161,11 +303,13 @@
     {
       "modelId": "deepseek-v4-flash",
       "statuses": [
-        "responses_incompatible"
+        "active_messages"
       ],
-      "healthyChannelCount": 0,
-      "temporarilyUnavailableReason": "No active verified Channel (responses_incompatible)",
-      "effectiveCostStatuses": []
+      "healthyChannelCount": 1,
+      "temporarilyUnavailableReason": null,
+      "effectiveCostStatuses": [
+        "estimated"
+      ]
     },
     {
       "modelId": "deepseek-v4-pro",
@@ -179,20 +323,24 @@
     {
       "modelId": "glm-5.1",
       "statuses": [
-        "responses_incompatible"
+        "active_responses"
       ],
-      "healthyChannelCount": 0,
-      "temporarilyUnavailableReason": "No active verified Channel (responses_incompatible)",
-      "effectiveCostStatuses": []
+      "healthyChannelCount": 1,
+      "temporarilyUnavailableReason": null,
+      "effectiveCostStatuses": [
+        "estimated"
+      ]
     },
     {
       "modelId": "kimi-k2.6",
       "statuses": [
-        "curve_only"
+        "active_messages"
       ],
-      "healthyChannelCount": 0,
-      "temporarilyUnavailableReason": "No active verified Channel (curve_only)",
-      "effectiveCostStatuses": []
+      "healthyChannelCount": 1,
+      "temporarilyUnavailableReason": null,
+      "effectiveCostStatuses": [
+        "estimated"
+      ]
     },
     {
       "modelId": "qwen3.5-flash",
@@ -235,7 +383,7 @@
       "statuses": [
         "active_responses"
       ],
-      "healthyChannelCount": 2,
+      "healthyChannelCount": 10,
       "temporarilyUnavailableReason": null,
       "effectiveCostStatuses": [
         "estimated",
@@ -248,7 +396,7 @@
         "active_responses",
         "active_messages"
       ],
-      "healthyChannelCount": 3,
+      "healthyChannelCount": 6,
       "temporarilyUnavailableReason": null,
       "effectiveCostStatuses": [
         "estimated",
@@ -261,7 +409,7 @@
         "active_responses",
         "active_messages"
       ],
-      "healthyChannelCount": 5,
+      "healthyChannelCount": 11,
       "temporarilyUnavailableReason": null,
       "effectiveCostStatuses": [
         "estimated",
@@ -271,29 +419,36 @@
     {
       "modelId": "glm-5.2",
       "statuses": [
-        "responses_incompatible"
+        "active_responses",
+        "active_messages"
       ],
-      "healthyChannelCount": 0,
-      "temporarilyUnavailableReason": "No active verified Channel (responses_incompatible)",
-      "effectiveCostStatuses": []
+      "healthyChannelCount": 1,
+      "temporarilyUnavailableReason": null,
+      "effectiveCostStatuses": [
+        "estimated"
+      ]
     },
     {
       "modelId": "kimi-k2.7-code",
       "statuses": [
-        "curve_only"
+        "active_messages"
       ],
-      "healthyChannelCount": 0,
-      "temporarilyUnavailableReason": "No active verified Channel (curve_only)",
-      "effectiveCostStatuses": []
+      "healthyChannelCount": 1,
+      "temporarilyUnavailableReason": null,
+      "effectiveCostStatuses": [
+        "estimated"
+      ]
     },
     {
       "modelId": "gemini-2.5-flash",
       "statuses": [
-        "provider_unavailable"
+        "active_responses"
       ],
-      "healthyChannelCount": 0,
-      "temporarilyUnavailableReason": "No active verified Channel (provider_unavailable)",
-      "effectiveCostStatuses": []
+      "healthyChannelCount": 1,
+      "temporarilyUnavailableReason": null,
+      "effectiveCostStatuses": [
+        "estimated"
+      ]
     },
     {
       "modelId": "meta-llama/llama-4-maverick",

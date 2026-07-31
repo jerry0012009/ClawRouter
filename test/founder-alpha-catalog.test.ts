@@ -22,6 +22,14 @@ describe("Founder Alpha New API catalog export", () => {
         outputPricePerMillion: item.outputPricePerMillion,
         cachedInputPricePerMillion: item.cachedInputPricePerMillion,
       });
+      expect(item.costCurrency).toBe("CNY");
+      expect(item.costSemantics).toBe("estimated_user_cash_cost");
+      expect(item.costExecutionProfileId).not.toBe("");
+      expect(item.effectiveInputPriceCnyPerMillion).toBeGreaterThan(0);
+      expect(item.effectiveOutputPriceCnyPerMillion).toBeGreaterThan(0);
+      expect(item.curve).toHaveLength(101);
+      expect(item.curve[0].difficultyScore).toBe(0);
+      expect(item.curve[100].difficultyScore).toBe(100);
       const protocols = new Set(profiles.filter((profile: { modelId: string }) => profile.modelId === item.modelId)
         .flatMap((profile: { protocols: string[] }) => profile.protocols));
       expect(item.protocol).toBe([...protocols].sort()
@@ -29,6 +37,13 @@ describe("Founder Alpha New API catalog export", () => {
     }
     expect(new Set(exported.curveModelStatuses.map((item: { modelId: string }) => item.modelId)))
       .toEqual(new Set(source.models.map((item: { modelId: string }) => item.modelId)));
+    const luna = exported.responses.find((item: { modelId: string }) => item.modelId === "gpt-5.6-luna");
+    expect(luna).toMatchObject({
+      costCurrency: "CNY",
+      effectiveInputPriceCnyPerMillion: 0.06,
+      effectiveOutputPriceCnyPerMillion: 0.36,
+      costProvider: "Lucen",
+    });
   });
 
   it("keeps all six Founder catalog surfaces aligned", async () => {

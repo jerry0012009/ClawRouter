@@ -1,14 +1,18 @@
 #!/usr/bin/env node
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { getAcuModel } from "../../src/acu/catalog.js";
+import { buildModelCurve, getAcuModel } from "../../src/acu/catalog.js";
 
 const catalogPath = resolve("deploy/alpha/newapi-acu-catalog.json");
 const profiles = JSON.parse(await readFile(resolve("deploy/alpha/execution-profiles.json"), "utf8")) as Array<Record<string, unknown>>;
+const economicsCatalog = JSON.parse(await readFile(resolve("deploy/alpha/provider-economics.json"), "utf8")) as {
+  providers: Array<Record<string, unknown>>;
+};
 const catalog = JSON.parse(await readFile(catalogPath, "utf8")) as {
   responses: Array<Record<string, unknown>>;
   curveModelStatuses: Array<Record<string, unknown>>;
 };
+const economicsByProvider = new Map(economicsCatalog.providers.map((provider) => [String(provider.providerId), provider]));
 function activeProfiles(modelId: string, responsesOnly: boolean): Array<Record<string, unknown>> {
   return profiles.filter((profile) => profile.modelId === modelId
     && (!responsesOnly || (profile.protocols instanceof Array && profile.protocols.includes("responses")))
@@ -28,6 +32,31 @@ function displayProvider(providerIds: string[]): string {
     : provider === "closeai" ? "CloseAI" : provider;
 }
 
+function profileCashCnyPerNominalUsd(profile: Record<string, unknown>): number {
+  const economics = economicsByProvider.get(String(profile.economicsProviderId ?? profile.provider));
+  const rechargeCashCny = Number(economics?.rechargeCashCny);
+  const creditsReceivedUsd = Number(economics?.creditsReceivedUsd);
+  const multiplier = Number(profile.observedBillingMultiplier ?? economics?.observedBillingMultiplier);
+  if (![rechargeCashCny, creditsReceivedUsd, multiplier].every((value) => Number.isFinite(value) && value > 0)) {
+    return Number.POSITIVE_INFINITY;
+  }
+  return multiplier * rechargeCashCny / creditsReceivedUsd;
+}
+
+function profileReferenceScore(profile: Record<string, unknown>): number {
+  const cashMultiplier = profileCashCnyPerNominalUsd(profile);
+  const healthFactor = profile.health === "degraded" ? 1.2 : profile.health === "unknown" ? 1.1 : 1;
+  const successRate = Math.max(0.5, Math.min(1, Number(profile.recentSuccessRate ?? 1)));
+  const latencyFactor = 1 + Math.min(0.05, Math.max(0, Number(profile.observedLatencyMs ?? 0)) / 1_200_000);
+  return cashMultiplier * healthFactor * latencyFactor / successRate;
+}
+
+function referenceProfile(items: Array<Record<string, unknown>>): Record<string, unknown> | undefined {
+  return items
+    .filter((profile) => profile.usageTrusted !== false && profile.effectiveCostStatus !== "missing")
+    .sort((left, right) => profileReferenceScore(left) - profileReferenceScore(right))[0];
+}
+
 const active = profiles.filter((profile) => profile.enabled === true
   && profile.administratorAllowed === true && profile.autoRouteEnabled !== false);
 const activeModelIds = [...new Set(active.map((profile) => String(profile.modelId)))].sort();
@@ -43,12 +72,35 @@ catalog.responses = activeModelIds.map((modelId) => {
   const channels = new Set(modelProfiles.map((profile) => String(profile.channelId ?? profile.channel)));
   const providers = [...new Set(modelProfiles.map((profile) => String(profile.provider)))].sort();
   const existing = existingResponses.get(modelId);
+  const healthyProfiles = activeProfiles(modelId, false);
+  const costProfile = referenceProfile(healthyProfiles);
+  const cashMultiplier = costProfile ? profileCashCnyPerNominalUsd(costProfile) : Number.NaN;
+  if (!costProfile || !Number.isFinite(cashMultiplier)) {
+    throw new Error(`Routing-active model ${modelId} has no healthy Profile with usable CNY economics`);
+  }
+  const effectiveCostStatus = costProfile?.effectiveCostStatus === "verified" ? "verified" : "estimated";
   return {
     modelId,
+    displayName: model.displayName,
     role: existing?.role ?? String(modelProfiles[0]?.capabilityTier ?? "Verified"),
     inputPricePerMillion: model.inputPricePerMillion,
     outputPricePerMillion: model.outputPricePerMillion,
     cachedInputPricePerMillion: model.cachedInputPricePerMillion ?? model.inputPricePerMillion,
+    effectiveInputPriceCnyPerMillion: model.inputPricePerMillion * cashMultiplier,
+    effectiveOutputPriceCnyPerMillion: model.outputPricePerMillion * cashMultiplier,
+    effectiveCachedInputPriceCnyPerMillion: (model.cachedInputPricePerMillion ?? model.inputPricePerMillion) * cashMultiplier,
+    costCurrency: "CNY",
+    costSemantics: "estimated_user_cash_cost",
+    costBasis: "current_reference_execution_profile",
+    costExecutionProfileId: String(costProfile?.executionProfileId ?? ""),
+    costProvider: displayProvider(costProfile ? [String(costProfile.provider)] : []),
+    costChannel: String(costProfile?.channel ?? ""),
+    effectiveCostStatus,
+    curveProfile: model.curveProfile,
+    profileConfidence: model.profileConfidence,
+    curve: buildModelCurve(model).map(({ difficultyScore, estimatedQuality, qualityLower, qualityUpper }) => ({
+      difficultyScore, estimatedQuality, qualityLower, qualityUpper,
+    })),
     protocol: protocols.map((protocol) => protocol === "responses" ? "Responses" : "Messages").join(" + "),
     toolCall: modelProfiles.every((profile) => profile.toolCallSupport === true),
     reasoning: modelProfiles.every((profile) => profile.thinkingSupport === true),

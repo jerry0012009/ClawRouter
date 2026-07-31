@@ -121,6 +121,7 @@ export class AdaptiveProbeWorker {
     ]);
     const queuedOrder = new Map(queued.rows.map((row, index) => [row.execution_profile_id, index]));
     const candidates = this.options.profiles.filter((profile) => {
+      if (profile.verificationStatus === "rejected") return false;
       if (!profile.enabled || !profile.administratorAllowed || !this.options.adapters.has(profile.executionProfileId)) return false;
       const channel = channels.get(profile.channelId ?? profile.channel);
       const runtime = runtimes.get(profile.executionProfileId);

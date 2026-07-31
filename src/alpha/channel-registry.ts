@@ -5,6 +5,18 @@ export type ChannelDiscoveryStatus = "pending" | "success" | "auth_failed" | "un
 export type SupplyProfileStatus = "active" | "probe_pending" | "degraded" | "temporarily_unavailable"
   | "disabled" | "rejected" | "alias_pending";
 
+export function isRecoveredSupplyProfile(input: {
+  actualModelVerified?: boolean;
+  usageTrusted?: boolean;
+  lastSuccessAt?: Date;
+  state?: string;
+}): boolean {
+  return input.actualModelVerified === true
+    && input.usageTrusted === true
+    && input.lastSuccessAt !== undefined
+    && input.state === "healthy";
+}
+
 export type ProviderChannel = {
   channelId: string;
   providerId: string;

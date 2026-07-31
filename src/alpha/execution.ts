@@ -1,6 +1,7 @@
 import type { NativeProviderAdapter, NativeProviderRequest } from "./provider.js";
 import type { AlphaExecutionProfile } from "./routing.js";
 import { ModelOutputObserver, setResponseObservation } from "./model-output.js";
+import type { RecoveryDecisionReason } from "./execution-outcome.js";
 
 export type ProviderAttemptHandle = {
   attemptId: string;
@@ -41,6 +42,7 @@ export type ProviderRecoveryOptions = {
     error?: unknown;
   }): Promise<void>;
   onSelected?(attempt: ProviderAttemptHandle): void;
+  onRecoveryDecision?(reason: RecoveryDecisionReason): void;
 };
 
 export function isRecoverableProviderStatus(status: number): boolean {
@@ -179,27 +181,36 @@ export function createRecoveringProviderAdapter(options: ProviderRecoveryOptions
           }
           const recoverable = isRecoverableProviderStatus(response.status)
             || options.isRecoverableResponse?.(response, current) === true;
-          if (!recoverable
-            || current.attemptIndex >= maxAttempts
-            || request.signal.aborted) {
+          if (!recoverable || current.attemptIndex >= maxAttempts || request.signal.aborted) {
+            options.onRecoveryDecision?.(!recoverable ? "not_recoverable"
+              : request.signal.aborted ? "client_disconnected" : "max_attempts_reached");
             options.onSelected?.(current);
             return response;
           }
           const failure = await bufferFailure(response);
           recoveryTarget = options.selectRecoveryTarget?.(current, failure) ?? legacyTarget(current.profile);
           if (!recoveryTarget) {
+            options.onRecoveryDecision?.("no_compatible_profile");
             options.onSelected?.(current);
             return new Response(new Uint8Array(failure.body), { status: failure.status, headers: failure.headers });
           }
+          options.onRecoveryDecision?.("executed");
           await options.recordFailedAttempt({
             attempt: current,
             latencyMs: Date.now() - startedAt,
             response: failure,
           });
         } catch (error) {
-          if (request.signal.aborted || current.attemptIndex >= maxAttempts) throw error;
+          if (request.signal.aborted || current.attemptIndex >= maxAttempts) {
+            options.onRecoveryDecision?.(request.signal.aborted ? "client_disconnected" : "max_attempts_reached");
+            throw error;
+          }
           recoveryTarget = options.selectRecoveryTarget?.(current, undefined, error) ?? legacyTarget(current.profile);
-          if (!recoveryTarget) throw error;
+          if (!recoveryTarget) {
+            options.onRecoveryDecision?.("no_compatible_profile");
+            throw error;
+          }
+          options.onRecoveryDecision?.("executed");
           await options.recordFailedAttempt({
             attempt: current,
             latencyMs: Date.now() - startedAt,

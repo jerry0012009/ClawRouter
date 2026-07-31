@@ -75,9 +75,12 @@ export function effectiveContextCeiling(profile: {
   modelId: string;
   canonicalAdvertisedContextWindow?: number;
   providerHardContextCap?: number | null;
+  contextCapabilityStatus?: "verified" | "observed_floor" | "unverified_long_context" | "provider_capped";
 }): number {
   const canonical = profile.canonicalAdvertisedContextWindow ?? canonicalAdvertisedContextWindow(profile.modelId);
+  const advertised = profile.contextCapabilityStatus === "unverified_long_context"
+    ? Math.min(canonical, 64 * 1024) : canonical;
   return profile.providerHardContextCap === null || profile.providerHardContextCap === undefined
-    ? canonical
-    : Math.min(canonical, profile.providerHardContextCap);
+    ? advertised
+    : Math.min(advertised, profile.providerHardContextCap);
 }

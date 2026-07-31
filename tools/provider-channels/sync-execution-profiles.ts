@@ -105,8 +105,9 @@ async function main(): Promise<void> {
       webSearchLastVerifiedAt: profile.webSearchLastVerifiedAt,
       webSearchFailureReason: profile.webSearchFailureReason,
       webTransportStatus: profile.webTransportStatus,
-      autoRouteEnabled: profile.activeInAcuAuto,
-      requiresFreshProbe: !profile.activeInAcuAuto,
+      verificationStatus: status === "rejected" ? "rejected" : profile.activeInAcuAuto ? "verified" : "discovered",
+      autoRouteEnabled: status !== "rejected" && profile.activeInAcuAuto,
+      requiresFreshProbe: status !== "rejected" && !profile.activeInAcuAuto,
     };
   });
   await writeFile(path, `${JSON.stringify([...promoted, ...retained], null, 2)}\n`);

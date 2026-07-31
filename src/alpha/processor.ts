@@ -40,6 +40,8 @@ import {
   withWebIntentSource,
 } from "./web-intent.js";
 import { compareWebPreference, resolveWebEligibility } from "./web-capability.js";
+import { isRecoveredSupplyProfile } from "./channel-registry.js";
+import { classifyExecutionOutcome, type RecoveryDecisionReason } from "./execution-outcome.js";
 
 const POLICY_VERSION = "alpha-p0-policy-v1";
 const QUALITY_CURVE_VERSION = "acu-catalog-v0.1";
@@ -124,6 +126,7 @@ export type AlphaResolutionContext = {
   reusedJudgeEvaluationId?: string;
   routeRefreshReason?: string;
   routeDecisionSnapshot?: JsonObject;
+  recoveryDecisionReason?: RecoveryDecisionReason;
 };
 
 type PreparedState = {
@@ -438,12 +441,7 @@ export class AlphaRequestProcessor {
       const channelId = profile.channelId ?? profile.channel;
       const channel = channelHealth.get(channelId);
       const runtime = profileHealth.get(profile.executionProfileId);
-      const runtimeRecovered = profile.autoRouteEnabled === false
-        && runtime?.state !== "open"
-        && runtime?.state !== "half_open"
-        && runtime?.state !== "disabled"
-        && runtime?.usageTrusted === true
-        && runtime?.lastSuccessAt !== undefined;
+      const runtimeRecovered = profile.autoRouteEnabled === false && isRecoveredSupplyProfile(runtime ?? {});
       const lastSuccessAt = profile.requiresFreshProbe ? runtime?.lastSuccessAt
         : runtime?.lastSuccessAt ?? channel?.lastSuccessAt;
       const fresh = Boolean(lastSuccessAt && Date.now() - lastSuccessAt.getTime() <= 120 * 60_000);
@@ -1795,6 +1793,7 @@ export class AlphaRequestProcessor {
     error?: unknown;
     latencyMs: number;
     webFailure?: boolean;
+    recoveryDecisionReason?: RecoveryDecisionReason;
   }): Promise<void> {
     const repository = new AlphaRepository(this.options.database);
     const contentType = input.response ? responseContentType(input.response.headers) : undefined;
@@ -1831,6 +1830,7 @@ export class AlphaRequestProcessor {
         metadata: { httpStatus: input.response.status },
       });
     }
+    const billing = usage ? resolveProviderBilling(usage) : undefined;
     await repository.completeAttempt({
       attemptId: input.attempt.attemptId,
       status: "error",
@@ -1844,7 +1844,8 @@ export class AlphaRequestProcessor {
       outputTokens: usage?.outputTokens,
       reasoningTokens: usage?.reasoningTokens,
       usageSource: usage?.usageSource,
-      actualCostUsd: "0.0000000000",
+      actualCostUsd: billing?.actualCostUsd ?? "0.0000000000",
+      providerBilled: billing?.providerBilled,
       latencyMs: input.latencyMs,
       visibleOutputBytes: input.response?.observation?.modelVisibleOutputBytes ?? 0,
       metadata: {
@@ -1861,6 +1862,8 @@ export class AlphaRequestProcessor {
         first_model_event_at: input.response?.observation?.firstModelEventAt?.toISOString(),
         first_model_event_latency_ms: input.response?.observation?.firstModelEventLatencyMs,
         cooldown_until: health?.cooldownUntil?.toISOString(),
+        billingStatus: billing?.billingStatus ?? "unknown",
+        recoveryDecisionReason: input.recoveryDecisionReason,
       },
     });
     if (input.webFailure) {
@@ -1902,6 +1905,7 @@ export class AlphaRequestProcessor {
         errorClass: health?.errorClass,
         cooldownUntil: health?.cooldownUntil?.toISOString(),
         recoveryEligible: (input.response?.observation?.modelVisibleOutputBytes ?? 0) === 0,
+        recoveryDecisionReason: input.recoveryDecisionReason,
       },
     });
   }
@@ -2446,7 +2450,11 @@ export class AlphaRequestProcessor {
           error,
           latencyMs,
           webFailure: Boolean(response && isExplicitWebCompatibilityFailure(response, envelope)),
+          recoveryDecisionReason: resolutionContext.recoveryDecisionReason,
         });
+      },
+      onRecoveryDecision(reason) {
+        resolutionContext.recoveryDecisionReason = reason;
       },
       startRetry: async (profile, nextAttemptIndex, target) => {
         const retryPrepared = prepareProviderBody(
@@ -2909,6 +2917,18 @@ export class AlphaRequestProcessor {
     }
     const transportSuccess = relay.httpStatus >= 200 && relay.httpStatus < 300 && relay.complete;
     const billing = resolveProviderBilling(usage);
+    const canonicalModel = canonicalActualModel(context.selectedProfile, usage.actualModel);
+    const actualModelMismatch = Boolean(usage.actualModel && canonicalModel !== context.selectedProfile.modelId);
+    const outcome = classifyExecutionOutcome({
+      httpStatus: relay.httpStatus,
+      complete: relay.complete,
+      clientCancelled: relay.clientCancelled,
+      modelVisibleOutputBytes: relay.modelVisibleOutputBytes,
+      providerUsageReported: usage.usageSource === "provider_usage",
+      actualModelMismatch,
+      hostedWebIncompatible: webRequiredFailure,
+      recoveryExecuted: context.recoveryDecisionReason === "executed",
+    });
     const success = transportSuccess && !webRequiredFailure;
     const status = relay.clientCancelled ? "cancelled" : success ? "success" : "error";
     const errorCategory = success
@@ -2986,17 +3006,23 @@ export class AlphaRequestProcessor {
         first_model_event_latency_ms: relay.firstModelEventLatencyMs,
         billingStatus: billing.billingStatus,
         providerBilled: billing.providerBilled === true,
+        deliveryStatus: outcome.deliveryStatus,
+        recoveryStatus: outcome.recoveryStatus,
+        healthImpact: outcome.healthImpact,
+        recoveryDecisionReason: context.recoveryDecisionReason,
       },
     });
-    const canonicalModel = canonicalActualModel(context.selectedProfile, usage.actualModel);
-    await this.recordRuntimeHealth(context.selectedProfile, context.protocol, {
-      success: transportSuccess,
-      clientCancelled: relay.clientCancelled,
-      httpStatus: relay.httpStatus,
-      actualModelMismatch: Boolean(usage.actualModel && canonicalModel !== context.selectedProfile.modelId),
-      usageTrusted: transportSuccess ? usage.usageSource === "provider_usage" : undefined,
-      firstTokenLatencyMs: relay.firstModelEventLatencyMs,
-    });
+    if (outcome.healthImpact !== "none") {
+      await this.recordRuntimeHealth(context.selectedProfile, context.protocol, {
+        success: outcome.healthImpact === "success" || actualModelMismatch,
+        clientCancelled: relay.clientCancelled,
+        httpStatus: relay.httpStatus,
+        actualModelMismatch,
+        usageTrusted: usage.usageSource === "provider_usage",
+        errorMessage: outcome.deliveryStatus,
+        firstTokenLatencyMs: relay.firstModelEventLatencyMs,
+      });
+    }
     if (transportSuccess || relay.webSearch.actuallyInvoked || webRequiredFailure) {
       await repository.saveProfileWebHealth({
         executionProfileId: context.selectedProfile.executionProfileId,
@@ -3005,7 +3031,7 @@ export class AlphaRequestProcessor {
         canonicalModelId: context.selectedProfile.modelId,
         protocol: context.protocol,
         usageTrusted: context.selectedProfile.usageTrusted !== false,
-        actualModelVerified: !usage.actualModel || canonicalModel === context.selectedProfile.modelId,
+        actualModelVerified: Boolean(usage.actualModel && canonicalModel === context.selectedProfile.modelId),
         canonicalAdvertisedContextWindow: context.selectedProfile.canonicalAdvertisedContextWindow,
         providerDeclaredContextWindow: context.selectedProfile.providerDeclaredContextWindow,
         observedSuccessfulInputTokens: transportSuccess ? usage.inputTokens : undefined,
@@ -3037,6 +3063,11 @@ export class AlphaRequestProcessor {
       webFallbackChain: context.webFallbackChain,
       webToolPruned: context.webToolPruned,
       webToolPruneReason: context.webToolPruneReason,
+      deliveryStatus: outcome.deliveryStatus,
+      recoveryStatus: outcome.recoveryStatus,
+      billingStatus: outcome.billingStatus,
+      healthImpact: outcome.healthImpact,
+      recoveryDecisionReason: context.recoveryDecisionReason,
     });
     await repository.completeLogicalRequest({
       logicalRequestId: context.logicalRequestId,

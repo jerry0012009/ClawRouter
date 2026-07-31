@@ -399,6 +399,10 @@ function updatePlanningMetadata(current: JsonObject, events: AlphaDomainEvent[])
 
 export class AlphaRequestProcessor {
   private readonly expectedOutputTokens: number;
+  private readonly selectionCorridorCache = new Map<string, {
+    expiresAt: number;
+    result: Promise<Record<string, unknown>>;
+  }>();
 
   constructor(private readonly options: AlphaProcessorOptions) {
     this.expectedOutputTokens = options.expectedOutputTokens ?? 800;
@@ -453,7 +457,29 @@ export class AlphaRequestProcessor {
     return { profiles, probeClaims: [] };
   }
 
-  async selectionCorridor(inputTokens: number, expectedOutputTokens: number): Promise<Record<string, unknown>> {
+  selectionCorridor(inputTokens: number, expectedOutputTokens: number): Promise<Record<string, unknown>> {
+    const key = `${inputTokens}:${expectedOutputTokens}`;
+    const now = Date.now();
+    const cached = this.selectionCorridorCache.get(key);
+    if (cached && cached.expiresAt > now) return cached.result;
+    if (cached) this.selectionCorridorCache.delete(key);
+
+    const result = this.calculateSelectionCorridor(inputTokens, expectedOutputTokens);
+    this.selectionCorridorCache.set(key, { expiresAt: now + 60_000, result });
+    void result.catch(() => {
+      if (this.selectionCorridorCache.get(key)?.result === result) {
+        this.selectionCorridorCache.delete(key);
+      }
+    });
+    while (this.selectionCorridorCache.size > 64) {
+      const oldestKey = this.selectionCorridorCache.keys().next().value;
+      if (oldestKey === undefined) break;
+      this.selectionCorridorCache.delete(oldestKey);
+    }
+    return result;
+  }
+
+  private async calculateSelectionCorridor(inputTokens: number, expectedOutputTokens: number): Promise<Record<string, unknown>> {
     const { profiles } = await this.effectiveProfiles([], false);
     const preferences = ["economy", "balanced", "quality"] as const;
     const factors = {

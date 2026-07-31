@@ -42,6 +42,7 @@ import {
 import { compareWebPreference, resolveWebEligibility } from "./web-capability.js";
 import { isRecoveredSupplyProfile } from "./channel-registry.js";
 import { classifyExecutionOutcome, type RecoveryDecisionReason } from "./execution-outcome.js";
+import { buildJudgeNativeContext } from "./judge-context-policy.js";
 
 const POLICY_VERSION = "alpha-p0-policy-v1";
 const QUALITY_CURVE_VERSION = "acu-catalog-v0.1";
@@ -1222,6 +1223,7 @@ export class AlphaRequestProcessor {
         .map((candidate) => candidate.text),
       rootGoalText: state.rootGoalText,
     };
+    const nativeContext = buildJudgeNativeContext({ rawRequest: Buffer.from(ingress.rawBody).toString("utf8") });
     const rawNative = {
       stateMetadata: {
         sessionId: state.sessionId,
@@ -1232,7 +1234,7 @@ export class AlphaRequestProcessor {
         priorJudgeEvaluationId: stringValue(storedSegment?.judge_evaluation_id),
         currentExecutionProfileId: stringValue(storedSegment?.selected_execution_profile_id),
       },
-      rawRequest: Buffer.from(ingress.rawBody).toString("utf8"),
+      rawRequest: nativeContext.body,
     };
     let judge: AlphaJudgeRun;
     try {

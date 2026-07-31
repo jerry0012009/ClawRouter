@@ -50,9 +50,16 @@ function config() {
     backupJudgeProvider: "closeai",
     backupJudgeBaseUrl: "https://closeai.invalid/v1",
     backupApiKey: "backup-fixture",
+    syncBackupEnabled: true,
     cachePath,
   });
 }
+
+it("defaults synchronous Judge backup to disabled", () => {
+  const runtime = readAcuRuntimeConfig({});
+  expect(runtime.syncBackupEnabled).toBe(false);
+  expect(runtime.timeoutMs).toBe(12_000);
+});
 
 function runner(primaryFetch: typeof fetch, backupFetch: typeof fetch) {
   const runtime = config();

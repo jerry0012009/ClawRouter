@@ -302,6 +302,27 @@ describe("Alpha current-formula routing", () => {
     expect(result.candidateEstimates).toHaveLength(2);
   });
 
+  it("keeps ordinary Profiles eligible when Web intent is required but hosted Web is not", () => {
+    const result = routeWithCurrentAcuFormula({
+      judge,
+      judgeCost: 0,
+      inputTokens: 2_000,
+      expectedOutputTokens: 500,
+      effectiveQualityTarget: 70,
+      profiles,
+      requirements: {
+        ...requirements,
+        requireTools: false,
+        clientDeclaredWebTool: true,
+        hostedWebRequired: false,
+        webIntent: "required",
+      },
+    });
+    expect(result.candidateEstimates).toHaveLength(2);
+    expect(result.excludedProfiles.flatMap((profile) => profile.reasons).some((reason) => reason.startsWith("web_")))
+      .toBe(false);
+  });
+
   it("keeps at least three production Coding candidates when Codex declares Web without Web intent", () => {
     const configured = JSON.parse(readFileSync(new URL("../deploy/alpha/execution-profiles.json", import.meta.url), "utf8")) as AlphaExecutionProfile[];
     const result = routeWithCurrentAcuFormula({

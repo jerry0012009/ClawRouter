@@ -243,7 +243,8 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
         if (error instanceof AcuJudgeAttemptError) attempts.push(failedAttempt(error, 1, "primary"));
         const primaryContextError = error instanceof AcuJudgeAttemptError
           && error.attempt.errorCategory === "context_length_exceeded";
-        if (error instanceof AcuJudgeAttemptError && error.attempt.backupEligible && backupClient) {
+        if (error instanceof AcuJudgeAttemptError && error.attempt.backupEligible
+          && options.config.syncBackupEnabled && backupClient) {
           try {
             const backup = await backupClient.judge(input.messages, [], false, input.rawNative, input.signal);
             if (backup.status === "live") attempts.push(successfulAttempt(backup, 2, "backup"));

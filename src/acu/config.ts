@@ -5,7 +5,7 @@ export const ACU_DEFAULT_JUDGE_MODEL = "mimo-v2.5-pro";
 export const ACU_DEFAULT_JUDGE_BASE_URL = "https://token-plan-cn.xiaomimimo.com/v1";
 export const ACU_DEFAULT_JUDGE_MODE = "non-thinking" as const;
 export const ACU_DEFAULT_JUDGE_FIRST_BYTE_TIMEOUT_MS = 0;
-export const ACU_DEFAULT_JUDGE_TOTAL_TIMEOUT_MS = 0;
+export const ACU_DEFAULT_JUDGE_TOTAL_TIMEOUT_MS = 12_000;
 export const ACU_DEFAULT_MAX_CONTEXT_TOKENS = 1_000_000;
 export const ACU_DEFAULT_BACKUP_MAX_CONTEXT_TOKENS = 1_000_000;
 export const ACU_DEFAULT_MAX_OUTPUT_TOKENS = 300;
@@ -68,6 +68,7 @@ export type AcuRuntimeConfig = {
   backupApiKey?: string;
   backupJudgeProvider?: string;
   backupMaxContextTokens: number;
+  syncBackupEnabled: boolean;
   cachePath?: string;
   allowMock: boolean;
   shadowMode: boolean;
@@ -107,6 +108,7 @@ export function readAcuRuntimeConfig(overrides: Partial<AcuRuntimeConfig> = {}):
       process.env.ACU_JUDGE_BACKUP_MAX_CONTEXT_TOKENS,
       ACU_DEFAULT_BACKUP_MAX_CONTEXT_TOKENS,
     ),
+    syncBackupEnabled: booleanValue(process.env.ACU_JUDGE_SYNC_BACKUP_ENABLED, false),
     cachePath: process.env.ACU_JUDGE_CACHE_PATH?.trim(),
     allowMock: booleanValue(process.env.ACU_ALLOW_MOCK),
     shadowMode: booleanValue(process.env.ACU_SHADOW_MODE, true),

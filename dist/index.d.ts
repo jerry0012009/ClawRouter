@@ -15,6 +15,7 @@ type AcuRuntimeConfig = {
     backupApiKey?: string;
     backupJudgeProvider?: string;
     backupMaxContextTokens: number;
+    syncBackupEnabled: boolean;
     cachePath?: string;
     allowMock: boolean;
     shadowMode: boolean;
@@ -128,6 +129,10 @@ type AcuModelEstimate = {
     qualityUpper: number;
     estimatedCallCost: number;
     expectedFallbackCost: number;
+    selectionCost: number;
+    judgeOverheadCost: number;
+    expectedEndToEndCost: number;
+    /** Backward-compatible alias for expectedEndToEndCost. */
     expectedTotalCost: number;
     predictedScore: number;
     conservativeScore: number;

@@ -84,6 +84,10 @@ describe("Routing Segment Web Intent", () => {
       trigger: "new_task",
       contextHash: "fixture",
       webIntentFallbackInput: { recentUserInputs: ["查询今天 BTC 价格"] },
+      rawNative: {
+        stateMetadata: { phase: "execution", trigger: "new_task" },
+        rawRequest: JSON.stringify({ model: "acu-auto", input: "查询今天 BTC 价格" }),
+      },
     });
     expect(client.judge).toHaveBeenCalledTimes(1);
     expect(result.webIntentDecision).toMatchObject({

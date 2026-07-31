@@ -4209,7 +4209,7 @@ var ACU_DEFAULT_JUDGE_MODEL = "mimo-v2.5-pro";
 var ACU_DEFAULT_JUDGE_BASE_URL = "https://token-plan-cn.xiaomimimo.com/v1";
 var ACU_DEFAULT_JUDGE_MODE = "non-thinking";
 var ACU_DEFAULT_JUDGE_FIRST_BYTE_TIMEOUT_MS = 0;
-var ACU_DEFAULT_JUDGE_TOTAL_TIMEOUT_MS = 0;
+var ACU_DEFAULT_JUDGE_TOTAL_TIMEOUT_MS = 12e3;
 var ACU_DEFAULT_MAX_CONTEXT_TOKENS = 1e6;
 var ACU_DEFAULT_BACKUP_MAX_CONTEXT_TOKENS = 1e6;
 var ACU_DEFAULT_MAX_OUTPUT_TOKENS = 300;
@@ -4276,6 +4276,7 @@ function readAcuRuntimeConfig(overrides = {}) {
       process.env.ACU_JUDGE_BACKUP_MAX_CONTEXT_TOKENS,
       ACU_DEFAULT_BACKUP_MAX_CONTEXT_TOKENS
     ),
+    syncBackupEnabled: booleanValue(process.env.ACU_JUDGE_SYNC_BACKUP_ENABLED, false),
     cachePath: process.env.ACU_JUDGE_CACHE_PATH?.trim(),
     allowMock: booleanValue(process.env.ACU_ALLOW_MOCK),
     shadowMode: booleanValue(process.env.ACU_SHADOW_MODE, true),
@@ -6305,7 +6306,8 @@ function estimateOne(model, difficultyScore2, entropyPenalty, inputTokens, outpu
   const upper = clamp(quality + model.uncertaintyWidth);
   const callCost = estimateCallCost(effectivePrice ?? model, inputTokens, outputTokens);
   const expectedFallbackCost = fallbackRiskScale * (1 - lower) * (fallbackCallCost + switchCost);
-  const total = judgeCost + callCost + expectedFallbackCost;
+  const selectionCost = callCost + expectedFallbackCost;
+  const expectedEndToEndCost = judgeCost + selectionCost;
   return {
     modelId: model.modelId,
     displayName: model.displayName,
@@ -6316,10 +6318,13 @@ function estimateOne(model, difficultyScore2, entropyPenalty, inputTokens, outpu
     qualityUpper: upper,
     estimatedCallCost: callCost,
     expectedFallbackCost,
-    expectedTotalCost: total,
+    selectionCost,
+    judgeOverheadCost: judgeCost,
+    expectedEndToEndCost,
+    expectedTotalCost: expectedEndToEndCost,
     predictedScore: quality * 100,
     conservativeScore: lower * 100,
-    riskAdjustedCost: total,
+    riskAdjustedCost: selectionCost,
     riskAdjustedScore: quality * 100,
     qualityUtility: 0,
     costUtility: 0,
@@ -6401,8 +6406,8 @@ function recommendModel(input) {
   const flagshipEstimate = estimates.find((estimate) => estimate.modelId === flagship.modelId);
   if (!flagshipEstimate) throw new Error("ACU flagship model estimate is missing");
   for (const estimate of estimates) {
-    estimate.savingsVsFlagship = flagshipEstimate.expectedTotalCost - estimate.expectedTotalCost;
-    estimate.savingsPercentVsFlagship = flagshipEstimate.expectedTotalCost > 0 ? estimate.savingsVsFlagship / flagshipEstimate.expectedTotalCost : 0;
+    estimate.savingsVsFlagship = flagshipEstimate.selectionCost - estimate.selectionCost;
+    estimate.savingsPercentVsFlagship = flagshipEstimate.selectionCost > 0 ? estimate.savingsVsFlagship / flagshipEstimate.selectionCost : 0;
   }
   const route2 = selectValueRoute(estimates, qualityTarget * 100, costSensitivity);
   const recommended = route2.selected;

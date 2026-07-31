@@ -1,5 +1,52 @@
 [
   {
+    "executionProfileId": "lucen-kiro-cache70-claude-006:claude-fable-5:messages",
+    "modelId": "claude-fable-5",
+    "providerModelId": "claude-fable-5",
+    "actualModelAliases": [],
+    "provider": "lucen",
+    "channel": "lucen-kiro-cache70-claude-006",
+    "channelId": "lucen-kiro-cache70-claude-006",
+    "routingGroupName": "cc协议-kiro-70%缓存-0.06",
+    "protocols": [
+      "messages"
+    ],
+    "toolCallSupport": true,
+    "supportedToolTypes": [
+      "function"
+    ],
+    "thinkingSupport": true,
+    "supportedReasoningEfforts": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "canonicalAdvertisedContextWindow": 200000,
+    "providerDeclaredContextWindow": null,
+    "observedSuccessfulInputTokens": 66,
+    "providerHardContextCap": null,
+    "contextCapabilityStatus": "observed_floor",
+    "contextCapabilitySource": "targeted_native_tool_sse_usage_preflight",
+    "contextLastVerifiedAt": "2026-07-31T10:50:00.000Z",
+    "health": "healthy",
+    "enabled": true,
+    "administratorAllowed": true,
+    "usageTrusted": true,
+    "recentSuccessRate": 1,
+    "baseUrlEnv": "ACU_CHANNEL_LUCEN_KIRO_CACHE70_CLAUDE_006_BASE_URL",
+    "networkFallbackBaseUrlEnvs": [],
+    "apiKeyEnv": "ACU_CHANNEL_LUCEN_KIRO_CACHE70_CLAUDE_006_API_KEY",
+    "authMode": "x-api-key",
+    "anthropicVersion": "2023-06-01",
+    "economicsProviderId": "lucen",
+    "observedBillingMultiplier": 0.06,
+    "effectiveCostStatus": "estimated",
+    "requiresFreshProbe": false,
+    "modelCategory": "text_agent",
+    "verificationStatus": "verified",
+    "autoRouteEnabled": true
+  },
+  {
     "executionProfileId": "blackai-claude-reverse:claude-opus-4-8:messages",
     "modelId": "claude-opus-4-8",
     "providerModelId": "claude-opus-4-8",
@@ -3414,5 +3461,54 @@
     "observedBillingMultiplier": 0.3,
     "effectiveCostStatus": "estimated",
     "requiresFreshProbe": false
+  },
+  {
+    "executionProfileId": "lucen-kimi-k3-openai-040:kimi-k3:responses",
+    "modelId": "kimi-k3",
+    "providerModelId": "kimi-k3",
+    "actualModelAliases": [],
+    "provider": "lucen",
+    "channel": "lucen-kimi-k3-openai-040",
+    "channelId": "lucen-kimi-k3-openai-040",
+    "routingGroupName": "kimi-k3-openai协议-0.4x",
+    "protocols": [
+      "responses"
+    ],
+    "toolCallSupport": true,
+    "supportedToolTypes": [
+      "function",
+      "custom",
+      "local_tool"
+    ],
+    "thinkingSupport": true,
+    "supportedReasoningEfforts": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "canonicalAdvertisedContextWindow": 1048576,
+    "providerDeclaredContextWindow": 1048576,
+    "observedSuccessfulInputTokens": 59482,
+    "providerHardContextCap": null,
+    "contextCapabilityStatus": "observed_floor",
+    "contextCapabilitySource": "official_kimi_k3_spec_and_live_59482_token_preflight",
+    "contextLastVerifiedAt": "2026-07-31T10:50:00.000Z",
+    "health": "healthy",
+    "enabled": true,
+    "administratorAllowed": true,
+    "usageTrusted": true,
+    "recentSuccessRate": 1,
+    "baseUrlEnv": "ACU_CHANNEL_LUCEN_KIMI_K3_OPENAI_040_BASE_URL",
+    "networkFallbackBaseUrlEnvs": [],
+    "apiKeyEnv": "ACU_CHANNEL_LUCEN_KIMI_K3_OPENAI_040_API_KEY",
+    "authMode": "bearer",
+    "stripV1Path": true,
+    "economicsProviderId": "lucen",
+    "observedBillingMultiplier": 2.6666666666666665,
+    "effectiveCostStatus": "verified",
+    "requiresFreshProbe": true,
+    "modelCategory": "text_agent",
+    "verificationStatus": "verified_provisional",
+    "autoRouteEnabled": true
   }
 ]

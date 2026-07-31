@@ -41,6 +41,7 @@ PROFILES: dict[str, dict[str, Any]] = {
 
 MODEL_PROFILE = {
     "gpt-5.6-sol": "frontier_resilient", "claude-opus-4-8": "frontier_resilient",
+    "claude-fable-5": "frontier_resilient",
     "gpt-5.6-terra": "balanced_frontier", "gpt-5.5": "balanced_frontier",
     "claude-sonnet-5": "balanced_frontier", "gemini-3.5-flash": "balanced_frontier",
     "deepseek-v4-pro": "balanced_frontier", "glm-5.2": "balanced_frontier",
@@ -53,12 +54,13 @@ MODEL_PROFILE = {
     "meta-llama/llama-3.3-70b-instruct": "efficient_fast",
     "qwen/qwen3-235b-a22b": "coding_specialist",
     "kimi-k2.7-code": "coding_specialist", "kimi-k2.6": "coding_specialist",
+    "kimi-k3": "efficient_fast",
     "qwen3.7-max": "coding_specialist", "minimax-m3": "balanced_frontier",
 }
 
 DEFAULT_MODELS = {
-    "claude-opus-4-8", "gpt-5.6-sol", "gpt-5.6-terra",
-    "deepseek-v4-flash", "kimi-k2.7-code", "glm-5.2",
+    "claude-opus-4-8", "claude-fable-5", "gpt-5.6-sol", "gpt-5.6-terra",
+    "deepseek-v4-flash", "kimi-k2.7-code", "kimi-k3", "glm-5.2",
 }
 
 OFFICIAL = {
@@ -69,6 +71,7 @@ OFFICIAL = {
     "deepseek": "https://api-docs.deepseek.com/news/news260424/",
     "glm": "https://zcode.z.ai/en/docs/agents",
     "kimi": "https://huggingface.co/moonshotai/Kimi-K2.7-Code",
+    "kimi_k3": "https://platform.kimi.ai/docs/guide/kimi-k3-quickstart",
     "qwen": "https://qwenlm.github.io/qwen-code-docs/en/users/configuration/model-providers/",
     "openhands": "https://huggingface.co/datasets/OpenHands/openhands-index",
 }
@@ -161,7 +164,7 @@ def phase2a_models() -> dict[str, dict[str, Any]]:
     if data["schemaVersion"] not in {"acu-model-catalog-v1", "acu-model-catalog-v2"}:
         raise RuntimeError("Unsupported ACU catalog schema")
     models = {model["modelId"]: model for model in data["models"] if model["modelId"] not in {
-        "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "glm-5.2", "kimi-k2.7-code",
+        "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "glm-5.2", "kimi-k2.7-code", "kimi-k3",
         "gemini-2.5-flash"}}
     models = {model_id: model for model_id, model in models.items() if model_id not in {
         "meta-llama/llama-4-maverick", "deepseek/deepseek-chat-v3-0324",
@@ -208,6 +211,7 @@ def evidence_rows() -> list[dict[str, str]]:
     add("deepseek-v4-flash|deepseek-v4-pro", "terminal/tool use|long-horizon agent|latency/cost positioning", OFFICIAL["deepseek"], "Official comparison says Flash is near Pro on simple agent tasks while Pro leads on complex reasoning.", "high")
     add("glm-5.2", "repository engineering|terminal/tool use|long-horizon agent", OFFICIAL["glm"], "Official coding-agent documentation targets multi-turn, tool-driven engineering workflows.")
     add("kimi-k2.7-code", "broad coding|repository engineering|terminal/tool use|long-horizon agent", OFFICIAL["kimi"], "Official model card reports gains over K2.6 across coding-agent suites, with harness differences explicitly noted.")
+    add("kimi-k3", "broad coding|repository engineering|terminal/tool use|long-horizon agent|context capability", OFFICIAL["kimi_k3"], "Official documentation positions K3 as a flagship 1M-context agent model; provisional LUNA capability placement is used until comparable benchmark evidence exists.", "low")
     add("qwen3.7-max|qwen3.6-plus|qwen3.5-flash", "broad coding|context capability|latency/cost positioning", OFFICIAL["qwen"], "Official Qwen Code provider documentation identifies current model roles; direct cross-vendor score comparability is unavailable.", "low")
     add("meta-llama/llama-4-maverick|meta-llama/llama-3.3-70b-instruct", "broad capability|context capability", "https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E-Instruct", "Fallback curves use low-confidence family-relative placement so actual execution is visible; no cross-vendor score equivalence is claimed.", "low")
     add("deepseek/deepseek-chat-v3-0324", "broad coding|latency/cost positioning", "https://api-docs.deepseek.com/news/news250325", "Legacy callable fallback is relatively anchored below the pinned V4 Flash position.", "low")
@@ -228,6 +232,7 @@ def build_models() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     new["gpt-5.6-luna"] = relative_model("gpt-5.6-luna", "GPT-5.6 Luna", "OpenAI", old["gpt-5.5"], 0.010, "GPT-5.6 official capability suite", OFFICIAL["openai"], "Family-relative product mapping from GPT-5.5; efficient profile follows official positioning.")
     new["glm-5.2"] = relative_model("glm-5.2", "GLM 5.2", "Zhipu AI", old["glm-5.1"], 0.025, "GLM-5.2 official coding-agent positioning", OFFICIAL["glm"], "Series-relative estimate from GLM 5.1; no directly comparable pinned OpenHands row.")
     new["kimi-k2.7-code"] = relative_model("kimi-k2.7-code", "Kimi K2.7 Code", "Moonshot AI", old["kimi-k2.6"], 0.030, "Kimi K2.7 Code official model-card suites", OFFICIAL["kimi"], "Series-relative estimate from K2.6; vendor comparisons use different agent harnesses.")
+    new["kimi-k3"] = relative_model("kimi-k3", "Kimi K3", "Moonshot AI", new["gpt-5.6-luna"], 0.0, "Provisional LUNA capability placement", OFFICIAL["kimi_k3"], "Official K3 specifications and live Agent protocol are verified, but no comparable pinned quality result exists; provisional LUNA placement prevents an unverified frontier claim.")
     new["gemini-2.5-flash"] = relative_model("gemini-2.5-flash", "Gemini 2.5 Flash", "Google", old["gemini-3.5-flash"], -0.100, "Gemini family relative product mapping", "https://ai.google.dev/gemini-api/docs/models#gemini-2.5-flash", "Low-confidence same-family relative estimate from Gemini 3.5 Flash; retained so an actual fallback is never hidden from the chart.")
     new["meta-llama/llama-4-maverick"] = relative_model("meta-llama/llama-4-maverick", "Llama 4 Maverick", "Meta", new["gemini-2.5-flash"], -0.015, "Fallback relative capability mapping", "https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E-Instruct", "Low-confidence relative estimate; included because this model is in the live fallback chain.")
     new["deepseek/deepseek-chat-v3-0324"] = relative_model("deepseek/deepseek-chat-v3-0324", "DeepSeek V3 (OR)", "DeepSeek", old["deepseek-v4-flash"], -0.070, "DeepSeek family relative product mapping", "https://api-docs.deepseek.com/news/news250325", "Low-confidence family-relative estimate; included because this model is in the live fallback chain.")

@@ -12,6 +12,644 @@
   },
   "responses": [
     {
+      "modelId": "claude-fable-5",
+      "displayName": "Claude Fable 5",
+      "role": "Verified",
+      "inputPricePerMillion": 10,
+      "outputPricePerMillion": 50,
+      "cachedInputPricePerMillion": 1,
+      "effectiveInputPriceCnyPerMillion": 0.6,
+      "effectiveOutputPriceCnyPerMillion": 3,
+      "effectiveCachedInputPriceCnyPerMillion": 0.06,
+      "costCurrency": "CNY",
+      "costSemantics": "estimated_user_cash_cost",
+      "costBasis": "current_reference_execution_profile",
+      "costExecutionProfileId": "lucen-kiro-cache70-claude-006:claude-fable-5:messages",
+      "costProvider": "Lucen",
+      "costChannel": "lucen-kiro-cache70-claude-006",
+      "effectiveCostStatus": "estimated",
+      "curveProfile": "frontier_resilient",
+      "profileConfidence": "medium",
+      "curve": [
+        {
+          "difficultyScore": 0,
+          "estimatedQuality": 0.9776560851806219,
+          "qualityLower": 0.8976560851806219,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 1,
+          "estimatedQuality": 0.977639783681098,
+          "qualityLower": 0.8976397836810981,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 2,
+          "estimatedQuality": 0.9776214428057296,
+          "qualityLower": 0.8976214428057296,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 3,
+          "estimatedQuality": 0.9776008259287458,
+          "qualityLower": 0.8976008259287458,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 4,
+          "estimatedQuality": 0.9775776738396917,
+          "qualityLower": 0.8975776738396918,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 5,
+          "estimatedQuality": 0.9775517038583688,
+          "qualityLower": 0.8975517038583688,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 6,
+          "estimatedQuality": 0.9775226092712831,
+          "qualityLower": 0.8975226092712831,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 7,
+          "estimatedQuality": 0.9774900591966055,
+          "qualityLower": 0.8974900591966055,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 8,
+          "estimatedQuality": 0.977453698997078,
+          "qualityLower": 0.897453698997078,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 9,
+          "estimatedQuality": 0.9774131513685397,
+          "qualityLower": 0.8974131513685397,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 10,
+          "estimatedQuality": 0.9773680182329508,
+          "qualityLower": 0.8973680182329509,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 11,
+          "estimatedQuality": 0.9773178835553589,
+          "qualityLower": 0.8973178835553589,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 12,
+          "estimatedQuality": 0.9772623171801045,
+          "qualityLower": 0.8972623171801045,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 13,
+          "estimatedQuality": 0.9772008797383325,
+          "qualityLower": 0.8972008797383325,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 14,
+          "estimatedQuality": 0.9771331286125764,
+          "qualityLower": 0.8971331286125764,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 15,
+          "estimatedQuality": 0.9770586248520999,
+          "qualityLower": 0.8970586248521,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 16,
+          "estimatedQuality": 0.9769769408144202,
+          "qualityLower": 0.8969769408144203,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 17,
+          "estimatedQuality": 0.9768876681674727,
+          "qualityLower": 0.8968876681674728,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 18,
+          "estimatedQuality": 0.9767904257317226,
+          "qualityLower": 0.8967904257317226,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 19,
+          "estimatedQuality": 0.9766848664867745,
+          "qualityLower": 0.8966848664867746,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 20,
+          "estimatedQuality": 0.9765706829334987,
+          "qualityLower": 0.8965706829334987,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 21,
+          "estimatedQuality": 0.9764476099160181,
+          "qualityLower": 0.8964476099160181,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 22,
+          "estimatedQuality": 0.9763154239957087,
+          "qualityLower": 0.8963154239957087,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 23,
+          "estimatedQuality": 0.9761739385563349,
+          "qualityLower": 0.896173938556335,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 24,
+          "estimatedQuality": 0.9760229940214418,
+          "qualityLower": 0.8960229940214418,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 25,
+          "estimatedQuality": 0.9758624428830913,
+          "qualityLower": 0.8958624428830914,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 26,
+          "estimatedQuality": 0.9756921296566764,
+          "qualityLower": 0.8956921296566764,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 27,
+          "estimatedQuality": 0.9755118663514596,
+          "qualityLower": 0.8955118663514596,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 28,
+          "estimatedQuality": 0.9753214045259202,
+          "qualityLower": 0.8953214045259202,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 29,
+          "estimatedQuality": 0.9751204054184124,
+          "qualityLower": 0.8951204054184124,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 30,
+          "estimatedQuality": 0.9749084099482354,
+          "qualityLower": 0.8949084099482354,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 31,
+          "estimatedQuality": 0.9746848105270193,
+          "qualityLower": 0.8946848105270193,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 32,
+          "estimatedQuality": 0.9744488265866856,
+          "qualityLower": 0.8944488265866857,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 33,
+          "estimatedQuality": 0.9741994855271207,
+          "qualityLower": 0.8941994855271207,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 34,
+          "estimatedQuality": 0.9739356104466109,
+          "qualityLower": 0.893935610446611,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 35,
+          "estimatedQuality": 0.9736558155878965,
+          "qualityLower": 0.8936558155878965,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 36,
+          "estimatedQuality": 0.9733585099612135,
+          "qualityLower": 0.8933585099612136,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 37,
+          "estimatedQuality": 0.9730419091324991,
+          "qualityLower": 0.8930419091324991,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 38,
+          "estimatedQuality": 0.9727040547128079,
+          "qualityLower": 0.8927040547128079,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 39,
+          "estimatedQuality": 0.9723428406582963,
+          "qualityLower": 0.8923428406582964,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 40,
+          "estimatedQuality": 0.9719560450790045,
+          "qualityLower": 0.8919560450790045,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 41,
+          "estimatedQuality": 0.9715413658437356,
+          "qualityLower": 0.8915413658437357,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 42,
+          "estimatedQuality": 0.9710964578481084,
+          "qualityLower": 0.8910964578481084,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 43,
+          "estimatedQuality": 0.9706189693907261,
+          "qualityLower": 0.8906189693907262,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 44,
+          "estimatedQuality": 0.970106574711258,
+          "qualityLower": 0.8901065747112581,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 45,
+          "estimatedQuality": 0.9695569994457616,
+          "qualityLower": 0.8895569994457616,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 46,
+          "estimatedQuality": 0.968968035635662,
+          "qualityLower": 0.8889680356356621,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 47,
+          "estimatedQuality": 0.9683375430878981,
+          "qualityLower": 0.8883375430878981,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 48,
+          "estimatedQuality": 0.9676634344192646,
+          "qualityLower": 0.8876634344192647,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 49,
+          "estimatedQuality": 0.9669436420918948,
+          "qualityLower": 0.8869436420918948,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 50,
+          "estimatedQuality": 0.9661760671676545,
+          "qualityLower": 0.8861760671676545,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 51,
+          "estimatedQuality": 0.9653585113117434,
+          "qualityLower": 0.8853585113117435,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 52,
+          "estimatedQuality": 0.9644885956159356,
+          "qualityLower": 0.8844885956159356,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 53,
+          "estimatedQuality": 0.9635636718799266,
+          "qualityLower": 0.8835636718799267,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 54,
+          "estimatedQuality": 0.9625807338407659,
+          "qualityLower": 0.882580733840766,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 55,
+          "estimatedQuality": 0.9615363372393781,
+          "qualityLower": 0.8815363372393782,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 56,
+          "estimatedQuality": 0.9604265383762799,
+          "qualityLower": 0.8804265383762799,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 57,
+          "estimatedQuality": 0.9592468608369416,
+          "qualityLower": 0.8792468608369416,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 58,
+          "estimatedQuality": 0.9579922993569018,
+          "qualityLower": 0.8779922993569018,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 59,
+          "estimatedQuality": 0.9566573684237296,
+          "qualityLower": 0.8766573684237297,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 60,
+          "estimatedQuality": 0.9552362012981362,
+          "qualityLower": 0.8752362012981363,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 61,
+          "estimatedQuality": 0.9537227028024889,
+          "qualityLower": 0.873722702802489,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 62,
+          "estimatedQuality": 0.952110756559139,
+          "qualityLower": 0.872110756559139,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 63,
+          "estimatedQuality": 0.9503944843984524,
+          "qualityLower": 0.8703944843984525,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 64,
+          "estimatedQuality": 0.9485685523891256,
+          "qualityLower": 0.8685685523891257,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 65,
+          "estimatedQuality": 0.9466285143554001,
+          "qualityLower": 0.8666285143554001,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 66,
+          "estimatedQuality": 0.9445711798677889,
+          "qualityLower": 0.864571179867789,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 67,
+          "estimatedQuality": 0.9423949896632439,
+          "qualityLower": 0.8623949896632439,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 68,
+          "estimatedQuality": 0.940100377560891,
+          "qualityLower": 0.8601003775608911,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 69,
+          "estimatedQuality": 0.9376900946613027,
+          "qualityLower": 0.8576900946613027,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 70,
+          "estimatedQuality": 0.9351694695747744,
+          "qualityLower": 0.8551694695747745,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 71,
+          "estimatedQuality": 0.9325465783155301,
+          "qualityLower": 0.8525465783155302,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 72,
+          "estimatedQuality": 0.9298322999635391,
+          "qualityLower": 0.8498322999635392,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 73,
+          "estimatedQuality": 0.9270402396437661,
+          "qualityLower": 0.8470402396437662,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 74,
+          "estimatedQuality": 0.9241865088129875,
+          "qualityLower": 0.8441865088129875,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 75,
+          "estimatedQuality": 0.9212893637595903,
+          "qualityLower": 0.8412893637595903,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 76,
+          "estimatedQuality": 0.9183687155426948,
+          "qualityLower": 0.8383687155426949,
+          "qualityUpper": 0.9983687155426948
+        },
+        {
+          "difficultyScore": 77,
+          "estimatedQuality": 0.9154455368089621,
+          "qualityLower": 0.8354455368089622,
+          "qualityUpper": 0.9954455368089621
+        },
+        {
+          "difficultyScore": 78,
+          "estimatedQuality": 0.9125412013095098,
+          "qualityLower": 0.8325412013095098,
+          "qualityUpper": 0.9925412013095097
+        },
+        {
+          "difficultyScore": 79,
+          "estimatedQuality": 0.9096767989028325,
+          "qualityLower": 0.8296767989028325,
+          "qualityUpper": 0.9896767989028324
+        },
+        {
+          "difficultyScore": 80,
+          "estimatedQuality": 0.9068724712471311,
+          "qualityLower": 0.8268724712471311,
+          "qualityUpper": 0.9868724712471311
+        },
+        {
+          "difficultyScore": 81,
+          "estimatedQuality": 0.9041468108549334,
+          "qualityLower": 0.8241468108549335,
+          "qualityUpper": 0.9841468108549334
+        },
+        {
+          "difficultyScore": 82,
+          "estimatedQuality": 0.9015163591209164,
+          "qualityLower": 0.8215163591209165,
+          "qualityUpper": 0.9815163591209164
+        },
+        {
+          "difficultyScore": 83,
+          "estimatedQuality": 0.8989952284809386,
+          "qualityLower": 0.8189952284809386,
+          "qualityUpper": 0.9789952284809386
+        },
+        {
+          "difficultyScore": 84,
+          "estimatedQuality": 0.8965948616254023,
+          "qualityLower": 0.8165948616254023,
+          "qualityUpper": 0.9765948616254022
+        },
+        {
+          "difficultyScore": 85,
+          "estimatedQuality": 0.894323928409503,
+          "qualityLower": 0.8143239284095031,
+          "qualityUpper": 0.974323928409503
+        },
+        {
+          "difficultyScore": 86,
+          "estimatedQuality": 0.8921883503086283,
+          "qualityLower": 0.8121883503086283,
+          "qualityUpper": 0.9721883503086283
+        },
+        {
+          "difficultyScore": 87,
+          "estimatedQuality": 0.890191434044046,
+          "qualityLower": 0.810191434044046,
+          "qualityUpper": 0.970191434044046
+        },
+        {
+          "difficultyScore": 88,
+          "estimatedQuality": 0.8883340908798616,
+          "qualityLower": 0.8083340908798616,
+          "qualityUpper": 0.9683340908798616
+        },
+        {
+          "difficultyScore": 89,
+          "estimatedQuality": 0.8866151160595768,
+          "qualityLower": 0.8066151160595768,
+          "qualityUpper": 0.9666151160595767
+        },
+        {
+          "difficultyScore": 90,
+          "estimatedQuality": 0.8850315034863176,
+          "qualityLower": 0.8050315034863177,
+          "qualityUpper": 0.9650315034863176
+        },
+        {
+          "difficultyScore": 91,
+          "estimatedQuality": 0.8835787733830964,
+          "qualityLower": 0.8035787733830965,
+          "qualityUpper": 0.9635787733830964
+        },
+        {
+          "difficultyScore": 92,
+          "estimatedQuality": 0.8822512945445116,
+          "qualityLower": 0.8022512945445116,
+          "qualityUpper": 0.9622512945445115
+        },
+        {
+          "difficultyScore": 93,
+          "estimatedQuality": 0.8810425872061162,
+          "qualityLower": 0.8010425872061162,
+          "qualityUpper": 0.9610425872061161
+        },
+        {
+          "difficultyScore": 94,
+          "estimatedQuality": 0.8799455969441582,
+          "qualityLower": 0.7999455969441582,
+          "qualityUpper": 0.9599455969441582
+        },
+        {
+          "difficultyScore": 95,
+          "estimatedQuality": 0.8789529339785418,
+          "qualityLower": 0.7989529339785418,
+          "qualityUpper": 0.9589529339785418
+        },
+        {
+          "difficultyScore": 96,
+          "estimatedQuality": 0.8780570755553732,
+          "qualityLower": 0.7980570755553732,
+          "qualityUpper": 0.9580570755553731
+        },
+        {
+          "difficultyScore": 97,
+          "estimatedQuality": 0.8772505316429862,
+          "qualityLower": 0.7972505316429862,
+          "qualityUpper": 0.9572505316429861
+        },
+        {
+          "difficultyScore": 98,
+          "estimatedQuality": 0.8765259760014198,
+          "qualityLower": 0.7965259760014198,
+          "qualityUpper": 0.9565259760014198
+        },
+        {
+          "difficultyScore": 99,
+          "estimatedQuality": 0.8758763458604117,
+          "qualityLower": 0.7958763458604118,
+          "qualityUpper": 0.9558763458604117
+        },
+        {
+          "difficultyScore": 100,
+          "estimatedQuality": 0.8752949140792022,
+          "qualityLower": 0.7952949140792023,
+          "qualityUpper": 0.9552949140792022
+        }
+      ],
+      "protocol": "Messages",
+      "toolCall": true,
+      "reasoning": true,
+      "activeInAcuAuto": true,
+      "provider": "Lucen",
+      "status": "routing_active",
+      "healthyChannelCount": 1,
+      "effectiveCostStatuses": [
+        "estimated"
+      ]
+    },
+    {
       "modelId": "claude-opus-4-8",
       "displayName": "Claude Opus 4.8",
       "role": "Verified",
@@ -8311,6 +8949,644 @@
       "effectiveCostStatuses": [
         "estimated"
       ]
+    },
+    {
+      "modelId": "kimi-k3",
+      "displayName": "Kimi K3",
+      "role": "Verified",
+      "inputPricePerMillion": 3,
+      "outputPricePerMillion": 15,
+      "cachedInputPricePerMillion": 0.3,
+      "effectiveInputPriceCnyPerMillion": 7.999999999999998,
+      "effectiveOutputPriceCnyPerMillion": 39.99999999999999,
+      "effectiveCachedInputPriceCnyPerMillion": 0.7999999999999998,
+      "costCurrency": "CNY",
+      "costSemantics": "estimated_user_cash_cost",
+      "costBasis": "current_reference_execution_profile",
+      "costExecutionProfileId": "lucen-kimi-k3-openai-040:kimi-k3:responses",
+      "costProvider": "Lucen",
+      "costChannel": "lucen-kimi-k3-openai-040",
+      "effectiveCostStatus": "verified",
+      "curveProfile": "efficient_fast",
+      "profileConfidence": "medium",
+      "curve": [
+        {
+          "difficultyScore": 0,
+          "estimatedQuality": 0.9970166643771861,
+          "qualityLower": 0.857016664377186,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 1,
+          "estimatedQuality": 0.9966299518963092,
+          "qualityLower": 0.8566299518963092,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 2,
+          "estimatedQuality": 0.9961946188316968,
+          "qualityLower": 0.8561946188316968,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 3,
+          "estimatedQuality": 0.995704955749126,
+          "qualityLower": 0.855704955749126,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 4,
+          "estimatedQuality": 0.995154688484643,
+          "qualityLower": 0.8551546884846429,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 5,
+          "estimatedQuality": 0.9945369495205572,
+          "qualityLower": 0.8545369495205571,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 6,
+          "estimatedQuality": 0.993844255226986,
+          "qualityLower": 0.853844255226986,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 7,
+          "estimatedQuality": 0.9930684911818334,
+          "qualityLower": 0.8530684911818334,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 8,
+          "estimatedQuality": 0.992200908047316,
+          "qualityLower": 0.852200908047316,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 9,
+          "estimatedQuality": 0.9912321306579169,
+          "qualityLower": 0.8512321306579169,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 10,
+          "estimatedQuality": 0.9901521830014468,
+          "qualityLower": 0.8501521830014468,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 11,
+          "estimatedQuality": 0.9889505315756086,
+          "qualityLower": 0.8489505315756086,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 12,
+          "estimatedQuality": 0.9876161490893862,
+          "qualityLower": 0.8476161490893862,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 13,
+          "estimatedQuality": 0.9861375995596259,
+          "qualityLower": 0.8461375995596259,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 14,
+          "estimatedQuality": 0.9845031444445858,
+          "qualityLower": 0.8445031444445857,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 15,
+          "estimatedQuality": 0.9827008675018939,
+          "qualityLower": 0.8427008675018939,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 16,
+          "estimatedQuality": 0.9807188135551504,
+          "qualityLower": 0.8407188135551504,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 17,
+          "estimatedQuality": 0.978545133381217,
+          "qualityLower": 0.838545133381217,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 18,
+          "estimatedQuality": 0.9761682236810314,
+          "qualityLower": 0.8361682236810314,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 19,
+          "estimatedQuality": 0.9735768478958136,
+          "qualityLower": 0.8335768478958135,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 20,
+          "estimatedQuality": 0.9707602209385663,
+          "qualityLower": 0.8307602209385663,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 21,
+          "estimatedQuality": 0.9677080392967446,
+          "qualityLower": 0.8277080392967446,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 22,
+          "estimatedQuality": 0.9644104380375708,
+          "qualityLower": 0.8244104380375707,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 23,
+          "estimatedQuality": 0.9608578585633197,
+          "qualityLower": 0.8208578585633197,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 24,
+          "estimatedQuality": 0.9570408158789007,
+          "qualityLower": 0.8170408158789007,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 25,
+          "estimatedQuality": 0.9529495616835193,
+          "qualityLower": 0.8129495616835193,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 26,
+          "estimatedQuality": 0.9485736493980872,
+          "qualityLower": 0.8085736493980872,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 27,
+          "estimatedQuality": 0.9439014184653486,
+          "qualityLower": 0.8039014184653486,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 28,
+          "estimatedQuality": 0.9389194267240222,
+          "qualityLower": 0.7989194267240222,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 29,
+          "estimatedQuality": 0.9336118699937781,
+          "qualityLower": 0.7936118699937781,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 30,
+          "estimatedQuality": 0.9279600359123171,
+          "qualityLower": 0.7879600359123171,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 31,
+          "estimatedQuality": 0.9219418435534537,
+          "qualityLower": 0.7819418435534536,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 32,
+          "estimatedQuality": 0.9155315209390305,
+          "qualityLower": 0.7755315209390304,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 33,
+          "estimatedQuality": 0.9086994693053067,
+          "qualityLower": 0.7686994693053066,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 34,
+          "estimatedQuality": 0.90141235642721,
+          "qualityLower": 0.76141235642721,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 35,
+          "estimatedQuality": 0.8936334722255829,
+          "qualityLower": 0.7536334722255829,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 36,
+          "estimatedQuality": 0.8853233690550375,
+          "qualityLower": 0.7453233690550375,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 37,
+          "estimatedQuality": 0.8764407970157887,
+          "qualityLower": 0.7364407970157887,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 38,
+          "estimatedQuality": 0.8669439314880054,
+          "qualityLower": 0.7269439314880054,
+          "qualityUpper": 1
+        },
+        {
+          "difficultyScore": 39,
+          "estimatedQuality": 0.8567918756087601,
+          "qualityLower": 0.7167918756087601,
+          "qualityUpper": 0.9967918756087601
+        },
+        {
+          "difficultyScore": 40,
+          "estimatedQuality": 0.8459464041348694,
+          "qualityLower": 0.7059464041348694,
+          "qualityUpper": 0.9859464041348694
+        },
+        {
+          "difficultyScore": 41,
+          "estimatedQuality": 0.8343738966536685,
+          "qualityLower": 0.6943738966536684,
+          "qualityUpper": 0.9743738966536685
+        },
+        {
+          "difficultyScore": 42,
+          "estimatedQuality": 0.8220473874189027,
+          "qualityLower": 0.6820473874189027,
+          "qualityUpper": 0.9620473874189027
+        },
+        {
+          "difficultyScore": 43,
+          "estimatedQuality": 0.8089486369529679,
+          "qualityLower": 0.6689486369529679,
+          "qualityUpper": 0.9489486369529679
+        },
+        {
+          "difficultyScore": 44,
+          "estimatedQuality": 0.7950701087308202,
+          "qualityLower": 0.6550701087308202,
+          "qualityUpper": 0.9350701087308202
+        },
+        {
+          "difficultyScore": 45,
+          "estimatedQuality": 0.7804167155953213,
+          "qualityLower": 0.6404167155953213,
+          "qualityUpper": 0.9204167155953213
+        },
+        {
+          "difficultyScore": 46,
+          "estimatedQuality": 0.7650071888111368,
+          "qualityLower": 0.6250071888111368,
+          "qualityUpper": 0.9050071888111368
+        },
+        {
+          "difficultyScore": 47,
+          "estimatedQuality": 0.7488749220328622,
+          "qualityLower": 0.6088749220328622,
+          "qualityUpper": 0.8888749220328622
+        },
+        {
+          "difficultyScore": 48,
+          "estimatedQuality": 0.7320681567686679,
+          "qualityLower": 0.5920681567686679,
+          "qualityUpper": 0.8720681567686679
+        },
+        {
+          "difficultyScore": 49,
+          "estimatedQuality": 0.7146494076350283,
+          "qualityLower": 0.5746494076350283,
+          "qualityUpper": 0.8546494076350283
+        },
+        {
+          "difficultyScore": 50,
+          "estimatedQuality": 0.6966940749432393,
+          "qualityLower": 0.5566940749432393,
+          "qualityUpper": 0.8366940749432393
+        },
+        {
+          "difficultyScore": 51,
+          "estimatedQuality": 0.6782882559895498,
+          "qualityLower": 0.5382882559895498,
+          "qualityUpper": 0.8182882559895498
+        },
+        {
+          "difficultyScore": 52,
+          "estimatedQuality": 0.6595258386764709,
+          "qualityLower": 0.5195258386764708,
+          "qualityUpper": 0.7995258386764709
+        },
+        {
+          "difficultyScore": 53,
+          "estimatedQuality": 0.6405050330130526,
+          "qualityLower": 0.5005050330130526,
+          "qualityUpper": 0.7805050330130526
+        },
+        {
+          "difficultyScore": 54,
+          "estimatedQuality": 0.6213245576533795,
+          "qualityLower": 0.48132455765337945,
+          "qualityUpper": 0.7613245576533795
+        },
+        {
+          "difficultyScore": 55,
+          "estimatedQuality": 0.6020797406522812,
+          "qualityLower": 0.4620797406522812,
+          "qualityUpper": 0.7420797406522812
+        },
+        {
+          "difficultyScore": 56,
+          "estimatedQuality": 0.5828588094096728,
+          "qualityLower": 0.4428588094096728,
+          "qualityUpper": 0.7228588094096728
+        },
+        {
+          "difficultyScore": 57,
+          "estimatedQuality": 0.563739631817273,
+          "qualityLower": 0.42373963181727303,
+          "qualityUpper": 0.7037396318172731
+        },
+        {
+          "difficultyScore": 58,
+          "estimatedQuality": 0.5447871310420322,
+          "qualityLower": 0.40478713104203223,
+          "qualityUpper": 0.6847871310420323
+        },
+        {
+          "difficultyScore": 59,
+          "estimatedQuality": 0.5260515364044042,
+          "qualityLower": 0.38605153640440415,
+          "qualityUpper": 0.6660515364044042
+        },
+        {
+          "difficultyScore": 60,
+          "estimatedQuality": 0.5075675612831311,
+          "qualityLower": 0.36756756128313106,
+          "qualityUpper": 0.6475675612831311
+        },
+        {
+          "difficultyScore": 61,
+          "estimatedQuality": 0.4893545254176968,
+          "qualityLower": 0.3493545254176968,
+          "qualityUpper": 0.6293545254176969
+        },
+        {
+          "difficultyScore": 62,
+          "estimatedQuality": 0.47141737169373193,
+          "qualityLower": 0.3314173716937319,
+          "qualityUpper": 0.6114173716937319
+        },
+        {
+          "difficultyScore": 63,
+          "estimatedQuality": 0.4537484722552969,
+          "qualityLower": 0.3137484722552969,
+          "qualityUpper": 0.5937484722552969
+        },
+        {
+          "difficultyScore": 64,
+          "estimatedQuality": 0.436330078290438,
+          "qualityLower": 0.296330078290438,
+          "qualityUpper": 0.576330078290438
+        },
+        {
+          "difficultyScore": 65,
+          "estimatedQuality": 0.41913724197620367,
+          "qualityLower": 0.27913724197620365,
+          "qualityUpper": 0.5591372419762037
+        },
+        {
+          "difficultyScore": 66,
+          "estimatedQuality": 0.402141025785811,
+          "qualityLower": 0.262141025785811,
+          "qualityUpper": 0.542141025785811
+        },
+        {
+          "difficultyScore": 67,
+          "estimatedQuality": 0.38531181076194654,
+          "qualityLower": 0.24531181076194652,
+          "qualityUpper": 0.5253118107619466
+        },
+        {
+          "difficultyScore": 68,
+          "estimatedQuality": 0.36862251879862723,
+          "qualityLower": 0.22862251879862722,
+          "qualityUpper": 0.5086225187986273
+        },
+        {
+          "difficultyScore": 69,
+          "estimatedQuality": 0.3520515728242453,
+          "qualityLower": 0.2120515728242453,
+          "qualityUpper": 0.49205157282424533
+        },
+        {
+          "difficultyScore": 70,
+          "estimatedQuality": 0.3355854327696507,
+          "qualityLower": 0.19558543276965068,
+          "qualityUpper": 0.4755854327696507
+        },
+        {
+          "difficultyScore": 71,
+          "estimatedQuality": 0.31922056526657666,
+          "qualityLower": 0.17922056526657665,
+          "qualityUpper": 0.4592205652665767
+        },
+        {
+          "difficultyScore": 72,
+          "estimatedQuality": 0.30296473269833957,
+          "qualityLower": 0.16296473269833955,
+          "qualityUpper": 0.4429647326983396
+        },
+        {
+          "difficultyScore": 73,
+          "estimatedQuality": 0.2868375238103479,
+          "qualityLower": 0.14683752381034787,
+          "qualityUpper": 0.4268375238103479
+        },
+        {
+          "difficultyScore": 74,
+          "estimatedQuality": 0.27087009369567006,
+          "qualityLower": 0.13087009369567004,
+          "qualityUpper": 0.41087009369567007
+        },
+        {
+          "difficultyScore": 75,
+          "estimatedQuality": 0.2551041338033701,
+          "qualityLower": 0.11510413380337009,
+          "qualityUpper": 0.3951041338033701
+        },
+        {
+          "difficultyScore": 76,
+          "estimatedQuality": 0.23959014868664275,
+          "qualityLower": 0.09959014868664273,
+          "qualityUpper": 0.37959014868664276
+        },
+        {
+          "difficultyScore": 77,
+          "estimatedQuality": 0.22438516966760275,
+          "qualityLower": 0.08438516966760273,
+          "qualityUpper": 0.36438516966760276
+        },
+        {
+          "difficultyScore": 78,
+          "estimatedQuality": 0.20955007968817269,
+          "qualityLower": 0.06955007968817267,
+          "qualityUpper": 0.3495500796881727
+        },
+        {
+          "difficultyScore": 79,
+          "estimatedQuality": 0.1951467520434922,
+          "qualityLower": 0.055146752043492175,
+          "qualityUpper": 0.3351467520434922
+        },
+        {
+          "difficultyScore": 80,
+          "estimatedQuality": 0.18123521405688037,
+          "qualityLower": 0.041235214056880354,
+          "qualityUpper": 0.3212352140568804
+        },
+        {
+          "difficultyScore": 81,
+          "estimatedQuality": 0.1678710336505389,
+          "qualityLower": 0.02787103365053889,
+          "qualityUpper": 0.3078710336505389
+        },
+        {
+          "difficultyScore": 82,
+          "estimatedQuality": 0.15510309420469917,
+          "qualityLower": 0.015103094204699158,
+          "qualityUpper": 0.29510309420469916
+        },
+        {
+          "difficultyScore": 83,
+          "estimatedQuality": 0.1429718761147007,
+          "qualityLower": 0.002971876114700678,
+          "qualityUpper": 0.2829718761147007
+        },
+        {
+          "difficultyScore": 84,
+          "estimatedQuality": 0.13150830903121202,
+          "qualityLower": 0,
+          "qualityUpper": 0.27150830903121204
+        },
+        {
+          "difficultyScore": 85,
+          "estimatedQuality": 0.12073320438550945,
+          "qualityLower": 0,
+          "qualityUpper": 0.26073320438550945
+        },
+        {
+          "difficultyScore": 86,
+          "estimatedQuality": 0.11065723003488287,
+          "qualityLower": 0,
+          "qualityUpper": 0.2506572300348829
+        },
+        {
+          "difficultyScore": 87,
+          "estimatedQuality": 0.10128135235347999,
+          "qualityLower": 0,
+          "qualityUpper": 0.24128135235348
+        },
+        {
+          "difficultyScore": 88,
+          "estimatedQuality": 0.0925976480836188,
+          "qualityLower": 0,
+          "qualityUpper": 0.23259764808361882
+        },
+        {
+          "difficultyScore": 89,
+          "estimatedQuality": 0.08459037869549421,
+          "qualityLower": 0,
+          "qualityUpper": 0.22459037869549422
+        },
+        {
+          "difficultyScore": 90,
+          "estimatedQuality": 0.0772372220402668,
+          "qualityLower": 0,
+          "qualityUpper": 0.2172372220402668
+        },
+        {
+          "difficultyScore": 91,
+          "estimatedQuality": 0.07051056681887385,
+          "qualityLower": 0,
+          "qualityUpper": 0.21051056681887387
+        },
+        {
+          "difficultyScore": 92,
+          "estimatedQuality": 0.0643787915731482,
+          "qualityLower": 0,
+          "qualityUpper": 0.2043787915731482
+        },
+        {
+          "difficultyScore": 93,
+          "estimatedQuality": 0.0588074685039347,
+          "qualityLower": 0,
+          "qualityUpper": 0.19880746850393471
+        },
+        {
+          "difficultyScore": 94,
+          "estimatedQuality": 0.053760450979936925,
+          "qualityLower": 0,
+          "qualityUpper": 0.19376045097993694
+        },
+        {
+          "difficultyScore": 95,
+          "estimatedQuality": 0.049200820399900785,
+          "qualityLower": 0,
+          "qualityUpper": 0.1892008203999008
+        },
+        {
+          "difficultyScore": 96,
+          "estimatedQuality": 0.045091682108861816,
+          "qualityLower": 0,
+          "qualityUpper": 0.18509168210886184
+        },
+        {
+          "difficultyScore": 97,
+          "estimatedQuality": 0.0413968109523318,
+          "qualityLower": 0,
+          "qualityUpper": 0.18139681095233182
+        },
+        {
+          "difficultyScore": 98,
+          "estimatedQuality": 0.03808115483308167,
+          "qualityLower": 0,
+          "qualityUpper": 0.17808115483308168
+        },
+        {
+          "difficultyScore": 99,
+          "estimatedQuality": 0.03511120965067766,
+          "qualityLower": 0,
+          "qualityUpper": 0.17511120965067767
+        },
+        {
+          "difficultyScore": 100,
+          "estimatedQuality": 0.03245528173664797,
+          "qualityLower": 0,
+          "qualityUpper": 0.17245528173664798
+        }
+      ],
+      "protocol": "Responses",
+      "toolCall": true,
+      "reasoning": true,
+      "activeInAcuAuto": true,
+      "provider": "Lucen",
+      "status": "routing_active",
+      "healthyChannelCount": 1,
+      "effectiveCostStatuses": [
+        "verified"
+      ]
     }
   ],
   "curveModelStatuses": [
@@ -8558,6 +9834,28 @@
       "healthyChannelCount": 0,
       "temporarilyUnavailableReason": "No active verified Channel (blocked)",
       "effectiveCostStatuses": []
+    },
+    {
+      "modelId": "claude-fable-5",
+      "statuses": [
+        "active_messages"
+      ],
+      "healthyChannelCount": 1,
+      "temporarilyUnavailableReason": null,
+      "effectiveCostStatuses": [
+        "estimated"
+      ]
+    },
+    {
+      "modelId": "kimi-k3",
+      "statuses": [
+        "active_responses"
+      ],
+      "healthyChannelCount": 1,
+      "temporarilyUnavailableReason": null,
+      "effectiveCostStatuses": [
+        "verified"
+      ]
     }
   ]
 }

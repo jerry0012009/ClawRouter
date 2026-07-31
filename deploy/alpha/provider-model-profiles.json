@@ -1,6 +1,6 @@
 {
   "schemaVersion": "acu-provider-model-profile-registry-v1",
-  "generatedAt": "2026-07-31T06:51:09.295Z",
+  "generatedAt": "2026-07-31T10:50:00.000Z",
   "profiles": [
     {
       "executionProfileId": "blackai-codex-mix-low:gpt-5.4-mini:responses",
@@ -3601,6 +3601,76 @@
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
       "actualModelAliases": []
+    },
+    {
+      "executionProfileId": "lucen-kiro-cache70-claude-006:claude-fable-5:messages",
+      "channelId": "lucen-kiro-cache70-claude-006",
+      "providerId": "lucen",
+      "canonicalModelId": "claude-fable-5",
+      "providerModelId": "claude-fable-5",
+      "actualModelAliases": [],
+      "protocol": "messages",
+      "toolCallSupport": true,
+      "supportedToolTypes": [
+        "function"
+      ],
+      "thinkingSupport": true,
+      "supportedReasoningEfforts": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "actualModelVerified": true,
+      "usageTrusted": true,
+      "effectivePriceAvailable": true,
+      "effectiveCostStatus": "estimated",
+      "health": "healthy",
+      "healthReason": "targeted_native_tool_sse_usage_preflight_passed",
+      "lastVerifiedAt": "2026-07-31T10:50:00.000Z",
+      "activeInAcuAuto": true,
+      "canonicalAdvertisedContextWindow": 200000,
+      "providerDeclaredContextWindow": null,
+      "observedSuccessfulInputTokens": 66,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "observed_floor",
+      "contextCapabilitySource": "targeted_native_tool_sse_usage_preflight",
+      "contextLastVerifiedAt": "2026-07-31T10:50:00.000Z"
+    },
+    {
+      "executionProfileId": "lucen-kimi-k3-openai-040:kimi-k3:responses",
+      "channelId": "lucen-kimi-k3-openai-040",
+      "providerId": "lucen",
+      "canonicalModelId": "kimi-k3",
+      "providerModelId": "kimi-k3",
+      "actualModelAliases": [],
+      "protocol": "responses",
+      "toolCallSupport": true,
+      "supportedToolTypes": [
+        "function",
+        "custom",
+        "local_tool"
+      ],
+      "thinkingSupport": true,
+      "supportedReasoningEfforts": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "actualModelVerified": true,
+      "usageTrusted": true,
+      "effectivePriceAvailable": true,
+      "effectiveCostStatus": "verified",
+      "health": "healthy",
+      "healthReason": "targeted_native_tool_sse_usage_preflight_passed",
+      "lastVerifiedAt": "2026-07-31T10:50:00.000Z",
+      "activeInAcuAuto": true,
+      "canonicalAdvertisedContextWindow": 1048576,
+      "providerDeclaredContextWindow": 1048576,
+      "observedSuccessfulInputTokens": 59482,
+      "providerHardContextCap": null,
+      "contextCapabilityStatus": "observed_floor",
+      "contextCapabilitySource": "official_kimi_k3_spec_and_live_59482_token_preflight",
+      "contextLastVerifiedAt": "2026-07-31T10:50:00.000Z"
     }
   ]
 }

@@ -1,6 +1,6 @@
 {
   "schemaVersion": "acu-model-catalog-v2",
-  "generatedAt": "2026-07-27",
+  "generatedAt": "2026-07-31",
   "estimateLabel": "public-benchmark constrained model score",
   "disclaimer": "预计模型得分用于相对匹配演示，不代表逐请求实测成功率。",
   "config": {
@@ -77,7 +77,7 @@
       "uncertaintyRiskWeightAtPreference60": 0.2,
       "uncertaintyRiskWeightAtPreference95": 0.45,
       "qualityExponentAtPreference60": 0.8,
-      "qualityExponentAtPreference95": 2.0,
+      "qualityExponentAtPreference95": 2,
       "combination": "qualityUtility * (qualityWeight + costWeight * costUtility)",
       "costTransform": "pareto-frontier log-relative",
       "hardScoreThreshold": false
@@ -107,10 +107,10 @@
       "modelId": "gpt-5.5",
       "displayName": "GPT-5.5",
       "upstream": "proxy",
-      "inputPricePerMillion": 5.0,
-      "outputPricePerMillion": 30.0,
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 30,
       "cachedInputPricePerMillion": 2.5,
-      "cacheWritePricePerMillion": 5.0,
+      "cacheWritePricePerMillion": 5,
       "contextWindow": 1050000,
       "maxOutputTokens": 65536,
       "toolCallSupport": true,
@@ -139,7 +139,7 @@
           "sourceVersion": "v2026.06.30-3015ac6",
           "benchmarkDate": "2026-06-30",
           "directForModel": true,
-          "configuredRelativeDelta": 0.0
+          "configuredRelativeDelta": 0
         }
       ],
       "evidenceConfidence": "medium",
@@ -156,7 +156,7 @@
       "curveFloor": 0.03,
       "curveCeiling": 0.99,
       "tierAdjustments": {
-        "low": 0.0,
+        "low": 0,
         "mid": 0.005,
         "midHigh": 0.015,
         "high": 0.015
@@ -187,8 +187,8 @@
       "fittingError": -1.1102230246251565e-16,
       "sufficientLow": 0.8940232055766547,
       "sufficientMid": 0.3280324412529797,
-      "sufficientMidHigh": 0.0,
-      "sufficientHigh": 0.0,
+      "sufficientMidHigh": 0,
+      "sufficientHigh": 0,
       "benchmarkEvidence": [
         {
           "benchmarkName": "SWE-bench Verified via OpenHands Index",
@@ -233,8 +233,8 @@
       "modelId": "claude-opus-4-8",
       "displayName": "Claude Opus 4.8",
       "upstream": "proxy",
-      "inputPricePerMillion": 5.0,
-      "outputPricePerMillion": 25.0,
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 25,
       "cachedInputPricePerMillion": 0.5,
       "cacheWritePricePerMillion": 6.25,
       "contextWindow": 200000,
@@ -265,7 +265,7 @@
           "sourceVersion": "v2026.06.30-3015ac6",
           "benchmarkDate": "2026-06-30",
           "directForModel": true,
-          "configuredRelativeDelta": 0.0
+          "configuredRelativeDelta": 0
         }
       ],
       "evidenceConfidence": "medium",
@@ -297,8 +297,8 @@
       "modelId": "claude-sonnet-5",
       "displayName": "Claude Sonnet 5",
       "upstream": "proxy",
-      "inputPricePerMillion": 3.0,
-      "outputPricePerMillion": 15.0,
+      "inputPricePerMillion": 3,
+      "outputPricePerMillion": 15,
       "cachedInputPricePerMillion": 0.3,
       "cacheWritePricePerMillion": 3.75,
       "contextWindow": 200000,
@@ -311,7 +311,7 @@
       "defaultDisplay": false,
       "abilityAnchor": 0.778,
       "solvedAbilityParameter": 0.5939799550182703,
-      "fittingError": 0.0,
+      "fittingError": 0,
       "sufficientLow": 0.9554788935293893,
       "sufficientMid": 0.810653469424331,
       "sufficientMidHigh": 0.4268137104879507,
@@ -346,7 +346,7 @@
       "curveFloor": 0.03,
       "curveCeiling": 0.99,
       "tierAdjustments": {
-        "low": 0.0,
+        "low": 0,
         "mid": 0.005,
         "midHigh": 0.015,
         "high": 0.015
@@ -361,7 +361,7 @@
       "displayName": "Gemini 3.5 Flash",
       "upstream": "proxy",
       "inputPricePerMillion": 1.5,
-      "outputPricePerMillion": 9.0,
+      "outputPricePerMillion": 9,
       "cachedInputPricePerMillion": 0.75,
       "cacheWritePricePerMillion": 1.5,
       "contextWindow": 1048576,
@@ -392,7 +392,7 @@
           "sourceVersion": "v2026.06.30-3015ac6",
           "benchmarkDate": "2026-06-30",
           "directForModel": true,
-          "configuredRelativeDelta": 0.0
+          "configuredRelativeDelta": 0
         }
       ],
       "evidenceConfidence": "medium",
@@ -409,7 +409,7 @@
       "curveFloor": 0.03,
       "curveCeiling": 0.99,
       "tierAdjustments": {
-        "low": 0.0,
+        "low": 0,
         "mid": 0.005,
         "midHigh": 0.015,
         "high": 0.015
@@ -438,11 +438,11 @@
       "defaultDisplay": true,
       "abilityAnchor": 0.6719999999999999,
       "solvedAbilityParameter": 0.33339868413138773,
-      "fittingError": 0.0,
+      "fittingError": 0,
       "sufficientLow": 0.913373885856422,
       "sufficientMid": 0.3633127845955678,
-      "sufficientMidHigh": 0.0,
-      "sufficientHigh": 0.0,
+      "sufficientMidHigh": 0,
+      "sufficientHigh": 0,
       "benchmarkEvidence": [
         {
           "benchmarkName": "SWE-bench Verified via OpenHands Index",
@@ -520,7 +520,7 @@
           "sourceVersion": "v2026.06.30-3015ac6",
           "benchmarkDate": "2026-06-30",
           "directForModel": true,
-          "configuredRelativeDelta": 0.0
+          "configuredRelativeDelta": 0
         }
       ],
       "evidenceConfidence": "medium",
@@ -537,7 +537,7 @@
       "curveFloor": 0.03,
       "curveCeiling": 0.99,
       "tierAdjustments": {
-        "low": 0.0,
+        "low": 0,
         "mid": 0.005,
         "midHigh": 0.015,
         "high": 0.015
@@ -566,7 +566,7 @@
       "defaultDisplay": false,
       "abilityAnchor": 0.75,
       "solvedAbilityParameter": 0.535266097743285,
-      "fittingError": 0.0,
+      "fittingError": 0,
       "sufficientLow": 0.9376953212576794,
       "sufficientMid": 0.7371881050531351,
       "sufficientMidHigh": 0.332479557090131,
@@ -584,7 +584,7 @@
           "sourceVersion": "v2026.06.30-3015ac6",
           "benchmarkDate": "2026-06-30",
           "directForModel": true,
-          "configuredRelativeDelta": 0.0
+          "configuredRelativeDelta": 0
         }
       ],
       "evidenceConfidence": "medium",
@@ -601,7 +601,7 @@
       "curveFloor": 0.03,
       "curveCeiling": 0.99,
       "tierAdjustments": {
-        "low": 0.0,
+        "low": 0,
         "mid": 0.005,
         "midHigh": 0.015,
         "high": 0.015
@@ -616,7 +616,7 @@
       "displayName": "Kimi K2.6",
       "upstream": "proxy",
       "inputPricePerMillion": 0.95,
-      "outputPricePerMillion": 4.0,
+      "outputPricePerMillion": 4,
       "cachedInputPricePerMillion": 0.475,
       "cacheWritePricePerMillion": 0.95,
       "contextWindow": 256000,
@@ -647,7 +647,7 @@
           "sourceVersion": "v2026.06.30-3015ac6",
           "benchmarkDate": "2026-06-30",
           "directForModel": true,
-          "configuredRelativeDelta": 0.0
+          "configuredRelativeDelta": 0
         }
       ],
       "evidenceConfidence": "medium",
@@ -664,7 +664,7 @@
       "curveFloor": 0.03,
       "curveCeiling": 0.99,
       "tierAdjustments": {
-        "low": 0.0,
+        "low": 0,
         "mid": 0.025,
         "midHigh": 0.05,
         "high": -0.01
@@ -695,8 +695,8 @@
       "fittingError": -1.1102230246251565e-16,
       "sufficientLow": 0.8489110087209144,
       "sufficientMid": 0.26613411276273974,
-      "sufficientMidHigh": 0.0,
-      "sufficientHigh": 0.0,
+      "sufficientMidHigh": 0,
+      "sufficientHigh": 0,
       "benchmarkEvidence": [
         {
           "benchmarkName": "SWE-bench Verified via OpenHands Index",
@@ -710,7 +710,7 @@
           "sourceVersion": "v2026.06.30-3015ac6",
           "benchmarkDate": "2026-06-30",
           "directForModel": true,
-          "configuredRelativeDelta": 0.0
+          "configuredRelativeDelta": 0
         }
       ],
       "evidenceConfidence": "medium",
@@ -774,7 +774,7 @@
           "sourceVersion": "v2026.06.30-3015ac6",
           "benchmarkDate": "2026-06-30",
           "directForModel": true,
-          "configuredRelativeDelta": 0.0
+          "configuredRelativeDelta": 0
         }
       ],
       "evidenceConfidence": "medium",
@@ -791,7 +791,7 @@
       "curveFloor": 0.03,
       "curveCeiling": 0.99,
       "tierAdjustments": {
-        "low": 0.0,
+        "low": 0,
         "mid": 0.005,
         "midHigh": 0.015,
         "high": 0.015
@@ -855,7 +855,7 @@
       "curveFloor": 0.03,
       "curveCeiling": 0.99,
       "tierAdjustments": {
-        "low": 0.0,
+        "low": 0,
         "mid": 0.025,
         "midHigh": 0.05,
         "high": -0.01
@@ -902,7 +902,7 @@
           "sourceVersion": "v2026.06.30-3015ac6",
           "benchmarkDate": "2026-06-30",
           "directForModel": true,
-          "configuredRelativeDelta": 0.0
+          "configuredRelativeDelta": 0
         }
       ],
       "evidenceConfidence": "medium",
@@ -919,7 +919,7 @@
       "curveFloor": 0.03,
       "curveCeiling": 0.99,
       "tierAdjustments": {
-        "low": 0.0,
+        "low": 0,
         "mid": 0.005,
         "midHigh": 0.015,
         "high": 0.015
@@ -933,10 +933,10 @@
       "modelId": "gpt-5.6-sol",
       "displayName": "GPT-5.6 Sol",
       "upstream": "proxy",
-      "inputPricePerMillion": 5.0,
-      "outputPricePerMillion": 30.0,
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 30,
       "cachedInputPricePerMillion": 0.5,
-      "cacheWritePricePerMillion": 5.0,
+      "cacheWritePricePerMillion": 5,
       "contextWindow": 1050000,
       "maxOutputTokens": 128000,
       "toolCallSupport": true,
@@ -999,7 +999,7 @@
       "displayName": "GPT-5.6 Terra",
       "upstream": "proxy",
       "inputPricePerMillion": 2.5,
-      "outputPricePerMillion": 15.0,
+      "outputPricePerMillion": 15,
       "cachedInputPricePerMillion": 0.25,
       "cacheWritePricePerMillion": 2.5,
       "contextWindow": 1050000,
@@ -1047,7 +1047,7 @@
       "curveFloor": 0.03,
       "curveCeiling": 0.99,
       "tierAdjustments": {
-        "low": 0.0,
+        "low": 0,
         "mid": 0.005,
         "midHigh": 0.015,
         "high": 0.015
@@ -1062,10 +1062,10 @@
       "modelId": "gpt-5.6-luna",
       "displayName": "GPT-5.6 Luna",
       "upstream": "proxy",
-      "inputPricePerMillion": 1.0,
-      "outputPricePerMillion": 6.0,
+      "inputPricePerMillion": 1,
+      "outputPricePerMillion": 6,
       "cachedInputPricePerMillion": 0.1,
-      "cacheWritePricePerMillion": 1.0,
+      "cacheWritePricePerMillion": 1,
       "contextWindow": 1050000,
       "maxOutputTokens": 128000,
       "toolCallSupport": true,
@@ -1076,8 +1076,8 @@
       "defaultDisplay": false,
       "abilityAnchor": 0.792,
       "solvedAbilityParameter": 0.6330257052523451,
-      "fittingError": 0.0,
-      "sufficientLow": 1.0,
+      "fittingError": 0,
+      "sufficientLow": 1,
       "sufficientMid": 0.9289424844844617,
       "sufficientMidHigh": 0.402231294647791,
       "sufficientHigh": 0.01138960308365651,
@@ -1175,7 +1175,7 @@
       "curveFloor": 0.03,
       "curveCeiling": 0.99,
       "tierAdjustments": {
-        "low": 0.0,
+        "low": 0,
         "mid": 0.005,
         "midHigh": 0.015,
         "high": 0.015
@@ -1191,7 +1191,7 @@
       "displayName": "Kimi K2.7 Code",
       "upstream": "proxy",
       "inputPricePerMillion": 0.95,
-      "outputPricePerMillion": 4.0,
+      "outputPricePerMillion": 4,
       "cachedInputPricePerMillion": 0.475,
       "cacheWritePricePerMillion": 0.95,
       "contextWindow": 256000,
@@ -1204,7 +1204,7 @@
       "defaultDisplay": true,
       "abilityAnchor": 0.776,
       "solvedAbilityParameter": 0.5839101949915135,
-      "fittingError": 0.0,
+      "fittingError": 0,
       "sufficientLow": 0.9610651235526767,
       "sufficientMid": 0.8357220147344683,
       "sufficientMidHigh": 0.43598320746351266,
@@ -1239,7 +1239,7 @@
       "curveFloor": 0.03,
       "curveCeiling": 0.99,
       "tierAdjustments": {
-        "low": 0.0,
+        "low": 0,
         "mid": 0.025,
         "midHigh": 0.05,
         "high": -0.01
@@ -1268,11 +1268,11 @@
       "defaultDisplay": false,
       "abilityAnchor": 0.6859999999999999,
       "solvedAbilityParameter": 0.3488493546512945,
-      "fittingError": 0.0,
+      "fittingError": 0,
       "sufficientLow": 0.9296262890788107,
       "sufficientMid": 0.3988112458887811,
       "sufficientMidHigh": 0.0036977465223457795,
-      "sufficientHigh": 0.0,
+      "sufficientHigh": 0,
       "benchmarkEvidence": [
         {
           "benchmarkName": "Gemini family relative product mapping",
@@ -1332,11 +1332,11 @@
       "defaultDisplay": false,
       "abilityAnchor": 0.6709999999999999,
       "solvedAbilityParameter": 0.33233528857103356,
-      "fittingError": 0.0,
+      "fittingError": 0,
       "sufficientLow": 0.9121799566038431,
       "sufficientMid": 0.36093564354761387,
-      "sufficientMidHigh": 0.0,
-      "sufficientHigh": 0.0,
+      "sufficientMidHigh": 0,
+      "sufficientHigh": 0,
       "benchmarkEvidence": [
         {
           "benchmarkName": "Fallback relative capability mapping",
@@ -1399,8 +1399,8 @@
       "fittingError": -1.1102230246251565e-16,
       "sufficientLow": 0.8257420780589249,
       "sufficientMid": 0.2419952938290411,
-      "sufficientMidHigh": 0.0,
-      "sufficientHigh": 0.0,
+      "sufficientMidHigh": 0,
+      "sufficientHigh": 0,
       "benchmarkEvidence": [
         {
           "benchmarkName": "DeepSeek family relative product mapping",
@@ -1463,8 +1463,8 @@
       "fittingError": -2.220446049250313e-16,
       "sufficientLow": 0.8501878516101128,
       "sufficientMid": 0.2675898425908389,
-      "sufficientMidHigh": 0.0,
-      "sufficientHigh": 0.0,
+      "sufficientMidHigh": 0,
+      "sufficientHigh": 0,
       "benchmarkEvidence": [
         {
           "benchmarkName": "Llama family relative product mapping",
@@ -1524,7 +1524,7 @@
       "defaultDisplay": false,
       "abilityAnchor": 0.65,
       "solvedAbilityParameter": 0.3715726164998827,
-      "fittingError": 0.0,
+      "fittingError": 0,
       "sufficientLow": 0.8505872079437978,
       "sufficientMid": 0.48065345307022056,
       "sufficientMidHigh": 0.1734225220822092,
@@ -1559,7 +1559,7 @@
       "curveFloor": 0.03,
       "curveCeiling": 0.99,
       "tierAdjustments": {
-        "low": 0.0,
+        "low": 0,
         "mid": 0.025,
         "midHigh": 0.05,
         "high": -0.01
@@ -1569,6 +1569,133 @@
         "https://huggingface.co/datasets/OpenHands/openhands-index"
       ],
       "profileConfidence": "low"
+    },
+    {
+      "modelId": "claude-fable-5",
+      "displayName": "Claude Fable 5",
+      "upstream": "proxy",
+      "inputPricePerMillion": 10,
+      "outputPricePerMillion": 50,
+      "cachedInputPricePerMillion": 1,
+      "cacheWritePricePerMillion": 12.5,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000,
+      "toolCallSupport": true,
+      "visionSupport": true,
+      "provider": "Anthropic",
+      "availability": "callable_preflight_or_repository",
+      "routingEligible": true,
+      "defaultDisplay": true,
+      "abilityAnchor": 0.958,
+      "solvedAbilityParameter": 1.1208913983330326,
+      "fittingError": 0,
+      "sufficientLow": 0.9777821259839409,
+      "sufficientMid": 0.9745104938556622,
+      "sufficientMidHigh": 0.961937592674017,
+      "sufficientHigh": 0.870667779629334,
+      "benchmarkEvidence": [
+        {
+          "benchmarkName": "SWE-bench Verified via OpenHands Index",
+          "normalizedScore": 0.958,
+          "scoreScale": "0-1 resolved fraction",
+          "sampleSize": 500,
+          "sourceModelName": "claude-fable-5",
+          "evaluationMode": "OpenHands agent harness",
+          "sourceUrl": "https://huggingface.co/datasets/OpenHands/openhands-index",
+          "resultsUrl": "https://github.com/OpenHands/openhands-index-results/tree/3015ac612e7196f428e6e8a3948965d32d9a3331",
+          "sourceVersion": "v2026.06.30-3015ac6",
+          "benchmarkDate": "2026-06-30",
+          "directForModel": true,
+          "configuredRelativeDelta": 0
+        }
+      ],
+      "evidenceConfidence": "medium",
+      "uncertaintyWidth": 0.08,
+      "curveMethod": "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
+      "sourceNames": [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      "sourceRetrievedAt": "2026-07-27",
+      "notes": "Direct aggregate anchor from the pinned OpenHands Index SWE-bench evaluation; agent-harness dependent.",
+      "curveProfile": "frontier_resilient",
+      "curveTemperature": 0.16,
+      "curveFloor": 0.03,
+      "curveCeiling": 0.99,
+      "tierAdjustments": {
+        "low": -0.01,
+        "mid": -0.005,
+        "midHigh": 0.02,
+        "high": 0.055
+      },
+      "profileEvidence": [
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      "profileConfidence": "medium"
+    },
+    {
+      "modelId": "kimi-k3",
+      "displayName": "Kimi K3",
+      "upstream": "proxy",
+      "inputPricePerMillion": 3,
+      "outputPricePerMillion": 15,
+      "cachedInputPricePerMillion": 0.3,
+      "cacheWritePricePerMillion": 3,
+      "contextWindow": 1048576,
+      "maxOutputTokens": 1048576,
+      "toolCallSupport": true,
+      "visionSupport": true,
+      "provider": "Moonshot AI",
+      "availability": "callable_preflight_or_repository",
+      "routingEligible": true,
+      "defaultDisplay": true,
+      "abilityAnchor": 0.792,
+      "solvedAbilityParameter": 0.6330257052523451,
+      "fittingError": 0,
+      "sufficientLow": 1,
+      "sufficientMid": 0.9289424844844617,
+      "sufficientMidHigh": 0.402231294647791,
+      "sufficientHigh": 0.01138960308365651,
+      "benchmarkEvidence": [
+        {
+          "benchmarkName": "Provisional LUNA capability placement",
+          "normalizedScore": 0.792,
+          "scoreScale": "relative family mapping onto pinned OpenHands anchor scale",
+          "sampleSize": 0,
+          "sourceModelName": "kimi-k3",
+          "evaluationMode": "vendor-reported; not OpenHands-comparable",
+          "sourceUrl": "https://platform.kimi.ai/docs/guide/kimi-k3-quickstart",
+          "resultsUrl": "https://platform.kimi.ai/docs/guide/kimi-k3-quickstart",
+          "sourceVersion": "retrieved-2026-07-27",
+          "benchmarkDate": "2026-07-27",
+          "directForModel": false,
+          "configuredRelativeDelta": 0
+        }
+      ],
+      "evidenceConfidence": "low",
+      "uncertaintyWidth": 0.14,
+      "curveMethod": "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
+      "sourceNames": [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      "sourceRetrievedAt": "2026-07-27",
+      "notes": "Official K3 specifications and live Agent protocol are verified, but no comparable pinned quality result exists; provisional LUNA placement prevents an unverified frontier claim.",
+      "curveProfile": "efficient_fast",
+      "curveTemperature": 0.095,
+      "curveFloor": 0.025,
+      "curveCeiling": 0.985,
+      "tierAdjustments": {
+        "low": 0.05,
+        "mid": 0.02,
+        "midHigh": -0.06,
+        "high": -0.08
+      },
+      "profileEvidence": [
+        "https://platform.kimi.ai/docs/guide/kimi-k3-quickstart",
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      "profileConfidence": "medium"
     }
   ]
 }

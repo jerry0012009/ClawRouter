@@ -1959,6 +1959,16 @@ var BLOCKRUN_MODELS = [
     maxTokens: 32768
   },
   {
+    id: "kimi-k3",
+    name: "Kimi K3",
+    upstream: "proxy",
+    reasoning: true,
+    input: ["text", "image"],
+    cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3 },
+    contextWindow: 1048576,
+    maxTokens: 1048576
+  },
+  {
     id: "kimi-k2.6",
     name: "Kimi K2.6",
     upstream: "proxy",
@@ -4387,7 +4397,7 @@ function continuousTierProbabilities(difficulty) {
 // src/acu/catalog/model-catalog.json
 var model_catalog_default = {
   schemaVersion: "acu-model-catalog-v2",
-  generatedAt: "2026-07-27",
+  generatedAt: "2026-07-31",
   estimateLabel: "public-benchmark constrained model score",
   disclaimer: "\u9884\u8BA1\u6A21\u578B\u5F97\u5206\u7528\u4E8E\u76F8\u5BF9\u5339\u914D\u6F14\u793A\uFF0C\u4E0D\u4EE3\u8868\u9010\u8BF7\u6C42\u5B9E\u6D4B\u6210\u529F\u7387\u3002",
   config: {
@@ -5956,6 +5966,133 @@ var model_catalog_default = {
         "https://huggingface.co/datasets/OpenHands/openhands-index"
       ],
       profileConfidence: "low"
+    },
+    {
+      modelId: "claude-fable-5",
+      displayName: "Claude Fable 5",
+      upstream: "proxy",
+      inputPricePerMillion: 10,
+      outputPricePerMillion: 50,
+      cachedInputPricePerMillion: 1,
+      cacheWritePricePerMillion: 12.5,
+      contextWindow: 2e5,
+      maxOutputTokens: 32e3,
+      toolCallSupport: true,
+      visionSupport: true,
+      provider: "Anthropic",
+      availability: "callable_preflight_or_repository",
+      routingEligible: true,
+      defaultDisplay: true,
+      abilityAnchor: 0.958,
+      solvedAbilityParameter: 1.1208913983330326,
+      fittingError: 0,
+      sufficientLow: 0.9777821259839409,
+      sufficientMid: 0.9745104938556622,
+      sufficientMidHigh: 0.961937592674017,
+      sufficientHigh: 0.870667779629334,
+      benchmarkEvidence: [
+        {
+          benchmarkName: "SWE-bench Verified via OpenHands Index",
+          normalizedScore: 0.958,
+          scoreScale: "0-1 resolved fraction",
+          sampleSize: 500,
+          sourceModelName: "claude-fable-5",
+          evaluationMode: "OpenHands agent harness",
+          sourceUrl: "https://huggingface.co/datasets/OpenHands/openhands-index",
+          resultsUrl: "https://github.com/OpenHands/openhands-index-results/tree/3015ac612e7196f428e6e8a3948965d32d9a3331",
+          sourceVersion: "v2026.06.30-3015ac6",
+          benchmarkDate: "2026-06-30",
+          directForModel: true,
+          configuredRelativeDelta: 0
+        }
+      ],
+      evidenceConfidence: "medium",
+      uncertaintyWidth: 0.08,
+      curveMethod: "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
+      sourceNames: [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      sourceRetrievedAt: "2026-07-27",
+      notes: "Direct aggregate anchor from the pinned OpenHands Index SWE-bench evaluation; agent-harness dependent.",
+      curveProfile: "frontier_resilient",
+      curveTemperature: 0.16,
+      curveFloor: 0.03,
+      curveCeiling: 0.99,
+      tierAdjustments: {
+        low: -0.01,
+        mid: -5e-3,
+        midHigh: 0.02,
+        high: 0.055
+      },
+      profileEvidence: [
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      profileConfidence: "medium"
+    },
+    {
+      modelId: "kimi-k3",
+      displayName: "Kimi K3",
+      upstream: "proxy",
+      inputPricePerMillion: 3,
+      outputPricePerMillion: 15,
+      cachedInputPricePerMillion: 0.3,
+      cacheWritePricePerMillion: 3,
+      contextWindow: 1048576,
+      maxOutputTokens: 1048576,
+      toolCallSupport: true,
+      visionSupport: true,
+      provider: "Moonshot AI",
+      availability: "callable_preflight_or_repository",
+      routingEligible: true,
+      defaultDisplay: true,
+      abilityAnchor: 0.792,
+      solvedAbilityParameter: 0.6330257052523451,
+      fittingError: 0,
+      sufficientLow: 1,
+      sufficientMid: 0.9289424844844617,
+      sufficientMidHigh: 0.402231294647791,
+      sufficientHigh: 0.01138960308365651,
+      benchmarkEvidence: [
+        {
+          benchmarkName: "Provisional LUNA capability placement",
+          normalizedScore: 0.792,
+          scoreScale: "relative family mapping onto pinned OpenHands anchor scale",
+          sampleSize: 0,
+          sourceModelName: "kimi-k3",
+          evaluationMode: "vendor-reported; not OpenHands-comparable",
+          sourceUrl: "https://platform.kimi.ai/docs/guide/kimi-k3-quickstart",
+          resultsUrl: "https://platform.kimi.ai/docs/guide/kimi-k3-quickstart",
+          sourceVersion: "retrieved-2026-07-27",
+          benchmarkDate: "2026-07-27",
+          directForModel: false,
+          configuredRelativeDelta: 0
+        }
+      ],
+      evidenceConfidence: "low",
+      uncertaintyWidth: 0.14,
+      curveMethod: "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
+      sourceNames: [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      sourceRetrievedAt: "2026-07-27",
+      notes: "Official K3 specifications and live Agent protocol are verified, but no comparable pinned quality result exists; provisional LUNA placement prevents an unverified frontier claim.",
+      curveProfile: "efficient_fast",
+      curveTemperature: 0.095,
+      curveFloor: 0.025,
+      curveCeiling: 0.985,
+      tierAdjustments: {
+        low: 0.05,
+        mid: 0.02,
+        midHigh: -0.06,
+        high: -0.08
+      },
+      profileEvidence: [
+        "https://platform.kimi.ai/docs/guide/kimi-k3-quickstart",
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      profileConfidence: "medium"
     }
   ]
 };

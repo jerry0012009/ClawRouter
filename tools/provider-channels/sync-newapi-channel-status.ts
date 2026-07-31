@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { buildModelCurve, getAcuModel } from "../../src/acu/catalog.js";
+import { buildModelCurve, getAcuCatalog, getAcuModel } from "../../src/acu/catalog.js";
 
 const catalogPath = resolve("deploy/alpha/newapi-acu-catalog.json");
 const profiles = JSON.parse(await readFile(resolve("deploy/alpha/execution-profiles.json"), "utf8")) as Array<Record<string, unknown>>;
@@ -61,6 +61,14 @@ const active = profiles.filter((profile) => profile.enabled === true
   && profile.administratorAllowed === true && profile.autoRouteEnabled !== false);
 const activeModelIds = [...new Set(active.map((profile) => String(profile.modelId)))].sort();
 const existingResponses = new Map(catalog.responses.map((item) => [String(item.modelId), item]));
+const existingStatuses = new Map(catalog.curveModelStatuses.map((item) => [String(item.modelId), item]));
+catalog.curveModelStatuses = getAcuCatalog().models.map((model) => existingStatuses.get(model.modelId) ?? {
+  modelId: model.modelId,
+  statuses: [],
+  healthyChannelCount: 0,
+  temporarilyUnavailableReason: "No active verified Channel",
+  effectiveCostStatuses: [],
+});
 catalog.responses = activeModelIds.map((modelId) => {
   const model = getAcuModel(modelId);
   if (!model || model.inputPricePerMillion === null || model.outputPricePerMillion === null) {

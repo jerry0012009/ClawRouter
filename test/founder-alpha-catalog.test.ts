@@ -44,6 +44,17 @@ describe("Founder Alpha New API catalog export", () => {
       effectiveOutputPriceCnyPerMillion: 0.36,
       costProvider: "Lucen",
     });
+    const fable = exported.responses.find((item: { modelId: string }) => item.modelId === "claude-fable-5");
+    expect(fable).toMatchObject({
+      effectiveInputPriceCnyPerMillion: 0.6,
+      effectiveOutputPriceCnyPerMillion: 3,
+      protocol: "Messages",
+      healthyChannelCount: 1,
+    });
+    const kimiK3 = exported.responses.find((item: { modelId: string }) => item.modelId === "kimi-k3");
+    expect(kimiK3.effectiveInputPriceCnyPerMillion).toBeCloseTo(8);
+    expect(kimiK3.effectiveOutputPriceCnyPerMillion).toBeCloseTo(40);
+    expect(kimiK3).toMatchObject({ protocol: "Responses", healthyChannelCount: 1 });
   });
 
   it("keeps all six Founder catalog surfaces aligned", async () => {
@@ -53,9 +64,9 @@ describe("Founder Alpha New API catalog export", () => {
       readFile("deploy/alpha/docker-compose.yml", "utf8"),
     ]);
     const expected = [
-      "acu-auto", "claude-opus-4-8", "claude-sonnet-5", "deepseek-v4-flash",
+      "acu-auto", "claude-fable-5", "claude-opus-4-8", "claude-sonnet-5", "deepseek-v4-flash",
       "gemini-2.5-flash", "glm-5.1", "glm-5.2", "gpt-5.4-mini", "gpt-5.5",
-      "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "kimi-k2.6", "kimi-k2.7-code",
+      "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "kimi-k2.6", "kimi-k2.7-code", "kimi-k3",
     ];
     expect([exported.auto.modelId, ...exported.responses.map((item: { modelId: string }) => item.modelId)])
       .toEqual(expected);

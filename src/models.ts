@@ -107,6 +107,8 @@ export const BLOCKRUN_MODELS: ExtendedModelDefinition[] = [
   // ── Moonshot Kimi ──
   { id: "kimi-k2.7-code", name: "Kimi K2.7 Code", upstream: "proxy", reasoning: false, input: ["text"],
     cost: { input: 0.95, output: 4, cacheRead: 0.475, cacheWrite: 0.95 }, contextWindow: 256_000, maxTokens: 32_768 },
+  { id: "kimi-k3", name: "Kimi K3", upstream: "proxy", reasoning: true, input: ["text", "image"],
+    cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3 }, contextWindow: 1_048_576, maxTokens: 1_048_576 },
   { id: "kimi-k2.6", name: "Kimi K2.6", upstream: "proxy", reasoning: false, input: ["text"],
     cost: { input: 0.95, output: 4, cacheRead: 0.475, cacheWrite: 0.95 }, contextWindow: 256_000, maxTokens: 32_768 },
   { id: "kimi-k2.5", name: "Kimi K2.5", upstream: "proxy", reasoning: false, input: ["text"],

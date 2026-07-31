@@ -1065,7 +1065,7 @@
       "multiplierStatus": "observed",
       "enabled": true,
       "discoveryStatus": "success",
-      "activationStatus": "inactive",
+      "activationStatus": "active",
       "notes": [
         "Directory discovery does not imply protocol compatibility or Active Pool admission"
       ]

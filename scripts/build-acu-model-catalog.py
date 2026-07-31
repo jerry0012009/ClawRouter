@@ -52,6 +52,7 @@ MODEL_SPECS: list[dict[str, Any]] = [
     {"model_id": "gpt-5.4-mini", "provider": "OpenAI", "relative_to": "GPT-5.4", "delta": -0.10, "default": False},
     {"model_id": "claude-opus-4-8", "provider": "Anthropic", "evidence": "claude-opus-4-8", "default": True},
     {"model_id": "claude-sonnet-5", "provider": "Anthropic", "relative_to": "claude-opus-4-8", "delta": -0.06, "default": True},
+    {"model_id": "claude-fable-5", "provider": "Anthropic", "evidence": "claude-fable-5", "default": True},
     {"model_id": "gemini-3.5-flash", "provider": "Google", "evidence": "Gemini-3.5-Flash", "default": True},
     {"model_id": "deepseek-v4-flash", "provider": "DeepSeek", "relative_to": "DeepSeek-V4-Pro", "delta": -0.06, "default": True},
     {"model_id": "deepseek-v4-pro", "provider": "DeepSeek", "evidence": "DeepSeek-V4-Pro", "default": True},

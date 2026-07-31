@@ -63,7 +63,8 @@ function estimateOne(
   const upper = clamp(quality + model.uncertaintyWidth);
   const callCost = estimateCallCost(effectivePrice ?? model, inputTokens, outputTokens);
   const expectedFallbackCost = fallbackRiskScale * (1 - lower) * (fallbackCallCost + switchCost);
-  const total = judgeCost + callCost + expectedFallbackCost;
+  const selectionCost = callCost + expectedFallbackCost;
+  const expectedEndToEndCost = judgeCost + selectionCost;
   return {
     modelId: model.modelId,
     displayName: model.displayName,
@@ -74,10 +75,13 @@ function estimateOne(
     qualityUpper: upper,
     estimatedCallCost: callCost,
     expectedFallbackCost,
-    expectedTotalCost: total,
+    selectionCost,
+    judgeOverheadCost: judgeCost,
+    expectedEndToEndCost,
+    expectedTotalCost: expectedEndToEndCost,
     predictedScore: quality * 100,
     conservativeScore: lower * 100,
-    riskAdjustedCost: total,
+    riskAdjustedCost: selectionCost,
     riskAdjustedScore: quality * 100,
     qualityUtility: 0,
     costUtility: 0,
@@ -199,9 +203,9 @@ export function recommendModel(input: AcuDecisionInput): AcuRecommendation {
   const flagshipEstimate = estimates.find((estimate) => estimate.modelId === flagship.modelId);
   if (!flagshipEstimate) throw new Error("ACU flagship model estimate is missing");
   for (const estimate of estimates) {
-    estimate.savingsVsFlagship = flagshipEstimate.expectedTotalCost - estimate.expectedTotalCost;
-    estimate.savingsPercentVsFlagship = flagshipEstimate.expectedTotalCost > 0
-      ? estimate.savingsVsFlagship / flagshipEstimate.expectedTotalCost
+    estimate.savingsVsFlagship = flagshipEstimate.selectionCost - estimate.selectionCost;
+    estimate.savingsPercentVsFlagship = flagshipEstimate.selectionCost > 0
+      ? estimate.savingsVsFlagship / flagshipEstimate.selectionCost
       : 0;
   }
   const route = selectValueRoute(estimates, qualityTarget * 100, costSensitivity);

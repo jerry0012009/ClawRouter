@@ -105,6 +105,10 @@ export type AcuModelEstimate = {
   qualityUpper: number;
   estimatedCallCost: number;
   expectedFallbackCost: number;
+  selectionCost: number;
+  judgeOverheadCost: number;
+  expectedEndToEndCost: number;
+  /** Backward-compatible alias for expectedEndToEndCost. */
   expectedTotalCost: number;
   predictedScore: number;
   conservativeScore: number;

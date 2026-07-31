@@ -10,7 +10,8 @@ function evaluation(requestId: string): AcuEvaluation {
   const estimate = {
     modelId: "qwen3.6-plus", displayName: "Qwen 3.6 Plus", provider: "Qwen",
     estimatedQuality: 0.8, conservativeQuality: 0.75, qualityLower: 0.75, qualityUpper: 0.85,
-    estimatedCallCost: 0.001, expectedFallbackCost: 0, expectedTotalCost: 0.001,
+    estimatedCallCost: 0.001, expectedFallbackCost: 0, selectionCost: 0.001,
+    judgeOverheadCost: 0, expectedEndToEndCost: 0.001, expectedTotalCost: 0.001,
     predictedScore: 80, conservativeScore: 75, riskAdjustedCost: 0.001, riskAdjustedScore: 75,
     qualityUtility: 0.8, costUtility: 0.9, valueUtility: 0.85, scoreGapVsBest: 0,
     costSavingsVsBest: 0, paretoEfficient: true, selectionReason: "test",

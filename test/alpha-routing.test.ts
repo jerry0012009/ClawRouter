@@ -82,6 +82,31 @@ const requirements: AlphaRouteRequirements = {
 };
 
 describe("Alpha current-formula routing", () => {
+  it("does not let shared Judge overhead change model selection or Pareto membership", () => {
+    const input = {
+      probabilities: judge,
+      difficultyScore: judge.difficultyIndex,
+      inputTokens: 57_307,
+      expectedOutputTokens: 1_000,
+      qualityTarget: 0.68,
+      costSensitivity: 1.8,
+      fallbackRiskScale: 0.35,
+      eligibleModelIds: ["gpt-5.4-mini", "gpt-5.5", "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"],
+    };
+    const withoutJudgeCost = recommendModel({ ...input, judgeCost: 0 });
+    const withLargeJudgeCost = recommendModel({ ...input, judgeCost: 100 });
+    expect(withLargeJudgeCost.recommended.modelId).toBe(withoutJudgeCost.recommended.modelId);
+    expect(withLargeJudgeCost.estimates.map((estimate) => [estimate.modelId, estimate.paretoEfficient]))
+      .toEqual(withoutJudgeCost.estimates.map((estimate) => [estimate.modelId, estimate.paretoEfficient]));
+    for (const estimate of withLargeJudgeCost.estimates) {
+      const baseline = withoutJudgeCost.estimates.find((item) => item.modelId === estimate.modelId)!;
+      expect(estimate.selectionCost).toBeCloseTo(baseline.selectionCost, 12);
+      expect(estimate.riskAdjustedCost).toBeCloseTo(baseline.riskAdjustedCost, 12);
+      expect(estimate.expectedEndToEndCost - baseline.expectedEndToEndCost).toBeCloseTo(100, 12);
+      expect(estimate.judgeOverheadCost).toBe(100);
+    }
+  });
+
   it("replays the existing decision.ts recommendation exactly", () => {
     const actual = routeWithCurrentAcuFormula({
       judge,

@@ -1,0 +1,611 @@
+{
+  "summary": {
+    "generatedAt": "2026-07-31T22:11:35.539Z",
+    "profileId": "lucen-cx006-value-dynamic:gpt-5.6-luna:responses",
+    "modelId": "gpt-5.6-luna",
+    "contextPolicy": "full_native",
+    "requestedSamples": 12,
+    "samples": 12,
+    "successfulSamples": 12,
+    "jsonParseSuccessRate": 1,
+    "difficultyIndexMae": 12.108333333333333,
+    "primaryTierAgreementRate": 0.5833333333333334,
+    "severeTierConflictRate": 0,
+    "factorMae": {
+      "reasoningDepth": 1.075,
+      "taskScope": 0.9083333333333331,
+      "constraintDensity": 1.616666666666667,
+      "toolDependency": 0.9083333333333332,
+      "verificationBurden": 1.1249999999999998,
+      "contextBurden": 1.6500000000000001
+    },
+    "webIntentAgreementRate": 0.9166666666666666,
+    "latencyMs": {
+      "p50": 8787,
+      "p95": 22932
+    },
+    "timeoutRate": 0,
+    "nominalCostUsd": {
+      "average": 0.053820349999999996,
+      "p95": 0.287274
+    }
+  },
+  "comparison": {
+    "mimo": {
+      "latencyMs": {
+        "p50": 6605,
+        "p95": 43161
+      },
+      "effectiveCostCny": {
+        "average": 0.15442081776,
+        "p95": 0.94509963216
+      }
+    },
+    "luna": {
+      "latencyMs": {
+        "p50": 8787,
+        "p95": 22932
+      },
+      "effectiveCostCny": {
+        "average": 0.003229220999999999,
+        "p95": 0.01723644
+      }
+    }
+  },
+  "differences": [
+    {
+      "judgeEvaluationId": "judge_5abb23dc021b4e78af6dbb4f271bb4a4",
+      "rawRequestTokenEstimate": 138470,
+      "mimoDifficultyIndex": 46.5,
+      "lunaDifficultyIndex": 75.6,
+      "difference": 29.099999999999994,
+      "mimoWebIntent": "required",
+      "lunaWebIntent": "required"
+    },
+    {
+      "judgeEvaluationId": "judge_b7df9574380e476189091d177e5d7ce0",
+      "rawRequestTokenEstimate": 15106,
+      "mimoDifficultyIndex": 46.7,
+      "lunaDifficultyIndex": 75.2,
+      "difference": 28.5,
+      "mimoWebIntent": "required",
+      "lunaWebIntent": "required"
+    },
+    {
+      "judgeEvaluationId": "judge_98f062fa9f764e6c8373ce58ffb03171",
+      "rawRequestTokenEstimate": 14965,
+      "mimoDifficultyIndex": 47.5,
+      "lunaDifficultyIndex": 66.9,
+      "difference": 19.400000000000006,
+      "mimoWebIntent": "required",
+      "lunaWebIntent": "likely"
+    },
+    {
+      "judgeEvaluationId": "judge_366af9665e7d4e379e5731f7a7ca263a",
+      "rawRequestTokenEstimate": 15143,
+      "mimoDifficultyIndex": 56.9,
+      "lunaDifficultyIndex": 73.5,
+      "difference": 16.6,
+      "mimoWebIntent": "required",
+      "lunaWebIntent": "required"
+    },
+    {
+      "judgeEvaluationId": "judge_cf2efefc84784df3b1b9d330c8ad9684",
+      "rawRequestTokenEstimate": 22287,
+      "mimoDifficultyIndex": 54.9,
+      "lunaDifficultyIndex": 69.7,
+      "difference": 14.800000000000004,
+      "mimoWebIntent": "required",
+      "lunaWebIntent": "required"
+    },
+    {
+      "judgeEvaluationId": "judge_1decaeb96c51475381c41afdcdf9f247",
+      "rawRequestTokenEstimate": 84683,
+      "mimoDifficultyIndex": 71.1,
+      "lunaDifficultyIndex": 82.2,
+      "difference": 11.100000000000009,
+      "mimoWebIntent": "not_required",
+      "lunaWebIntent": "not_required"
+    },
+    {
+      "judgeEvaluationId": "judge_95f47785e49547ec8738cc8a36acf845",
+      "rawRequestTokenEstimate": 36740,
+      "mimoDifficultyIndex": 71.9,
+      "lunaDifficultyIndex": 82.3,
+      "difference": 10.399999999999991,
+      "mimoWebIntent": "required",
+      "lunaWebIntent": "required"
+    },
+    {
+      "judgeEvaluationId": "judge_cd690e8ecb554ba4bd965437e37aa7dd",
+      "rawRequestTokenEstimate": 91,
+      "mimoDifficultyIndex": 8,
+      "lunaDifficultyIndex": 13.1,
+      "difference": 5.1,
+      "mimoWebIntent": "not_required",
+      "lunaWebIntent": "not_required"
+    }
+  ],
+  "samples": [
+    {
+      "judgeEvaluationId": "judge_5abb23dc021b4e78af6dbb4f271bb4a4",
+      "createdAt": "2026-07-31T21:29:57.934Z",
+      "rawRequestTokenEstimate": 138470,
+      "rawRequestSha256": "de42b0b0365f97f2042cedf280cee5d34c8830f24fccf7770d717a20001e1ed0",
+      "historical": {
+        "difficultyIndex": 46.5,
+        "tier": "mid",
+        "factors": {
+          "taskScope": 4.6,
+          "contextBurden": 5.1,
+          "reasoningDepth": 4.1,
+          "toolDependency": 6.8,
+          "constraintDensity": 3.2,
+          "verificationBurden": 4.5
+        },
+        "webIntent": "required",
+        "latencyMs": 21746,
+        "effectiveCostCny": 0.94509963216
+      },
+      "luna": {
+        "difficultyIndex": 75.6,
+        "tier": "mid_high",
+        "factors": {
+          "reasoningDepth": 7.2,
+          "taskScope": 7.1,
+          "constraintDensity": 5.8,
+          "toolDependency": 8.9,
+          "verificationBurden": 7.4,
+          "contextBurden": 8.7
+        },
+        "webIntent": "required",
+        "latencyMs": 12126,
+        "promptTokens": 284964,
+        "completionTokens": 385,
+        "cachedPromptTokens": 0,
+        "nominalCostUsd": 0.287274,
+        "effectiveCostCny": 0.01723644
+      }
+    },
+    {
+      "judgeEvaluationId": "judge_1decaeb96c51475381c41afdcdf9f247",
+      "createdAt": "2026-07-30T14:24:41.867Z",
+      "rawRequestTokenEstimate": 84683,
+      "rawRequestSha256": "f1d3c3b524b8fe9b86e0caa7b3bfe0255a5e5e143d96620e732660e8bd9a384e",
+      "historical": {
+        "difficultyIndex": 71.1,
+        "tier": "mid_high",
+        "factors": {
+          "taskScope": 7.2,
+          "contextBurden": 7.3,
+          "reasoningDepth": 6.8,
+          "toolDependency": 8.5,
+          "constraintDensity": 5.6,
+          "verificationBurden": 7
+        },
+        "webIntent": "not_required",
+        "latencyMs": 43161,
+        "effectiveCostCny": 0.454628592
+      },
+      "luna": {
+        "difficultyIndex": 82.2,
+        "tier": "high",
+        "factors": {
+          "reasoningDepth": 7.8,
+          "taskScope": 8.6,
+          "constraintDensity": 6.4,
+          "toolDependency": 9.3,
+          "verificationBurden": 8.2,
+          "contextBurden": 8.7
+        },
+        "webIntent": "not_required",
+        "latencyMs": 10322,
+        "promptTokens": 137230,
+        "completionTokens": 403,
+        "cachedPromptTokens": 0,
+        "nominalCostUsd": 0.139648,
+        "effectiveCostCny": 0.00837888
+      }
+    },
+    {
+      "judgeEvaluationId": "judge_95f47785e49547ec8738cc8a36acf845",
+      "createdAt": "2026-07-31T19:56:03.025Z",
+      "rawRequestTokenEstimate": 36740,
+      "rawRequestSha256": "045acc999c253d619e02635ac90c34898f91bf027eb7b8d94878d8903edb6ce0",
+      "historical": {
+        "difficultyIndex": 71.9,
+        "tier": "mid_high",
+        "factors": {
+          "taskScope": 7.5,
+          "contextBurden": 7.3,
+          "reasoningDepth": 6.8,
+          "toolDependency": 8.9,
+          "constraintDensity": 5.2,
+          "verificationBurden": 7.1
+        },
+        "webIntent": "required",
+        "latencyMs": 7899,
+        "effectiveCostCny": 0.14601384
+      },
+      "luna": {
+        "difficultyIndex": 82.3,
+        "tier": "high",
+        "factors": {
+          "reasoningDepth": 7.7,
+          "taskScope": 8.1,
+          "constraintDensity": 6.8,
+          "toolDependency": 9.4,
+          "verificationBurden": 8.5,
+          "contextBurden": 8.8
+        },
+        "webIntent": "required",
+        "latencyMs": 12278,
+        "promptTokens": 49604,
+        "completionTokens": 451,
+        "cachedPromptTokens": 0,
+        "nominalCostUsd": 0.05231,
+        "effectiveCostCny": 0.0031386
+      }
+    },
+    {
+      "judgeEvaluationId": "judge_cf2efefc84784df3b1b9d330c8ad9684",
+      "createdAt": "2026-07-31T16:22:46.544Z",
+      "rawRequestTokenEstimate": 22287,
+      "rawRequestSha256": "5097de050a6446091565f32cb8f6c69553261e41bc481495689d4c63e445c11b",
+      "historical": {
+        "difficultyIndex": 54.9,
+        "tier": "mid_high",
+        "factors": {
+          "taskScope": 6.3,
+          "contextBurden": 4.9,
+          "reasoningDepth": 5.1,
+          "toolDependency": 7.4,
+          "constraintDensity": 3.2,
+          "verificationBurden": 5.8
+        },
+        "webIntent": "required",
+        "latencyMs": 6605,
+        "effectiveCostCny": 0.087921504
+      },
+      "luna": {
+        "difficultyIndex": 69.7,
+        "tier": "mid_high",
+        "factors": {
+          "reasoningDepth": 6.2,
+          "taskScope": 7.1,
+          "constraintDensity": 5.8,
+          "toolDependency": 8.4,
+          "verificationBurden": 7.2,
+          "contextBurden": 7.6
+        },
+        "webIntent": "required",
+        "latencyMs": 19041,
+        "promptTokens": 32483,
+        "completionTokens": 456,
+        "cachedPromptTokens": 0,
+        "nominalCostUsd": 0.035219,
+        "effectiveCostCny": 0.00211314
+      }
+    },
+    {
+      "judgeEvaluationId": "judge_366af9665e7d4e379e5731f7a7ca263a",
+      "createdAt": "2026-07-31T15:35:55.455Z",
+      "rawRequestTokenEstimate": 15143,
+      "rawRequestSha256": "1d250e5a4fe709d0bdf1316e8ffc4deab38799b8011ab11df08dbe4d47b4c801",
+      "historical": {
+        "difficultyIndex": 56.9,
+        "tier": "mid_high",
+        "factors": {
+          "taskScope": 6.2,
+          "contextBurden": 4.2,
+          "reasoningDepth": 5.8,
+          "toolDependency": 7.5,
+          "constraintDensity": 3.1,
+          "verificationBurden": 6.9
+        },
+        "webIntent": "required",
+        "latencyMs": 6688,
+        "effectiveCostCny": 0.057766608
+      },
+      "luna": {
+        "difficultyIndex": 73.5,
+        "tier": "mid_high",
+        "factors": {
+          "reasoningDepth": 6.8,
+          "taskScope": 7.2,
+          "constraintDensity": 5.8,
+          "toolDependency": 8.7,
+          "verificationBurden": 7.8,
+          "contextBurden": 6.5
+        },
+        "webIntent": "required",
+        "latencyMs": 10836,
+        "promptTokens": 23856,
+        "completionTokens": 412,
+        "cachedPromptTokens": 0,
+        "nominalCostUsd": 0.026328,
+        "effectiveCostCny": 0.00157968
+      }
+    },
+    {
+      "judgeEvaluationId": "judge_b7df9574380e476189091d177e5d7ce0",
+      "createdAt": "2026-07-31T11:45:40.342Z",
+      "rawRequestTokenEstimate": 15106,
+      "rawRequestSha256": "b83bd8f2062d79653eae72809413f26ef3c4937c77f715a55e6087e22c4dfcd0",
+      "historical": {
+        "difficultyIndex": 46.7,
+        "tier": "mid",
+        "factors": {
+          "taskScope": 5.8,
+          "contextBurden": 2.8,
+          "reasoningDepth": 4.2,
+          "toolDependency": 6.5,
+          "constraintDensity": 3.1,
+          "verificationBurden": 5.4
+        },
+        "webIntent": "required",
+        "latencyMs": 7781,
+        "effectiveCostCny": 0.05131452816
+      },
+      "luna": {
+        "difficultyIndex": 75.2,
+        "tier": "mid_high",
+        "factors": {
+          "reasoningDepth": 6.8,
+          "taskScope": 8.1,
+          "constraintDensity": 6.4,
+          "toolDependency": 8.9,
+          "verificationBurden": 7.8,
+          "contextBurden": 6.2
+        },
+        "webIntent": "required",
+        "latencyMs": 8692,
+        "promptTokens": 23823,
+        "completionTokens": 392,
+        "cachedPromptTokens": 0,
+        "nominalCostUsd": 0.026175,
+        "effectiveCostCny": 0.0015705
+      }
+    },
+    {
+      "judgeEvaluationId": "judge_98f062fa9f764e6c8373ce58ffb03171",
+      "createdAt": "2026-07-31T10:39:33.718Z",
+      "rawRequestTokenEstimate": 14965,
+      "rawRequestSha256": "c81644ca1688f062c6d23a2c80dc7fbcd630add5f06515701e779d397adde5fa",
+      "historical": {
+        "difficultyIndex": 47.5,
+        "tier": "mid",
+        "factors": {
+          "taskScope": 5.8,
+          "contextBurden": 3.8,
+          "reasoningDepth": 4.2,
+          "toolDependency": 6.5,
+          "constraintDensity": 3.1,
+          "verificationBurden": 5.4
+        },
+        "webIntent": "required",
+        "latencyMs": 5887,
+        "effectiveCostCny": 0.05060043216
+      },
+      "luna": {
+        "difficultyIndex": 66.9,
+        "tier": "mid_high",
+        "factors": {
+          "reasoningDepth": 6.3,
+          "taskScope": 7.1,
+          "constraintDensity": 5.8,
+          "toolDependency": 7.6,
+          "verificationBurden": 7.2,
+          "contextBurden": 5.4
+        },
+        "webIntent": "likely",
+        "latencyMs": 8787,
+        "promptTokens": 23658,
+        "completionTokens": 414,
+        "cachedPromptTokens": 7936,
+        "nominalCostUsd": 0.0189996,
+        "effectiveCostCny": 0.0011399759999999998
+      }
+    },
+    {
+      "judgeEvaluationId": "judge_e59e67338aef44ccb6ff7ca755527fc4",
+      "createdAt": "2026-07-31T08:13:25.920Z",
+      "rawRequestTokenEstimate": 14234,
+      "rawRequestSha256": "ccec9e1ed7b95cd5e1484b21cfde71427096ae01714db76261b8ad749620fdfe",
+      "historical": {
+        "difficultyIndex": 3.9,
+        "tier": "low",
+        "factors": {
+          "taskScope": 0.3,
+          "contextBurden": 0.4,
+          "reasoningDepth": 0.5,
+          "toolDependency": 0,
+          "constraintDensity": 0.8,
+          "verificationBurden": 0.2
+        },
+        "webIntent": "not_required",
+        "latencyMs": 7262,
+        "effectiveCostCny": 0.051107976
+      },
+      "luna": {
+        "difficultyIndex": 7.4,
+        "tier": "low",
+        "factors": {
+          "reasoningDepth": 0.7,
+          "taskScope": 0.5,
+          "constraintDensity": 1.1,
+          "toolDependency": 0,
+          "verificationBurden": 0.8,
+          "contextBurden": 1.6
+        },
+        "webIntent": "not_required",
+        "latencyMs": 7365,
+        "promptTokens": 21995,
+        "completionTokens": 332,
+        "cachedPromptTokens": 0,
+        "nominalCostUsd": 0.023987,
+        "effectiveCostCny": 0.00143922
+      }
+    },
+    {
+      "judgeEvaluationId": "judge_27a2622ccf8d4c119ad8b599077f24a1",
+      "createdAt": "2026-07-31T21:07:52.841Z",
+      "rawRequestTokenEstimate": 162,
+      "rawRequestSha256": "79cf7b60ee844ee085d47c5b3f85c8dd119f6948e8ec34399fe30fbc5a7d30de",
+      "historical": {
+        "difficultyIndex": 14.3,
+        "tier": "low",
+        "factors": {
+          "taskScope": 1.5,
+          "contextBurden": 1.3,
+          "reasoningDepth": 1.2,
+          "toolDependency": 1.8,
+          "constraintDensity": 2.1,
+          "verificationBurden": 1
+        },
+        "webIntent": "not_required",
+        "latencyMs": 3111,
+        "effectiveCostCny": 0.0022955961600000002
+      },
+      "luna": {
+        "difficultyIndex": 12.1,
+        "tier": "low",
+        "factors": {
+          "reasoningDepth": 1.1,
+          "taskScope": 1.2,
+          "constraintDensity": 1.3,
+          "toolDependency": 1.8,
+          "verificationBurden": 0.8,
+          "contextBurden": 0.7
+        },
+        "webIntent": "not_required",
+        "latencyMs": 6649,
+        "promptTokens": 8969,
+        "completionTokens": 303,
+        "cachedPromptTokens": 0,
+        "nominalCostUsd": 0.010787,
+        "effectiveCostCny": 0.00064722
+      }
+    },
+    {
+      "judgeEvaluationId": "judge_b19e5e4c6daa44e6b60b7732561782c1",
+      "createdAt": "2026-07-31T21:06:02.658Z",
+      "rawRequestTokenEstimate": 140,
+      "rawRequestSha256": "15b0bbedc961ac9d2d089269ae3da058ce4b33c061d9297273a40eb60c5f0dd7",
+      "historical": {
+        "difficultyIndex": 6.1,
+        "tier": "low",
+        "factors": {
+          "taskScope": 0.3,
+          "contextBurden": 0.6,
+          "reasoningDepth": 0.5,
+          "toolDependency": 0.8,
+          "constraintDensity": 1.2,
+          "verificationBurden": 0.4
+        },
+        "webIntent": "not_required",
+        "latencyMs": 3049,
+        "effectiveCostCny": 0.00209828016
+      },
+      "luna": {
+        "difficultyIndex": 3.7,
+        "tier": "low",
+        "factors": {
+          "reasoningDepth": 0.3,
+          "taskScope": 0.2,
+          "constraintDensity": 0.6,
+          "toolDependency": 0.2,
+          "verificationBurden": 0.4,
+          "contextBurden": 0.5
+        },
+        "webIntent": "not_required",
+        "latencyMs": 6121,
+        "promptTokens": 8954,
+        "completionTokens": 284,
+        "cachedPromptTokens": 0,
+        "nominalCostUsd": 0.010658,
+        "effectiveCostCny": 0.00063948
+      }
+    },
+    {
+      "judgeEvaluationId": "judge_cd690e8ecb554ba4bd965437e37aa7dd",
+      "createdAt": "2026-07-31T21:06:24.464Z",
+      "rawRequestTokenEstimate": 91,
+      "rawRequestSha256": "6b04da933b03284b55827d2bdeeadd272ab80be652bd2dc0acacfa05f1f2d53d",
+      "historical": {
+        "difficultyIndex": 8,
+        "tier": "low",
+        "factors": {
+          "taskScope": 0.6,
+          "contextBurden": 0.3,
+          "reasoningDepth": 0.8,
+          "toolDependency": 1.5,
+          "constraintDensity": 1.2,
+          "verificationBurden": 0.5
+        },
+        "webIntent": "not_required",
+        "latencyMs": 3159,
+        "effectiveCostCny": 0.0021452601599999998
+      },
+      "luna": {
+        "difficultyIndex": 13.1,
+        "tier": "low",
+        "factors": {
+          "reasoningDepth": 1.2,
+          "taskScope": 0.8,
+          "constraintDensity": 2.6,
+          "toolDependency": 0.8,
+          "verificationBurden": 1.1,
+          "contextBurden": 1.3
+        },
+        "webIntent": "not_required",
+        "latencyMs": 22932,
+        "promptTokens": 8893,
+        "completionTokens": 345,
+        "cachedPromptTokens": 7936,
+        "nominalCostUsd": 0.0038206,
+        "effectiveCostCny": 0.00022923599999999999
+      }
+    },
+    {
+      "judgeEvaluationId": "judge_33be269c04f2437aa623ba0de58b7463",
+      "createdAt": "2026-07-31T21:07:04.886Z",
+      "rawRequestTokenEstimate": 86,
+      "rawRequestSha256": "34d6d9e5461c12b4508b3d42cb685fb5a804aac1908e91337f52cf82806bcb2f",
+      "historical": {
+        "difficultyIndex": 5.9,
+        "tier": "low",
+        "factors": {
+          "taskScope": 0.5,
+          "contextBurden": 0.3,
+          "reasoningDepth": 0.8,
+          "toolDependency": 0.3,
+          "constraintDensity": 1.2,
+          "verificationBurden": 0.4
+        },
+        "webIntent": "not_required",
+        "latencyMs": 3132,
+        "effectiveCostCny": 0.0020575641600000002
+      },
+      "luna": {
+        "difficultyIndex": 8.1,
+        "tier": "low",
+        "factors": {
+          "reasoningDepth": 0.6,
+          "taskScope": 0.7,
+          "constraintDensity": 1.2,
+          "toolDependency": 0.8,
+          "verificationBurden": 0.5,
+          "contextBurden": 0.7
+        },
+        "webIntent": "not_required",
+        "latencyMs": 6432,
+        "promptTokens": 8892,
+        "completionTokens": 291,
+        "cachedPromptTokens": 0,
+        "nominalCostUsd": 0.010638,
+        "effectiveCostCny": 0.00063828
+      }
+    }
+  ]
+}

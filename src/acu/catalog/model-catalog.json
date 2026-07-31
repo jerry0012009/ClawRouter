@@ -1607,6 +1607,20 @@
           "benchmarkDate": "2026-06-30",
           "directForModel": true,
           "configuredRelativeDelta": 0
+        },
+        {
+          "benchmarkName": "Artificial Analysis Intelligence Index v4.1",
+          "normalizedScore": 0.598606463217303,
+          "scoreScale": "0-100 composite index normalized to 0-1",
+          "sampleSize": 0,
+          "sourceModelName": "Claude Fable 5 (with fallback)",
+          "evaluationMode": "independent composite; Opus 4.8 fallback enabled",
+          "sourceUrl": "https://artificialanalysis.ai/models/claude-fable-5",
+          "resultsUrl": "https://artificialanalysis.ai/models/claude-fable-5",
+          "sourceVersion": "v4.1-retrieved-2026-07-31",
+          "benchmarkDate": "2026-07-31",
+          "directForModel": true,
+          "configuredRelativeDelta": 0
         }
       ],
       "evidenceConfidence": "medium",
@@ -1617,7 +1631,7 @@
         "ClawRouter BLOCKRUN_MODELS"
       ],
       "sourceRetrievedAt": "2026-07-27",
-      "notes": "Direct aggregate anchor from the pinned OpenHands Index SWE-bench evaluation; agent-harness dependent.",
+      "notes": "Direct OpenHands SWE-bench anchor plus an independent broad composite. The Artificial Analysis run used Opus 4.8 fallback, so its 59.8606 score is corroborating evidence, not a standalone Fable-only anchor.",
       "curveProfile": "frontier_resilient",
       "curveTemperature": 0.16,
       "curveFloor": 0.03,
@@ -1629,6 +1643,7 @@
         "high": 0.055
       },
       "profileEvidence": [
+        "https://artificialanalysis.ai/models/claude-fable-5",
         "https://huggingface.co/datasets/OpenHands/openhands-index"
       ],
       "profileConfidence": "medium"
@@ -1649,53 +1664,55 @@
       "availability": "callable_preflight_or_repository",
       "routingEligible": true,
       "defaultDisplay": true,
-      "abilityAnchor": 0.792,
-      "solvedAbilityParameter": 0.6330257052523451,
+      "abilityAnchor": 0.930516931154788,
+      "solvedAbilityParameter": 1.003212096898729,
       "fittingError": 0,
-      "sufficientLow": 1,
-      "sufficientMid": 0.9289424844844617,
-      "sufficientMidHigh": 0.402231294647791,
-      "sufficientHigh": 0.01138960308365651,
+      "sufficientLow": 0.975383957649151,
+      "sufficientMid": 0.9633702646634364,
+      "sufficientMidHigh": 0.9148906333031231,
+      "sufficientHigh": 0.7411957585817248,
       "benchmarkEvidence": [
         {
-          "benchmarkName": "Provisional LUNA capability placement",
-          "normalizedScore": 0.792,
-          "scoreScale": "relative family mapping onto pinned OpenHands anchor scale",
+          "benchmarkName": "Artificial Analysis Intelligence Index v4.1",
+          "normalizedScore": 0.571123394372091,
+          "scoreScale": "0-100 composite index normalized to 0-1",
           "sampleSize": 0,
-          "sourceModelName": "kimi-k3",
-          "evaluationMode": "vendor-reported; not OpenHands-comparable",
-          "sourceUrl": "https://platform.kimi.ai/docs/guide/kimi-k3-quickstart",
-          "resultsUrl": "https://platform.kimi.ai/docs/guide/kimi-k3-quickstart",
-          "sourceVersion": "retrieved-2026-07-27",
-          "benchmarkDate": "2026-07-27",
-          "directForModel": false,
-          "configuredRelativeDelta": 0
+          "sourceModelName": "Kimi K3 (max)",
+          "evaluationMode": "independent composite; dedicated evaluation runs",
+          "sourceUrl": "https://artificialanalysis.ai/models/kimi-k3",
+          "resultsUrl": "https://artificialanalysis.ai/models/kimi-k3",
+          "sourceVersion": "v4.1-retrieved-2026-07-31",
+          "benchmarkDate": "2026-07-31",
+          "directForModel": true,
+          "configuredRelativeDelta": -0.02748306884521199
         }
       ],
-      "evidenceConfidence": "low",
-      "uncertaintyWidth": 0.14,
+      "evidenceConfidence": "medium",
+      "uncertaintyWidth": 0.1,
       "curveMethod": "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
       "sourceNames": [
         "OpenHands Index SWE-bench aggregate",
         "ClawRouter BLOCKRUN_MODELS"
       ],
       "sourceRetrievedAt": "2026-07-27",
-      "notes": "Official K3 specifications and live Agent protocol are verified, but no comparable pinned quality result exists; provisional LUNA placement prevents an unverified frontier claim.",
-      "curveProfile": "efficient_fast",
-      "curveTemperature": 0.095,
-      "curveFloor": 0.025,
-      "curveCeiling": 0.985,
+      "notes": "Frontier placement is calibrated from the independent same-methodology gap to Fable 5; official K3 task results corroborate strong coding, terminal, browsing, tool-use and knowledge-work performance.",
+      "curveProfile": "frontier_resilient",
+      "curveTemperature": 0.16,
+      "curveFloor": 0.03,
+      "curveCeiling": 0.99,
       "tierAdjustments": {
-        "low": 0.05,
-        "mid": 0.02,
-        "midHigh": -0.06,
-        "high": -0.08
+        "low": -0.01,
+        "mid": -0.005,
+        "midHigh": 0.02,
+        "high": 0.055
       },
       "profileEvidence": [
         "https://platform.kimi.ai/docs/guide/kimi-k3-quickstart",
+        "https://www.kimi.com/blog/kimi-k3",
+        "https://artificialanalysis.ai/models/kimi-k3",
         "https://huggingface.co/datasets/OpenHands/openhands-index"
       ],
-      "profileConfidence": "low"
+      "profileConfidence": "medium"
     }
   ]
 }

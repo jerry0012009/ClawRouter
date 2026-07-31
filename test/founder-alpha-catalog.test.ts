@@ -55,6 +55,12 @@ describe("Founder Alpha New API catalog export", () => {
     expect(kimiK3.effectiveInputPriceCnyPerMillion).toBeCloseTo(8);
     expect(kimiK3.effectiveOutputPriceCnyPerMillion).toBeCloseTo(40);
     expect(kimiK3).toMatchObject({ protocol: "Responses", healthyChannelCount: 1 });
+    expect(kimiK3).toMatchObject({ curveProfile: "frontier_resilient", profileConfidence: "medium" });
+    const kimiK3Source = source.models.find((item: { modelId: string }) => item.modelId === "kimi-k3");
+    expect(kimiK3Source.evidenceConfidence).toBe("medium");
+    expect(kimiK3Source.abilityAnchor).toBeCloseTo(0.9305169312, 8);
+    expect(kimiK3.curve[75].estimatedQuality).toBeGreaterThan(0.8);
+    expect(fable.curve[75].estimatedQuality - kimiK3.curve[75].estimatedQuality).toBeLessThan(0.1);
   });
 
   it("keeps all six Founder catalog surfaces aligned", async () => {

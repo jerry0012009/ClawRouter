@@ -26,7 +26,14 @@ TIER_DIFFICULTY = {"low": 0.15, "mid": 0.40, "mid_high": 0.65, "high": 0.88}
 WEIGHTS = {"low": 689 / 970, "mid": 62 / 970, "mid_high": 49 / 970, "high": 170 / 970}
 CURVE_THRESHOLDS = {"above_low": 0.275, "above_mid": 0.525, "above_mid_high": 0.765}
 CURVE_TEMPERATURE = 0.08
-RETRIEVED_AT = "2026-07-27"
+RETRIEVED_AT = "2026-07-31"
+
+# Artificial Analysis Intelligence Index v4.1 evaluates both models under one
+# methodology. Preserve Fable's direct OpenHands anchor and use the same-scale
+# index gap for K3's relative placement instead of borrowing Luna's curve.
+AA_FABLE_5_SCORE = 59.8606463217303
+AA_KIMI_K3_SCORE = 57.1123394372091
+KIMI_K3_RELATIVE_DELTA = (AA_KIMI_K3_SCORE - AA_FABLE_5_SCORE) / 100
 
 PROFILES: dict[str, dict[str, Any]] = {
     "frontier_resilient": {"temperature": 0.16, "floor": 0.03, "ceiling": 0.99,
@@ -41,7 +48,7 @@ PROFILES: dict[str, dict[str, Any]] = {
 
 MODEL_PROFILE = {
     "gpt-5.6-sol": "frontier_resilient", "claude-opus-4-8": "frontier_resilient",
-    "claude-fable-5": "frontier_resilient",
+    "claude-fable-5": "frontier_resilient", "kimi-k3": "frontier_resilient",
     "gpt-5.6-terra": "balanced_frontier", "gpt-5.5": "balanced_frontier",
     "claude-sonnet-5": "balanced_frontier", "gemini-3.5-flash": "balanced_frontier",
     "deepseek-v4-pro": "balanced_frontier", "glm-5.2": "balanced_frontier",
@@ -54,7 +61,6 @@ MODEL_PROFILE = {
     "meta-llama/llama-3.3-70b-instruct": "efficient_fast",
     "qwen/qwen3-235b-a22b": "coding_specialist",
     "kimi-k2.7-code": "coding_specialist", "kimi-k2.6": "coding_specialist",
-    "kimi-k3": "efficient_fast",
     "qwen3.7-max": "coding_specialist", "minimax-m3": "balanced_frontier",
 }
 
@@ -72,6 +78,9 @@ OFFICIAL = {
     "glm": "https://zcode.z.ai/en/docs/agents",
     "kimi": "https://huggingface.co/moonshotai/Kimi-K2.7-Code",
     "kimi_k3": "https://platform.kimi.ai/docs/guide/kimi-k3-quickstart",
+    "kimi_k3_benchmarks": "https://www.kimi.com/blog/kimi-k3",
+    "artificial_analysis_k3": "https://artificialanalysis.ai/models/kimi-k3",
+    "artificial_analysis_fable": "https://artificialanalysis.ai/models/claude-fable-5",
     "qwen": "https://qwenlm.github.io/qwen-code-docs/en/users/configuration/model-providers/",
     "openhands": "https://huggingface.co/datasets/OpenHands/openhands-index",
 }
@@ -171,6 +180,8 @@ def phase2a_models() -> dict[str, dict[str, Any]]:
         "meta-llama/llama-3.3-70b-instruct", "qwen/qwen3-235b-a22b"}}
     frozen = pd.read_csv(PHASE2A / "model_tier_sufficiency.csv").set_index("model_id")
     for model_id, model in models.items():
+        if model_id not in frozen.index:
+            continue
         row = frozen.loc[model_id]
         model["solvedAbilityParameter"] = float(row.solved_ability_parameter)
         model["fittingError"] = float(row.fitting_error)
@@ -211,7 +222,8 @@ def evidence_rows() -> list[dict[str, str]]:
     add("deepseek-v4-flash|deepseek-v4-pro", "terminal/tool use|long-horizon agent|latency/cost positioning", OFFICIAL["deepseek"], "Official comparison says Flash is near Pro on simple agent tasks while Pro leads on complex reasoning.", "high")
     add("glm-5.2", "repository engineering|terminal/tool use|long-horizon agent", OFFICIAL["glm"], "Official coding-agent documentation targets multi-turn, tool-driven engineering workflows.")
     add("kimi-k2.7-code", "broad coding|repository engineering|terminal/tool use|long-horizon agent", OFFICIAL["kimi"], "Official model card reports gains over K2.6 across coding-agent suites, with harness differences explicitly noted.")
-    add("kimi-k3", "broad coding|repository engineering|terminal/tool use|long-horizon agent|context capability", OFFICIAL["kimi_k3"], "Official documentation positions K3 as a flagship 1M-context agent model; provisional LUNA capability placement is used until comparable benchmark evidence exists.", "low")
+    add("kimi-k3", "broad coding|repository engineering|terminal/tool use|long-horizon agent|context capability", OFFICIAL["kimi_k3_benchmarks"], "Official K3 results are competitive with Fable 5 across coding, terminal, browsing, tool-use, reasoning and knowledge-work suites; harness differences are disclosed.", "medium")
+    add("kimi-k3|claude-fable-5", "broad reasoning|terminal/tool use|knowledge work|coding", OFFICIAL["artificial_analysis_k3"], "Artificial Analysis Intelligence Index v4.1 measures K3 max at 57.1123 and Fable 5 with fallback at 59.8606 under one independent composite methodology.", "medium")
     add("qwen3.7-max|qwen3.6-plus|qwen3.5-flash", "broad coding|context capability|latency/cost positioning", OFFICIAL["qwen"], "Official Qwen Code provider documentation identifies current model roles; direct cross-vendor score comparability is unavailable.", "low")
     add("meta-llama/llama-4-maverick|meta-llama/llama-3.3-70b-instruct", "broad capability|context capability", "https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E-Instruct", "Fallback curves use low-confidence family-relative placement so actual execution is visible; no cross-vendor score equivalence is claimed.", "low")
     add("deepseek/deepseek-chat-v3-0324", "broad coding|latency/cost positioning", "https://api-docs.deepseek.com/news/news250325", "Legacy callable fallback is relatively anchored below the pinned V4 Flash position.", "low")
@@ -232,7 +244,41 @@ def build_models() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     new["gpt-5.6-luna"] = relative_model("gpt-5.6-luna", "GPT-5.6 Luna", "OpenAI", old["gpt-5.5"], 0.010, "GPT-5.6 official capability suite", OFFICIAL["openai"], "Family-relative product mapping from GPT-5.5; efficient profile follows official positioning.")
     new["glm-5.2"] = relative_model("glm-5.2", "GLM 5.2", "Zhipu AI", old["glm-5.1"], 0.025, "GLM-5.2 official coding-agent positioning", OFFICIAL["glm"], "Series-relative estimate from GLM 5.1; no directly comparable pinned OpenHands row.")
     new["kimi-k2.7-code"] = relative_model("kimi-k2.7-code", "Kimi K2.7 Code", "Moonshot AI", old["kimi-k2.6"], 0.030, "Kimi K2.7 Code official model-card suites", OFFICIAL["kimi"], "Series-relative estimate from K2.6; vendor comparisons use different agent harnesses.")
-    new["kimi-k3"] = relative_model("kimi-k3", "Kimi K3", "Moonshot AI", new["gpt-5.6-luna"], 0.0, "Provisional LUNA capability placement", OFFICIAL["kimi_k3"], "Official K3 specifications and live Agent protocol are verified, but no comparable pinned quality result exists; provisional LUNA placement prevents an unverified frontier claim.")
+    new["kimi-k3"] = relative_model(
+        "kimi-k3", "Kimi K3", "Moonshot AI", old["claude-fable-5"], KIMI_K3_RELATIVE_DELTA,
+        "Artificial Analysis Intelligence Index v4.1 relative placement",
+        OFFICIAL["artificial_analysis_k3"],
+        "Frontier placement is calibrated from the independent same-methodology gap to Fable 5; official K3 task results corroborate strong coding, terminal, browsing, tool-use and knowledge-work performance.")
+    new["kimi-k3"]["benchmarkEvidence"] = [{
+        "benchmarkName": "Artificial Analysis Intelligence Index v4.1",
+        "normalizedScore": AA_KIMI_K3_SCORE / 100,
+        "scoreScale": "0-100 composite index normalized to 0-1",
+        "sampleSize": 0, "sourceModelName": "Kimi K3 (max)",
+        "evaluationMode": "independent composite; dedicated evaluation runs",
+        "sourceUrl": OFFICIAL["artificial_analysis_k3"],
+        "resultsUrl": OFFICIAL["artificial_analysis_k3"],
+        "sourceVersion": "v4.1-retrieved-2026-07-31", "benchmarkDate": "2026-07-31",
+        "directForModel": True, "configuredRelativeDelta": KIMI_K3_RELATIVE_DELTA,
+    }]
+    new["kimi-k3"].update({"evidenceConfidence": "medium", "uncertaintyWidth": 0.10})
+    new["claude-fable-5"]["benchmarkEvidence"] = [
+        evidence for evidence in new["claude-fable-5"]["benchmarkEvidence"]
+        if evidence["benchmarkName"] != "Artificial Analysis Intelligence Index v4.1"
+    ]
+    new["claude-fable-5"]["benchmarkEvidence"].append({
+        "benchmarkName": "Artificial Analysis Intelligence Index v4.1",
+        "normalizedScore": AA_FABLE_5_SCORE / 100,
+        "scoreScale": "0-100 composite index normalized to 0-1",
+        "sampleSize": 0, "sourceModelName": "Claude Fable 5 (with fallback)",
+        "evaluationMode": "independent composite; Opus 4.8 fallback enabled",
+        "sourceUrl": OFFICIAL["artificial_analysis_fable"],
+        "resultsUrl": OFFICIAL["artificial_analysis_fable"],
+        "sourceVersion": "v4.1-retrieved-2026-07-31", "benchmarkDate": "2026-07-31",
+        "directForModel": True, "configuredRelativeDelta": 0,
+    })
+    new["claude-fable-5"]["notes"] = (
+        "Direct OpenHands SWE-bench anchor plus an independent broad composite. "
+        "The Artificial Analysis run used Opus 4.8 fallback, so its 59.8606 score is corroborating evidence, not a standalone Fable-only anchor.")
     new["gemini-2.5-flash"] = relative_model("gemini-2.5-flash", "Gemini 2.5 Flash", "Google", old["gemini-3.5-flash"], -0.100, "Gemini family relative product mapping", "https://ai.google.dev/gemini-api/docs/models#gemini-2.5-flash", "Low-confidence same-family relative estimate from Gemini 3.5 Flash; retained so an actual fallback is never hidden from the chart.")
     new["meta-llama/llama-4-maverick"] = relative_model("meta-llama/llama-4-maverick", "Llama 4 Maverick", "Meta", new["gemini-2.5-flash"], -0.015, "Fallback relative capability mapping", "https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E-Instruct", "Low-confidence relative estimate; included because this model is in the live fallback chain.")
     new["deepseek/deepseek-chat-v3-0324"] = relative_model("deepseek/deepseek-chat-v3-0324", "DeepSeek V3 (OR)", "DeepSeek", old["deepseek-v4-flash"], -0.070, "DeepSeek family relative product mapping", "https://api-docs.deepseek.com/news/news250325", "Low-confidence family-relative estimate; included because this model is in the live fallback chain.")
@@ -262,7 +308,7 @@ def build_models() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
                                 "midHigh": profile["adjustments"]["mid_high"], "high": profile["adjustments"]["high"]},
             "profileEvidence": [row["source_url"] for row in evidence_rows() if model_id in row["model_ids"] or row["model_ids"] == "all_phase2a_models"],
             "profileConfidence": "high" if model_id.startswith("deepseek-v4") else (
-                "low" if model_id == "kimi-k3" else ("medium" if model_id in DEFAULT_MODELS else "low")),
+                "medium" if model_id in DEFAULT_MODELS else "low"),
             "curveMethod": "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
         })
         output.append(model)
@@ -350,6 +396,12 @@ def main() -> None:
     CATALOG.write_text(json.dumps(base, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     few_shots = json.loads((ROOT / "src/acu/catalog/twin-few-shots.json").read_text(encoding="utf-8"))["examples"]
     labels = {
+        "simple-rewrite-1": ("简单改写任务", "单一明确执行"),
+        "json-extraction-1": ("结构化提取任务", "格式约束与一致性"),
+        "code-fix-1": ("常规代码修复", "局部推理与修复"),
+        "multi-file-fix-1": ("多文件修复任务", "跨文件状态整合"),
+        "multi-tool-agent-1": ("多工具 Agent 任务", "工具链调查与验证"),
+        "long-horizon-reasoning-1": ("长程推理任务", "高风险多步规划"),
         "low-1": ("简单明确任务 A", "单一明确执行"), "low-2": ("简单明确任务 B", "低约束回应"),
         "mid-1": ("常规多约束任务 A", "多条件整合"), "mid-2": ("常规多约束任务 B", "工具参数与一致性"),
         "mid_high-1": ("多工具/调试任务 A", "执行状态整合"), "mid_high-2": ("多工具/调试任务 B", "上下文依赖调试"),

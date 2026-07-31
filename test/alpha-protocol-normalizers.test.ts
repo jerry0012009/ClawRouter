@@ -104,6 +104,24 @@ describe("Responses canonical envelope", () => {
 });
 
 describe("Messages canonical envelope", () => {
+  it("distinguishes Anthropic and Kimi hosted Web tools from client functions", () => {
+    const anthropic = normalizeMessagesRequest({
+      model: "acu-auto",
+      messages: [{ role: "user", content: "Search current news" }],
+      tools: [{ type: "web_search_20260318", name: "web_search" }],
+    });
+    expect(anthropic.clientDeclaredWebTool).toBe(true);
+    expect(anthropic.requiredToolTypes).toEqual([]);
+
+    const kimi = normalizeMessagesRequest({
+      model: "acu-auto",
+      messages: [{ role: "user", content: "Search current news" }],
+      tools: [{ type: "builtin_function", function: { name: "$web_search" } }, { name: "Read" }],
+    });
+    expect(kimi.clientDeclaredWebTool).toBe(true);
+    expect(kimi.requiredToolTypes).toEqual(["function"]);
+  });
+
   it("separates tool_result from text in the same role=user content", () => {
     const envelope = normalizeMessagesRequest({
       model: "acu-auto",

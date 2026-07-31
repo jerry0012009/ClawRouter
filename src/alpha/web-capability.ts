@@ -22,9 +22,28 @@ type WebRequirements = {
 
 const MODEL_WEB_CAPABILITIES: Readonly<Record<string, ModelWebCapability>> = {
   "gpt-5.4-mini": "supported",
+  "gpt-5.5": "supported",
   "gpt-5.6-luna": "supported",
   "gpt-5.6-terra": "supported",
   "gpt-5.6-sol": "supported",
+  "claude-fable-5": "supported",
+  "claude-opus-4-8": "supported",
+  "claude-sonnet-5": "supported",
+  "gemini-2.5-flash": "supported",
+  "gemini-3.5-flash": "supported",
+  "glm-5.1": "supported",
+  "glm-5.2": "supported",
+  "kimi-k2.6": "supported",
+  "kimi-k2.7-code": "unknown",
+  "kimi-k3": "supported",
+  "qwen3.5-flash": "supported",
+  "qwen3.6-plus": "supported",
+  "qwen3.7-max": "supported",
+  "deepseek-v4-flash": "unsupported",
+  "deepseek-v4-pro": "unsupported",
+  "deepseek/deepseek-chat-v3-0324": "unsupported",
+  "meta-llama/llama-3.3-70b-instruct": "unsupported",
+  "meta-llama/llama-4-maverick": "unsupported",
 };
 
 const EXPLICIT_INCOMPATIBILITY_REASONS = new Set([
@@ -79,7 +98,8 @@ export function resolveWebEligibility(
       reason: modelCapability === "unsupported" ? "web_model_unsupported" : "web_model_capability_unknown",
     };
   }
-  if (!profile.protocols.includes(requirements.protocol) || requirements.protocol !== "responses") {
+  if (!profile.protocols.includes(requirements.protocol)
+    || !["responses", "messages"].includes(requirements.protocol)) {
     return {
       eligible: false,
       confidence: "not_applicable",

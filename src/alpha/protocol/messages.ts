@@ -14,6 +14,15 @@ function systemText(value: unknown): string {
   return textParts(value).join("\n") || (typeof value === "string" ? value : "");
 }
 
+function isHostedWebTool(value: unknown): boolean {
+  const tool = record(value);
+  const type = String(tool?.type ?? "").toLowerCase();
+  const name = String(tool?.name ?? record(tool?.function)?.name ?? "").toLowerCase();
+  return type.startsWith("web_search_")
+    || type === "web_search"
+    || (type === "builtin_function" && name === "$web_search");
+}
+
 function continuityMessage(value: unknown): unknown {
   const item = record(value);
   if (item?.role !== "system") return value;
@@ -34,6 +43,7 @@ export function normalizeMessagesRequest(
   const messages = array(raw.messages);
   const continuityHistory = messages.map(continuityMessage);
   const tools = array(raw.tools);
+  const clientDeclaredWebTool = tools.some(isHostedWebTool);
   const humanCandidates: CanonicalEnvelope["humanCandidates"] = [];
   const toolCalls: CanonicalEnvelope["toolCalls"] = [];
   const toolResults: CanonicalEnvelope["toolResults"] = [];
@@ -112,8 +122,8 @@ export function normalizeMessagesRequest(
     instructions: raw.system,
     history: continuityHistory,
     tools,
-    requiredToolTypes: tools.length > 0 ? ["function"] : [],
-    clientDeclaredWebTool: false,
+    requiredToolTypes: tools.some((tool) => !isHostedWebTool(tool)) ? ["function"] : [],
+    clientDeclaredWebTool,
     webIntent: "likely",
     webIntentConfidence: 0,
     webIntentReason: "Pending Routing Segment Judge evaluation.",

@@ -68,6 +68,18 @@ function observePayload(payload: unknown, statuses: Set<string>): { invoked: boo
     invoked = true;
     completed = status === "completed";
   }
+  const contentBlock = object(root?.content_block);
+  if (type === "content_block_start" && contentBlock?.type === "server_tool_use"
+    && contentBlock.name === "web_search") {
+    statuses.add("in_progress");
+    invoked = true;
+  }
+  if (type === "content_block_start" && contentBlock?.type === "web_search_tool_result") {
+    statuses.add("completed");
+    invoked = true;
+    completed = true;
+    result = true;
+  }
   const item = object(root?.item) ?? object(root?.output_item);
   if (item?.type === "web_search_call") {
     invoked = true;
@@ -84,6 +96,20 @@ function observePayload(payload: unknown, statuses: Set<string>): { invoked: boo
     result = true;
     if (typeof outputItem.status === "string") statuses.add(outputItem.status);
     if (outputItem.status === "completed") completed = true;
+  }
+  const content = Array.isArray(response?.content) ? response.content : [];
+  for (const value of content) {
+    const block = object(value);
+    if (block?.type === "server_tool_use" && block.name === "web_search") {
+      statuses.add("in_progress");
+      invoked = true;
+    }
+    if (block?.type === "web_search_tool_result") {
+      statuses.add("completed");
+      invoked = true;
+      completed = true;
+      result = true;
+    }
   }
   return { invoked, completed, result };
 }

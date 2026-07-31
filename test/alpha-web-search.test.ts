@@ -19,6 +19,38 @@ describe("Responses Web Search evidence", () => {
     expect(observer.evidence().searchLatencyMs).toBeGreaterThanOrEqual(0);
   });
 
+  it("recognizes Anthropic Messages server-tool lifecycle events", () => {
+    const observer = new WebSearchStreamObserver();
+    observer.observe(Buffer.from(`data: ${JSON.stringify({
+      type: "content_block_start",
+      content_block: { type: "server_tool_use", id: "srvtoolu_1", name: "web_search" },
+    })}\n\n`));
+    observer.observe(Buffer.from(`data: ${JSON.stringify({
+      type: "content_block_start",
+      content_block: { type: "web_search_tool_result", tool_use_id: "srvtoolu_1", content: [] },
+    })}\n\n`));
+    expect(observer.evidence()).toMatchObject({
+      actuallyInvoked: true,
+      eventStatus: ["in_progress", "completed"],
+      executionCompleted: true,
+      resultVerified: true,
+    });
+  });
+
+  it("recognizes non-streaming Anthropic Messages Web results", () => {
+    const evidence = inspectWebSearchEvidence(Buffer.from(JSON.stringify({
+      content: [
+        { type: "server_tool_use", id: "srvtoolu_1", name: "web_search" },
+        { type: "web_search_tool_result", tool_use_id: "srvtoolu_1", content: [] },
+      ],
+    })), "application/json");
+    expect(evidence).toMatchObject({
+      actuallyInvoked: true,
+      executionCompleted: true,
+      resultVerified: true,
+    });
+  });
+
   it("does not infer invocation from a declaration-only response", () => {
     const evidence = inspectWebSearchEvidence(Buffer.from(JSON.stringify({
       type: "response.completed",

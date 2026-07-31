@@ -261,7 +261,8 @@ def build_models() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
             "tierAdjustments": {"low": profile["adjustments"]["low"], "mid": profile["adjustments"]["mid"],
                                 "midHigh": profile["adjustments"]["mid_high"], "high": profile["adjustments"]["high"]},
             "profileEvidence": [row["source_url"] for row in evidence_rows() if model_id in row["model_ids"] or row["model_ids"] == "all_phase2a_models"],
-            "profileConfidence": "high" if model_id.startswith("deepseek-v4") else ("medium" if model_id in DEFAULT_MODELS else "low"),
+            "profileConfidence": "high" if model_id.startswith("deepseek-v4") else (
+                "low" if model_id == "kimi-k3" else ("medium" if model_id in DEFAULT_MODELS else "low")),
             "curveMethod": "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
         })
         output.append(model)

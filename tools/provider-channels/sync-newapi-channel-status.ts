@@ -90,7 +90,9 @@ catalog.responses = activeModelIds.map((modelId) => {
   return {
     modelId,
     displayName: model.displayName,
-    role: existing?.role ?? String(modelProfiles[0]?.capabilityTier ?? "Verified"),
+    role: modelProfiles.some((profile) => profile.verificationStatus === "verified_provisional")
+      ? "Verified Provisional"
+      : existing?.role ?? String(modelProfiles[0]?.capabilityTier ?? "Verified"),
     inputPricePerMillion: model.inputPricePerMillion,
     outputPricePerMillion: model.outputPricePerMillion,
     cachedInputPricePerMillion: model.cachedInputPricePerMillion ?? model.inputPricePerMillion,

@@ -8953,7 +8953,7 @@
     {
       "modelId": "kimi-k3",
       "displayName": "Kimi K3",
-      "role": "Verified",
+      "role": "Verified Provisional",
       "inputPricePerMillion": 3,
       "outputPricePerMillion": 15,
       "cachedInputPricePerMillion": 0.3,
@@ -8968,7 +8968,7 @@
       "costChannel": "lucen-kimi-k3-openai-040",
       "effectiveCostStatus": "verified",
       "curveProfile": "efficient_fast",
-      "profileConfidence": "medium",
+      "profileConfidence": "low",
       "curve": [
         {
           "difficultyScore": 0,

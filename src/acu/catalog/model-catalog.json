@@ -1695,7 +1695,7 @@
         "https://platform.kimi.ai/docs/guide/kimi-k3-quickstart",
         "https://huggingface.co/datasets/OpenHands/openhands-index"
       ],
-      "profileConfidence": "medium"
+      "profileConfidence": "low"
     }
   ]
 }

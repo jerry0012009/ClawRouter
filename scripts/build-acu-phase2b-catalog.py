@@ -28,12 +28,16 @@ CURVE_THRESHOLDS = {"above_low": 0.275, "above_mid": 0.525, "above_mid_high": 0.
 CURVE_TEMPERATURE = 0.08
 RETRIEVED_AT = "2026-07-31"
 
-# Artificial Analysis Intelligence Index v4.1 evaluates both models under one
-# methodology. Preserve Fable's direct OpenHands anchor and use the same-scale
-# index gap for K3's relative placement instead of borrowing Luna's curve.
+# Artificial Analysis Intelligence Index v4.1 provides same-methodology gaps
+# for newer models that lack direct pinned OpenHands rows. Preserve Fable's
+# direct anchor and use only effort-matched results for relative placement.
 AA_FABLE_5_SCORE = 59.8606463217303
 AA_KIMI_K3_SCORE = 57.1123394372091
+AA_GPT_56_SOL_MEDIUM_SCORE = 53.5888349532218
+AA_GLM_52_SCORE = 51.0858
 KIMI_K3_RELATIVE_DELTA = (AA_KIMI_K3_SCORE - AA_FABLE_5_SCORE) / 100
+GPT_56_SOL_MEDIUM_RELATIVE_DELTA = (AA_GPT_56_SOL_MEDIUM_SCORE - AA_FABLE_5_SCORE) / 100
+GLM_52_RELATIVE_DELTA = (AA_GLM_52_SCORE - AA_FABLE_5_SCORE) / 100
 
 PROFILES: dict[str, dict[str, Any]] = {
     "frontier_resilient": {"temperature": 0.16, "floor": 0.03, "ceiling": 0.99,
@@ -81,6 +85,9 @@ OFFICIAL = {
     "kimi_k3_benchmarks": "https://www.kimi.com/blog/kimi-k3",
     "artificial_analysis_k3": "https://artificialanalysis.ai/models/kimi-k3",
     "artificial_analysis_fable": "https://artificialanalysis.ai/models/claude-fable-5",
+    "artificial_analysis_sol_medium": "https://artificialanalysis.ai/models/gpt-5-6-sol-medium",
+    "artificial_analysis_glm_52": "https://artificialanalysis.ai/models/glm-5-2",
+    "openrouter_rankings": "https://openrouter.ai/rankings#benchmarks",
     "qwen": "https://qwenlm.github.io/qwen-code-docs/en/users/configuration/model-providers/",
     "openhands": "https://huggingface.co/datasets/OpenHands/openhands-index",
 }
@@ -216,11 +223,14 @@ def evidence_rows() -> list[dict[str, str]]:
                      "profile_confidence": confidence, "comparability_note": "Curve-shape evidence only; not merged into a common benchmark score."})
     add("gpt-5.6-sol|gpt-5.6-terra|gpt-5.6-luna", "broad coding|latency/cost positioning|context capability", OFFICIAL["openai"], "Sol is flagship, Terra balanced, Luna fastest/cost-efficient; official release reports a 1.05M context window.")
     add("gpt-5.6-sol", "terminal/tool use|long-horizon agent|repository engineering", OFFICIAL["openai_sol"], "Official preview positions Sol for coding, terminal and long-horizon agent work.")
+    add("gpt-5.6-sol|claude-fable-5", "broad reasoning|coding|agentic capability", OFFICIAL["artificial_analysis_sol_medium"], "Artificial Analysis v4.1 measures Sol medium at 53.5888 and Fable 5 with fallback at 59.8606 under one composite methodology; medium matches the common client default better than max.", "medium")
+    add("gpt-5.6-sol|gpt-5.6-terra|gpt-5.6-luna|claude-fable-5|claude-opus-4-8|kimi-k3|glm-5.2|deepseek-v4-pro|deepseek-v4-flash", "intelligence|coding|agentic|design arena", OFFICIAL["openrouter_rankings"], "OpenRouter exposes independent Artificial Analysis and Design Arena dimensions used as a cross-check for material ordering errors, not as direct success probabilities.", "medium")
     add("claude-opus-4-8", "repository engineering|long-horizon agent|context capability", OFFICIAL["anthropic"], "Official Opus page emphasizes long-running coding and agent tasks with sustained consistency.")
     add("gemini-3.5-flash", "terminal/tool use|long-horizon agent|latency/cost positioning", OFFICIAL["google"], "Official release reports agentic/terminal benchmarks and fast deployment positioning.")
     add("gemini-2.5-flash", "latency/cost positioning|context capability", "https://ai.google.dev/gemini-api/docs/models#gemini-2.5-flash", "Catalog curve is a low-confidence same-family relative estimate; it is included because this callable fallback can become the actual execution model.", "low")
     add("deepseek-v4-flash|deepseek-v4-pro", "terminal/tool use|long-horizon agent|latency/cost positioning", OFFICIAL["deepseek"], "Official comparison says Flash is near Pro on simple agent tasks while Pro leads on complex reasoning.", "high")
     add("glm-5.2", "repository engineering|terminal/tool use|long-horizon agent", OFFICIAL["glm"], "Official coding-agent documentation targets multi-turn, tool-driven engineering workflows.")
+    add("glm-5.2|claude-fable-5", "broad reasoning|coding|agentic capability", OFFICIAL["artificial_analysis_glm_52"], "Artificial Analysis v4.1 and its OpenRouter benchmark feed place GLM 5.2 materially above the prior GLM 5.1 family-delta estimate.", "medium")
     add("kimi-k2.7-code", "broad coding|repository engineering|terminal/tool use|long-horizon agent", OFFICIAL["kimi"], "Official model card reports gains over K2.6 across coding-agent suites, with harness differences explicitly noted.")
     add("kimi-k3", "broad coding|repository engineering|terminal/tool use|long-horizon agent|context capability", OFFICIAL["kimi_k3_benchmarks"], "Official K3 results are competitive with Fable 5 across coding, terminal, browsing, tool-use, reasoning and knowledge-work suites; harness differences are disclosed.", "medium")
     add("kimi-k3|claude-fable-5", "broad reasoning|terminal/tool use|knowledge work|coding", OFFICIAL["artificial_analysis_k3"], "Artificial Analysis Intelligence Index v4.1 measures K3 max at 57.1123 and Fable 5 with fallback at 59.8606 under one independent composite methodology.", "medium")
@@ -239,10 +249,44 @@ def build_models() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     old = phase2a_models()
     reg = registry()
     new = dict(old)
-    new["gpt-5.6-sol"] = relative_model("gpt-5.6-sol", "GPT-5.6 Sol", "OpenAI", old["gpt-5.5"], 0.060, "GPT-5.6 official capability suite", OFFICIAL["openai"], "Family-relative product mapping from GPT-5.5; official results are not OpenHands-harness results.")
+    new["gpt-5.6-sol"] = relative_model(
+        "gpt-5.6-sol", "GPT-5.6 Sol", "OpenAI", old["claude-fable-5"],
+        GPT_56_SOL_MEDIUM_RELATIVE_DELTA,
+        "Artificial Analysis Intelligence Index v4.1 relative placement",
+        OFFICIAL["artificial_analysis_sol_medium"],
+        "Default-effort placement is calibrated from the independent same-methodology gap between Sol medium and Fable 5. Max and xhigh results are not applied to ordinary Sol requests.")
+    new["gpt-5.6-sol"]["benchmarkEvidence"] = [{
+        "benchmarkName": "Artificial Analysis Intelligence Index v4.1",
+        "normalizedScore": AA_GPT_56_SOL_MEDIUM_SCORE / 100,
+        "scoreScale": "0-100 composite index normalized to 0-1",
+        "sampleSize": 0, "sourceModelName": "GPT-5.6 Sol (medium)",
+        "evaluationMode": "independent composite; explicit medium reasoning effort",
+        "sourceUrl": OFFICIAL["artificial_analysis_sol_medium"],
+        "resultsUrl": OFFICIAL["artificial_analysis_sol_medium"],
+        "sourceVersion": "v4.1-retrieved-2026-07-31", "benchmarkDate": "2026-07-31",
+        "directForModel": True, "configuredRelativeDelta": GPT_56_SOL_MEDIUM_RELATIVE_DELTA,
+    }]
+    new["gpt-5.6-sol"].update({"evidenceConfidence": "medium", "uncertaintyWidth": 0.10})
     new["gpt-5.6-terra"] = relative_model("gpt-5.6-terra", "GPT-5.6 Terra", "OpenAI", old["gpt-5.5"], 0.030, "GPT-5.6 official capability suite", OFFICIAL["openai"], "Family-relative product mapping from GPT-5.5; proxy price metadata unavailable.")
     new["gpt-5.6-luna"] = relative_model("gpt-5.6-luna", "GPT-5.6 Luna", "OpenAI", old["gpt-5.5"], 0.010, "GPT-5.6 official capability suite", OFFICIAL["openai"], "Family-relative product mapping from GPT-5.5; efficient profile follows official positioning.")
-    new["glm-5.2"] = relative_model("glm-5.2", "GLM 5.2", "Zhipu AI", old["glm-5.1"], 0.025, "GLM-5.2 official coding-agent positioning", OFFICIAL["glm"], "Series-relative estimate from GLM 5.1; no directly comparable pinned OpenHands row.")
+    new["glm-5.2"] = relative_model(
+        "glm-5.2", "GLM 5.2", "Zhipu AI", old["claude-fable-5"],
+        GLM_52_RELATIVE_DELTA,
+        "Artificial Analysis Intelligence Index v4.1 relative placement",
+        OFFICIAL["artificial_analysis_glm_52"],
+        "Placement is calibrated from the independent same-methodology gap to Fable 5 and cross-checked against OpenRouter coding and agentic dimensions.")
+    new["glm-5.2"]["benchmarkEvidence"] = [{
+        "benchmarkName": "Artificial Analysis Intelligence Index v4.1",
+        "normalizedScore": AA_GLM_52_SCORE / 100,
+        "scoreScale": "0-100 composite index normalized to 0-1",
+        "sampleSize": 0, "sourceModelName": "GLM 5.2",
+        "evaluationMode": "independent composite; high reasoning effort",
+        "sourceUrl": OFFICIAL["artificial_analysis_glm_52"],
+        "resultsUrl": OFFICIAL["openrouter_rankings"],
+        "sourceVersion": "v4.1-retrieved-2026-07-31", "benchmarkDate": "2026-07-31",
+        "directForModel": True, "configuredRelativeDelta": GLM_52_RELATIVE_DELTA,
+    }]
+    new["glm-5.2"].update({"evidenceConfidence": "medium", "uncertaintyWidth": 0.10})
     new["kimi-k2.7-code"] = relative_model("kimi-k2.7-code", "Kimi K2.7 Code", "Moonshot AI", old["kimi-k2.6"], 0.030, "Kimi K2.7 Code official model-card suites", OFFICIAL["kimi"], "Series-relative estimate from K2.6; vendor comparisons use different agent harnesses.")
     new["kimi-k3"] = relative_model(
         "kimi-k3", "Kimi K3", "Moonshot AI", old["claude-fable-5"], KIMI_K3_RELATIVE_DELTA,

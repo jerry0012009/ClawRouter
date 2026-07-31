@@ -61,6 +61,24 @@ describe("Founder Alpha New API catalog export", () => {
     expect(kimiK3Source.abilityAnchor).toBeCloseTo(0.9305169312, 8);
     expect(kimiK3.curve[75].estimatedQuality).toBeGreaterThan(0.8);
     expect(fable.curve[75].estimatedQuality - kimiK3.curve[75].estimatedQuality).toBeLessThan(0.1);
+    const solSource = source.models.find((item: { modelId: string }) => item.modelId === "gpt-5.6-sol");
+    expect(solSource).toMatchObject({
+      curveProfile: "frontier_resilient",
+      evidenceConfidence: "medium",
+      uncertaintyWidth: 0.1,
+    });
+    expect(solSource.abilityAnchor).toBeCloseTo(0.8952818863, 8);
+    expect(solSource.benchmarkEvidence[0]).toMatchObject({
+      sourceModelName: "GPT-5.6 Sol (medium)",
+      evaluationMode: "independent composite; explicit medium reasoning effort",
+    });
+    const sol = exported.responses.find((item: { modelId: string }) => item.modelId === "gpt-5.6-sol");
+    expect(sol.curve[50].estimatedQuality).toBeCloseTo(0.8920271189, 8);
+    const glm52Source = source.models.find((item: { modelId: string }) => item.modelId === "glm-5.2");
+    expect(glm52Source).toMatchObject({ evidenceConfidence: "medium", uncertaintyWidth: 0.1 });
+    expect(glm52Source.abilityAnchor).toBeCloseTo(0.8702515368, 8);
+    const glm52 = exported.responses.find((item: { modelId: string }) => item.modelId === "glm-5.2");
+    expect(glm52.curve[50].estimatedQuality).toBeCloseTo(0.8696127004, 8);
   });
 
   it("keeps all six Founder catalog surfaces aligned", async () => {

@@ -4437,7 +4437,7 @@ var model_catalog_default = {
     priceAndAvailabilitySource: "src/models.ts at build-time",
     priceAndAvailabilitySourceSha256: "105e2ceb8c9795faf9cd226bef5d703164dfc3824bfa2fc9caaf2d0c45fbfd32",
     crossBenchmarkCaveat: "Product-demo constrained connection; not strict statistical equivalence across benchmarks.",
-    phase2aCatalogSha256: "bcc0c8b2f3c6e7b267a8f4016ae4bb2349c23a6edd711e6b9c496c7ee016d0f6",
+    phase2aCatalogSha256: "f6104c065ee8f9acb92bc96ad4c6333f8aee61bccfdccda2857cb26b94293167",
     phase2bBuilder: "scripts/build-acu-phase2b-catalog.py",
     gpt56ProxyPricing: "not exposed; official list price used",
     profileEvidence: "research/quality-curves/acu-demo/phase2b-product/curve_profile_evidence.csv"
@@ -4451,7 +4451,7 @@ var model_catalog_default = {
       outputPricePerMillion: 30,
       cachedInputPricePerMillion: 2.5,
       cacheWritePricePerMillion: 5,
-      contextWindow: 105e4,
+      contextWindow: 1048576,
       maxOutputTokens: 65536,
       toolCallSupport: true,
       visionSupport: true,
@@ -4514,7 +4514,7 @@ var model_catalog_default = {
       outputPricePerMillion: 4.5,
       cachedInputPricePerMillion: 0.375,
       cacheWritePricePerMillion: 0.75,
-      contextWindow: 4e5,
+      contextWindow: 1048576,
       maxOutputTokens: 32768,
       toolCallSupport: true,
       visionSupport: true,
@@ -4628,6 +4628,7 @@ var model_catalog_default = {
         high: 0.055
       },
       profileEvidence: [
+        "https://openrouter.ai/rankings#benchmarks",
         "https://www.anthropic.com/claude/opus",
         "https://huggingface.co/datasets/OpenHands/openhands-index"
       ],
@@ -4819,6 +4820,7 @@ var model_catalog_default = {
         high: -0.08
       },
       profileEvidence: [
+        "https://openrouter.ai/rankings#benchmarks",
         "https://api-docs.deepseek.com/news/news260424/",
         "https://huggingface.co/datasets/OpenHands/openhands-index"
       ],
@@ -4883,6 +4885,7 @@ var model_catalog_default = {
         high: 0.015
       },
       profileEvidence: [
+        "https://openrouter.ai/rankings#benchmarks",
         "https://api-docs.deepseek.com/news/news260424/",
         "https://huggingface.co/datasets/OpenHands/openhands-index"
       ],
@@ -5270,6 +5273,87 @@ var model_catalog_default = {
       profileConfidence: "low"
     },
     {
+      modelId: "claude-fable-5",
+      displayName: "Claude Fable 5",
+      upstream: "proxy",
+      inputPricePerMillion: 10,
+      outputPricePerMillion: 50,
+      cachedInputPricePerMillion: 1,
+      cacheWritePricePerMillion: 12.5,
+      contextWindow: 2e5,
+      maxOutputTokens: 32e3,
+      toolCallSupport: true,
+      visionSupport: true,
+      provider: "Anthropic",
+      availability: "callable_preflight_or_repository",
+      routingEligible: true,
+      defaultDisplay: true,
+      abilityAnchor: 0.958,
+      solvedAbilityParameter: 1.1208913983330326,
+      fittingError: 0,
+      sufficientLow: 0.9777821259839409,
+      sufficientMid: 0.9745104938556622,
+      sufficientMidHigh: 0.961937592674017,
+      sufficientHigh: 0.870667779629334,
+      benchmarkEvidence: [
+        {
+          benchmarkName: "SWE-bench Verified via OpenHands Index",
+          normalizedScore: 0.958,
+          scoreScale: "0-1 resolved fraction",
+          sampleSize: 500,
+          sourceModelName: "claude-fable-5",
+          evaluationMode: "OpenHands agent harness",
+          sourceUrl: "https://huggingface.co/datasets/OpenHands/openhands-index",
+          resultsUrl: "https://github.com/OpenHands/openhands-index-results/tree/3015ac612e7196f428e6e8a3948965d32d9a3331",
+          sourceVersion: "v2026.06.30-3015ac6",
+          benchmarkDate: "2026-06-30",
+          directForModel: true,
+          configuredRelativeDelta: 0
+        },
+        {
+          benchmarkName: "Artificial Analysis Intelligence Index v4.1",
+          normalizedScore: 0.598606463217303,
+          scoreScale: "0-100 composite index normalized to 0-1",
+          sampleSize: 0,
+          sourceModelName: "Claude Fable 5 (with fallback)",
+          evaluationMode: "independent composite; Opus 4.8 fallback enabled",
+          sourceUrl: "https://artificialanalysis.ai/models/claude-fable-5",
+          resultsUrl: "https://artificialanalysis.ai/models/claude-fable-5",
+          sourceVersion: "v4.1-retrieved-2026-07-31",
+          benchmarkDate: "2026-07-31",
+          directForModel: true,
+          configuredRelativeDelta: 0
+        }
+      ],
+      evidenceConfidence: "medium",
+      uncertaintyWidth: 0.08,
+      curveMethod: "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
+      sourceNames: [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      sourceRetrievedAt: "2026-07-27",
+      notes: "Direct OpenHands SWE-bench anchor plus an independent broad composite. The Artificial Analysis run used Opus 4.8 fallback, so its 59.8606 score is corroborating evidence, not a standalone Fable-only anchor.",
+      curveProfile: "frontier_resilient",
+      curveTemperature: 0.16,
+      curveFloor: 0.03,
+      curveCeiling: 0.99,
+      tierAdjustments: {
+        low: -0.01,
+        mid: -5e-3,
+        midHigh: 0.02,
+        high: 0.055
+      },
+      profileEvidence: [
+        "https://artificialanalysis.ai/models/gpt-5-6-sol-medium",
+        "https://openrouter.ai/rankings#benchmarks",
+        "https://artificialanalysis.ai/models/glm-5-2",
+        "https://artificialanalysis.ai/models/kimi-k3",
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      profileConfidence: "medium"
+    },
+    {
       modelId: "gpt-5.6-sol",
       displayName: "GPT-5.6 Sol",
       upstream: "proxy",
@@ -5279,44 +5363,44 @@ var model_catalog_default = {
       cacheWritePricePerMillion: 5,
       contextWindow: 105e4,
       maxOutputTokens: 128e3,
-      toolCallSupport: true,
+      toolCallSupport: false,
       visionSupport: false,
       provider: "OpenAI",
       availability: "callable_preflight_or_repository",
       routingEligible: true,
       defaultDisplay: true,
-      abilityAnchor: 0.8420000000000001,
-      solvedAbilityParameter: 0.759664839738035,
-      fittingError: -11102230246251565e-32,
-      sufficientLow: 0.959206709866638,
-      sufficientMid: 0.8932909051908762,
-      sufficientMidHigh: 0.6883462622036792,
-      sufficientHigh: 0.3925504348945394,
+      abilityAnchor: 0.895281886314915,
+      solvedAbilityParameter: 0.8948362414976221,
+      fittingError: 0,
+      sufficientLow: 0.9709547480958614,
+      sufficientMid: 0.9433280527995646,
+      sufficientMidHigh: 0.8391578747062672,
+      sufficientHigh: 0.5872384303131705,
       benchmarkEvidence: [
         {
-          benchmarkName: "GPT-5.6 official capability suite",
-          normalizedScore: 0.8420000000000001,
-          scoreScale: "relative family mapping onto pinned OpenHands anchor scale",
+          benchmarkName: "Artificial Analysis Intelligence Index v4.1",
+          normalizedScore: 0.535888349532218,
+          scoreScale: "0-100 composite index normalized to 0-1",
           sampleSize: 0,
-          sourceModelName: "gpt-5.6-sol",
-          evaluationMode: "vendor-reported; not OpenHands-comparable",
-          sourceUrl: "https://openai.com/index/gpt-5-6/",
-          resultsUrl: "https://openai.com/index/gpt-5-6/",
-          sourceVersion: "retrieved-2026-07-27",
-          benchmarkDate: "2026-07-09",
-          directForModel: false,
-          configuredRelativeDelta: 0.06
+          sourceModelName: "GPT-5.6 Sol (medium)",
+          evaluationMode: "independent composite; explicit medium reasoning effort",
+          sourceUrl: "https://artificialanalysis.ai/models/gpt-5-6-sol-medium",
+          resultsUrl: "https://artificialanalysis.ai/models/gpt-5-6-sol-medium",
+          sourceVersion: "v4.1-retrieved-2026-07-31",
+          benchmarkDate: "2026-07-31",
+          directForModel: true,
+          configuredRelativeDelta: -0.06271811368508501
         }
       ],
-      evidenceConfidence: "low",
-      uncertaintyWidth: 0.14,
+      evidenceConfidence: "medium",
+      uncertaintyWidth: 0.1,
       curveMethod: "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
       sourceNames: [
         "OpenHands Index SWE-bench aggregate",
         "ClawRouter BLOCKRUN_MODELS"
       ],
       sourceRetrievedAt: "2026-07-27",
-      notes: "Family-relative product mapping from GPT-5.5; official results are not OpenHands-harness results. CloseAI RC1 native Responses and Messages tool-call/tool-result loops passed on 2026-07-29.",
+      notes: "Default-effort placement is calibrated from the independent same-methodology gap between Sol medium and Fable 5. Max and xhigh results are not applied to ordinary Sol requests.",
       curveProfile: "frontier_resilient",
       curveTemperature: 0.16,
       curveFloor: 0.03,
@@ -5330,6 +5414,8 @@ var model_catalog_default = {
       profileEvidence: [
         "https://openai.com/index/gpt-5-6/",
         "https://openai.com/index/previewing-gpt-5-6-sol/",
+        "https://artificialanalysis.ai/models/gpt-5-6-sol-medium",
+        "https://openrouter.ai/rankings#benchmarks",
         "https://huggingface.co/datasets/OpenHands/openhands-index"
       ],
       profileConfidence: "medium"
@@ -5344,7 +5430,7 @@ var model_catalog_default = {
       cacheWritePricePerMillion: 2.5,
       contextWindow: 105e4,
       maxOutputTokens: 128e3,
-      toolCallSupport: true,
+      toolCallSupport: false,
       visionSupport: false,
       provider: "OpenAI",
       availability: "callable_preflight_or_repository",
@@ -5381,7 +5467,7 @@ var model_catalog_default = {
         "ClawRouter BLOCKRUN_MODELS"
       ],
       sourceRetrievedAt: "2026-07-27",
-      notes: "Family-relative product mapping from GPT-5.5; proxy price metadata unavailable. CloseAI RC1 native Responses and Messages tool-call/tool-result loops passed on 2026-07-29.",
+      notes: "Family-relative product mapping from GPT-5.5; proxy price metadata unavailable.",
       curveProfile: "balanced_frontier",
       curveTemperature: 0.135,
       curveFloor: 0.03,
@@ -5394,6 +5480,7 @@ var model_catalog_default = {
       },
       profileEvidence: [
         "https://openai.com/index/gpt-5-6/",
+        "https://openrouter.ai/rankings#benchmarks",
         "https://huggingface.co/datasets/OpenHands/openhands-index"
       ],
       profileConfidence: "medium"
@@ -5408,7 +5495,7 @@ var model_catalog_default = {
       cacheWritePricePerMillion: 1,
       contextWindow: 105e4,
       maxOutputTokens: 128e3,
-      toolCallSupport: true,
+      toolCallSupport: false,
       visionSupport: false,
       provider: "OpenAI",
       availability: "callable_preflight_or_repository",
@@ -5445,7 +5532,7 @@ var model_catalog_default = {
         "ClawRouter BLOCKRUN_MODELS"
       ],
       sourceRetrievedAt: "2026-07-27",
-      notes: "Family-relative product mapping from GPT-5.5; efficient profile follows official positioning. CloseAI RC1 native Responses and Messages tool-call/tool-result loops passed on 2026-07-29.",
+      notes: "Family-relative product mapping from GPT-5.5; efficient profile follows official positioning.",
       curveProfile: "efficient_fast",
       curveTemperature: 0.095,
       curveFloor: 0.025,
@@ -5458,6 +5545,7 @@ var model_catalog_default = {
       },
       profileEvidence: [
         "https://openai.com/index/gpt-5-6/",
+        "https://openrouter.ai/rankings#benchmarks",
         "https://huggingface.co/datasets/OpenHands/openhands-index"
       ],
       profileConfidence: "low"
@@ -5478,38 +5566,38 @@ var model_catalog_default = {
       availability: "callable_preflight_or_repository",
       routingEligible: true,
       defaultDisplay: true,
-      abilityAnchor: 0.775,
-      solvedAbilityParameter: 0.5873636486848062,
-      fittingError: -2220446049250313e-31,
-      sufficientLow: 0.9538102488561416,
-      sufficientMid: 0.8032432662800806,
-      sufficientMidHigh: 0.41560199859398517,
-      sufficientHigh: 0.14358328292734096,
+      abilityAnchor: 0.870251536782697,
+      solvedAbilityParameter: 0.8130550749324599,
+      fittingError: -11102230246251565e-32,
+      sufficientLow: 0.9829847954258241,
+      sufficientMid: 0.951990135633307,
+      sufficientMidHigh: 0.7841156886518483,
+      sufficientHigh: 0.4083671145742209,
       benchmarkEvidence: [
         {
-          benchmarkName: "GLM-5.2 official coding-agent positioning",
-          normalizedScore: 0.775,
-          scoreScale: "relative family mapping onto pinned OpenHands anchor scale",
+          benchmarkName: "Artificial Analysis Intelligence Index v4.1",
+          normalizedScore: 0.510858,
+          scoreScale: "0-100 composite index normalized to 0-1",
           sampleSize: 0,
-          sourceModelName: "glm-5.2",
-          evaluationMode: "vendor-reported; not OpenHands-comparable",
-          sourceUrl: "https://zcode.z.ai/en/docs/agents",
-          resultsUrl: "https://zcode.z.ai/en/docs/agents",
-          sourceVersion: "retrieved-2026-07-27",
-          benchmarkDate: "2026-07-27",
-          directForModel: false,
-          configuredRelativeDelta: 0.025
+          sourceModelName: "GLM 5.2",
+          evaluationMode: "independent composite; high reasoning effort",
+          sourceUrl: "https://artificialanalysis.ai/models/glm-5-2",
+          resultsUrl: "https://openrouter.ai/rankings#benchmarks",
+          sourceVersion: "v4.1-retrieved-2026-07-31",
+          benchmarkDate: "2026-07-31",
+          directForModel: true,
+          configuredRelativeDelta: -0.08774846321730301
         }
       ],
-      evidenceConfidence: "low",
-      uncertaintyWidth: 0.14,
+      evidenceConfidence: "medium",
+      uncertaintyWidth: 0.1,
       curveMethod: "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
       sourceNames: [
         "OpenHands Index SWE-bench aggregate",
         "ClawRouter BLOCKRUN_MODELS"
       ],
       sourceRetrievedAt: "2026-07-27",
-      notes: "Series-relative estimate from GLM 5.1; no directly comparable pinned OpenHands row.",
+      notes: "Placement is calibrated from the independent same-methodology gap to Fable 5 and cross-checked against OpenRouter coding and agentic dimensions.",
       curveProfile: "balanced_frontier",
       curveTemperature: 0.135,
       curveFloor: 0.03,
@@ -5521,7 +5609,9 @@ var model_catalog_default = {
         high: 0.015
       },
       profileEvidence: [
+        "https://openrouter.ai/rankings#benchmarks",
         "https://zcode.z.ai/en/docs/agents",
+        "https://artificialanalysis.ai/models/glm-5-2",
         "https://huggingface.co/datasets/OpenHands/openhands-index"
       ],
       profileConfidence: "medium"
@@ -5586,6 +5676,72 @@ var model_catalog_default = {
       },
       profileEvidence: [
         "https://huggingface.co/moonshotai/Kimi-K2.7-Code",
+        "https://huggingface.co/datasets/OpenHands/openhands-index"
+      ],
+      profileConfidence: "medium"
+    },
+    {
+      modelId: "kimi-k3",
+      displayName: "Kimi K3",
+      upstream: "proxy",
+      inputPricePerMillion: 3,
+      outputPricePerMillion: 15,
+      cachedInputPricePerMillion: 0.3,
+      cacheWritePricePerMillion: 3,
+      contextWindow: 1048576,
+      maxOutputTokens: 1048576,
+      toolCallSupport: true,
+      visionSupport: true,
+      provider: "Moonshot AI",
+      availability: "callable_preflight_or_repository",
+      routingEligible: true,
+      defaultDisplay: true,
+      abilityAnchor: 0.930516931154788,
+      solvedAbilityParameter: 1.003212096898729,
+      fittingError: 0,
+      sufficientLow: 0.975383957649151,
+      sufficientMid: 0.9633702646634364,
+      sufficientMidHigh: 0.9148906333031231,
+      sufficientHigh: 0.7411957585817248,
+      benchmarkEvidence: [
+        {
+          benchmarkName: "Artificial Analysis Intelligence Index v4.1",
+          normalizedScore: 0.571123394372091,
+          scoreScale: "0-100 composite index normalized to 0-1",
+          sampleSize: 0,
+          sourceModelName: "Kimi K3 (max)",
+          evaluationMode: "independent composite; dedicated evaluation runs",
+          sourceUrl: "https://artificialanalysis.ai/models/kimi-k3",
+          resultsUrl: "https://artificialanalysis.ai/models/kimi-k3",
+          sourceVersion: "v4.1-retrieved-2026-07-31",
+          benchmarkDate: "2026-07-31",
+          directForModel: true,
+          configuredRelativeDelta: -0.02748306884521199
+        }
+      ],
+      evidenceConfidence: "medium",
+      uncertaintyWidth: 0.1,
+      curveMethod: "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
+      sourceNames: [
+        "OpenHands Index SWE-bench aggregate",
+        "ClawRouter BLOCKRUN_MODELS"
+      ],
+      sourceRetrievedAt: "2026-07-27",
+      notes: "Frontier placement is calibrated from the independent same-methodology gap to Fable 5; official K3 task results corroborate strong coding, terminal, browsing, tool-use and knowledge-work performance.",
+      curveProfile: "frontier_resilient",
+      curveTemperature: 0.16,
+      curveFloor: 0.03,
+      curveCeiling: 0.99,
+      tierAdjustments: {
+        low: -0.01,
+        mid: -5e-3,
+        midHigh: 0.02,
+        high: 0.055
+      },
+      profileEvidence: [
+        "https://openrouter.ai/rankings#benchmarks",
+        "https://www.kimi.com/blog/kimi-k3",
+        "https://artificialanalysis.ai/models/kimi-k3",
         "https://huggingface.co/datasets/OpenHands/openhands-index"
       ],
       profileConfidence: "medium"
@@ -5909,150 +6065,6 @@ var model_catalog_default = {
         "https://huggingface.co/datasets/OpenHands/openhands-index"
       ],
       profileConfidence: "low"
-    },
-    {
-      modelId: "claude-fable-5",
-      displayName: "Claude Fable 5",
-      upstream: "proxy",
-      inputPricePerMillion: 10,
-      outputPricePerMillion: 50,
-      cachedInputPricePerMillion: 1,
-      cacheWritePricePerMillion: 12.5,
-      contextWindow: 2e5,
-      maxOutputTokens: 32e3,
-      toolCallSupport: true,
-      visionSupport: true,
-      provider: "Anthropic",
-      availability: "callable_preflight_or_repository",
-      routingEligible: true,
-      defaultDisplay: true,
-      abilityAnchor: 0.958,
-      solvedAbilityParameter: 1.1208913983330326,
-      fittingError: 0,
-      sufficientLow: 0.9777821259839409,
-      sufficientMid: 0.9745104938556622,
-      sufficientMidHigh: 0.961937592674017,
-      sufficientHigh: 0.870667779629334,
-      benchmarkEvidence: [
-        {
-          benchmarkName: "SWE-bench Verified via OpenHands Index",
-          normalizedScore: 0.958,
-          scoreScale: "0-1 resolved fraction",
-          sampleSize: 500,
-          sourceModelName: "claude-fable-5",
-          evaluationMode: "OpenHands agent harness",
-          sourceUrl: "https://huggingface.co/datasets/OpenHands/openhands-index",
-          resultsUrl: "https://github.com/OpenHands/openhands-index-results/tree/3015ac612e7196f428e6e8a3948965d32d9a3331",
-          sourceVersion: "v2026.06.30-3015ac6",
-          benchmarkDate: "2026-06-30",
-          directForModel: true,
-          configuredRelativeDelta: 0
-        },
-        {
-          benchmarkName: "Artificial Analysis Intelligence Index v4.1",
-          normalizedScore: 0.598606463217303,
-          scoreScale: "0-100 composite index normalized to 0-1",
-          sampleSize: 0,
-          sourceModelName: "Claude Fable 5 (with fallback)",
-          evaluationMode: "independent composite; Opus 4.8 fallback enabled",
-          sourceUrl: "https://artificialanalysis.ai/models/claude-fable-5",
-          resultsUrl: "https://artificialanalysis.ai/models/claude-fable-5",
-          sourceVersion: "v4.1-retrieved-2026-07-31",
-          benchmarkDate: "2026-07-31",
-          directForModel: true,
-          configuredRelativeDelta: 0
-        }
-      ],
-      evidenceConfidence: "medium",
-      uncertaintyWidth: 0.08,
-      curveMethod: "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
-      sourceNames: [
-        "OpenHands Index SWE-bench aggregate",
-        "ClawRouter BLOCKRUN_MODELS"
-      ],
-      sourceRetrievedAt: "2026-07-27",
-      notes: "Direct OpenHands SWE-bench anchor plus an independent broad composite. The Artificial Analysis run used Opus 4.8 fallback, so its 59.8606 score is corroborating evidence, not a standalone Fable-only anchor.",
-      curveProfile: "frontier_resilient",
-      curveTemperature: 0.16,
-      curveFloor: 0.03,
-      curveCeiling: 0.99,
-      tierAdjustments: {
-        low: -0.01,
-        mid: -5e-3,
-        midHigh: 0.02,
-        high: 0.055
-      },
-      profileEvidence: [
-        "https://artificialanalysis.ai/models/claude-fable-5",
-        "https://huggingface.co/datasets/OpenHands/openhands-index"
-      ],
-      profileConfidence: "medium"
-    },
-    {
-      modelId: "kimi-k3",
-      displayName: "Kimi K3",
-      upstream: "proxy",
-      inputPricePerMillion: 3,
-      outputPricePerMillion: 15,
-      cachedInputPricePerMillion: 0.3,
-      cacheWritePricePerMillion: 3,
-      contextWindow: 1048576,
-      maxOutputTokens: 1048576,
-      toolCallSupport: true,
-      visionSupport: true,
-      provider: "Moonshot AI",
-      availability: "callable_preflight_or_repository",
-      routingEligible: true,
-      defaultDisplay: true,
-      abilityAnchor: 0.930516931154788,
-      solvedAbilityParameter: 1.003212096898729,
-      fittingError: 0,
-      sufficientLow: 0.975383957649151,
-      sufficientMid: 0.9633702646634364,
-      sufficientMidHigh: 0.9148906333031231,
-      sufficientHigh: 0.7411957585817248,
-      benchmarkEvidence: [
-        {
-          benchmarkName: "Artificial Analysis Intelligence Index v4.1",
-          normalizedScore: 0.571123394372091,
-          scoreScale: "0-100 composite index normalized to 0-1",
-          sampleSize: 0,
-          sourceModelName: "Kimi K3 (max)",
-          evaluationMode: "independent composite; dedicated evaluation runs",
-          sourceUrl: "https://artificialanalysis.ai/models/kimi-k3",
-          resultsUrl: "https://artificialanalysis.ai/models/kimi-k3",
-          sourceVersion: "v4.1-retrieved-2026-07-31",
-          benchmarkDate: "2026-07-31",
-          directForModel: true,
-          configuredRelativeDelta: -0.02748306884521199
-        }
-      ],
-      evidenceConfidence: "medium",
-      uncertaintyWidth: 0.1,
-      curveMethod: "profiled constrained logistic; monotone projection; Twin-distribution anchor preservation",
-      sourceNames: [
-        "OpenHands Index SWE-bench aggregate",
-        "ClawRouter BLOCKRUN_MODELS"
-      ],
-      sourceRetrievedAt: "2026-07-27",
-      notes: "Frontier placement is calibrated from the independent same-methodology gap to Fable 5; official K3 task results corroborate strong coding, terminal, browsing, tool-use and knowledge-work performance.",
-      curveProfile: "frontier_resilient",
-      curveTemperature: 0.16,
-      curveFloor: 0.03,
-      curveCeiling: 0.99,
-      tierAdjustments: {
-        low: -0.01,
-        mid: -5e-3,
-        midHigh: 0.02,
-        high: 0.055
-      },
-      profileEvidence: [
-        "https://platform.kimi.ai/docs/guide/kimi-k3-quickstart",
-        "https://www.kimi.com/blog/kimi-k3",
-        "https://artificialanalysis.ai/models/kimi-k3",
-        "https://huggingface.co/datasets/OpenHands/openhands-index"
-      ],
-      profileConfidence: "medium"
     }
   ]
 };
@@ -6062,8 +6074,8 @@ var twin_product_presets_default = {
   schemaVersion: "acu-twin-presets-v1",
   examples: [
     {
-      id: "low-1",
-      title: "\u7B80\u5355\u660E\u786E\u4EFB\u52A1 A",
+      id: "simple-rewrite-1",
+      title: "\u7B80\u5355\u6539\u5199\u4EFB\u52A1",
       category: "\u5355\u4E00\u660E\u786E\u6267\u884C",
       source: "TwinRouterBench",
       publishedTier: "low",
@@ -6072,15 +6084,15 @@ var twin_product_presets_default = {
         messages: [
           {
             role: "user",
-            content: "[SYSTEM]\nYou are a helpful assistant that can use tools.\n\n[USER]\nguide me"
+            content: "[USER]\n\u628A\u8FD9\u53E5\u8BDD\u6539\u5F97\u66F4\u793C\u8C8C\uFF1A\u4ECA\u5929\u628A\u6587\u4EF6\u7ED9\u6211\u3002"
           }
         ]
       }
     },
     {
-      id: "low-2",
-      title: "\u7B80\u5355\u660E\u786E\u4EFB\u52A1 B",
-      category: "\u4F4E\u7EA6\u675F\u56DE\u5E94",
+      id: "json-extraction-1",
+      title: "\u7ED3\u6784\u5316\u63D0\u53D6\u4EFB\u52A1",
+      category: "\u683C\u5F0F\u7EA6\u675F\u4E0E\u4E00\u81F4\u6027",
       source: "TwinRouterBench",
       publishedTier: "low",
       request: {
@@ -6088,15 +6100,15 @@ var twin_product_presets_default = {
         messages: [
           {
             role: "user",
-            content: "[SYSTEM]\nYou are a helpful assistant that can use tools.\n\n[USER]\ndelete all txt files"
+            content: "[USER]\n\u4ECE\u8BA2\u5355\u8BF4\u660E\u4E2D\u63D0\u53D6order_id\u3001amount\u548Ccurrency\uFF0C\u53EA\u8FD4\u56DE\u5408\u6CD5JSON\uFF0C\u7F3A\u5931\u503C\u4E3Anull\u3002"
           }
         ]
       }
     },
     {
-      id: "mid-1",
-      title: "\u5E38\u89C4\u591A\u7EA6\u675F\u4EFB\u52A1 A",
-      category: "\u591A\u6761\u4EF6\u6574\u5408",
+      id: "code-fix-1",
+      title: "\u5E38\u89C4\u4EE3\u7801\u4FEE\u590D",
+      category: "\u5C40\u90E8\u63A8\u7406\u4E0E\u4FEE\u590D",
       source: "TwinRouterBench",
       publishedTier: "mid",
       request: {
@@ -6104,31 +6116,15 @@ var twin_product_presets_default = {
         messages: [
           {
             role: "user",
-            content: "[SYSTEM]\nYou are a helpful assistant that can use tools.\n\n[USER]\nI'd like to know how to retrieve a weather forecast for New York City on the 4th of July this year."
+            content: "[USER]\n\u4FEE\u590D\u8FD9\u4E2APython\u51FD\u6570\u5728\u7A7A\u5217\u8868\u65F6\u9664\u96F6\u7684\u95EE\u9898\uFF0C\u7ED9\u51FA\u4FEE\u6539\u540E\u7684\u51FD\u6570\u5E76\u89E3\u91CA\u539F\u56E0\u3002"
           }
         ]
       }
     },
     {
-      id: "mid-2",
-      title: "\u5E38\u89C4\u591A\u7EA6\u675F\u4EFB\u52A1 B",
-      category: "\u5DE5\u5177\u53C2\u6570\u4E0E\u4E00\u81F4\u6027",
-      source: "TwinRouterBench",
-      publishedTier: "mid",
-      request: {
-        model: "auto",
-        messages: [
-          {
-            role: "user",
-            content: "[SYSTEM]\nYou are a helpful assistant that can use tools.\n\n[USER]\nCould you kindly show me the list of files in tmp directory in my file system including the hidden one?"
-          }
-        ]
-      }
-    },
-    {
-      id: "mid_high-1",
-      title: "\u591A\u5DE5\u5177/\u8C03\u8BD5\u4EFB\u52A1 A",
-      category: "\u6267\u884C\u72B6\u6001\u6574\u5408",
+      id: "multi-file-fix-1",
+      title: "\u591A\u6587\u4EF6\u4FEE\u590D\u4EFB\u52A1",
+      category: "\u8DE8\u6587\u4EF6\u72B6\u6001\u6574\u5408",
       source: "TwinRouterBench",
       publishedTier: "mid_high",
       request: {
@@ -6136,15 +6132,15 @@ var twin_product_presets_default = {
         messages: [
           {
             role: "user",
-            content: "[SYSTEM]\nYou are a helpful assistant that can use tools.\n\n[USER]\nDelete all the files in the 'Drafts' directory including the directory."
+            content: "[SYSTEM]\nYou can inspect and edit repository files and run tests.\n\n[USER]\n\u5B9A\u4F4D\u8BA4\u8BC1\u91CD\u8BD5\u5BFC\u81F4\u7684\u91CD\u590D\u5199\u5165\uFF0C\u4FEE\u6539API\u5C42\u548C\u5B58\u50A8\u5C42\uFF0C\u8865\u56DE\u5F52\u6D4B\u8BD5\u5E76\u8BF4\u660E\u517C\u5BB9\u98CE\u9669\u3002"
           }
         ]
       }
     },
     {
-      id: "mid_high-2",
-      title: "\u591A\u5DE5\u5177/\u8C03\u8BD5\u4EFB\u52A1 B",
-      category: "\u4E0A\u4E0B\u6587\u4F9D\u8D56\u8C03\u8BD5",
+      id: "multi-tool-agent-1",
+      title: "\u591A\u5DE5\u5177 Agent \u4EFB\u52A1",
+      category: "\u5DE5\u5177\u94FE\u8C03\u67E5\u4E0E\u9A8C\u8BC1",
       source: "TwinRouterBench",
       publishedTier: "mid_high",
       request: {
@@ -6152,15 +6148,15 @@ var twin_product_presets_default = {
         messages: [
           {
             role: "user",
-            content: "[SYSTEM]\nYou are a helpful assistant for query-based meeting summarization ([TASK]). Answer the user's query using the meeting transcript below. Be accurate, concise, and faithful to what was discussed in the transcript.\n\n[USER]\n## Meeting transcript\nIndustrial Designer: {vocalsound} Okay . Okay , so that's basically the the voice recognition item we were searching for . Okay . This sample sensor uh requires an regular chip , I thought . Um no op I'm not very sure . No , it's not in here . If we want to use the L_C_D_ display , we really need the advanced version , which is a bit l little bit more costly . If we want to use the scroll-wheels we need the regular version . And if we don't want to use uh any of these uh more advanced functions we can keep with the simple uh chip , which is a bit cheaper .\nProject Manager: Okay . Uh well {disfmarker} uh\nIndustrial Designer: Okay .\nProject Manager: d did we already decide on the display ? To {disfmarker}\nIndustrial Designer: Um no , but I think that's something for uh Roo here to think about .\nUser Interface: Yeah . Well , I don't have um {disfmarker} I haven't looked for uh for information about it , but I don't think information {disfmarker} uh y I don't think you need it on a display .\nProject Manager: No .\nUser Interface: Especially when when we have to look at a cost , I don't think uh {disfmarker}\nIndustrial Designer: I I don't think either .\nUser Interface: 'cause uh {gap} uh all {disfmarker} any T_V_ can uh can uh view a digit on uh on screen ,\nIndustrial Designer: No . I don't think you need it .\nProject Manager: On screen display . Yeah .\nUser Interface: yeah .\nProject Manager: Okay\nIndustrial Designer: Okay . Okay ,\n[...deterministic middle truncation...]\nIndustrial Designer: Mm-hmm .\nProject Manager: because it it adds a little ext extra high-tech feeling to it .\nIndustrial Designer: Yes .\nUser Interface: But we already have the scroll-wheels , the sp uh the speaker uh the speak recognition , the rubber , the fancy colours .\nProject Manager: Mm yeah .\nIndustrial Designer: Uh I think our customers will go insane .\nProject Manager: Okay , okay .\nIndustrial Designer: {vocalsound} It's it's too much .\n\n## Query\nWhy did the team decide not to use LCD displays when discussing interface controls?\n\nAnswer this query based only on the transcript above."
+            content: "[SYSTEM]\nUse shell, repository search and browser tools when necessary.\n\n[USER]\n\u8C03\u67E5\u90E8\u7F72\u540E\u652F\u4ED8\u56DE\u8C03\u91CD\u590D\u6267\u884C\uFF1A\u68C0\u67E5\u65E5\u5FD7\u548C\u914D\u7F6E\u3001\u5B9A\u4F4D\u63D0\u4EA4\u3001\u4FEE\u590D\u5E42\u7B49\u903B\u8F91\u3001\u8FD0\u884C\u6D4B\u8BD5\u5E76\u9A8C\u8BC1\u7070\u5EA6\u73AF\u5883\u3002"
           }
         ]
       }
     },
     {
-      id: "high-1",
-      title: "\u9AD8\u98CE\u9669\u957F\u7A0B Agent \u4EFB\u52A1 A",
-      category: "\u957F\u7A0B\u591A\u6B65\u63A8\u7406",
+      id: "long-horizon-reasoning-1",
+      title: "\u957F\u7A0B\u63A8\u7406\u4EFB\u52A1",
+      category: "\u9AD8\u98CE\u9669\u591A\u6B65\u89C4\u5212",
       source: "TwinRouterBench",
       publishedTier: "high",
       request: {
@@ -6168,106 +6164,7 @@ var twin_product_presets_default = {
         messages: [
           {
             role: "user",
-            content: `[SYSTEM]
-You are a helpful, accurate assistant. You are given a multi-turn conversation and reference passages retrieved from a knowledge base. Answer the user's latest question based on the reference passages and conversation history. Be concise and factual. If the passages do not contain enough information, say so honestly.
-
-[USER]
-Here are reference passages from the knowledge base:
-
-[Passage 1]
-
-This command returns either cc, cd, ci, or pr, depending on which pipeline is running. This way, you can reuse the setup script between pipelines if necessary.
-
- Static code scan
-
-The static code scan stage runs a static code analyzer tool on the specified app repo codebases.
-
-CC pipeline provides the repos that are found in the inventory for the scanner.
-
-You can use any of the following methods to add static code to your pipeline:
-
-* Provide an already running SonarQube instance name, URL, and credentials by adding the SonarQube tool to your toolchain. The static-scan task runs a scan on the specified repos.
-* Add your code to the static-scan custom stage in your .pipeline-config.yaml file for a custom implementation.
-
- Dynamic scan
-
-The Dynamic scan stage runs a dynamic application security testing tool to find vulnerabilities in the deployed application.
-
-* Add your own dynamic scan code to the dynamic-scan custom stage in your .pipeline-config.yaml file for a custom implementation.
-
-To learn more about configuring dynamic scan by using OWASP-ZAP, see [Configuring ZAP scan for CC pipeline]([URL]
-
- Scans and checks in compliance checks
-
-Table 3. Compliance scans and checks
-
- Scan or check Description
-
- Detect secrets The [IBM Detect Secrets]([URL] tool identifies where secr
-[...deterministic middle truncation...]
-USER]
-Is Dynamic secret better than Static secret?
-
-[ASSISTANT]
-You can not compare dynamic and static secrets in terms of one being "better" than another. There are differences between them. Dynamic secrets have their expiration date and time enforced when their secret data is read or accessed, while static secrets have their expiration date and time enforced at secret creation or rotation time. With a Secrets Manager, you can create, lease, and centrally manage secrets that are used in IBM Cloud services or your custom-built applications.
-
-[USER]
-Which one protects more from vulnerabilities?`
-          }
-        ]
-      }
-    },
-    {
-      id: "high-2",
-      title: "\u9AD8\u98CE\u9669\u957F\u7A0B Agent \u4EFB\u52A1 B",
-      category: "\u9AD8\u98CE\u9669\u5DE5\u5177\u94FE",
-      source: "TwinRouterBench",
-      publishedTier: "high",
-      request: {
-        model: "auto",
-        messages: [
-          {
-            role: "user",
-            content: `[SYSTEM]
-You are a personal assistant running inside OpenClaw.
-## Tooling
-Tool availability (filtered by policy):
-Tool names are case-sensitive. Call tools exactly as listed.
-- read: Read file contents
-- write: Create or overwrite files
-- edit: Make precise edits to files
-- exec: Run shell commands (pty available for TTY-required CLIs)
-- process: Manage background exec sessions
-- web_search: Search the web (Brave API)
-- web_fetch: Fetch and extract readable content from a URL
-- browser: Control web browser
-- canvas: Present/eval/snapshot the Canvas
-- nodes: List/describe/notify/camera/screen on paired nodes
-- cron: Manage cron jobs and wake events (use for reminders; when scheduling a reminder, write the systemEvent text as something that will read like a reminder when it fires, and mention that it is a reminder depending on the time gap between setting and firing; include recent context in reminder text if appropriate)
-- message: Send messages and channel actions
-- gateway: Restart, apply config, or run updates on the running OpenClaw process
-- agents_list: List OpenClaw agent ids allowed for sessions_spawn when runtime="subagent" (not ACP harness ids)
-- sessions_list: List other sessions (incl. sub-agents) with filters/last
-- sessions_history: Fetch history for another session/sub-agent
-- sessions_send: Send a message to another session/sub-agent
-- subagents: List, steer, or kill sub-agent runs for this requester session
-- session_status: Show a /status-equivalent status card (usage + time + Reasoning/Verbose/Elevated); use for model-use questions (\u{1F4CA} session_status); optional per-session model override
-- memory_get: Safe snippet read from MEMORY.md or memory/*.md with o
-[...deterministic middle truncation...]
-he empathy, ethical judgment, and contextual understanding that human healthcare providers bring to patient care. This collaborative approach promises to improve outcomes, reduce costs, and make quality healthcare more accessible to populations around the world.
-
-[ASSISTANT]
-[TOOL_CALL name=write]
-{"path":"/tmp/[TASK]/smartroute-task_05_summary/agent_workspace/summary_output.txt"}
-
-[TOOL name=write]
-Validation failed for tool "write":
-  - content: must have required property 'content'
-
-Received arguments:
-{
-  "path": "/tmp/[TASK]/smartroute-task_05_summary/agent_workspace/summary_output.txt"
-}`
+            content: "[USER]\n\u4E3A\u8DE8\u5730\u533A\u8BA2\u5355\u7CFB\u7EDF\u5236\u5B9A\u4E0D\u505C\u673A\u8FC1\u79FB\u65B9\u6848\uFF0C\u8986\u76D6\u652F\u4ED8\u5E42\u7B49\u3001\u6D88\u606F\u91CD\u653E\u3001\u6570\u636E\u4E00\u81F4\u6027\u3001\u7070\u5EA6\u56DE\u6EDA\u3001\u76D1\u7BA1\u7EA6\u675F\u3001\u9A8C\u8BC1\u6307\u6807\u548C\u6545\u969C\u6F14\u7EC3\uFF0C\u5E76\u7ED9\u51FA\u4F9D\u8D56\u987A\u5E8F\u3002"
           }
         ]
       }

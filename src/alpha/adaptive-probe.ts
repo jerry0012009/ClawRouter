@@ -303,7 +303,7 @@ export class AdaptiveProbeWorker {
         actualModelMismatch,
         totalLatencyMs: Date.now() - startedAt.getTime(),
       };
-      if (profile.economics) {
+      if (profile.economics && usageTrusted) {
         const breakdown = providerCostBreakdown(profile.economics, Number(usage.providerCostUsd));
         costCny = breakdown.effectiveCashCostCny;
         costBreakdown = {
@@ -316,6 +316,17 @@ export class AdaptiveProbeWorker {
           effectiveCostStatus: breakdown.effectiveCostStatus,
           effectiveCostSource: breakdown.effectiveCostSource,
           effectiveCostVersion: breakdown.effectiveCostVersion,
+        };
+      } else if (profile.economics) {
+        costBreakdown = {
+          effectiveCostStatus: "unavailable",
+          costUnavailableReason: "provider_usage_unavailable",
+          untrustedEstimatedNominalCostUsd: Number(usage.providerCostUsd),
+          billingMultiplier: profile.economics.observedBillingMultiplier,
+          providerCreditCashCostCny: profile.economics.rechargeCashCny !== null
+            && profile.economics.creditsReceivedUsd !== null
+            ? profile.economics.rechargeCashCny / profile.economics.creditsReceivedUsd
+            : null,
         };
       }
     } catch (error) {
@@ -367,6 +378,9 @@ export class AdaptiveProbeWorker {
             outputTokens: outputTokens.toString(),
             reasoningTokens: reasoningTokens.toString(),
             actualModel: actualModel ?? null,
+            usageSource: usageTrusted ? "provider_usage" : "unavailable",
+            errorCode: outcome.errorCode ?? null,
+            errorMessage: outcome.errorMessage ?? null,
             costBreakdown,
             ...probeMetadata,
           }), startedAt],

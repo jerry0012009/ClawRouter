@@ -90,6 +90,8 @@ No configured Profile was found without its required runtime Adapter or Economic
 
 The full pool is probed serially at most once every six hours. A scheduled run requires at least one real API Logical Request in the preceding six hours; after an idle period, the next real request wakes the shared Worker asynchronously and does not wait for it. Probe attempts do not call Judge, enter user billing, or appear in Work Timeline.
 
+The first production full-pool run attempted all 73 Profiles: 65 succeeded and 8 failed. The 65 attempts with trusted Provider Usage cost CNY 0.038363499. Eight failures had no Provider Usage, so their cash cost is recorded as unavailable rather than estimated from an error body. At four runs per day the measured trusted cost is CNY 0.153453996; the daily safety budget is CNY 0.20.
+
 Lucen cash conversion is founder-confirmed as CNY 100 for 100 USD-denominated Provider credits, so one Provider credit costs CNY 1. Each Execution Profile's observed multiplier is then applied to nominal Catalog token cost. For example, the supplied cx025 record is independently reproducible:
 
 `((4,473 x $1/M input) + (6 x $6/M output)) x 0.25 x CNY 1/credit = CNY 0.00112725`, matching the Lucen balance charge `$0.001127` after display rounding.

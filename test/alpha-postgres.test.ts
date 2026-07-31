@@ -366,7 +366,7 @@ run("Alpha PostgreSQL foundation", () => {
       health: "healthy" as const, priority: 1, enabled: true,
       effectiveCostStatus: "verified" as const, effectiveCostSource: "fixture", effectiveCostVersion: "fixture-v1",
     };
-    const profiles: AlphaExecutionProfile[] = [1, 2].map((index) => ({
+    const profiles: AlphaExecutionProfile[] = [1, 2, 3].map((index) => ({
       executionProfileId: `full-pool-profile-${index}`,
       modelId: "gpt-5.4-mini",
       providerModelId: "gpt-5.4-mini",
@@ -397,10 +397,18 @@ run("Alpha PostgreSQL foundation", () => {
         );
       },
     };
+    const failedAdapter: NativeProviderAdapter = {
+      async execute() {
+        return new Response('{"error":{"message":"fixture rejection"}}', {
+          status: 400,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    };
     const worker = new AdaptiveProbeWorker({
       database,
       profiles,
-      adapters: new Map(profiles.map((profile) => [profile.executionProfileId, adapter])),
+      adapters: new Map(profiles.map((profile, index) => [profile.executionProfileId, index === 2 ? failedAdapter : adapter])),
       dailyBudgetCny: 1,
     });
 
@@ -411,15 +419,15 @@ run("Alpha PostgreSQL foundation", () => {
       status: string; profile_count: number; attempted_count: number; success_count: number; cost_cny: string;
     }>("SELECT status,profile_count,attempted_count,success_count,cost_cny::text FROM acu_full_pool_probe_runs");
     expect(runs.rows).toEqual([expect.objectContaining({
-      status: "completed", profile_count: 2, attempted_count: 2, success_count: 2,
+      status: "completed", profile_count: 3, attempted_count: 3, success_count: 2,
     })]);
     expect(Number(runs.rows[0]?.cost_cny)).toBeGreaterThan(0);
     expect(maxInFlight).toBe(1);
     const attempts = await database.query<{ metadata_json: Record<string, unknown> }>(
       "SELECT metadata_json FROM acu_profile_probe_attempts ORDER BY execution_profile_id",
     );
-    expect(attempts.rows).toHaveLength(2);
-    for (const row of attempts.rows) {
+    expect(attempts.rows).toHaveLength(3);
+    for (const row of attempts.rows.slice(0, 2)) {
       expect(row.metadata_json).toMatchObject({
         probeMode: "full_pool",
         trigger: "manual",
@@ -433,6 +441,19 @@ run("Alpha PostgreSQL foundation", () => {
       });
       expect(row.metadata_json.fullPoolProbeRunId).toBeTypeOf("string");
     }
+    expect(attempts.rows[2]?.metadata_json).toMatchObject({
+      probeMode: "full_pool",
+      usageSource: "unavailable",
+      errorMessage: '{"error":{"message":"fixture rejection"}}',
+      costBreakdown: {
+        effectiveCostStatus: "unavailable",
+        costUnavailableReason: "provider_usage_unavailable",
+      },
+    });
+    const failedCost = await database.query<{ cost_cny: string }>(
+      "SELECT cost_cny::text FROM acu_profile_probe_attempts WHERE execution_profile_id='full-pool-profile-3'",
+    );
+    expect(Number(failedCost.rows[0]?.cost_cny)).toBe(0);
     const marker = await database.query("SELECT 1 FROM acu_profile_probe_queue WHERE execution_profile_id='__full_pool__'");
     expect(marker.rowCount).toBe(0);
   });

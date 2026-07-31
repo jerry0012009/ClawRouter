@@ -123,7 +123,7 @@ services:
       ACU_PROVIDER_PREFLIGHT_FILE: /app/config/provider-channel-preflight-observations.json
       ACU_PROVIDER_ECONOMICS_FILE: /app/config/provider-economics.json
       ACU_DEMO_ROUTER_ENABLED: "true"
-      ACU_PROBE_DAILY_BUDGET_CNY: ${ACU_PROBE_DAILY_BUDGET_CNY:-0.05}
+      ACU_PROBE_DAILY_BUDGET_CNY: ${ACU_PROBE_DAILY_BUDGET_CNY:-0.20}
       ACU_JUDGE_API_KEY: ${MIMO_API_KEY:?set MIMO_API_KEY}
       ACU_JUDGE_MODEL: mimo-v2.5-pro
       ACU_JUDGE_PROVIDER: xiaomi_mimo

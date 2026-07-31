@@ -171,9 +171,20 @@ describe("Alpha current-formula routing", () => {
     expect(result.candidateEstimates).toHaveLength(2);
   });
 
-  it("allows only execution-verified Web Profiles when Web is required", () => {
-    const verified = { ...profiles[0], webSearchExecutionVerified: true };
-    const unverified = { ...profiles[1], webSearchExecutionVerified: false };
+  it("prefers verified Web transport but admits optimistic pass-through for a supported model", () => {
+    const verified = {
+      ...profiles[0],
+      executionProfileId: "verified",
+      modelId: "gpt-5.4-mini",
+      webSearchExecutionVerified: true,
+    };
+    const unverified = {
+      ...profiles[0],
+      executionProfileId: "optimistic",
+      modelId: "gpt-5.4-mini",
+      webSearchExecutionVerified: false,
+      webSearchFailureReason: "not_verified_for_full_pool_profile",
+    };
     const result = routeWithCurrentAcuFormula({
       judge,
       judgeCost: 0,
@@ -181,13 +192,85 @@ describe("Alpha current-formula routing", () => {
       expectedOutputTokens: 500,
       effectiveQualityTarget: 70,
       profiles: [verified, unverified],
-      requirements: { ...requirements, requireTools: false, webIntent: "required" },
+      requirements: {
+        ...requirements,
+        requireTools: false,
+        clientDeclaredWebTool: true,
+        webIntent: "required",
+      },
     });
-    expect(result.candidateEstimates.map((item) => item.modelId)).toEqual([verified.modelId]);
-    expect(result.excludedProfiles).toContainEqual({
-      executionProfileId: unverified.executionProfileId,
-      reasons: ["web_search_execution_unverified"],
+    expect(result.candidateEstimates).toHaveLength(1);
+    expect(result.candidateEstimates[0]?.executionProfileIds).toEqual(["verified", "optimistic"]);
+    expect(result.selectedProfile.executionProfileId).toBe("verified");
+    expect(result.excludedProfiles).toEqual([]);
+  });
+
+  it("routes a supported model through a compatible unverified Web transport", () => {
+    const optimistic = {
+      ...profiles[0],
+      modelId: "gpt-5.6-sol",
+      webSearchExecutionVerified: false,
+      webSearchFailureReason: "not_verified_for_full_pool_profile",
+    };
+    const result = routeWithCurrentAcuFormula({
+      judge,
+      judgeCost: 0,
+      inputTokens: 2_000,
+      expectedOutputTokens: 500,
+      effectiveQualityTarget: 70,
+      profiles: [optimistic],
+      requirements: {
+        ...requirements,
+        requireTools: false,
+        clientDeclaredWebTool: true,
+        webIntent: "required",
+      },
     });
+    expect(result.selectedProfile.executionProfileId).toBe(optimistic.executionProfileId);
+    expect(result.providerSelectionReason).toContain("web_eligibility=optimistic");
+  });
+
+  it("excludes explicit Web transport incompatibility", () => {
+    const incompatible = {
+      ...profiles[0],
+      modelId: "gpt-5.6-luna",
+      webSearchFailureReason: "web_search_output_item_missing",
+    };
+    expect(() => routeWithCurrentAcuFormula({
+      judge,
+      judgeCost: 0,
+      inputTokens: 2_000,
+      expectedOutputTokens: 500,
+      effectiveQualityTarget: 70,
+      profiles: [incompatible],
+      requirements: {
+        ...requirements,
+        requireTools: false,
+        clientDeclaredWebTool: true,
+        webIntent: "required",
+      },
+    })).toThrowError(expect.objectContaining({
+      errorType: "web_capability_unavailable",
+      details: { exclusion_counts: expect.objectContaining({ web: 1 }) },
+    }));
+  });
+
+  it("does not require hosted Web transport for client-side Web tools", () => {
+    const result = routeWithCurrentAcuFormula({
+      judge,
+      judgeCost: 0,
+      inputTokens: 2_000,
+      expectedOutputTokens: 500,
+      effectiveQualityTarget: 70,
+      profiles,
+      requirements: {
+        ...requirements,
+        requireTools: false,
+        clientDeclaredWebTool: false,
+        webIntent: "required",
+      },
+    });
+    expect(result.candidateEstimates).toHaveLength(2);
   });
 
   it("keeps at least three production Coding candidates when Codex declares Web without Web intent", () => {

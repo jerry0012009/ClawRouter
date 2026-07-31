@@ -59,6 +59,7 @@ async function main(): Promise<void> {
       webSearchObservedLatencyMs: profile.webSearchObservedLatencyMs,
       webSearchLastVerifiedAt: profile.webSearchLastVerifiedAt,
       webSearchFailureReason: profile.webSearchFailureReason,
+      webTransportStatus: profile.webTransportStatus,
     };
   });
   await writeFile(path, `${JSON.stringify([...promoted, ...retained], null, 2)}\n`);

@@ -6,6 +6,11 @@ import type { AlphaProtocol } from "./repository.js";
 import type { WebIntent } from "./protocol/types.js";
 import { cashCnyPerNominalUsd, type ProviderEconomics } from "./provider-economics.js";
 import { effectiveContextCeiling, type ContextAdmissionEstimate } from "./context-admission.js";
+import {
+  compareWebPreference,
+  resolveWebEligibility,
+  type WebTransportStatus,
+} from "./web-capability.js";
 
 export type ProfileHealth = "healthy" | "degraded" | "cooldown" | "open" | "half_open" | "disabled" | "unknown";
 export type RoutingPreference = "economy" | "balanced" | "quality";
@@ -68,6 +73,7 @@ export type AlphaExecutionProfile = {
   webSearchObservedLatencyMs?: number;
   webSearchLastVerifiedAt?: string;
   webSearchFailureReason?: string;
+  webTransportStatus?: WebTransportStatus;
   modelVendor?: string;
   modelCategory?: "text_agent" | "image" | "audio" | "realtime" | "unsupported";
   capabilityTier?: "LUNA" | "TERRA" | "SOL" | "FRONTIER";
@@ -113,7 +119,7 @@ export function exclusionCategory(reason: string): ExclusionCategory {
   if (reason === "context_window") return "context_window";
   if (reason === "native_protocol") return "protocol";
   if (reason === "tool_call_support" || reason.startsWith("tool_type:")) return "tool_capability";
-  if (reason === "web_search_execution_unverified") return "web";
+  if (reason.startsWith("web_")) return "web";
   if (reason === "thinking_support" || reason.startsWith("reasoning_effort:")) return "thinking";
   if (reason.startsWith("health_") || reason === "provider_cooldown" || reason === "disabled") return "health";
   if (reason === "administrator_policy" || reason === "model_policy" || reason === "profile_policy") return "allowlist";
@@ -220,7 +226,8 @@ function providerSelectionScore(profile: AlphaExecutionProfile, inputTokens: num
 }
 
 function webReliabilityFactor(profile: AlphaExecutionProfile, requirements: AlphaRouteRequirements): number {
-  if (requirements.webIntent === "likely" && profile.webSearchExecutionVerified) return 0.98;
+  if (requirements.webIntent === "likely"
+    && resolveWebEligibility(profile, { ...requirements, webIntent: "required" }).confidence === "verified") return 0.98;
   if (requirements.webIntent === "not_required" && requirements.clientDeclaredWebTool
     && profile.webToolDeclarationAccepted) return 0.99;
   return 1;
@@ -253,9 +260,8 @@ function exclusionReasons(
   for (const toolType of requirements.requiredToolTypes ?? []) {
     if (!profile.supportedToolTypes?.includes(toolType)) reasons.push(`tool_type:${toolType}`);
   }
-  if (requirements.webIntent === "required" && !profile.webSearchExecutionVerified) {
-    reasons.push("web_search_execution_unverified");
-  }
+  const webEligibility = resolveWebEligibility(profile, requirements);
+  if (!webEligibility.eligible) reasons.push(webEligibility.reason);
   if (requirements.requireThinking && !profile.thinkingSupport) reasons.push("thinking_support");
   if (requirements.reasoningEffort && profile.supportedReasoningEfforts
     && !profile.supportedReasoningEfforts.includes(requirements.reasoningEffort)) {
@@ -341,8 +347,9 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
         },
       );
     }
-    if (input.requirements.webIntent === "required") {
-      throw new AlphaAdmissionError("web_capability_unavailable", "No healthy Alpha execution profile has verified Web Search execution capability", 400, {
+    if (input.requirements.webIntent === "required" && input.requirements.clientDeclaredWebTool
+      && normalizedExclusionCounts.web > 0) {
+      throw new AlphaAdmissionError("web_capability_unavailable", "No eligible Alpha execution profile can execute the declared hosted Web Search tool", 400, {
         exclusion_counts: normalizedExclusionCounts,
       });
     }
@@ -364,8 +371,10 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
   const bestProfileByModel = new Map<string, AlphaExecutionProfile>();
   for (const profile of eligibleProfiles) {
     const current = bestProfileByModel.get(profile.modelId);
-    if (!current || effectiveProviderSelectionScore(profile, input.requirements, input.inputTokens, input.expectedOutputTokens)
-      < effectiveProviderSelectionScore(current, input.requirements, input.inputTokens, input.expectedOutputTokens)) {
+    const webPreference = current ? compareWebPreference(profile, current, input.requirements) : 0;
+    if (!current || webPreference < 0 || (webPreference === 0
+      && effectiveProviderSelectionScore(profile, input.requirements, input.inputTokens, input.expectedOutputTokens)
+      < effectiveProviderSelectionScore(current, input.requirements, input.inputTokens, input.expectedOutputTokens))) {
       bestProfileByModel.set(profile.modelId, profile);
     }
   }
@@ -414,8 +423,9 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
       observedLatencyMs: profile.observedLatencyMs,
       selected: profile.executionProfileId === selectedProfile.executionProfileId,
     })).sort((left, right) => left.providerSelectionScore - right.providerSelectionScore);
-  const selectedProviderEstimate = providerCandidateEstimates[0];
-  const nextProviderEstimate = providerCandidateEstimates[1];
+  const selectedProviderEstimate = providerCandidateEstimates.find((candidate) => candidate.selected)!;
+  const nextProviderEstimate = providerCandidateEstimates.find((candidate) => !candidate.selected);
+  const selectedWebEligibility = resolveWebEligibility(selectedProfile, input.requirements);
   const providerSelectionReason = [
     `Selected ${selectedProfile.provider}/${selectedProfile.channelId ?? selectedProfile.channel}/${selectedProfile.providerModelId ?? selectedProfile.modelId}`,
     `for canonical model ${selectedProfile.modelId}`,
@@ -424,6 +434,9 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
     `usage_trusted=${selectedProfile.usageTrusted !== false}`,
     `effective_cost_status=${selectedProfile.effectiveCostStatus ?? "verified"}`,
     `latency_ms=${selectedProfile.observedLatencyMs ?? "unknown"}`,
+    `web_model_capability=${selectedWebEligibility.modelCapability}`,
+    `web_transport=${selectedWebEligibility.transportStatus}`,
+    `web_eligibility=${selectedWebEligibility.confidence}`,
     `effective_cash_estimate=${selectedProviderEstimate.effectiveCashCost.toFixed(8)}`,
     nextProviderEstimate ? `next_channel=${nextProviderEstimate.channelId}:${nextProviderEstimate.effectiveCashCost.toFixed(8)}` : "next_channel=none",
   ].join("; ");

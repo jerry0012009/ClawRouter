@@ -195,6 +195,7 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
       webSearchObservedLatencyMs: profile.webSearchObservedLatencyMs,
       webSearchLastVerifiedAt: profile.webSearchLastVerifiedAt,
       webSearchFailureReason: profile.webSearchFailureReason,
+      webTransportStatus: profile.webTransportStatus,
       modelVendor: profile.modelVendor ?? getAcuModel(profile.modelId)?.provider,
       modelCategory: profile.modelCategory ?? "text_agent",
       capabilityTier: profile.capabilityTier ?? "LUNA",

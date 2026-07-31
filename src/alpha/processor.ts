@@ -39,6 +39,7 @@ import {
   isWebIntentSource,
   withWebIntentSource,
 } from "./web-intent.js";
+import { compareWebPreference, resolveWebEligibility } from "./web-capability.js";
 
 const POLICY_VERSION = "alpha-p0-policy-v1";
 const QUALITY_CURVE_VERSION = "acu-catalog-v0.1";
@@ -336,8 +337,15 @@ function bodyDeclaresHostedWebTool(body: Uint8Array): boolean {
   }
 }
 
-function isWebSearchProviderError(response: { status: number }, webIntent: CanonicalEnvelope["webIntent"]): boolean {
-  return webIntent !== "not_required" && [400, 409, 422].includes(response.status);
+function isWebSearchProviderError(response: { status: number }, envelope: CanonicalEnvelope): boolean {
+  return envelope.webIntent === "required" && envelope.clientDeclaredWebTool
+    && [400, 409, 422].includes(response.status);
+}
+
+function isExplicitWebCompatibilityFailure(response: BufferedProviderFailure, envelope: CanonicalEnvelope): boolean {
+  if (!isWebSearchProviderError(response, envelope)) return false;
+  const evidence = response.body.toString("utf8").toLowerCase();
+  return /web[_ -]?search|hosted[_ -]?tool|unsupported[^\n]{0,80}tool|tool[^\n]{0,80}(unsupported|invalid)/.test(evidence);
 }
 
 export function prepareProviderBody(
@@ -451,6 +459,11 @@ export class AlphaRequestProcessor {
           || profile.webSearchLastVerifiedAt,
         webSearchFailureReason: stringValue(runtime?.metadata?.webSearchFailureReason)
           || profile.webSearchFailureReason,
+        webTransportStatus: runtime?.metadata?.webTransportStatus === "verified"
+          || runtime?.metadata?.webTransportStatus === "compatible_unverified"
+          || runtime?.metadata?.webTransportStatus === "incompatible"
+          ? runtime.metadata.webTransportStatus
+          : profile.webTransportStatus,
       };
     });
     if (wakeProbe && probeCandidateId) this.options.wakeProbe?.(probeCandidateId);
@@ -1668,11 +1681,13 @@ export class AlphaRequestProcessor {
       && profile.protocols.includes(envelope.protocol)
       && (!envelope.requiredToolTypes.length || profile.toolCallSupport)
       && envelope.requiredToolTypes.every((toolType) => profile.supportedToolTypes?.includes(toolType))
-      && (envelope.webIntent !== "required" || profile.webSearchExecutionVerified === true)
+      && resolveWebEligibility(profile, envelope).eligible
       && (!envelope.containsThinking || profile.thinkingSupport)
       && effectiveContextCeiling(profile) >= estimateContextAdmission(envelope, this.expectedOutputTokens).requiredTotalContextTokens
       && this.options.adapters.has(profile.executionProfileId)
     )).sort((left, right) => {
+      const webPreference = compareWebPreference(left, right, envelope);
+      if (webPreference !== 0) return webPreference;
       const leftRate = left.economics
         ? left.economics.observedBillingMultiplier * (left.economics.rechargeCashCny ?? Number.POSITIVE_INFINITY)
           / (left.economics.creditsReceivedUsd ?? 1)
@@ -1818,7 +1833,8 @@ export class AlphaRequestProcessor {
         actualModelVerified: true,
         metadata: {
           webSearchRecentSuccessRate: (previousRate * 4) / 5,
-          webSearchFailureReason: "web_search_provider_error",
+          webSearchFailureReason: "web_search_protocol_incompatible",
+          webTransportStatus: "incompatible",
         },
       });
     }
@@ -1865,6 +1881,7 @@ export class AlphaRequestProcessor {
     const repository = new AlphaRepository(this.options.database);
     const attemptId = alphaId("att");
     const catalogModel = getAcuModel(input.profile.modelId);
+    const webEligibility = resolveWebEligibility(input.profile, input.envelope);
     await repository.createAttempt({
       attemptId,
       logicalRequestId: input.logicalRequestId,
@@ -1888,7 +1905,9 @@ export class AlphaRequestProcessor {
         webIntent: input.envelope.webIntent,
         webIntentSource: input.envelope.webIntentSource,
         providerRequestDeclaresWebTool: bodyDeclaresHostedWebTool(input.body),
-        webProfileVerified: input.profile.webSearchExecutionVerified === true,
+        webProfileVerified: webEligibility.transportStatus === "verified",
+        webTransportStatus: webEligibility.transportStatus,
+        webEligibilityConfidence: webEligibility.confidence,
       },
     });
     await repository.savePayload({
@@ -1912,7 +1931,9 @@ export class AlphaRequestProcessor {
         webIntent: input.envelope.webIntent,
         webIntentSource: input.envelope.webIntentSource,
         providerRequestDeclaresWebTool: bodyDeclaresHostedWebTool(input.body),
-        webProfileVerified: input.profile.webSearchExecutionVerified === true,
+        webProfileVerified: webEligibility.transportStatus === "verified",
+        webTransportStatus: webEligibility.transportStatus,
+        webEligibilityConfidence: webEligibility.confidence,
       },
     });
     if (input.attemptIndex > 1) {
@@ -2276,18 +2297,18 @@ export class AlphaRequestProcessor {
       && profile.protocols.includes(envelope.protocol)
       && (!envelope.requiredToolTypes.length || profile.toolCallSupport)
       && envelope.requiredToolTypes.every((toolType) => profile.supportedToolTypes?.includes(toolType))
-      && (envelope.webIntent !== "required" || profile.webSearchExecutionVerified === true)
+      && resolveWebEligibility(profile, envelope).eligible
       && (!envelope.containsThinking || profile.thinkingSupport)
       && effectiveContextCeiling(profile) >= recoveryContextAdmission.requiredTotalContextTokens
       && this.options.adapters.has(profile.executionProfileId)
-    ));
+    )).sort((left, right) => compareWebPreference(left, right, envelope));
     const hasUnattemptedRecovery = (current: ProviderAttemptHandle): boolean => recoveryPool.some((profile) => (
       !attemptedProfiles.has(profile.executionProfileId) && !attemptedChannels.has(profile.channelId ?? profile.channel)
     )) || this.endpoints(current.profile).some((item) => !attemptedEndpoints.has(item.endpoint));
     const adapter = createRecoveringProviderAdapter({
       initial: initialAttempt,
       maxAttempts: maxProviderAttempts,
-      isRecoverableResponse: (response) => isWebSearchProviderError(response, envelope.webIntent),
+      isRecoverableResponse: (response) => isWebSearchProviderError(response, envelope),
       hasRecoveryTarget: hasUnattemptedRecovery,
       firstModelEventDeadlineMs: () => firstModelEventDeadlineMs,
       selectRecoveryTarget: (() => {
@@ -2348,7 +2369,7 @@ export class AlphaRequestProcessor {
           response,
           error,
           latencyMs,
-          webFailure: Boolean(response && isWebSearchProviderError(response, envelope.webIntent)),
+          webFailure: Boolean(response && isExplicitWebCompatibilityFailure(response, envelope)),
         });
       },
       startRetry: async (profile, nextAttemptIndex, target) => {
@@ -2653,7 +2674,16 @@ export class AlphaRequestProcessor {
         web_intent_source: input.context.webIntentSource,
         web_actually_invoked: input.context.webActuallyInvoked,
         web_search_event_status: input.context.webSearchEventStatus,
-        web_profile_verified: input.context.selectedProfile.webSearchExecutionVerified === true,
+        web_profile_verified: resolveWebEligibility(input.context.selectedProfile, {
+          protocol: input.context.protocol,
+          webIntent: input.context.webIntent,
+          clientDeclaredWebTool: input.context.clientDeclaredWebTool,
+        }).transportStatus === "verified",
+        web_transport_status: resolveWebEligibility(input.context.selectedProfile, {
+          protocol: input.context.protocol,
+          webIntent: input.context.webIntent,
+          clientDeclaredWebTool: input.context.clientDeclaredWebTool,
+        }).transportStatus,
         web_fallback_chain: input.context.webFallbackChain,
         attempted_execution_profile_ids: input.context.attemptedExecutionProfileIds,
         attempted_channel_ids: input.context.attemptedChannelIds,
@@ -2789,10 +2819,12 @@ export class AlphaRequestProcessor {
       if (webSucceeded) {
         context.selectedProfile.webSearchLastVerifiedAt = new Date().toISOString();
         context.selectedProfile.webSearchFailureReason = undefined;
+        context.selectedProfile.webTransportStatus = "verified";
       } else {
         context.selectedProfile.webSearchFailureReason = relay.webSearch.actuallyInvoked
           ? "web_search_event_incomplete"
           : "web_search_not_invoked";
+        if (previousRate <= 0.8) context.selectedProfile.webTransportStatus = "incompatible";
       }
     }
     const transportSuccess = relay.httpStatus >= 200 && relay.httpStatus < 300 && relay.complete;
@@ -2861,7 +2893,8 @@ export class AlphaRequestProcessor {
         webSearchExecutionCompleted: relay.webSearch.executionCompleted,
         webSearchResultVerified: relay.webSearch.resultVerified,
         webSearchObservedLatencyMs: relay.webSearch.searchLatencyMs,
-        webProfileVerified: context.selectedProfile.webSearchExecutionVerified === true,
+        webProfileVerified: resolveWebEligibility(context.selectedProfile, trace.envelope).transportStatus === "verified",
+        webTransportStatus: resolveWebEligibility(context.selectedProfile, trace.envelope).transportStatus,
         webFallbackChain: context.webFallbackChain,
         webToolPruned: context.webToolPruned,
         webToolPruneReason: context.webToolPruneReason,
@@ -2905,6 +2938,7 @@ export class AlphaRequestProcessor {
           webSearchObservedLatencyMs: context.selectedProfile.webSearchObservedLatencyMs,
           webSearchLastVerifiedAt: context.selectedProfile.webSearchLastVerifiedAt,
           webSearchFailureReason: context.selectedProfile.webSearchFailureReason,
+          webTransportStatus: context.selectedProfile.webTransportStatus,
         },
       });
     }
@@ -2913,7 +2947,8 @@ export class AlphaRequestProcessor {
       webIntent: context.webIntent,
       webActuallyInvoked: context.webActuallyInvoked,
       webSearchEventStatus: context.webSearchEventStatus,
-      webProfileVerified: context.selectedProfile.webSearchExecutionVerified === true,
+      webProfileVerified: resolveWebEligibility(context.selectedProfile, trace.envelope).transportStatus === "verified",
+      webTransportStatus: resolveWebEligibility(context.selectedProfile, trace.envelope).transportStatus,
       webFallbackChain: context.webFallbackChain,
       webToolPruned: context.webToolPruned,
       webToolPruneReason: context.webToolPruneReason,

@@ -65,6 +65,7 @@ export type ProviderModelProfile = {
   webSearchObservedLatencyMs?: number | null;
   webSearchLastVerifiedAt?: string | null;
   webSearchFailureReason?: string | null;
+  webTransportStatus?: "verified" | "compatible_unverified" | "incompatible";
   activeInAcuAuto: boolean;
 };
 

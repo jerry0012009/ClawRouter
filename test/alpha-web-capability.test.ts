@@ -9,6 +9,7 @@ const requirements = {
   protocol: "responses" as const,
   webIntent: "required" as const,
   clientDeclaredWebTool: true,
+  hostedWebRequired: true,
 };
 
 const profile = {
@@ -82,6 +83,7 @@ describe("Alpha Web capability", () => {
       protocol: "messages",
       webIntent: "required",
       clientDeclaredWebTool: true,
+      hostedWebRequired: true,
     })).toMatchObject({
       eligible: true,
       confidence: "optimistic",

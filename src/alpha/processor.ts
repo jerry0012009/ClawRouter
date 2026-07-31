@@ -88,6 +88,7 @@ export type AlphaResolutionContext = {
   requestBytes: number;
   replayed: boolean;
   clientDeclaredWebTool: boolean;
+  hostedWebRequired: boolean;
   webIntent: CanonicalEnvelope["webIntent"];
   webIntentConfidence: number;
   webIntentReason: string;
@@ -866,6 +867,7 @@ export class AlphaRequestProcessor {
         expectedOutputTokens: this.expectedOutputTokens,
         allowedProfileIds: identity.allowedProfileIds.length > 0 ? identity.allowedProfileIds : undefined,
         clientDeclaredWebTool: envelope.clientDeclaredWebTool,
+        hostedWebRequired: envelope.hostedWebRequired,
         webIntent: envelope.webIntent,
         });
       } catch (error) {
@@ -988,9 +990,10 @@ export class AlphaRequestProcessor {
       && (identity.allowedProfileIds.length === 0 || identity.allowedProfileIds.includes(storedProfile.executionProfileId))
       ? storedProfile
       : undefined;
+    let reuseInvalidationReason: string | undefined;
     if (!state.decision.runJudge && reused && reused.health !== "cooldown") {
       const admission = await startAdmissionTrace(stringValue(storedSegment?.judge_evaluation_id));
-      let compatible: AlphaExecutionProfile;
+      let compatible: AlphaExecutionProfile | undefined;
       try {
         compatible = resolveExplicitProfile(reused.modelId, effectiveProfiles, {
         protocol: envelope.protocol,
@@ -1003,6 +1006,7 @@ export class AlphaRequestProcessor {
         allowedModelIds: identity.routingPolicy === "custom_allowlist" ? identity.allowedModelIds : undefined,
         allowedProfileIds: identity.allowedProfileIds.length > 0 ? identity.allowedProfileIds : undefined,
         clientDeclaredWebTool: envelope.clientDeclaredWebTool,
+        hostedWebRequired: envelope.hostedWebRequired,
         webIntent: envelope.webIntent,
         });
       } catch (error) {
@@ -1015,39 +1019,41 @@ export class AlphaRequestProcessor {
           exclusionCounts: typed?.details.exclusion_counts as Record<string, number> | undefined,
         });
         if (typed) typed.details.admission_trace_id = admission.admissionTraceId;
-        throw error;
+        reuseInvalidationReason = "profile_capability_changed";
       }
-      await repository.completeAdmissionTrace({
-        admissionTraceId: admission.admissionTraceId, status: "admitted",
-        maximumAvailableContextTokens: effectiveContextCeiling(compatible),
-        metadata: { selectedProfileId: compatible.executionProfileId, judgeReused: true },
-      });
-      if (!storedWebIntent) {
-        const legacyWebIntent = withWebIntentSource(classifyWebIntentFallback({
-          recentUserInputs: envelope.humanCandidates
-            .filter((candidate) => candidate.confidence === "high")
-            .map((candidate) => candidate.text),
-          rootGoalText: state.rootGoalText,
-        }), "legacy_heuristic");
-        applyWebIntent(envelope, legacyWebIntent);
-        await repository.updateSegmentMetadata(state.segmentId, identity.newapiUserId, {
-          ...storedSegmentMetadata,
-          ...webIntentMetadata(legacyWebIntent),
+      if (compatible) {
+        await repository.completeAdmissionTrace({
+          admissionTraceId: admission.admissionTraceId, status: "admitted",
+          maximumAvailableContextTokens: effectiveContextCeiling(compatible),
+          metadata: { selectedProfileId: compatible.executionProfileId, judgeReused: true },
         });
+        if (!storedWebIntent) {
+          const legacyWebIntent = withWebIntentSource(classifyWebIntentFallback({
+            recentUserInputs: envelope.humanCandidates
+              .filter((candidate) => candidate.confidence === "high")
+              .map((candidate) => candidate.text),
+            rootGoalText: state.rootGoalText,
+          }), "legacy_heuristic");
+          applyWebIntent(envelope, legacyWebIntent);
+          await repository.updateSegmentMetadata(state.segmentId, identity.newapiUserId, {
+            ...storedSegmentMetadata,
+            ...webIntentMetadata(legacyWebIntent),
+          });
+        }
+        await this.releaseUnusedProbeClaims(probeClaims, compatible);
+        return { profile: compatible, recoveryProfiles };
       }
-      await this.releaseUnusedProbeClaims(probeClaims, compatible);
-      return { profile: compatible, recoveryProfiles };
     }
 
     const reusedJudgeEvaluationId = stringValue(storedSegment?.judge_evaluation_id);
-    const routeRefreshReason = profilePolicyChanged
+    const routeRefreshReason = reuseInvalidationReason ?? (profilePolicyChanged
       ? "profile_policy_changed"
-      : !formulaVersionMatches ? "routing_formula_changed" : "profile_health";
+      : !formulaVersionMatches ? "routing_formula_changed" : "profile_health");
     const profileHealthRefresh = !state.decision.runJudge
       && Boolean(reusedJudgeEvaluationId)
       && Boolean(previousJudge)
       && Boolean(originalStoredProfile)
-      && (!reused || reused.health === "cooldown"
+      && (Boolean(reuseInvalidationReason) || !reused || reused.health === "cooldown"
         || originalStoredProfile?.health === "cooldown" || originalStoredProfile?.enabled === false);
     if (profileHealthRefresh && previousJudge && reusedJudgeEvaluationId) {
       applyWebIntent(envelope, previousJudge.webIntentDecision);
@@ -1075,6 +1081,7 @@ export class AlphaRequestProcessor {
               : identity.routingPolicy === "custom_allowlist" ? identity.allowedModelIds : [],
             allowedProfileIds: identity.allowedProfileIds.length > 0 ? identity.allowedProfileIds : undefined,
             clientDeclaredWebTool: envelope.clientDeclaredWebTool,
+            hostedWebRequired: envelope.hostedWebRequired,
             webIntent: envelope.webIntent,
           },
           routeDirection: state.decision.routeDirection,
@@ -1494,6 +1501,7 @@ export class AlphaRequestProcessor {
             : [],
         allowedProfileIds: identity.allowedProfileIds.length > 0 ? identity.allowedProfileIds : undefined,
         clientDeclaredWebTool: envelope.clientDeclaredWebTool,
+        hostedWebRequired: envelope.hostedWebRequired,
         webIntent: envelope.webIntent,
       },
       routeDirection: state.decision.routeDirection,
@@ -1633,6 +1641,7 @@ export class AlphaRequestProcessor {
         reasoningEffort: envelope.reasoningEffort,
         requiredToolTypes: envelope.requiredToolTypes,
         clientDeclaredWebTool: envelope.clientDeclaredWebTool,
+        hostedWebRequired: envelope.hostedWebRequired,
         ...webIntentMetadata(judge.webIntentDecision),
         decisionSnapshot: routeDecisionSnapshot,
       },
@@ -2001,6 +2010,7 @@ export class AlphaRequestProcessor {
         requestIdentityVersion: "trusted-request-instance-v1",
         reasoningEffort: envelope.reasoningEffort,
         clientDeclaredWebTool: envelope.clientDeclaredWebTool,
+        hostedWebRequired: envelope.hostedWebRequired,
         webIntent: envelope.webIntent,
         webIntentConfidence: envelope.webIntentConfidence,
         webIntentReason: envelope.webIntentReason,
@@ -2053,6 +2063,7 @@ export class AlphaRequestProcessor {
             requestBytes: ingress.rawBody.byteLength,
             replayed: true,
             clientDeclaredWebTool: envelope.clientDeclaredWebTool,
+            hostedWebRequired: envelope.hostedWebRequired,
             webIntent: envelope.webIntent,
             webIntentConfidence: envelope.webIntentConfidence,
             webIntentReason: envelope.webIntentReason,
@@ -2134,6 +2145,17 @@ export class AlphaRequestProcessor {
           identity,
           envelope,
           error,
+        });
+      } else {
+        await repository.updateLogicalRequestMetadata(logical.logicalRequestId, identity.newapiUserId, {
+          routingErrorType: error instanceof Error ? error.name : "UnknownError",
+          routingErrorMessage: error instanceof Error ? error.message : String(error),
+        });
+        await repository.completeLogicalRequest({
+          logicalRequestId: logical.logicalRequestId,
+          newapiUserId: identity.newapiUserId,
+          status: "failed",
+          errorCategory: "routing_failed",
         });
       }
       throw error;
@@ -2225,6 +2247,7 @@ export class AlphaRequestProcessor {
       requestBytes: ingress.rawBody.byteLength,
       replayed: false,
       clientDeclaredWebTool: envelope.clientDeclaredWebTool,
+      hostedWebRequired: envelope.hostedWebRequired,
       webIntent: envelope.webIntent,
       webIntentConfidence: envelope.webIntentConfidence,
       webIntentReason: envelope.webIntentReason,
@@ -2811,8 +2834,8 @@ export class AlphaRequestProcessor {
     const webSucceeded = relay.webSearch.actuallyInvoked
       && relay.webSearch.executionCompleted
       && relay.webSearch.resultVerified;
-    const webRequiredFailure = context.webIntent === "required" && !webSucceeded;
-    if (relay.webSearch.actuallyInvoked || webRequiredFailure) {
+    const webRequiredFailure = context.hostedWebRequired && !webSucceeded;
+    if (relay.webSearch.actuallyInvoked) {
       const previousRate = context.selectedProfile.webSearchRecentSuccessRate ?? 1;
       context.selectedProfile.webSearchRecentSuccessRate = (previousRate * 4 + (webSucceeded ? 1 : 0)) / 5;
       context.selectedProfile.webSearchObservedLatencyMs = relay.webSearch.searchLatencyMs;
@@ -2821,10 +2844,7 @@ export class AlphaRequestProcessor {
         context.selectedProfile.webSearchFailureReason = undefined;
         context.selectedProfile.webTransportStatus = "verified";
       } else {
-        context.selectedProfile.webSearchFailureReason = relay.webSearch.actuallyInvoked
-          ? "web_search_event_incomplete"
-          : "web_search_not_invoked";
-        if (previousRate <= 0.8) context.selectedProfile.webTransportStatus = "incompatible";
+        context.selectedProfile.webSearchFailureReason = "web_search_event_incomplete";
       }
     }
     const transportSuccess = relay.httpStatus >= 200 && relay.httpStatus < 300 && relay.complete;
@@ -2887,6 +2907,7 @@ export class AlphaRequestProcessor {
         complete: relay.complete,
         clientCancelled: relay.clientCancelled,
         clientDeclaredWebTool: context.clientDeclaredWebTool,
+        hostedWebRequired: context.hostedWebRequired,
         webIntent: context.webIntent,
         webActuallyInvoked: context.webActuallyInvoked,
         webSearchEventStatus: context.webSearchEventStatus,
@@ -2944,6 +2965,7 @@ export class AlphaRequestProcessor {
     }
     await repository.updateLogicalRequestMetadata(context.logicalRequestId, context.newapiUserId, {
       clientDeclaredWebTool: context.clientDeclaredWebTool,
+      hostedWebRequired: context.hostedWebRequired,
       webIntent: context.webIntent,
       webActuallyInvoked: context.webActuallyInvoked,
       webSearchEventStatus: context.webSearchEventStatus,

@@ -50,9 +50,20 @@ describe("Responses canonical envelope", () => {
       "computer_use",
     ]);
     expect(envelope.clientDeclaredWebTool).toBe(true);
+    expect(envelope.hostedWebRequired).toBe(false);
     expect(envelope.webIntentReason).toBe("Pending Routing Segment Judge evaluation.");
     expect(envelope.webIntentSource).toBeUndefined();
     expect(envelope.webActuallyInvoked).toBe(false);
+  });
+
+  it("requires hosted Web only when tool_choice explicitly selects it", () => {
+    const envelope = normalizeResponsesRequest({
+      model: "acu-auto",
+      input: "Search the web",
+      tools: [{ type: "web_search" }, { type: "function", name: "exec_command" }],
+      tool_choice: { type: "web_search" },
+    });
+    expect(envelope.hostedWebRequired).toBe(true);
   });
 
   it("does not classify current-information requests before the Routing Segment Judge", () => {
@@ -111,6 +122,7 @@ describe("Messages canonical envelope", () => {
       tools: [{ type: "web_search_20260318", name: "web_search" }],
     });
     expect(anthropic.clientDeclaredWebTool).toBe(true);
+    expect(anthropic.hostedWebRequired).toBe(false);
     expect(anthropic.requiredToolTypes).toEqual([]);
 
     const kimi = normalizeMessagesRequest({
@@ -120,6 +132,16 @@ describe("Messages canonical envelope", () => {
     });
     expect(kimi.clientDeclaredWebTool).toBe(true);
     expect(kimi.requiredToolTypes).toEqual(["function"]);
+  });
+
+  it("recognizes an explicitly selected Messages hosted Web tool", () => {
+    const envelope = normalizeMessagesRequest({
+      model: "acu-auto",
+      messages: [{ role: "user", content: "Search current news" }],
+      tools: [{ type: "web_search_20260318", name: "web_search" }, { name: "Read" }],
+      tool_choice: { type: "tool", name: "web_search" },
+    });
+    expect(envelope.hostedWebRequired).toBe(true);
   });
 
   it("separates tool_result from text in the same role=user content", () => {

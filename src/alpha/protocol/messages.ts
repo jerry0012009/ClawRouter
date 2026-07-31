@@ -23,6 +23,21 @@ function isHostedWebTool(value: unknown): boolean {
     || (type === "builtin_function" && name === "$web_search");
 }
 
+function hostedWebRequired(toolChoice: unknown, tools: unknown[]): boolean {
+  const choice = record(toolChoice);
+  if (!choice) return false;
+  const choiceType = String(choice.type ?? "").toLowerCase();
+  if (choiceType === "any") return tools.length > 0 && tools.every(isHostedWebTool);
+  if (isHostedWebTool(choice)) return true;
+  if (choiceType !== "tool") return false;
+  const selectedName = String(choice.name ?? "").toLowerCase();
+  return tools.some((tool) => {
+    const declared = record(tool);
+    return isHostedWebTool(tool)
+      && String(declared?.name ?? record(declared?.function)?.name ?? "web_search").toLowerCase() === selectedName;
+  });
+}
+
 function continuityMessage(value: unknown): unknown {
   const item = record(value);
   if (item?.role !== "system") return value;
@@ -124,6 +139,7 @@ export function normalizeMessagesRequest(
     tools,
     requiredToolTypes: tools.some((tool) => !isHostedWebTool(tool)) ? ["function"] : [],
     clientDeclaredWebTool,
+    hostedWebRequired: clientDeclaredWebTool && hostedWebRequired(raw.tool_choice, tools),
     webIntent: "likely",
     webIntentConfidence: 0,
     webIntentReason: "Pending Routing Segment Judge evaluation.",

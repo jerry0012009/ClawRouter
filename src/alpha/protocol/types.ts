@@ -50,6 +50,7 @@ export type CanonicalEnvelope = {
   tools: unknown[];
   requiredToolTypes: ToolCapability[];
   clientDeclaredWebTool: boolean;
+  hostedWebRequired: boolean;
   webIntent: WebIntent;
   webIntentConfidence: number;
   webIntentReason: string;

@@ -28,6 +28,15 @@ function isHostedWebTool(value: unknown): boolean {
   return type === "web_search" || type.startsWith("web_search_");
 }
 
+function hostedWebRequired(toolChoice: unknown, tools: unknown[]): boolean {
+  if (toolChoice === "required") return tools.length > 0 && tools.every(isHostedWebTool);
+  const choice = record(toolChoice);
+  if (!choice) return false;
+  return isHostedWebTool(choice)
+    || isHostedWebTool(choice.function)
+    || String(choice.name ?? "").toLowerCase().startsWith("web_search");
+}
+
 export function isCodexEnvironmentContextWrapper(text: string): boolean {
   const trimmed = text.trim();
   if (!/^<environment_context>[\s\S]*<\/environment_context>$/.test(trimmed)) return false;
@@ -94,6 +103,7 @@ export function normalizeResponsesRequest(body: unknown, headers: NativeRequestH
     tools,
     requiredToolTypes: requiredToolTypes(tools),
     clientDeclaredWebTool,
+    hostedWebRequired: clientDeclaredWebTool && hostedWebRequired(raw.tool_choice, tools),
     webIntent: "likely",
     webIntentConfidence: 0,
     webIntentReason: "Pending Routing Segment Judge evaluation.",

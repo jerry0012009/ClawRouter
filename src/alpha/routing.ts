@@ -94,6 +94,7 @@ export type AlphaRouteRequirements = {
   allowedProfileIds?: string[];
   expectedOutputTokens?: number;
   clientDeclaredWebTool?: boolean;
+  hostedWebRequired?: boolean;
   webIntent?: WebIntent;
 };
 
@@ -347,7 +348,7 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
         },
       );
     }
-    if (input.requirements.webIntent === "required" && input.requirements.clientDeclaredWebTool
+    if (input.requirements.hostedWebRequired
       && normalizedExclusionCounts.web > 0) {
       throw new AlphaAdmissionError("web_capability_unavailable", "No eligible Alpha execution profile can execute the declared hosted Web Search tool", 400, {
         exclusion_counts: normalizedExclusionCounts,

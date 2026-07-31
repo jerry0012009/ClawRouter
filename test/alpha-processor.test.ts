@@ -80,6 +80,10 @@ run("Alpha PostgreSQL request processor", () => {
   let judgeCalls = 0;
   let cancelledJudgeStarted: (() => void) | undefined;
   let releaseCancelledJudge: (() => void) | undefined;
+  let primaryProfile: AlphaExecutionProfile;
+  let recoveryProfile: AlphaExecutionProfile;
+  let crossProviderRecoveryProfile: AlphaExecutionProfile;
+  let alternateModelProfile: AlphaExecutionProfile;
   const upstreamBodies: Array<Record<string, unknown>> = [];
   const upstreamCaseCalls = new Map<string, number>();
 
@@ -102,7 +106,11 @@ run("Alpha PostgreSQL request processor", () => {
         response.statusCode = Number(requestBody.test_failure_status ?? 503);
         response.setHeader("content-type", "application/json");
         response.setHeader("x-request-id", `provider-${testCase}-failed-${testCaseCall}`);
-        response.end(JSON.stringify({ error: { type: "overloaded_error", message: "controlled test overload" } }));
+        response.end(JSON.stringify({
+          error: testCase === "web-retry-once"
+            ? { type: "invalid_request_error", message: "web search tool unsupported" }
+            : { type: "overloaded_error", message: "controlled test overload" },
+        }));
         return;
       }
       if (request.url?.startsWith("/v1/messages")) {
@@ -221,18 +229,27 @@ run("Alpha PostgreSQL request processor", () => {
       apiKey: "test-provider-key",
       authMode: "bearer",
     });
-    const recoveryProfile: AlphaExecutionProfile = {
+    recoveryProfile = {
       ...profile,
       executionProfileId: "test:gpt-5.4-mini:recovery",
       channel: "test-recovery-channel",
       provider: "lucen",
     };
     profile.provider = "lucen";
-    const crossProviderRecoveryProfile: AlphaExecutionProfile = {
+    crossProviderRecoveryProfile = {
       ...profile,
       executionProfileId: "test:gpt-5.4-mini:cross-provider-recovery",
       channel: "test-cross-provider-channel",
       provider: "blackai",
+    };
+    primaryProfile = profile;
+    alternateModelProfile = {
+      ...profile,
+      executionProfileId: "test:gpt-5.6-luna:alternate",
+      modelId: "gpt-5.6-luna",
+      channel: "test-alternate-model-channel",
+      provider: "blackai",
+      enabled: false,
     };
     const judgeRunner: AlphaJudgeRunner = {
       async run(input) {
@@ -294,11 +311,12 @@ run("Alpha PostgreSQL request processor", () => {
     };
     const processor = new AlphaRequestProcessor({
       database,
-      profiles: [profile, recoveryProfile, crossProviderRecoveryProfile],
+      profiles: [profile, recoveryProfile, crossProviderRecoveryProfile, alternateModelProfile],
       adapters: new Map([
         [profile.executionProfileId, adapter],
         [recoveryProfile.executionProfileId, adapter],
         [crossProviderRecoveryProfile.executionProfileId, adapter],
+        [alternateModelProfile.executionProfileId, adapter],
       ]),
       judgeRunner,
     });
@@ -470,13 +488,16 @@ run("Alpha PostgreSQL request processor", () => {
        FROM acu_route_decisions WHERE newapi_user_id='user-auto' LIMIT 1`,
     );
     expect(routeEvidence.rows[0]).toEqual({
-      configured_profiles: "3",
-      protocol_profiles: "3",
-      initial_models: "1",
+      configured_profiles: "4",
+      protocol_profiles: "4",
+      initial_models: "2",
       filtered_profiles: "3",
       filtered_models: "1",
       pareto_models: "1",
-      excluded_profiles: [],
+      excluded_profiles: [{
+        executionProfileId: "test:gpt-5.6-luna:alternate",
+        reasons: ["disabled"],
+      }],
       routing_preference: "balanced",
       routing_model_version: "acu-routing-model-v0.4",
     });
@@ -615,6 +636,95 @@ run("Alpha PostgreSQL request processor", () => {
       judge_intents: ["not_required", "required"],
       route_intents: ["not_required", "required"],
     });
+  });
+
+  it("keeps optional hosted Web non-invocation successful and capability-neutral", async () => {
+    const userId = "user-optional-web";
+    const initial = [{
+      type: "message", role: "user",
+      content: [{ type: "input_text", text: "Use web search to inspect this website" }],
+    }];
+    const beforeJudge = judgeCalls;
+    await send({ model: "acu-auto", input: initial, tools: [{ type: "web_search" }], stream: true }, "optional-web-1", userId);
+    await send({
+      model: "acu-auto",
+      input: [
+        ...initial,
+        { type: "function_call", call_id: "curl-site", name: "exec_command", arguments: "{\"cmd\":\"curl example.test\"}" },
+        { type: "function_call_output", call_id: "curl-site", output: "HTTP 200" },
+      ],
+      tools: [{ type: "web_search" }],
+      stream: true,
+    }, "optional-web-2", userId);
+    expect(judgeCalls).toBe(beforeJudge + 1);
+    const result = await database.query<{ logical_statuses: string[]; attempt_statuses: string[]; web_statuses: Array<string | null> }>(
+      `SELECT
+       (SELECT array_agg(status ORDER BY started_at) FROM acu_logical_requests WHERE newapi_user_id=$1) logical_statuses,
+       (SELECT array_agg(status ORDER BY started_at) FROM acu_attempts
+        WHERE logical_request_id IN (SELECT logical_request_id FROM acu_logical_requests WHERE newapi_user_id=$1)) attempt_statuses,
+       (SELECT array_agg(metadata_json->>'webTransportStatus' ORDER BY started_at) FROM acu_attempts
+        WHERE logical_request_id IN (SELECT logical_request_id FROM acu_logical_requests WHERE newapi_user_id=$1)) web_statuses`,
+      [userId],
+    );
+    expect(result.rows[0].logical_statuses).toEqual(["completed", "completed"]);
+    expect(result.rows[0].attempt_statuses).toEqual(["success", "success"]);
+    expect(result.rows[0].web_statuses).not.toContain("incompatible");
+  });
+
+  it("refreshes an acu-auto route with the cached Judge when its reused model loses a required capability", async () => {
+    const userId = "user-web-capability-refresh";
+    const initial = [{
+      type: "message", role: "user",
+      content: [{ type: "input_text", text: "Use web search for the current UTC date" }],
+    }];
+    const request = {
+      model: "acu-auto",
+      input: initial,
+      tools: [{ type: "web_search" }],
+      tool_choice: { type: "web_search" },
+      stream: true,
+      test_web_success: true,
+    };
+    const beforeJudge = judgeCalls;
+    await send(request, "web-capability-refresh-1", userId);
+    primaryProfile.webTransportStatus = "incompatible";
+    recoveryProfile.webTransportStatus = "incompatible";
+    crossProviderRecoveryProfile.webTransportStatus = "incompatible";
+    alternateModelProfile.enabled = true;
+    await database.query(
+      `UPDATE acu_provider_model_profile_health
+       SET metadata_json=jsonb_set(metadata_json,'{webTransportStatus}','"incompatible"'::jsonb,true)
+       WHERE canonical_model_id='gpt-5.4-mini'`,
+    );
+    try {
+      await send({
+        ...request,
+        input: [
+          ...initial,
+          { type: "function_call", call_id: "web-step", name: "exec_command", arguments: "{}" },
+          { type: "function_call_output", call_id: "web-step", output: "continue" },
+        ],
+      }, "web-capability-refresh-2", userId);
+    } finally {
+      primaryProfile.webTransportStatus = undefined;
+      recoveryProfile.webTransportStatus = undefined;
+      crossProviderRecoveryProfile.webTransportStatus = undefined;
+      alternateModelProfile.enabled = false;
+    }
+    expect(judgeCalls).toBe(beforeJudge + 1);
+    const result = await database.query<{ models: string[]; judge_evaluations: string[]; refresh_reason: string }>(
+      `SELECT
+       (SELECT array_agg(a.actual_model ORDER BY l.started_at) FROM acu_logical_requests l
+        JOIN acu_attempts a ON a.logical_request_id=l.logical_request_id WHERE l.newapi_user_id=$1) models,
+       (SELECT array_agg(DISTINCT s.judge_evaluation_id) FROM acu_logical_requests l
+        JOIN acu_segments s ON s.segment_id=l.segment_id WHERE l.newapi_user_id=$1) judge_evaluations,
+       (SELECT metadata_json->>'routeRefreshReason' FROM acu_admission_traces
+        WHERE newapi_user_id=$1 ORDER BY updated_at DESC LIMIT 1) refresh_reason`,
+      [userId],
+    );
+    expect(result.rows[0].models).toEqual(["gpt-5.4-mini", "gpt-5.6-luna"]);
+    expect(result.rows[0].judge_evaluations).toHaveLength(1);
+    expect(result.rows[0].refresh_reason).toBe("profile_capability_changed");
   });
 
   it("marks an old Segment without Web fields as legacy_heuristic without another Judge", async () => {

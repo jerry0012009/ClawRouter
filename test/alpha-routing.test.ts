@@ -196,6 +196,7 @@ describe("Alpha current-formula routing", () => {
         ...requirements,
         requireTools: false,
         clientDeclaredWebTool: true,
+        hostedWebRequired: true,
         webIntent: "required",
       },
     });
@@ -223,6 +224,7 @@ describe("Alpha current-formula routing", () => {
         ...requirements,
         requireTools: false,
         clientDeclaredWebTool: true,
+        hostedWebRequired: true,
         webIntent: "required",
       },
     });
@@ -247,6 +249,7 @@ describe("Alpha current-formula routing", () => {
         ...requirements,
         requireTools: false,
         clientDeclaredWebTool: true,
+        hostedWebRequired: true,
         webIntent: "required",
       },
     })).toThrowError(expect.objectContaining({

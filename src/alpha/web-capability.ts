@@ -18,6 +18,7 @@ type WebRequirements = {
   protocol: AlphaProtocol;
   webIntent?: WebIntent;
   clientDeclaredWebTool?: boolean;
+  hostedWebRequired?: boolean;
 };
 
 const MODEL_WEB_CAPABILITIES: Readonly<Record<string, ModelWebCapability>> = {
@@ -79,11 +80,16 @@ export function resolveWebEligibility(
   const modelCapability = modelWebCapability(profile.modelId);
   const transportStatus = webTransportStatus(profile);
 
-  // Client-side Web tools do not require Provider-hosted Web execution.
-  if (requirements.webIntent !== "required" || !requirements.clientDeclaredWebTool) {
+  if (!requirements.hostedWebRequired) {
+    const canPreferHostedWeb = requirements.webIntent === "required"
+      && requirements.clientDeclaredWebTool
+      && modelCapability === "supported"
+      && transportStatus !== "incompatible";
     return {
       eligible: true,
-      confidence: "not_applicable",
+      confidence: canPreferHostedWeb
+        ? transportStatus === "verified" ? "verified" : "optimistic"
+        : "not_applicable",
       modelCapability,
       transportStatus,
       reason: "hosted_web_execution_not_required",

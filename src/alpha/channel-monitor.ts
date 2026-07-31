@@ -1,4 +1,5 @@
 import type { ConfiguredExecutionProfile } from "./server.js";
+import { deriveRuntimeEligibility } from "./channel-health.js";
 
 export type MonitorRange = "1h" | "6h" | "24h" | "7d";
 
@@ -15,6 +16,12 @@ function stateOf(row: MonitorHealthRow): string {
   return String(row.circuit_state ?? "healthy");
 }
 
+function runtimeRecovered(profile: ConfiguredExecutionProfile, runtime: MonitorHealthRow): boolean {
+  return profile.autoRouteEnabled === false && runtime.usage_trusted === true
+    && Boolean(runtime.last_success_at)
+    && !["open", "half_open", "disabled"].includes(stateOf(runtime));
+}
+
 export function monitorRoutingStatus(
   profile: ConfiguredExecutionProfile,
   channel: MonitorHealthRow,
@@ -28,6 +35,7 @@ export function monitorRoutingStatus(
   | "administrator_blocked" {
   if (!profile.enabled || profile.health === "disabled" || stateOf(runtime) === "disabled")
     return "profile_disabled";
+  if (profile.autoRouteEnabled === false && !runtimeRecovered(profile, runtime)) return "profile_disabled";
   if (!profile.administratorAllowed) return "administrator_blocked";
   if (
     runtime.usage_trusted === false ||
@@ -45,11 +53,18 @@ export function combinedMonitorState(
   channel: MonitorHealthRow,
   runtime: MonitorHealthRow,
 ): string {
-  const states = [stateOf(channel), stateOf(runtime), profile.health];
-  for (const candidate of ["disabled", "open", "half_open", "degraded"]) {
-    if (states.includes(candidate)) return candidate;
+  const derived = deriveRuntimeEligibility({
+    profileState: stateOf(runtime) === "healthy" ? profile.health : stateOf(runtime),
+    channelState: stateOf(channel),
+    providerState: "healthy",
+    probeState: profile.requiresFreshProbe && !runtime.last_success_at ? "stale" : "fresh",
+    enabled: profile.enabled,
+    administratorAllowed: profile.administratorAllowed,
+  });
+  if (derived.effectiveState === "temporarily_unavailable") {
+    return [stateOf(channel), stateOf(runtime)].includes("half_open") ? "half_open" : "open";
   }
-  return "healthy";
+  return derived.effectiveState;
 }
 
 type DiscoveryChannel = {
@@ -83,11 +98,10 @@ export function mergeSupplyInventory(
   profiles: ConfiguredExecutionProfile[],
   preflightObservations: PreflightObservation[],
 ): Array<Record<string, unknown>> {
-  const activeProfiles = profiles.filter(
-    (profile) => profile.enabled && profile.administratorAllowed,
-  );
+  const allProfiles = profiles.filter((profile) => profile.enabled && profile.administratorAllowed);
+  const activeProfiles = allProfiles.filter((profile) => profile.autoRouteEnabled !== false);
   const profileByKey = new Map<string, ConfiguredExecutionProfile[]>();
-  for (const profile of activeProfiles) {
+  for (const profile of allProfiles) {
     for (const protocol of profile.protocols) {
       const key = inventoryKey(profile.channelId ?? profile.channel, profile.modelId, protocol);
       profileByKey.set(key, [...(profileByKey.get(key) ?? []), profile]);
@@ -108,10 +122,11 @@ export function mergeSupplyInventory(
     const channelId = String(channel.channelId ?? "");
     const key = inventoryKey(channelId, model, protocol);
     const matchingProfiles = profileByKey.get(key) ?? [];
+    const activeMatches = matchingProfiles.filter((profile) => profile.autoRouteEnabled !== false);
     const preflight = preflightByKey.get(key);
     const modelListVerified = channel.status === "success" && Number(channel.httpStatus) === 200;
     const rejected = preflight?.status === "failed";
-    const routingActive = matchingProfiles.length > 0 && !rejected;
+    const routingActive = activeMatches.length > 0 && !rejected;
     const rejectionReason = rejected
       ? preflight?.errorClass === "provider_http_503"
         ? "rejected_http_503"
@@ -130,7 +145,8 @@ export function mergeSupplyInventory(
       modelListVerified,
       protocolVerified: routingActive || preflight?.status === "passed",
       routingActive,
-      activeExecutionProfileIds: matchingProfiles.map((profile) => profile.executionProfileId),
+      activeExecutionProfileIds: activeMatches.map((profile) => profile.executionProfileId),
+      supplyExecutionProfileIds: matchingProfiles.map((profile) => profile.executionProfileId),
       rejectionReason,
       verificationState: routingActive ? "routing_active" : rejectionReason,
     });

@@ -18,7 +18,7 @@ async function profiles(): Promise<ConfiguredProfile[]> {
   const economics = JSON.parse(await readFile(
     new URL("../deploy/alpha/provider-economics.json", import.meta.url), "utf8",
   )) as ProviderEconomicsCatalog;
-  return (JSON.parse(text) as ConfiguredProfile[]).map((profile) => ({
+  return (JSON.parse(text) as ConfiguredProfile[]).filter((profile) => profile.autoRouteEnabled !== false).map((profile) => ({
     ...profile,
     economics: economics.providers.find((item) => item.providerId === profile.provider),
   }));

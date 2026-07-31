@@ -31,7 +31,7 @@ import {
   type ProviderAttemptHandle,
   type ProviderRecoveryTarget,
 } from "./execution.js";
-import { applyAttemptOutcome, classifyAttemptOutcome, type AttemptOutcome, type HealthSnapshot } from "./channel-health.js";
+import { applyAttemptOutcome, classifyAttemptOutcome, deriveRuntimeEligibility, type AttemptOutcome, type HealthSnapshot } from "./channel-health.js";
 import { estimateContextAdmission, effectiveContextCeiling } from "./context-admission.js";
 import {
   classifyWebIntentFallback,
@@ -356,19 +356,23 @@ export function prepareProviderBody(
   envelope: CanonicalEnvelope,
   profile: AlphaExecutionProfile,
   reasoningEffortOverride?: string,
-): { body: Buffer; webToolPruned: boolean; pruneReason?: string } {
+): { body: Buffer; webToolPruned: boolean; pruneReason?: string;
+  reasoningControlMode: AlphaExecutionProfile["reasoningControlMode"];
+  providerReasoningOverrideApplied: boolean } {
   const parsed = JSON.parse(Buffer.from(rawBody).toString("utf8")) as JsonObject;
   const next: JsonObject = { ...parsed, model };
-  if (reasoningEffortOverride === "high" && profile.thinkingSupport) {
+  let providerReasoningOverrideApplied = false;
+  if (reasoningEffortOverride === "high" && profile.thinkingSupport
+    && profile.reasoningControlMode === "standard_effort"
+    && profile.supportedReasoningEfforts?.includes("high")) {
     if (envelope.protocol === "responses") {
       const existing = record(parsed.reasoning) ?? {};
       next.reasoning = { ...existing, effort: "high" };
-    } else if (envelope.protocol === "messages") {
-      const existing = record(parsed.thinking) ?? {};
-      next.thinking = { type: "enabled", ...existing, budget_tokens: numberValue(existing.budget_tokens, 16_000) };
+      providerReasoningOverrideApplied = true;
     }
   }
-  return { body: Buffer.from(JSON.stringify(next)), webToolPruned: false };
+  return { body: Buffer.from(JSON.stringify(next)), webToolPruned: false,
+    reasoningControlMode: profile.reasoningControlMode ?? "none", providerReasoningOverrideApplied };
 }
 
 function responseContentType(headers: Record<string, string>): string {
@@ -434,20 +438,35 @@ export class AlphaRequestProcessor {
       const channelId = profile.channelId ?? profile.channel;
       const channel = channelHealth.get(channelId);
       const runtime = profileHealth.get(profile.executionProfileId);
-      const lastSuccessAt = runtime?.lastSuccessAt ?? channel?.lastSuccessAt;
+      const runtimeRecovered = profile.autoRouteEnabled === false
+        && runtime?.state !== "open"
+        && runtime?.state !== "half_open"
+        && runtime?.state !== "disabled"
+        && runtime?.usageTrusted === true
+        && runtime?.lastSuccessAt !== undefined;
+      const lastSuccessAt = profile.requiresFreshProbe ? runtime?.lastSuccessAt
+        : runtime?.lastSuccessAt ?? channel?.lastSuccessAt;
       const fresh = Boolean(lastSuccessAt && Date.now() - lastSuccessAt.getTime() <= 120 * 60_000);
       const staleFreshnessRequired = profile.requiresFreshProbe === true && !fresh;
+      const runtimeHealth = deriveRuntimeEligibility({
+        profileState: runtime?.state ?? profile.health,
+        channelState: channel?.state,
+        providerState: profile.economics?.health,
+        probeState: staleFreshnessRequired ? "stale" : "fresh",
+        enabled: profile.enabled,
+        administratorAllowed: profile.administratorAllowed,
+        cooldownUntil: runtime?.cooldownUntil ?? channel?.cooldownUntil,
+      });
       if ((!allowed || allowed.has(profile.executionProfileId)) && !probeCandidateId
         && (staleFreshnessRequired || channel?.state === "open" || channel?.state === "half_open"
         || runtime?.state === "open" || runtime?.state === "half_open")) probeCandidateId = profile.executionProfileId;
-      const unavailable = channel?.state === "disabled" || runtime?.state === "disabled"
-        || channel?.state === "open" || channel?.state === "half_open"
-        || runtime?.state === "open" || runtime?.state === "half_open";
-      const degraded = staleFreshnessRequired
-        || [channel?.state, runtime?.state].some((state) => state === "degraded");
       return {
         ...profile,
-        health: unavailable ? "cooldown" as const : degraded ? "degraded" as const : profile.health,
+        autoRouteEnabled: profile.autoRouteEnabled !== false || runtimeRecovered,
+        runtimeHealth,
+        health: runtimeHealth.effectiveState === "temporarily_unavailable" ? "cooldown" as const
+          : runtimeHealth.effectiveState === "disabled" ? "disabled" as const
+            : runtimeHealth.effectiveState === "degraded" ? "degraded" as const : "healthy" as const,
         usageTrusted: runtime?.usageTrusted ?? profile.usageTrusted,
         recentSuccessRate: Math.min(channel?.recentSuccessRate ?? 1, runtime?.recentSuccessRate ?? 1),
         observedLatencyMs: runtime?.totalLatencyMs ?? channel?.totalLatencyMs ?? profile.observedLatencyMs,
@@ -1153,6 +1172,8 @@ export class AlphaRequestProcessor {
           providerCandidateEstimates: route.providerCandidateEstimates,
           excludedProfiles: route.excludedProfiles,
           eligibleProfileIds: route.eligibleProfileIds,
+          profileEvaluations: route.profileEvaluations,
+          modelAvailability: route.modelAvailability,
           costUnit: "CNY",
           ...webIntentMetadata(previousJudge.webIntentDecision),
         },
@@ -1588,8 +1609,11 @@ export class AlphaRequestProcessor {
         executionProfileId: profile.executionProfileId,
         exclusionReason: exclusionCategory(profile.reasons[0] ?? "adapter"),
         exclusionDetail: profile.reasons[0] ?? "adapter",
+        reasons: profile.reasons,
       })),
       eligibleProfileIds: route.eligibleProfileIds,
+      profileEvaluations: route.profileEvaluations,
+      modelAvailability: route.modelAvailability,
       selectedModel: route.selectedProfile.modelId,
       selectedChannel: route.selectedProfile.channelId ?? route.selectedProfile.channel,
       modelSelectionReason: route.recommendation.reason,
@@ -1645,6 +1669,8 @@ export class AlphaRequestProcessor {
         paretoFrontierCandidateCount: route.paretoFrontier.length,
         excludedProfiles: route.excludedProfiles,
         eligibleProfileIds: route.eligibleProfileIds,
+        profileEvaluations: route.profileEvaluations,
+        modelAvailability: route.modelAvailability,
         costUnit: "CNY",
         providerSelectionReason: route.providerSelectionReason,
         providerCandidateEstimates: route.providerCandidateEstimates,
@@ -1893,6 +1919,8 @@ export class AlphaRequestProcessor {
     networkEndpointIndex?: number;
     routeDecisionId?: string;
     judgeEvaluationId?: string;
+    providerReasoningOverrideApplied?: boolean;
+    reasoningControlMode?: AlphaExecutionProfile["reasoningControlMode"];
   }): Promise<ProviderAttemptHandle> {
     const endpointIndex = input.networkEndpointIndex ?? 0;
     const endpoint = this.endpoints(input.profile)[endpointIndex];
@@ -1927,6 +1955,12 @@ export class AlphaRequestProcessor {
         webProfileVerified: webEligibility.transportStatus === "verified",
         webTransportStatus: webEligibility.transportStatus,
         webEligibilityConfidence: webEligibility.confidence,
+        clientRequestedReasoningEffort: input.envelope.reasoningEffort,
+        effectiveReasoningEffort: input.state.effectiveReasoningEffort,
+        reasoningOverrideReason: input.state.effectiveReasoningEffort === "high"
+          && input.envelope.reasoningEffort !== "high" ? "plan_active" : undefined,
+        reasoningControlMode: input.reasoningControlMode ?? input.profile.reasoningControlMode ?? "none",
+        providerReasoningOverrideApplied: input.providerReasoningOverrideApplied === true,
       },
     });
     await repository.savePayload({
@@ -1953,6 +1987,12 @@ export class AlphaRequestProcessor {
         webProfileVerified: webEligibility.transportStatus === "verified",
         webTransportStatus: webEligibility.transportStatus,
         webEligibilityConfidence: webEligibility.confidence,
+        clientRequestedReasoningEffort: input.envelope.reasoningEffort,
+        effectiveReasoningEffort: input.state.effectiveReasoningEffort,
+        reasoningOverrideReason: input.state.effectiveReasoningEffort === "high"
+          && input.envelope.reasoningEffort !== "high" ? "plan_active" : undefined,
+        reasoningControlMode: input.reasoningControlMode ?? input.profile.reasoningControlMode ?? "none",
+        providerReasoningOverrideApplied: input.providerReasoningOverrideApplied === true,
       },
     });
     if (input.attemptIndex > 1) {
@@ -2226,6 +2266,8 @@ export class AlphaRequestProcessor {
       body: providerBody,
       routeDecisionId,
       judgeEvaluationId,
+      providerReasoningOverrideApplied: prepared.providerReasoningOverrideApplied,
+      reasoningControlMode: prepared.reasoningControlMode,
     });
     const judgeCashCostCny = result.judge?.costCny ?? "0.0000000000";
     const resolutionContext: AlphaResolutionContext = {
@@ -2428,6 +2470,8 @@ export class AlphaRequestProcessor {
           networkEndpointIndex: target?.networkEndpointIndex,
           routeDecisionId,
           judgeEvaluationId,
+          providerReasoningOverrideApplied: retryPrepared.providerReasoningOverrideApplied,
+          reasoningControlMode: retryPrepared.reasoningControlMode,
         });
         resolutionContext.attemptId = next.attemptId;
         resolutionContext.attemptIndex = next.attemptIndex;

@@ -38,7 +38,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
-      "contextLastVerifiedAt": "2026-07-31T06:51:09.293Z"
+      "contextLastVerifiedAt": "2026-07-31T06:51:09.293Z",
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "blackai-codex-mix-low:gpt-5.5:responses",
@@ -74,7 +79,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.293Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "blackai-codex-mix-low:gpt-5.6-luna:responses",
@@ -115,7 +125,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.293Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "blackai-codex-mix-low:gpt-5.6-sol:responses",
@@ -156,7 +171,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.293Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "blackai-codex-mix-low:gpt-5.6-terra:responses",
@@ -197,7 +217,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.293Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "blackai-pro-1-4:gpt-5.4-mini:responses",
@@ -224,7 +249,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "unverified_long_context",
       "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "tool_result_no_message"
     },
     {
       "executionProfileId": "blackai-pro-1-4:gpt-5.5:responses",
@@ -260,7 +290,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.293Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "blackai-pro-1-4:gpt-5.6-luna:responses",
@@ -296,7 +331,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.293Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "blackai-pro-1-4:gpt-5.6-sol:responses",
@@ -332,7 +372,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.293Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "blackai-pro-1-4:gpt-5.6-terra:responses",
@@ -359,7 +404,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "unverified_long_context",
       "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "tool_result_no_message"
     },
     {
       "executionProfileId": "blackai-claude-reverse:claude-opus-4-8:messages",
@@ -393,7 +443,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.293Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "invalid_sse_content_type"
     },
     {
       "executionProfileId": "blackai-claude-reverse:claude-sonnet-5:messages",
@@ -427,7 +482,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.293Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "invalid_sse_content_type"
     },
     {
       "executionProfileId": "blackai-codex-mix-pro-fallback:gpt-5.4-mini:responses",
@@ -465,7 +525,12 @@
       "contextLastVerifiedAt": "2026-07-31T06:51:09.293Z",
       "actualModelAliases": [
         "gpt-5.4-mini-2026-03-17"
-      ]
+      ],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "blackai-codex-mix-pro-fallback:gpt-5.5:responses",
@@ -501,7 +566,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.293Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "blackai-codex-mix-pro-fallback:gpt-5.6-luna:responses",
@@ -537,7 +607,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.293Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "blackai-codex-mix-pro-fallback:gpt-5.6-sol:responses",
@@ -573,7 +648,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.293Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "blackai-codex-mix-pro-fallback:gpt-5.6-terra:responses",
@@ -609,7 +689,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.293Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "lucen-cn-models-k3-015:glm-5.2:responses",
@@ -636,7 +721,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "provider_capped",
       "contextCapabilitySource": "legacy_profile_declared_hard_cap",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "timeout"
     },
     {
       "executionProfileId": "lucen-claude-clone-020:claude-opus-4-8:messages",
@@ -663,7 +753,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "provider_capped",
       "contextCapabilitySource": "legacy_profile_declared_hard_cap",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "invalid_sse_content_type"
     },
     {
       "executionProfileId": "lucen-claude-clone-020:claude-sonnet-5:messages",
@@ -690,7 +785,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "provider_capped",
       "contextCapabilitySource": "legacy_profile_declared_hard_cap",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "invalid_sse_content_type"
     },
     {
       "executionProfileId": "lucen-claude-cursor-reverse-030:claude-opus-4-8:messages",
@@ -717,7 +817,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "provider_capped",
       "contextCapabilitySource": "legacy_profile_declared_hard_cap",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "invalid_sse_content_type"
     },
     {
       "executionProfileId": "lucen-claude-cursor-reverse-030:claude-sonnet-5:messages",
@@ -744,7 +849,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "provider_capped",
       "contextCapabilitySource": "legacy_profile_declared_hard_cap",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "invalid_sse_content_type"
     },
     {
       "executionProfileId": "lucen-cx003-low:gpt-5.5:responses",
@@ -771,7 +881,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "unverified_long_context",
       "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "provider_http_502"
     },
     {
       "executionProfileId": "lucen-cx003-low:gpt-5.6-luna:responses",
@@ -798,7 +913,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "unverified_long_context",
       "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "provider_http_502"
     },
     {
       "executionProfileId": "lucen-cx003-low:gpt-5.6-sol:responses",
@@ -825,7 +945,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "unverified_long_context",
       "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "provider_http_502"
     },
     {
       "executionProfileId": "lucen-cx003-low:gpt-5.6-terra:responses",
@@ -852,7 +977,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "unverified_long_context",
       "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "provider_http_502"
     },
     {
       "executionProfileId": "lucen-cx004-low-dedicated:gpt-5.4-mini:responses",
@@ -879,7 +1009,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "unverified_long_context",
       "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "provider_http_503"
     },
     {
       "executionProfileId": "lucen-cx004-low-dedicated:gpt-5.5:responses",
@@ -906,7 +1041,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "unverified_long_context",
       "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "provider_http_502"
     },
     {
       "executionProfileId": "lucen-cx004-low-dedicated:gpt-5.6-luna:responses",
@@ -933,7 +1073,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "unverified_long_context",
       "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "provider_http_503"
     },
     {
       "executionProfileId": "lucen-cx004-low-dedicated:gpt-5.6-sol:responses",
@@ -960,7 +1105,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "unverified_long_context",
       "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "provider_http_502"
     },
     {
       "executionProfileId": "lucen-cx004-low-dedicated:gpt-5.6-terra:responses",
@@ -987,7 +1137,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "unverified_long_context",
       "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "provider_http_502"
     },
     {
       "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.4-mini:responses",
@@ -1033,7 +1188,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
-      "contextLastVerifiedAt": "2026-07-31T06:51:09.293Z"
+      "contextLastVerifiedAt": "2026-07-31T06:51:09.293Z",
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.5:responses",
@@ -1069,7 +1229,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.293Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.6-luna:responses",
@@ -1112,7 +1277,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "founder_supplied_provider_usage_record",
-      "contextLastVerifiedAt": "2026-07-30T00:00:00.000Z"
+      "contextLastVerifiedAt": "2026-07-30T00:00:00.000Z",
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "timeout"
     },
     {
       "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.6-sol:responses",
@@ -1139,7 +1309,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "unverified_long_context",
       "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "timeout"
     },
     {
       "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.6-terra:responses",
@@ -1182,7 +1357,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "unverified_long_context",
       "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "timeout"
     },
     {
       "executionProfileId": "lucen-cx006-plus:gpt-5.4-mini:responses",
@@ -1220,7 +1400,12 @@
       "contextLastVerifiedAt": "2026-07-31T06:51:09.293Z",
       "actualModelAliases": [
         "gpt-5.4-mini-2026-03-17"
-      ]
+      ],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "lucen-cx006-plus:gpt-5.5:responses",
@@ -1256,7 +1441,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.293Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "lucen-cx006-plus:gpt-5.6-luna:responses",
@@ -1292,7 +1482,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.293Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "lucen-cx006-plus:gpt-5.6-sol:responses",
@@ -1328,7 +1523,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "lucen-cx006-plus:gpt-5.6-terra:responses",
@@ -1355,7 +1555,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "unverified_long_context",
       "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "tool_result_no_message"
     },
     {
       "executionProfileId": "lucen-cx008-plus-dedicated:gpt-5.4-mini:responses",
@@ -1382,7 +1587,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "unverified_long_context",
       "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "timeout"
     },
     {
       "executionProfileId": "lucen-cx008-plus-dedicated:gpt-5.5:responses",
@@ -1409,7 +1619,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "unverified_long_context",
       "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "timeout"
     },
     {
       "executionProfileId": "lucen-cx008-plus-dedicated:gpt-5.6-luna:responses",
@@ -1444,7 +1659,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "unverified_long_context",
       "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "timeout"
     },
     {
       "executionProfileId": "lucen-cx008-plus-dedicated:gpt-5.6-sol:responses",
@@ -1480,7 +1700,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "lucen-cx008-plus-dedicated:gpt-5.6-terra:responses",
@@ -1507,7 +1732,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "unverified_long_context",
       "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "timeout"
     },
     {
       "executionProfileId": "lucen-cx010-plus-fast:gpt-5.4-mini:responses",
@@ -1545,7 +1775,12 @@
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
       "actualModelAliases": [
         "gpt-5.4-mini-2026-03-17"
-      ]
+      ],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "lucen-cx010-plus-fast:gpt-5.5:responses",
@@ -1581,7 +1816,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "lucen-cx010-plus-fast:gpt-5.6-luna:responses",
@@ -1617,7 +1857,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "lucen-cx010-plus-fast:gpt-5.6-sol:responses",
@@ -1653,7 +1898,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "lucen-cx010-plus-fast:gpt-5.6-terra:responses",
@@ -1680,7 +1930,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "unverified_long_context",
       "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "timeout"
     },
     {
       "executionProfileId": "lucen-cx012-pro:gpt-5.4-mini:responses",
@@ -1707,7 +1962,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "unverified_long_context",
       "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "timeout"
     },
     {
       "executionProfileId": "lucen-cx012-pro:gpt-5.5:responses",
@@ -1734,7 +1994,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "unverified_long_context",
       "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "timeout"
     },
     {
       "executionProfileId": "lucen-cx012-pro:gpt-5.6-luna:responses",
@@ -1761,7 +2026,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "unverified_long_context",
       "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "timeout"
     },
     {
       "executionProfileId": "lucen-cx012-pro:gpt-5.6-sol:responses",
@@ -1788,7 +2058,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "unverified_long_context",
       "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "timeout"
     },
     {
       "executionProfileId": "lucen-cx012-pro:gpt-5.6-terra:responses",
@@ -1815,7 +2090,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "unverified_long_context",
       "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "timeout"
     },
     {
       "executionProfileId": "lucen-cx014-pro-stable:gpt-5.4-mini:responses",
@@ -1853,7 +2133,12 @@
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
       "actualModelAliases": [
         "gpt-5.4-mini-2026-03-17"
-      ]
+      ],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "lucen-cx014-pro-stable:gpt-5.5:responses",
@@ -1889,7 +2174,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "lucen-cx014-pro-stable:gpt-5.6-luna:responses",
@@ -1925,7 +2215,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "lucen-cx014-pro-stable:gpt-5.6-sol:responses",
@@ -1961,7 +2256,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "lucen-cx014-pro-stable:gpt-5.6-terra:responses",
@@ -1988,7 +2288,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "unverified_long_context",
       "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "tool_result_no_message"
     },
     {
       "executionProfileId": "lucen-cx017-pro-first-token:gpt-5.4-mini:responses",
@@ -2026,7 +2331,12 @@
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
       "actualModelAliases": [
         "gpt-5.4-mini-2026-03-17"
-      ]
+      ],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "lucen-cx017-pro-first-token:gpt-5.5:responses",
@@ -2062,7 +2372,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "lucen-cx017-pro-first-token:gpt-5.6-luna:responses",
@@ -2098,7 +2413,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "lucen-cx017-pro-first-token:gpt-5.6-sol:responses",
@@ -2134,7 +2454,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "lucen-cx017-pro-first-token:gpt-5.6-terra:responses",
@@ -2170,7 +2495,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "lucen-cx025-pro-premium:gpt-5.4-mini:responses",
@@ -2208,7 +2538,12 @@
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
       "actualModelAliases": [
         "gpt-5.4-mini-2026-03-17"
-      ]
+      ],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "lucen-cx025-pro-premium:gpt-5.5:responses",
@@ -2244,7 +2579,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "lucen-cx025-pro-premium:gpt-5.6-luna:responses",
@@ -2280,7 +2620,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "lucen-cx025-pro-premium:gpt-5.6-sol:responses",
@@ -2316,7 +2661,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "lucen-cx025-pro-premium:gpt-5.6-terra:responses",
@@ -2352,7 +2702,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "lucen-claude-aws-reverse-040:claude-opus-4-8:messages",
@@ -2379,7 +2734,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "provider_capped",
       "contextCapabilitySource": "legacy_profile_declared_hard_cap",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "invalid_sse_content_type"
     },
     {
       "executionProfileId": "lucen-claude-max-090:claude-opus-4-8:messages",
@@ -2406,7 +2766,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "provider_capped",
       "contextCapabilitySource": "legacy_profile_declared_hard_cap",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "invalid_sse_content_type"
     },
     {
       "executionProfileId": "lucen-claude-max-090:claude-sonnet-5:messages",
@@ -2433,7 +2798,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "provider_capped",
       "contextCapabilitySource": "legacy_profile_declared_hard_cap",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "invalid_sse_content_type"
     },
     {
       "executionProfileId": "lucen-claude-antigravity-reverse-040:claude-opus-4-8:messages",
@@ -2460,7 +2830,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "provider_capped",
       "contextCapabilitySource": "legacy_profile_declared_hard_cap",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "invalid_sse_content_type"
     },
     {
       "executionProfileId": "lucen-gemini-openai-030:gemini-2.5-flash:responses",
@@ -2496,7 +2871,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "lucen-gemini-openai-030:gemini-3.5-flash:responses",
@@ -2523,7 +2903,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "provider_capped",
       "contextCapabilitySource": "legacy_profile_declared_hard_cap",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "rejected",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "actual_model_mismatch:gemini-3-flash-agent,gemini-3-flash-agent"
     },
     {
       "executionProfileId": "lucen-mainstream-cn-claude-030:claude-opus-4-8:messages",
@@ -2557,7 +2942,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "invalid_sse_content_type"
     },
     {
       "executionProfileId": "lucen-mainstream-cn-claude-030:deepseek-v4-flash:messages",
@@ -2584,7 +2974,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "provider_capped",
       "contextCapabilitySource": "legacy_profile_declared_hard_cap",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "invalid_sse_content_type"
     },
     {
       "executionProfileId": "lucen-mainstream-cn-claude-030:deepseek-v4-pro:messages",
@@ -2611,7 +3006,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "provider_capped",
       "contextCapabilitySource": "legacy_profile_declared_hard_cap",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "invalid_sse_content_type"
     },
     {
       "executionProfileId": "lucen-mainstream-cn-claude-030:glm-5.1:messages",
@@ -2638,7 +3038,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "provider_capped",
       "contextCapabilitySource": "legacy_profile_declared_hard_cap",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "invalid_sse_content_type"
     },
     {
       "executionProfileId": "lucen-mainstream-cn-claude-030:glm-5.2:messages",
@@ -2672,7 +3077,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "invalid_sse_content_type"
     },
     {
       "executionProfileId": "lucen-mainstream-cn-claude-030:kimi-k2.6:messages",
@@ -2706,7 +3116,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "invalid_sse_content_type"
     },
     {
       "executionProfileId": "lucen-mainstream-cn-claude-030:kimi-k2.7-code:messages",
@@ -2740,7 +3155,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "invalid_sse_content_type"
     },
     {
       "executionProfileId": "lucen-kiro-cache-claude-015:claude-opus-4-8:messages",
@@ -2774,7 +3194,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "invalid_sse_content_type"
     },
     {
       "executionProfileId": "lucen-kiro-cache-claude-015:claude-sonnet-5:messages",
@@ -2808,7 +3233,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "invalid_sse_content_type"
     },
     {
       "executionProfileId": "lucen-glm-official-claude-030:claude-opus-4-8:messages",
@@ -2842,7 +3272,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "invalid_sse_content_type"
     },
     {
       "executionProfileId": "lucen-glm-official-claude-030:glm-5.1:messages",
@@ -2869,7 +3304,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "provider_capped",
       "contextCapabilitySource": "legacy_profile_declared_hard_cap",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "invalid_sse_content_type"
     },
     {
       "executionProfileId": "lucen-glm-official-claude-030:glm-5.2:messages",
@@ -2903,7 +3343,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "invalid_sse_content_type"
     },
     {
       "executionProfileId": "lucen-glm-official-openai-030:glm-5.1:responses",
@@ -2939,7 +3384,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "lucen-glm-official-openai-030:glm-5.2:responses",
@@ -2975,7 +3425,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "lucen-glm-official-openai-030:gpt-5.5:responses",
@@ -3011,7 +3466,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "passed",
+      "consecutiveProbeFailures": 0,
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "lucen-qwen-official-claude-010:qwen3.7-max:messages",
@@ -3038,7 +3498,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "provider_capped",
       "contextCapabilitySource": "legacy_profile_declared_hard_cap",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "invalid_sse_content_type"
     },
     {
       "executionProfileId": "lucen-qwen-official-openai-010:qwen3.7-max:responses",
@@ -3065,7 +3530,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "provider_capped",
       "contextCapabilitySource": "legacy_profile_declared_hard_cap",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "provider_http_502"
     },
     {
       "executionProfileId": "lucen-grok-006:claude-opus-4-8:responses",
@@ -3092,7 +3562,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "provider_capped",
       "contextCapabilitySource": "legacy_profile_declared_hard_cap",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "provider_http_503"
     },
     {
       "executionProfileId": "lucen-grok-006:claude-sonnet-5:responses",
@@ -3119,7 +3594,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "provider_capped",
       "contextCapabilitySource": "legacy_profile_declared_hard_cap",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "provider_http_503"
     },
     {
       "executionProfileId": "lucen-deepseek-openai-050:deepseek-v4-flash:responses",
@@ -3146,7 +3626,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "provider_capped",
       "contextCapabilitySource": "legacy_profile_declared_hard_cap",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "provider_http_502"
     },
     {
       "executionProfileId": "lucen-deepseek-openai-050:deepseek-v4-pro:responses",
@@ -3173,7 +3658,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "provider_capped",
       "contextCapabilitySource": "legacy_profile_declared_hard_cap",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "provider_http_502"
     },
     {
       "executionProfileId": "lucen-deepseek-openai-050:glm-5.1:responses",
@@ -3200,7 +3690,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "provider_capped",
       "contextCapabilitySource": "legacy_profile_declared_hard_cap",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "provider_http_502"
     },
     {
       "executionProfileId": "lucen-deepseek-openai-050:glm-5.2:responses",
@@ -3227,7 +3722,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "provider_capped",
       "contextCapabilitySource": "legacy_profile_declared_hard_cap",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "provider_http_502"
     },
     {
       "executionProfileId": "lucen-deepseek-openai-050:kimi-k2.6:responses",
@@ -3254,7 +3754,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "provider_capped",
       "contextCapabilitySource": "legacy_profile_declared_hard_cap",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "provider_http_502"
     },
     {
       "executionProfileId": "lucen-deepseek-openai-050:kimi-k2.7-code:responses",
@@ -3281,7 +3786,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "provider_capped",
       "contextCapabilitySource": "legacy_profile_declared_hard_cap",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "provider_http_502"
     },
     {
       "executionProfileId": "lucen-deepseek-openai-050:qwen3.6-plus:responses",
@@ -3308,7 +3818,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "provider_capped",
       "contextCapabilitySource": "legacy_profile_declared_hard_cap",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "provider_http_502"
     },
     {
       "executionProfileId": "lucen-deepseek-openai-050:qwen3.7-max:responses",
@@ -3335,7 +3850,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "provider_capped",
       "contextCapabilitySource": "legacy_profile_declared_hard_cap",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "provider_http_502"
     },
     {
       "executionProfileId": "lucen-deepseek-claude-050:deepseek-v4-flash:messages",
@@ -3369,7 +3889,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "invalid_sse_content_type"
     },
     {
       "executionProfileId": "lucen-deepseek-claude-050:deepseek-v4-pro:messages",
@@ -3396,7 +3921,12 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "provider_capped",
       "contextCapabilitySource": "legacy_profile_declared_hard_cap",
-      "contextLastVerifiedAt": null
+      "contextLastVerifiedAt": null,
+      "status": "temporarily_unavailable",
+      "activeInRouting": false,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "invalid_sse_content_type"
     },
     {
       "executionProfileId": "lucen-kiro-cache90-claude-006:claude-opus-4-8:messages",
@@ -3430,7 +3960,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "invalid_sse_content_type"
     },
     {
       "executionProfileId": "lucen-kiro-cache90-claude-006:claude-sonnet-5:messages",
@@ -3464,7 +3999,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "invalid_sse_content_type"
     },
     {
       "executionProfileId": "lucen-kiro-cache70-claude-006:claude-opus-4-8:messages",
@@ -3498,7 +4038,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "invalid_sse_content_type"
     },
     {
       "executionProfileId": "lucen-kiro-cache70-claude-006:claude-sonnet-5:messages",
@@ -3532,7 +4077,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "invalid_sse_content_type"
     },
     {
       "executionProfileId": "lucen-claude-max-unlimited-100:claude-opus-4-8:messages",
@@ -3566,7 +4116,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "invalid_sse_content_type"
     },
     {
       "executionProfileId": "lucen-claude-max-unlimited-100:claude-sonnet-5:messages",
@@ -3600,7 +4155,12 @@
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "full_pool_native_tool_sse_usage_preflight",
       "contextLastVerifiedAt": "2026-07-31T06:51:09.294Z",
-      "actualModelAliases": []
+      "actualModelAliases": [],
+      "status": "active",
+      "activeInRouting": true,
+      "lastProbeStatus": "failed",
+      "consecutiveProbeFailures": 1,
+      "statusReason": "invalid_sse_content_type"
     },
     {
       "executionProfileId": "lucen-kiro-cache70-claude-006:claude-fable-5:messages",
@@ -3634,7 +4194,11 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "targeted_native_tool_sse_usage_preflight",
-      "contextLastVerifiedAt": "2026-07-31T10:50:00.000Z"
+      "contextLastVerifiedAt": "2026-07-31T10:50:00.000Z",
+      "status": "active",
+      "activeInRouting": true,
+      "consecutiveProbeFailures": 0,
+      "statusReason": "targeted_native_tool_sse_usage_preflight_passed"
     },
     {
       "executionProfileId": "lucen-kimi-k3-openai-040:kimi-k3:responses",
@@ -3670,7 +4234,11 @@
       "providerHardContextCap": null,
       "contextCapabilityStatus": "observed_floor",
       "contextCapabilitySource": "official_kimi_k3_spec_and_live_59482_token_preflight",
-      "contextLastVerifiedAt": "2026-07-31T10:50:00.000Z"
+      "contextLastVerifiedAt": "2026-07-31T10:50:00.000Z",
+      "status": "active",
+      "activeInRouting": true,
+      "consecutiveProbeFailures": 0,
+      "statusReason": "targeted_native_tool_sse_usage_preflight_passed"
     }
   ]
 }

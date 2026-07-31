@@ -2,6 +2,8 @@ import { readFile } from "node:fs/promises";
 
 export type ChannelActivationStatus = "active" | "inactive" | "needs_mapping" | "disabled";
 export type ChannelDiscoveryStatus = "pending" | "success" | "auth_failed" | "unavailable" | "failed";
+export type SupplyProfileStatus = "active" | "probe_pending" | "degraded" | "temporarily_unavailable"
+  | "disabled" | "rejected" | "alias_pending";
 
 export type ProviderChannel = {
   channelId: string;
@@ -67,6 +69,13 @@ export type ProviderModelProfile = {
   webSearchFailureReason?: string | null;
   webTransportStatus?: "verified" | "compatible_unverified" | "incompatible";
   activeInAcuAuto: boolean;
+  status?: SupplyProfileStatus;
+  activeInRouting?: boolean;
+  lastProbeAt?: string;
+  lastProbeStatus?: string;
+  consecutiveProbeFailures?: number;
+  nextProbeAt?: string;
+  statusReason?: string;
 };
 
 export type ProviderModelProfileRegistry = {
@@ -120,6 +129,22 @@ export function validateProviderModelProfiles(value: unknown): ProviderModelProf
     }
   }
   return registry as ProviderModelProfileRegistry;
+}
+
+export function assertSupplyProfileConservation(
+  discoveredCanonicalProfileIds: string[],
+  profiles: Array<Pick<ProviderModelProfile, "executionProfileId" | "status" | "healthReason">>,
+): void {
+  const discovered = [...discoveredCanonicalProfileIds].sort();
+  const registered = profiles.map((profile) => profile.executionProfileId).sort();
+  const duplicates = registered.filter((id, index) => registered[index - 1] === id);
+  const missing = discovered.filter((id) => !registered.includes(id));
+  const unexpected = registered.filter((id) => !discovered.includes(id));
+  const unclassified = profiles.filter((profile) => !profile.status || !profile.healthReason)
+    .map((profile) => profile.executionProfileId);
+  if (duplicates.length || missing.length || unexpected.length || unclassified.length) {
+    throw new Error(`Supply Profile conservation failed: ${JSON.stringify({ duplicates, missing, unexpected, unclassified })}`);
+  }
 }
 
 export async function readProviderChannelRegistry(path: string): Promise<ProviderChannelRegistry> {

@@ -19,6 +19,60 @@ export type HealthSnapshot = {
   httpStatus?: number;
 };
 
+export type RuntimeHealth = {
+  profileState: string;
+  channelState: string;
+  providerState: string;
+  probeState: string;
+  effectiveState: "eligible" | "degraded" | "temporarily_unavailable" | "disabled";
+  blockingScope?: "profile" | "channel" | "provider" | "probe" | "administrator";
+  statusReason?: string;
+  cooldownUntil?: Date;
+};
+
+export function deriveRuntimeEligibility(input: {
+  profileState?: string;
+  channelState?: string;
+  providerState?: string;
+  probeState?: string;
+  enabled?: boolean;
+  administratorAllowed?: boolean;
+  cooldownUntil?: Date;
+}): RuntimeHealth {
+  const result: RuntimeHealth = {
+    profileState: input.profileState ?? "healthy",
+    channelState: input.channelState ?? "healthy",
+    providerState: input.providerState ?? "healthy",
+    probeState: input.probeState ?? "fresh",
+    effectiveState: "eligible",
+    cooldownUntil: input.cooldownUntil,
+  };
+  if (!input.enabled || !input.administratorAllowed) return {
+    ...result, effectiveState: "disabled", blockingScope: "administrator",
+    statusReason: !input.enabled ? "profile_disabled" : "administrator_disabled",
+  };
+  if (result.providerState === "blocked" || result.providerState === "disabled") return {
+    ...result, effectiveState: "disabled", blockingScope: "provider", statusReason: `provider_${result.providerState}`,
+  };
+  if (result.providerState === "cooldown") return {
+    ...result, effectiveState: "temporarily_unavailable", blockingScope: "provider", statusReason: "provider_cooldown",
+  };
+  for (const [scope, state] of [["channel", result.channelState], ["profile", result.profileState]] as const) {
+    if (state === "disabled") return { ...result, effectiveState: "disabled", blockingScope: scope, statusReason: `${scope}_disabled` };
+    if (state === "open" || state === "half_open") return {
+      ...result, effectiveState: "temporarily_unavailable", blockingScope: scope,
+      statusReason: state === "half_open" ? `${scope}_half_open_probe_only` : `${scope}_cooldown`,
+    };
+  }
+  if (result.probeState === "stale") return {
+    ...result, effectiveState: "degraded", blockingScope: "probe", statusReason: "probe_stale",
+  };
+  if ([result.profileState, result.channelState, result.providerState].includes("degraded")) {
+    return { ...result, effectiveState: "degraded", statusReason: "runtime_degraded" };
+  }
+  return result;
+}
+
 export type AttemptOutcome = {
   success: boolean;
   clientCancelled?: boolean;

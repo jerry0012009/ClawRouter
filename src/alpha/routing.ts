@@ -11,6 +11,7 @@ import {
   resolveWebEligibility,
   type WebTransportStatus,
 } from "./web-capability.js";
+import type { RuntimeHealth } from "./channel-health.js";
 
 export type ProfileHealth = "healthy" | "degraded" | "cooldown" | "open" | "half_open" | "disabled" | "unknown";
 export type RoutingPreference = "economy" | "balanced" | "quality";
@@ -22,6 +23,8 @@ export type ToolCapability =
   | "file_search"
   | "computer_use"
   | "other_hosted_tool";
+
+export type ReasoningControlMode = "standard_effort" | "client_thinking_passthrough" | "none";
 
 export type RoutingPreferenceParameters = {
   qualityTargetOffset: number;
@@ -50,6 +53,7 @@ export type AlphaExecutionProfile = {
   supportedToolTypes?: ToolCapability[];
   thinkingSupport: boolean;
   supportedReasoningEfforts?: string[];
+  reasoningControlMode?: ReasoningControlMode;
   contextWindow?: number;
   canonicalAdvertisedContextWindow?: number;
   providerDeclaredContextWindow?: number | null;
@@ -80,6 +84,7 @@ export type AlphaExecutionProfile = {
   verificationStatus?: "discovered" | "verified_provisional" | "verified" | "rejected";
   autoRouteEnabled?: boolean;
   requiresFreshProbe?: boolean;
+  runtimeHealth?: RuntimeHealth;
 };
 
 export type AlphaRouteRequirements = {
@@ -112,6 +117,22 @@ export type AlphaRouteInput = {
 };
 
 export type ExcludedProfile = { executionProfileId: string; reasons: string[] };
+
+export type ProfileEvaluation = {
+  executionProfileId: string;
+  canonicalModelId: string;
+  providerId: string;
+  channelId: string;
+  eligible: boolean;
+  reasons: string[];
+  excludedAtStage?: "runtime_health" | "protocol" | "tools" | "web" | "reasoning" | "context" | "policy" | "economics";
+  profileState: string;
+  channelState: string;
+  providerState: string;
+  probeState: string;
+  blockingScope?: string;
+  statusReason?: string;
+};
 
 export type ExclusionCategory = "context_window" | "tool_capability" | "protocol" | "web" | "thinking"
   | "health" | "allowlist" | "cost" | "adapter";
@@ -183,6 +204,8 @@ export type AlphaRouteDecision = {
   paretoFrontier: string[];
   excludedProfiles: ExcludedProfile[];
   eligibleProfileIds: string[];
+  profileEvaluations: ProfileEvaluation[];
+  modelAvailability: Array<{ canonicalModelId: string; available: boolean; eligibleProfileCount: number; excludedProfileCount: number }>;
 };
 
 function nominalPrice(modelId: string): { inputPricePerMillion: number; outputPricePerMillion: number } {
@@ -265,8 +288,8 @@ function exclusionReasons(
   const webEligibility = resolveWebEligibility(profile, requirements);
   if (!webEligibility.eligible) reasons.push(webEligibility.reason);
   if (requirements.requireThinking && !profile.thinkingSupport) reasons.push("thinking_support");
-  if (requirements.reasoningEffort && profile.supportedReasoningEfforts
-    && !profile.supportedReasoningEfforts.includes(requirements.reasoningEffort)) {
+  if (requirements.reasoningEffort
+    && !profile.supportedReasoningEfforts?.includes(requirements.reasoningEffort)) {
     reasons.push(`reasoning_effort:${requirements.reasoningEffort}`);
   }
   const requiredContextTokens = requirements.context?.requiredTotalContextTokens ?? requirements.contextTokens ?? 0;
@@ -290,14 +313,69 @@ function exclusionReasons(
   return reasons;
 }
 
-export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDecision {
-  const excludedProfiles: ExcludedProfile[] = [];
-  const eligibleProfiles = input.profiles.filter((profile) => {
-    const reasons = exclusionReasons(profile, input.requirements, input);
-    if (reasons.length) excludedProfiles.push({ executionProfileId: profile.executionProfileId, reasons });
-    return reasons.length === 0;
+function exclusionStage(reasons: string[]): ProfileEvaluation["excludedAtStage"] {
+  const categories = reasons.map(exclusionCategory);
+  if (categories.includes("health")) return "runtime_health";
+  if (categories.includes("protocol")) return "protocol";
+  if (categories.includes("tool_capability")) return "tools";
+  if (categories.includes("web")) return "web";
+  if (categories.includes("thinking")) return "reasoning";
+  if (categories.includes("context_window")) return "context";
+  if (categories.includes("allowlist")) return "policy";
+  if (categories.includes("cost")) return "economics";
+  return reasons.length ? "policy" : undefined;
+}
+
+export function evaluateProfiles(input: AlphaRouteInput): ProfileEvaluation[] {
+  return input.profiles.map((profile) => {
+    const reasons = [...new Set(exclusionReasons(profile, input.requirements, input))];
+    const health = profile.runtimeHealth;
+    return {
+      executionProfileId: profile.executionProfileId,
+      canonicalModelId: profile.modelId,
+      providerId: profile.provider,
+      channelId: profile.channelId ?? profile.channel,
+      eligible: reasons.length === 0,
+      reasons,
+      excludedAtStage: exclusionStage(reasons),
+      profileState: health?.profileState ?? profile.health,
+      channelState: health?.channelState ?? "unknown",
+      providerState: health?.providerState ?? profile.economics?.health ?? "unknown",
+      probeState: health?.probeState ?? (profile.requiresFreshProbe ? "stale" : "not_required"),
+      blockingScope: health?.blockingScope,
+      statusReason: health?.statusReason,
+    };
   });
+}
+
+export function profileEvaluationConserved(inputProfiles: AlphaExecutionProfile[], evaluations: ProfileEvaluation[]): boolean {
+  const inputIds = inputProfiles.map((profile) => profile.executionProfileId).sort();
+  const evaluationIds = evaluations.map((evaluation) => evaluation.executionProfileId).sort();
+  return new Set(inputIds).size === inputIds.length
+    && new Set(evaluationIds).size === evaluationIds.length
+    && inputIds.length === evaluationIds.length
+    && inputIds.every((id, index) => id === evaluationIds[index]);
+}
+
+export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDecision {
+  const profileEvaluations = evaluateProfiles(input);
+  if (!profileEvaluationConserved(input.profiles, profileEvaluations)) {
+    const message = "Router Profile evaluation conservation failed";
+    if (process.env.NODE_ENV === "test") throw new Error(message);
+    console.error(message);
+  }
+  const eligibleIds = new Set(profileEvaluations.filter((evaluation) => evaluation.eligible)
+    .map((evaluation) => evaluation.executionProfileId));
+  const eligibleProfiles = input.profiles.filter((profile) => eligibleIds.has(profile.executionProfileId));
+  const excludedProfiles: ExcludedProfile[] = profileEvaluations.filter((evaluation) => !evaluation.eligible)
+    .map(({ executionProfileId, reasons }) => ({ executionProfileId, reasons }));
   const eligibleModelIds = [...new Set(eligibleProfiles.map((profile) => profile.modelId))];
+  const modelAvailability = [...new Set(input.profiles.map((profile) => profile.modelId))].map((canonicalModelId) => {
+    const evaluations = profileEvaluations.filter((evaluation) => evaluation.canonicalModelId === canonicalModelId);
+    const eligibleProfileCount = evaluations.filter((evaluation) => evaluation.eligible).length;
+    return { canonicalModelId, available: eligibleProfileCount > 0, eligibleProfileCount,
+      excludedProfileCount: evaluations.length - eligibleProfileCount };
+  });
   if (eligibleModelIds.length === 0) {
     const normalizedExclusionCounts = exclusionCounts(excludedProfiles);
     if (input.requirements.allowedProfileIds) {
@@ -465,6 +543,8 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
       .map((estimate) => estimate.modelId),
     excludedProfiles,
     eligibleProfileIds: eligibleProfiles.map((profile) => profile.executionProfileId),
+    profileEvaluations,
+    modelAvailability,
   };
 }
 

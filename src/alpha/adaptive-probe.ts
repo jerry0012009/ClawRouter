@@ -16,6 +16,14 @@ export function adaptiveProbeIntervalMinutes(userRequestsLast30Minutes: number):
   return 15;
 }
 
+export function probeBackoffMinutes(consecutiveFailures: number): number {
+  if (consecutiveFailures <= 0) return 0;
+  if (consecutiveFailures === 1) return 5;
+  if (consecutiveFailures === 2) return 15;
+  if (consecutiveFailures === 3) return 60;
+  return 360;
+}
+
 export function fullPoolProbeDue(input: {
   manual: boolean;
   lastCompletedAt?: Date;
@@ -88,36 +96,45 @@ export class AdaptiveProbeWorker {
 
   private async runEligibleProbe(): Promise<void> {
     if (await this.runFullPoolIfEligible()) return;
+    const queued = await this.options.database.query<{ execution_profile_id: string }>(
+      "SELECT execution_profile_id FROM acu_profile_probe_queue ORDER BY enqueued_at LIMIT 100",
+    );
+    const targetedQueued = queued.rows.some((row) => row.execution_profile_id !== MANUAL_FULL_POOL_QUEUE_ID);
     const activity = await this.options.database.query<{ request_count: number }>(
       "SELECT count(*)::int request_count FROM acu_logical_requests WHERE started_at>=now()-interval '30 minutes'",
     );
     const intervalMinutes = adaptiveProbeIntervalMinutes(Number(activity.rows[0]?.request_count ?? 0));
-    if (intervalMinutes === null) return;
+    if (intervalMinutes === null && !targetedQueued) return;
     const budget = await this.options.database.query<{ spend: string; last_probe_at: Date | null }>(
       `SELECT coalesce(sum(cost_cny) FILTER (WHERE started_at>=date_trunc('day',now())),0)::text spend,
         max(started_at) last_probe_at FROM acu_profile_probe_attempts`,
     );
     if (Number(budget.rows[0]?.spend ?? 0) >= this.options.dailyBudgetCny) return;
     const lastProbeAt = budget.rows[0]?.last_probe_at;
-    if (lastProbeAt && Date.now() - new Date(lastProbeAt).getTime() < intervalMinutes * 60_000) return;
+    if (!targetedQueued && intervalMinutes !== null && lastProbeAt
+      && Date.now() - new Date(lastProbeAt).getTime() < intervalMinutes * 60_000) return;
 
     const repository = new AlphaRepository(this.options.database);
     const [channels, runtimes] = await Promise.all([
       repository.batchChannelHealth(this.options.profiles.map((profile) => profile.channelId ?? profile.channel)),
       repository.batchProfileHealth(this.options.profiles.map((profile) => profile.executionProfileId)),
     ]);
-    const queued = await this.options.database.query<{ execution_profile_id: string }>(
-      "SELECT execution_profile_id FROM acu_profile_probe_queue ORDER BY enqueued_at LIMIT 100",
-    );
     const queuedOrder = new Map(queued.rows.map((row, index) => [row.execution_profile_id, index]));
     const candidates = this.options.profiles.filter((profile) => {
       if (!profile.enabled || !profile.administratorAllowed || !this.options.adapters.has(profile.executionProfileId)) return false;
       const channel = channels.get(profile.channelId ?? profile.channel);
       const runtime = runtimes.get(profile.executionProfileId);
+      const lastAttemptAt = runtime?.lastAttemptAt ?? channel?.lastAttemptAt;
+      const consecutiveFailures = Math.max(runtime?.consecutiveFailures ?? 0, channel?.consecutiveFailures ?? 0);
+      const retryAt = lastAttemptAt
+        ? lastAttemptAt.getTime() + probeBackoffMinutes(consecutiveFailures) * 60_000
+        : 0;
+      if (retryAt > Date.now()) return false;
       const cooldownExpired = [channel, runtime].some((health) =>
         health && ["open", "half_open"].includes(health.state)
           && (!health.cooldownUntil || health.cooldownUntil.getTime() <= Date.now()));
-      const lastSuccessAt = runtime?.lastSuccessAt ?? channel?.lastSuccessAt;
+      const lastSuccessAt = profile.requiresFreshProbe ? runtime?.lastSuccessAt
+        : runtime?.lastSuccessAt ?? channel?.lastSuccessAt;
       const stale = !lastSuccessAt || Date.now() - lastSuccessAt.getTime() > 120 * 60_000;
       return cooldownExpired || (profile.requiresFreshProbe === true && stale);
     }).sort((left, right) => (queuedOrder.get(left.executionProfileId) ?? Number.MAX_SAFE_INTEGER)
@@ -172,8 +189,17 @@ export class AdaptiveProbeWorker {
     );
     if (Number(budget.rows[0]?.spend ?? 0) >= this.options.dailyBudgetCny) return false;
     const runId = `full_pool_${randomUUID().replaceAll("-", "")}`;
+    const lastProbes = await this.options.database.query<{ execution_profile_id: string; last_probe_at: Date }>(
+      `SELECT execution_profile_id,max(started_at) last_probe_at FROM acu_profile_probe_attempts
+       GROUP BY execution_profile_id`,
+    );
+    const lastProbeByProfile = new Map(lastProbes.rows.map((row) => [
+      row.execution_profile_id, new Date(row.last_probe_at).getTime(),
+    ]));
     const profiles = this.options.profiles.filter((profile) => profile.enabled && profile.administratorAllowed
-      && this.options.adapters.has(profile.executionProfileId));
+      && this.options.adapters.has(profile.executionProfileId))
+      .sort((left, right) => (lastProbeByProfile.get(left.executionProfileId) ?? 0)
+        - (lastProbeByProfile.get(right.executionProfileId) ?? 0));
     await this.options.database.query(
       `INSERT INTO acu_full_pool_probe_runs
         (full_pool_probe_run_id,status,trigger,profile_count,metadata_json)
@@ -186,9 +212,12 @@ export class AdaptiveProbeWorker {
     let failed = 0;
     let costCny = 0;
     let status = "completed";
+    const failedChannels = new Set<string>();
     try {
       const repository = new AlphaRepository(this.options.database);
       for (const profile of profiles) {
+        const channelId = profile.channelId ?? profile.channel;
+        if (failedChannels.has(channelId)) continue;
         const currentSpend = Number(budget.rows[0]?.spend ?? 0) + costCny;
         if (currentSpend >= this.options.dailyBudgetCny) {
           status = "budget_exhausted";
@@ -213,7 +242,10 @@ export class AdaptiveProbeWorker {
         attempted += 1;
         costCny += result.costCny;
         if (result.success) success += 1;
-        else failed += 1;
+        else {
+          failed += 1;
+          failedChannels.add(channelId);
+        }
         await this.options.database.query(
           `UPDATE acu_full_pool_probe_runs SET attempted_count=$2,success_count=$3,failed_count=$4,cost_cny=$5
            WHERE full_pool_probe_run_id=$1`,

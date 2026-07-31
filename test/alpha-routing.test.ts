@@ -322,7 +322,7 @@ describe("Alpha current-formula routing", () => {
   it("excludes a profile that explicitly does not support the requested reasoning effort", () => {
     const effortProfiles = profiles.map((profile) => ({
       ...profile,
-      supportedReasoningEfforts: profile.modelId === "gpt-5.4-mini" ? ["low", "medium"] : undefined,
+      supportedReasoningEfforts: profile.modelId === "gpt-5.4-mini" ? ["low", "medium"] : ["high"],
     }));
     const result = routeWithCurrentAcuFormula({
       judge,

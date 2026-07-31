@@ -36,13 +36,15 @@ const profile = (protocol: "responses" | "messages"): AlphaExecutionProfile => (
   protocols: [protocol],
   toolCallSupport: true,
   thinkingSupport: true,
+  supportedReasoningEfforts: ["high"],
+  reasoningControlMode: protocol === "responses" ? "standard_effort" : "client_thinking_passthrough",
   health: "healthy",
   enabled: true,
   administratorAllowed: true,
 });
 
 describe("Plan reasoning escalation", () => {
-  it.each(["responses", "messages"] as const)("writes high reasoning for %s", (protocol) => {
+  it.each(["responses", "messages"] as const)("handles plan reasoning for %s", (protocol) => {
     const raw = protocol === "responses"
       ? { model: "acu-auto", input: [], reasoning: { effort: "medium" } }
       : { model: "acu-auto", messages: [], thinking: { type: "enabled", budget_tokens: 8_000 } };
@@ -57,6 +59,7 @@ describe("Plan reasoning escalation", () => {
     expect(parsed.model).toBe("gpt-5.6-sol");
     if (protocol === "responses") expect(parsed.reasoning.effort).toBe("high");
     else expect(parsed.thinking.budget_tokens).toBe(8_000);
+    expect(body.providerReasoningOverrideApplied).toBe(protocol === "responses");
   });
 
   it("does not override an explicit low effort", () => {
@@ -68,5 +71,29 @@ describe("Plan reasoning escalation", () => {
       undefined,
     );
     expect(JSON.parse(body.body.toString("utf8")).reasoning).toBeUndefined();
+  });
+
+  it.each([
+    { thinking: { type: "enabled", budget_tokens: 3_333 } },
+    { thinking: { type: "disabled" } },
+    {},
+  ])("preserves Messages thinking without inventing a budget", (request) => {
+    const body = prepareProviderBody(
+      Buffer.from(JSON.stringify({ model: "acu-auto", messages: [], ...request })),
+      "gpt-5.6-sol", envelope("messages"), profile("messages"), "high",
+    );
+    const parsed = JSON.parse(body.body.toString("utf8"));
+    expect(parsed.thinking).toEqual(request.thinking);
+    expect(body.providerReasoningOverrideApplied).toBe(false);
+  });
+
+  it("does not claim standard high support when the Profile did not declare it", () => {
+    const unsupported = { ...profile("responses"), supportedReasoningEfforts: [] };
+    const body = prepareProviderBody(
+      Buffer.from(JSON.stringify({ model: "acu-auto", input: [] })),
+      "gpt-5.6-sol", envelope("responses"), unsupported, "high",
+    );
+    expect(JSON.parse(body.body.toString("utf8")).reasoning).toBeUndefined();
+    expect(body.providerReasoningOverrideApplied).toBe(false);
   });
 });

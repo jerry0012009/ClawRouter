@@ -6,6 +6,7 @@ import { getAcuCatalog } from "../../src/acu/catalog.js";
 import {
   readProviderChannelRegistry,
   validateProviderModelProfiles,
+  assertSupplyProfileConservation,
   type ProviderModelProfile,
 } from "../../src/alpha/channel-registry.js";
 import { validateDotenv } from "./normalize-env.js";
@@ -154,11 +155,16 @@ async function main(): Promise<void> {
         healthReason: "directory_only_pending_minimal_protocol_preflight",
         lastVerifiedAt: null,
         activeInAcuAuto: false,
+        status: "probe_pending" as const,
+        activeInRouting: false,
+        consecutiveProbeFailures: 0,
+        statusReason: "directory_only_pending_minimal_protocol_preflight",
       })));
   });
   const profileRegistry = { schemaVersion: "acu-provider-model-profile-registry-v1" as const,
     generatedAt: new Date().toISOString(), profiles };
   validateProviderModelProfiles(profileRegistry);
+  assertSupplyProfileConservation(profiles.map((profile) => profile.executionProfileId), profiles);
   await writeFile(outputPath, `${JSON.stringify(discoveredRegistry, null, 2)}\n`);
   await writeFile(profilesPath, `${JSON.stringify(profileRegistry, null, 2)}\n`);
   console.log(JSON.stringify(discoveredRegistry.summary));

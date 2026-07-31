@@ -17,7 +17,8 @@ import { canonicalAdvertisedContextWindow } from "./context-admission.js";
 import { ACU_ROUTING_MODEL_VERSION } from "../acu/config.js";
 import { getAcuModel } from "../acu/catalog.js";
 import { combinedMonitorState, mergeSupplyInventory, monitorRangeSpec, monitorRoutingStatus, type MonitorRange } from "./channel-monitor.js";
-import { AdaptiveProbeWorker } from "./adaptive-probe.js";
+import { AdaptiveProbeWorker, probeBackoffMinutes } from "./adaptive-probe.js";
+import { deriveRuntimeEligibility } from "./channel-health.js";
 
 export type ConfiguredExecutionProfile = AlphaExecutionProfile & {
   baseUrl?: string;
@@ -172,6 +173,7 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
       supportedToolTypes: profile.supportedToolTypes,
       thinkingSupport: profile.thinkingSupport,
       supportedReasoningEfforts: profile.supportedReasoningEfforts,
+      reasoningControlMode: profile.reasoningControlMode ?? "none",
       contextWindow: profile.contextWindow,
       canonicalAdvertisedContextWindow: profile.canonicalAdvertisedContextWindow ?? canonicalAdvertisedContextWindow(profile.modelId),
       providerDeclaredContextWindow: profile.providerDeclaredContextWindow ?? null,
@@ -313,7 +315,7 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
             (bucket,provider,channel,canonical_model),
             (bucket,provider,channel,canonical_model,execution_profile_id)
           ) ORDER BY bucket,scope_type,scope_id`;
-        const [channels, profileHealth, attempts, history, cooldowns, adminPauses, probes] = await Promise.all([
+        const [channels, profileHealth, attempts, history, cooldowns, adminPauses, probes, probeHistory] = await Promise.all([
           database.query<Record<string, unknown>>("SELECT * FROM acu_channel_health ORDER BY provider_id,channel_id"),
           database.query<Record<string, unknown>>("SELECT * FROM acu_provider_model_profile_health ORDER BY canonical_model_id,provider_id,channel_id"),
           database.query<Record<string, unknown>>(
@@ -361,6 +363,15 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
                coalesce(daily.probe_count,0) probe_count,coalesce(daily.probe_success_count,0) probe_success_count
              FROM latest LEFT JOIN daily USING(execution_profile_id)`,
           ),
+          database.query<Record<string, unknown>>(
+            `SELECT execution_profile_id,channel_id,provider_id,canonical_model_id,protocol,status,
+                    http_status,error_class,latency_ms,input_tokens,output_tokens,actual_model,
+                    usage_trusted,cost_cny,started_at,completed_at,metadata_json
+             FROM acu_profile_probe_attempts
+             WHERE started_at>=now()-$1::interval
+             ORDER BY started_at DESC`,
+            [interval],
+          ),
         ]);
         const healthByChannel = new Map(channels.rows.map((row) => [String(row.channel_id), row]));
         const healthByProfile = new Map(profileHealth.rows.map((row) => [String(row.execution_profile_id), row]));
@@ -372,6 +383,14 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
           const aggregate = aggregateByProfile.get(profile.executionProfileId) ?? {};
           const probe = probeByProfile.get(profile.executionProfileId) ?? {};
           const routingEligibility = monitorRoutingStatus(profile, channel, runtime);
+          const runtimeHealth = deriveRuntimeEligibility({
+            profileState: String(runtime.circuit_state ?? profile.health),
+            channelState: String(channel.circuit_state ?? "healthy"),
+            providerState: "healthy",
+            probeState: profile.requiresFreshProbe && !runtime.last_success_at ? "stale" : "fresh",
+            enabled: profile.enabled,
+            administratorAllowed: profile.administratorAllowed,
+          });
           let endpointHost = "";
           try {
             endpointHost = new URL(profile.baseUrl ?? process.env[profile.baseUrlEnv ?? ""] ?? "").host;
@@ -385,43 +404,54 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
             provider: profile.provider,
             channel: profile.channelId ?? profile.channel,
             endpointHost,
-            multiplier: profile.observedBillingMultiplier,
+            multiplier: Number(profile.observedBillingMultiplier ?? 0),
             effectiveCostStatus: profile.effectiveCostStatus,
             enabled: profile.enabled,
             administratorAllowed: profile.administratorAllowed,
+            autoRouteEnabled: profile.autoRouteEnabled !== false,
             routingEligible: routingEligibility === "eligible",
             routingEligibility,
+            profileStateRaw: runtimeHealth.profileState,
+            channelStateRaw: runtimeHealth.channelState,
+            providerStateRaw: runtimeHealth.providerState,
+            probeStateRaw: runtimeHealth.probeState,
+            effectiveState: runtimeHealth.effectiveState,
+            blockingScope: runtimeHealth.blockingScope,
+            statusReason: runtimeHealth.statusReason ?? routingEligibility,
             state: combinedMonitorState(profile, channel, runtime),
             channelState: channel.circuit_state ?? "healthy",
             profileState: runtime.circuit_state ?? profile.health,
             usageTrusted: runtime.usage_trusted ?? profile.usageTrusted,
-            recentSuccessRate: channel.recent_success_rate ?? runtime.recent_success_rate,
-            consecutiveFailures: channel.consecutive_failures ?? runtime.consecutive_failures ?? 0,
-            p50FirstModelEventLatencyMs: aggregate.p50_first_model_event_ms,
-            p95FirstModelEventLatencyMs: aggregate.p95_first_model_event_ms,
+            recentSuccessRate: Number(channel.recent_success_rate ?? runtime.recent_success_rate ?? 0),
+            consecutiveFailures: Number(channel.consecutive_failures ?? runtime.consecutive_failures ?? 0),
+            p50FirstModelEventLatencyMs: Number(aggregate.p50_first_model_event_ms ?? 0),
+            p95FirstModelEventLatencyMs: Number(aggregate.p95_first_model_event_ms ?? 0),
             lastError: channel.error_class ?? runtime.error_class,
             lastSuccessAt: channel.last_success_at ?? runtime.last_success_at,
             cooldownUntil: channel.cooldown_until ?? runtime.cooldown_until,
             requiresFreshProbe: profile.requiresFreshProbe === true,
             lastProbeAt: probe.started_at,
             probeStatus: probe.status,
-            probeLatencyMs: probe.latency_ms,
-            probeCostCny: probe.cost_cny,
-            probeDailySpendCny: probe.daily_spend ?? 0,
+            probeLatencyMs: Number(probe.latency_ms ?? 0),
+            probeCostCny: Number(probe.cost_cny ?? 0),
+            probeDailySpendCny: Number(probe.daily_spend ?? 0),
             probeSuccessRate: Number(probe.probe_count ?? 0) > 0
               ? Number(probe.probe_success_count ?? 0) / Number(probe.probe_count) : null,
             probeFreshness: profile.requiresFreshProbe
               ? probe.started_at && Date.now() - new Date(String(probe.started_at)).getTime() <= 120 * 60_000 ? "fresh" : "stale"
               : "not_required",
             nextEligibleProbeAt: probe.started_at
-              ? new Date(new Date(String(probe.started_at)).getTime() + 120 * 60_000).toISOString() : null,
+              ? new Date(new Date(String(probe.started_at)).getTime()
+                + probeBackoffMinutes(Math.max(Number(runtime.consecutive_failures ?? 0),
+                  Number(channel.consecutive_failures ?? 0))) * 60_000).toISOString() : null,
           };
         });
         const activeModelPool = [...new Set(serviceConfig.profiles.map((profile) => profile.modelId))]
           .map((modelId) => {
             const catalog = getAcuModel(modelId);
             const modelProfiles = publicProfiles.filter((profile) => profile.canonicalModel === modelId);
-            const activeProfiles = modelProfiles.filter((profile) => profile.enabled && profile.administratorAllowed);
+            const activeProfiles = modelProfiles.filter((profile) => profile.enabled && profile.administratorAllowed
+              && (profile.autoRouteEnabled !== false || profile.routingEligible));
             const healthyProfiles = activeProfiles.filter((profile) => profile.routingEligibility === "eligible");
             const ordered = [...healthyProfiles].sort((left, right) =>
               Number(left.multiplier ?? Number.POSITIVE_INFINITY) - Number(right.multiplier ?? Number.POSITIVE_INFINITY));
@@ -507,6 +537,7 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
           profiles: publicProfiles,
           history: history.rows,
           cooldownIntervals: [...cooldowns.rows, ...adminPauses.rows, ...activeStateIntervals],
+          probeHistory: probeHistory.rows,
           supplyInventory,
           modelPool,
           generatedAt: new Date().toISOString(),

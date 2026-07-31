@@ -1,0 +1,365 @@
+{
+  "generatedAt": "2026-07-31T20:39:17.548Z",
+  "source": "production acu_route_decisions",
+  "totalRows": 164,
+  "usableRows": 148,
+  "economyRows": 41,
+  "observedFallbackCount": 7,
+  "parameters": {
+    "old": {
+      "economy": {
+        "qualityTargetOffset": -12,
+        "costSensitivity": 3,
+        "fallbackRiskScale": 0
+      },
+      "balanced": {
+        "qualityTargetOffset": -3,
+        "costSensitivity": 1.4,
+        "fallbackRiskScale": 0.25
+      },
+      "quality": {
+        "qualityTargetOffset": 8,
+        "costSensitivity": 0.45,
+        "fallbackRiskScale": 1.25
+      }
+    },
+    "current": {
+      "economy": {
+        "qualityTargetOffset": -6,
+        "costSensitivity": 1.8,
+        "fallbackRiskScale": 0.35
+      },
+      "balanced": {
+        "qualityTargetOffset": -3,
+        "costSensitivity": 1.4,
+        "fallbackRiskScale": 0.25
+      },
+      "quality": {
+        "qualityTargetOffset": 8,
+        "costSensitivity": 0.45,
+        "fallbackRiskScale": 1.25
+      }
+    }
+  },
+  "versions": {
+    "old": {
+      "economy": {
+        "samples": 148,
+        "qualityTargetHitRate": 0.8108108108108109,
+        "meanPredictedQuality": 0.7563603012306667,
+        "expectedCost": 4.359889599999999,
+        "expectedCostIncludingFallback": 5.722618664,
+        "expectedFallbackCount": 56.038675417861306
+      },
+      "balanced": {
+        "samples": 148,
+        "qualityTargetHitRate": 0.6148648648648649,
+        "meanPredictedQuality": 0.8023140953700494,
+        "expectedCost": 5.088167784999998,
+        "expectedCostIncludingFallback": 7.29545509438589,
+        "expectedFallbackCount": 48.937513885232654
+      },
+      "quality": {
+        "samples": 148,
+        "qualityTargetHitRate": 0.5067567567567568,
+        "meanPredictedQuality": 0.866288894103676,
+        "expectedCost": 7.9178475699999975,
+        "expectedCostIncludingFallback": 12.826951770365286,
+        "expectedFallbackCount": 39.16924367265588
+      }
+    },
+    "current": {
+      "economy": {
+        "samples": 148,
+        "qualityTargetHitRate": 0.8108108108108109,
+        "meanPredictedQuality": 0.7818016032866704,
+        "expectedCost": 4.623918044999998,
+        "expectedCostIncludingFallback": 7.236150222107354,
+        "expectedFallbackCount": 52.21336271357279
+      },
+      "balanced": {
+        "samples": 148,
+        "qualityTargetHitRate": 0.6148648648648649,
+        "meanPredictedQuality": 0.8023140953700494,
+        "expectedCost": 5.088167784999998,
+        "expectedCostIncludingFallback": 7.29545509438589,
+        "expectedFallbackCount": 48.937513885232654
+      },
+      "quality": {
+        "samples": 148,
+        "qualityTargetHitRate": 0.5067567567567568,
+        "meanPredictedQuality": 0.866288894103676,
+        "expectedCost": 7.9178475699999975,
+        "expectedCostIncludingFallback": 12.826951770365286,
+        "expectedFallbackCount": 39.16924367265588
+      }
+    }
+  },
+  "economyComparison": {
+    "modelChanges": 6,
+    "channelChanges": 6,
+    "old": {
+      "samples": 41,
+      "qualityTargetHitRate": 0.7804878048780488,
+      "meanPredictedQuality": 0.7837632327500668,
+      "expectedCost": 0.8969731000000001,
+      "expectedCostIncludingFallback": 2.2597021639999992,
+      "expectedFallbackCount": 14.345707457247252
+    },
+    "current": {
+      "samples": 41,
+      "qualityTargetHitRate": 0.7804878048780488,
+      "meanPredictedQuality": 0.8426061605461553,
+      "expectedCost": 0.913238545,
+      "expectedCostIncludingFallback": 2.7032461586590446,
+      "expectedFallbackCount": 11.933147417607623
+    },
+    "buckets": {
+      "0-39": {
+        "samples": 25,
+        "old": {
+          "samples": 25,
+          "qualityTargetHitRate": 0.92,
+          "meanPredictedQuality": 0.8716432845224736,
+          "expectedCost": 0.32167392999999994,
+          "expectedCostIncludingFallback": 0.474275754,
+          "expectedFallbackCount": 6.708917886938156
+        },
+        "current": {
+          "samples": 25,
+          "qualityTargetHitRate": 0.96,
+          "meanPredictedQuality": 0.9007158704041492,
+          "expectedCost": 0.32235164499999996,
+          "expectedCostIncludingFallback": 0.5026483667392666,
+          "expectedFallbackCount": 5.982103239896269
+        }
+      },
+      "40-59": {
+        "samples": 11,
+        "old": {
+          "samples": 11,
+          "qualityTargetHitRate": 0.7272727272727273,
+          "meanPredictedQuality": 0.6797151334164124,
+          "expectedCost": 0.5144545349999999,
+          "expectedCostIncludingFallback": 0.980688497,
+          "expectedFallbackCount": 4.843133532419462
+        },
+        "current": {
+          "samples": 11,
+          "qualityTargetHitRate": 0.5454545454545454,
+          "meanPredictedQuality": 0.7897274584085635,
+          "expectedCost": 0.5297043,
+          "expectedCostIncludingFallback": 1.2802134779681777,
+          "expectedFallbackCount": 3.6329979575058
+        }
+      },
+      "60-79": {
+        "samples": 3,
+        "old": {
+          "samples": 3,
+          "qualityTargetHitRate": 0,
+          "meanPredictedQuality": 0.546766682399401,
+          "expectedCost": 0.058733520000000004,
+          "expectedCostIncludingFallback": 0.78787572,
+          "expectedFallbackCount": 1.7396999528017971
+        },
+        "current": {
+          "samples": 3,
+          "qualityTargetHitRate": 0,
+          "meanPredictedQuality": 0.546766682399401,
+          "expectedCost": 0.058733520000000004,
+          "expectedCostIncludingFallback": 0.9013794508321804,
+          "expectedFallbackCount": 1.7396999528017971
+        }
+      },
+      "80-100": {
+        "samples": 0,
+        "old": {
+          "samples": 0,
+          "qualityTargetHitRate": 0,
+          "meanPredictedQuality": 0,
+          "expectedCost": 0,
+          "expectedCostIncludingFallback": 0,
+          "expectedFallbackCount": 0
+        },
+        "current": {
+          "samples": 0,
+          "qualityTargetHitRate": 0,
+          "meanPredictedQuality": 0,
+          "expectedCost": 0,
+          "expectedCostIncludingFallback": 0,
+          "expectedFallbackCount": 0
+        }
+      }
+    },
+    "examples": [
+      {
+        "routeDecisionId": "route_1454507be4e74e8f89d80a59dd0963da",
+        "createdAt": "2026-07-30 00:26:26.864075+00",
+        "difficulty": 29.1,
+        "old": {
+          "model": "gpt-5.4-mini",
+          "channel": "lucen-cx006-value-dynamic:gpt-5.4-mini:responses",
+          "predictedQuality": 0.5661161755987993,
+          "target": 68,
+          "targetHit": false,
+          "expectedCost": 0.00101961,
+          "expectedCostIncludingFallback": 0.01815577,
+          "expectedFallbackCount": 0.5738838244012007
+        },
+        "current": {
+          "model": "gpt-5.6-luna",
+          "channel": "lucen-cx006-value-dynamic:gpt-5.6-luna:responses",
+          "predictedQuality": 0.933046686585632,
+          "target": 74,
+          "targetHit": true,
+          "expectedCost": 0.00135948,
+          "expectedCostIncludingFallback": 0.01869841658164304,
+          "expectedFallbackCount": 0.20695331341436807
+        },
+        "modelChanged": true,
+        "channelChanged": true
+      },
+      {
+        "routeDecisionId": "route_40c4db54820347a6ad62e5a0ca95af14",
+        "createdAt": "2026-07-30 05:39:48.545208+00",
+        "difficulty": 39.8,
+        "old": {
+          "model": "gpt-5.4-mini",
+          "channel": "lucen-cx006-value-dynamic:gpt-5.4-mini:responses",
+          "predictedQuality": 0.3725056807455702,
+          "target": 68,
+          "targetHit": false,
+          "expectedCost": 0.001013895,
+          "expectedCostIncludingFallback": 0.014557622999999999,
+          "expectedFallbackCount": 0.7674943192544298
+        },
+        "current": {
+          "model": "gpt-5.6-luna",
+          "channel": "lucen-cx006-value-dynamic:gpt-5.6-luna:responses",
+          "predictedQuality": 0.8481154984296476,
+          "target": 74,
+          "targetHit": true,
+          "expectedCost": 0.0013518599999999999,
+          "expectedCostIncludingFallback": 0.015180803232593972,
+          "expectedFallbackCount": 0.2918845015703524
+        },
+        "modelChanged": true,
+        "channelChanged": true
+      },
+      {
+        "routeDecisionId": "route_db98dfeeb76843c1af62a20193820622",
+        "createdAt": "2026-07-30 09:35:35.631448+00",
+        "difficulty": 28.6,
+        "old": {
+          "model": "gpt-5.4-mini",
+          "channel": "lucen-cx006-value-dynamic:gpt-5.4-mini:responses",
+          "predictedQuality": 0.5758507566308199,
+          "target": 68,
+          "targetHit": false,
+          "expectedCost": 0.0010135349999999999,
+          "expectedCostIncludingFallback": 0.022453035,
+          "expectedFallbackCount": 0.5641492433691802
+        },
+        "current": {
+          "model": "gpt-5.6-luna",
+          "channel": "lucen-cx006-plus:gpt-5.6-luna:responses",
+          "predictedQuality": 0.9357348926858757,
+          "target": 74,
+          "targetHit": true,
+          "expectedCost": 0.00135138,
+          "expectedCostIncludingFallback": 0.022990443537339075,
+          "expectedFallbackCount": 0.20426510731412428
+        },
+        "modelChanged": true,
+        "channelChanged": true
+      },
+      {
+        "routeDecisionId": "route_96c83cd7921b4e59a0053aa7be4d4ece",
+        "createdAt": "2026-07-31 15:35:55.574604+00",
+        "difficulty": 56.9,
+        "old": {
+          "model": "glm-5.1",
+          "channel": "lucen-glm-official-openai-030:glm-5.1:responses",
+          "predictedQuality": 0.46818403435824507,
+          "target": 68,
+          "targetHit": false,
+          "expectedCost": 0.006586950000000001,
+          "expectedCostIncludingFallback": 0.034252950000000004,
+          "expectedFallbackCount": 0.611815965641755
+        },
+        "current": {
+          "model": "glm-5.2",
+          "channel": "lucen-glm-official-openai-030:glm-5.2:responses",
+          "predictedQuality": 0.816443924144239,
+          "target": 74,
+          "targetHit": true,
+          "expectedCost": 0.008670599999999999,
+          "expectedCostIncludingFallback": 0.03734002272119154,
+          "expectedFallbackCount": 0.2835560758557609
+        },
+        "modelChanged": true,
+        "channelChanged": true
+      },
+      {
+        "routeDecisionId": "route_659fb74d351b461e8eb66be7644f5b67",
+        "createdAt": "2026-07-31 16:19:17.242838+00",
+        "difficulty": 42,
+        "old": {
+          "model": "gemini-2.5-flash",
+          "channel": "lucen-gemini-openai-030:gemini-2.5-flash:responses",
+          "predictedQuality": 0.3894636961838444,
+          "target": 68,
+          "targetHit": false,
+          "expectedCost": 0.001476765,
+          "expectedCostIncludingFallback": 0.07115842500000001,
+          "expectedFallbackCount": 0.7505363038161557
+        },
+        "current": {
+          "model": "glm-5.2",
+          "channel": "lucen-glm-official-openai-030:glm-5.2:responses",
+          "predictedQuality": 0.9157704202706304,
+          "target": 74,
+          "targetHit": true,
+          "expectedCost": 0.011670119999999999,
+          "expectedCostIncludingFallback": 0.08219712516423057,
+          "expectedFallbackCount": 0.1842295797293696
+        },
+        "modelChanged": true,
+        "channelChanged": true
+      },
+      {
+        "routeDecisionId": "route_5aa37b15929047bfaa70715347f0b611",
+        "createdAt": "2026-07-31 16:22:46.662288+00",
+        "difficulty": 54.9,
+        "old": {
+          "model": "glm-5.1",
+          "channel": "lucen-glm-official-openai-030:glm-5.1:responses",
+          "predictedQuality": 0.4972930447712693,
+          "target": 68,
+          "targetHit": false,
+          "expectedCost": 0.00925428,
+          "expectedCostIncludingFallback": 0.051362279999999996,
+          "expectedFallbackCount": 0.5827069552287307
+        },
+        "current": {
+          "model": "glm-5.2",
+          "channel": "lucen-glm-official-openai-030:glm-5.2:responses",
+          "predictedQuality": 0.8328620058121508,
+          "target": 74,
+          "targetHit": true,
+          "expectedCost": 0.01222704,
+          "expectedCostIncludingFallback": 0.05561288497822979,
+          "expectedFallbackCount": 0.2671379941878492
+        },
+        "modelChanged": true,
+        "channelChanged": true
+      }
+    ]
+  },
+  "limitations": [
+    "Counterfactual selection reuses the candidate set and effective per-call costs captured in each production Route Decision.",
+    "It does not infer Profiles that were absent from the historical Router input.",
+    "Observed fallback count is factual; counterfactual fallback count is the summed conservative failure probability."
+  ]
+}

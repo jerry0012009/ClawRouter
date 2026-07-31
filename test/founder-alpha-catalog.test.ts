@@ -30,7 +30,8 @@ describe("Founder Alpha New API catalog export", () => {
       expect(item.curve).toHaveLength(101);
       expect(item.curve[0].difficultyScore).toBe(0);
       expect(item.curve[100].difficultyScore).toBe(100);
-      const protocols = new Set(profiles.filter((profile: { modelId: string }) => profile.modelId === item.modelId)
+      const protocols = new Set(profiles.filter((profile: { modelId: string; autoRouteEnabled?: boolean }) =>
+        profile.modelId === item.modelId && profile.autoRouteEnabled !== false)
         .flatMap((profile: { protocols: string[] }) => profile.protocols));
       expect(item.protocol).toBe([...protocols].sort()
         .map((protocol) => protocol === "responses" ? "Responses" : "Messages").join(" + "));

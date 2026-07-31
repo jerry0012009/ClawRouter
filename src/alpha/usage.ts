@@ -11,6 +11,25 @@ export type AlphaUsage = {
   providerCostUsd: string;
 };
 
+export type ProviderBillingStatus = "provider_usage_verified" | "estimated" | "unknown";
+
+export function classifyProviderBilling(usage: Pick<AlphaUsage, "usageSource">): ProviderBillingStatus {
+  return usage.usageSource === "provider_usage" ? "provider_usage_verified" : "unknown";
+}
+
+export function resolveProviderBilling(usage: Pick<AlphaUsage, "usageSource" | "providerCostUsd">): {
+  actualCostUsd: string;
+  providerBilled: true | undefined;
+  billingStatus: ProviderBillingStatus;
+} {
+  const verified = usage.usageSource === "provider_usage";
+  return {
+    actualCostUsd: verified ? usage.providerCostUsd : "0.0000000000",
+    providerBilled: verified ? true : undefined,
+    billingStatus: classifyProviderBilling(usage),
+  };
+}
+
 function object(value: unknown): Record<string, unknown> | undefined {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>

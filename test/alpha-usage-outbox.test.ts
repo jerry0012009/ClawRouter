@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import type { PendingUsageReport } from "../src/alpha/repository.js";
+import { classifyProviderBilling, resolveProviderBilling } from "../src/alpha/usage.js";
 import {
   UsageOutboxWorker,
   signUsageFinalizeBody,
@@ -42,6 +43,27 @@ function report(overrides: Partial<PendingUsageReport> = {}): PendingUsageReport
 }
 
 describe("Alpha Usage Finalize outbox", () => {
+  it("separates provider billing facts from transport delivery", () => {
+    expect(classifyProviderBilling({ usageSource: "provider_usage" })).toBe("provider_usage_verified");
+    expect(classifyProviderBilling({ usageSource: "response_text_estimate" })).toBe("unknown");
+    expect(resolveProviderBilling({
+      usageSource: "provider_usage",
+      providerCostUsd: "0.0174000000",
+    })).toEqual({
+      actualCostUsd: "0.0174000000",
+      providerBilled: true,
+      billingStatus: "provider_usage_verified",
+    });
+    expect(resolveProviderBilling({
+      usageSource: "response_text_estimate",
+      providerCostUsd: "0.0174000000",
+    })).toEqual({
+      actualCostUsd: "0.0000000000",
+      providerBilled: undefined,
+      billingStatus: "unknown",
+    });
+  });
+
   it("serializes the authoritative report and signs the exact bytes", () => {
     const body = usageFinalizeBody(report());
     const parsed = JSON.parse(body.toString("utf8")) as Record<string, unknown>;

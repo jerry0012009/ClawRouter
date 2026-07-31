@@ -19,7 +19,7 @@ import {
 import type { AlphaGatewayTrace, AlphaIngressContext, AlphaExecutionResolution } from "./gateway.js";
 import type { NativeProviderAdapter } from "./provider.js";
 import type { TrustedNewApiIdentity } from "./trusted-identity.js";
-import { parseProviderUsage } from "./usage.js";
+import { parseProviderUsage, resolveProviderBilling } from "./usage.js";
 import { buildModelCurve, getAcuModel } from "../acu/catalog.js";
 import { ACU_ROUTING_MODEL_VERSION } from "../acu/config.js";
 import { AcuJudgeClientCancelledError, AcuJudgeContextLengthError } from "../acu/judge.js";
@@ -2529,8 +2529,11 @@ export class AlphaRequestProcessor {
     reasoningTokens?: bigint;
     providerCostUsd?: string;
     usageSource: string;
+    billingStatus?: string;
   }): Promise<void> {
     const providerCostUsd = input.providerCostUsd ?? "0.0000000000";
+    const billingStatus = input.billingStatus ?? (input.usageSource === "provider_usage"
+      ? "provider_usage_verified" : "unknown");
     const economics = input.context.selectedProfile.economics;
     const providerCash = economics
       ? providerCostBreakdown(economics, Number(providerCostUsd))
@@ -2695,6 +2698,7 @@ export class AlphaRequestProcessor {
         user_charge_cny: actualTotalCashCostCny,
         counterfactual_quality_ceiling_cost_cny: counterfactualQualityCeilingCostCny,
         usageSource: input.usageSource,
+        billing_status: billingStatus,
         reasoning_effort: input.context.reasoningEffort,
         routing_preference: input.context.routeSummary.routingPreference,
         mode: input.context.routeSummary.mode,
@@ -2904,6 +2908,7 @@ export class AlphaRequestProcessor {
       }
     }
     const transportSuccess = relay.httpStatus >= 200 && relay.httpStatus < 300 && relay.complete;
+    const billing = resolveProviderBilling(usage);
     const success = transportSuccess && !webRequiredFailure;
     const status = relay.clientCancelled ? "cancelled" : success ? "success" : "error";
     const errorCategory = success
@@ -2956,8 +2961,8 @@ export class AlphaRequestProcessor {
       outputTokens: usage.outputTokens,
       reasoningTokens: usage.reasoningTokens,
       usageSource: usage.usageSource,
-      actualCostUsd: transportSuccess ? usage.providerCostUsd : "0.0000000000",
-      providerBilled: transportSuccess ? true : undefined,
+      actualCostUsd: billing.actualCostUsd,
+      providerBilled: billing.providerBilled,
       visibleOutputBytes: relay.modelVisibleOutputBytes,
       metadata: {
         complete: relay.complete,
@@ -2979,6 +2984,8 @@ export class AlphaRequestProcessor {
         model_visible_output_bytes: relay.modelVisibleOutputBytes,
         first_model_event_at: relay.firstModelEventAt,
         first_model_event_latency_ms: relay.firstModelEventLatencyMs,
+        billingStatus: billing.billingStatus,
+        providerBilled: billing.providerBilled === true,
       },
     });
     const canonicalModel = canonicalActualModel(context.selectedProfile, usage.actualModel);
@@ -3047,8 +3054,9 @@ export class AlphaRequestProcessor {
       cachedInputTokens: usage.cachedInputTokens,
       outputTokens: usage.outputTokens,
       reasoningTokens: usage.reasoningTokens,
-      providerCostUsd: transportSuccess ? usage.providerCostUsd : "0.0000000000",
+      providerCostUsd: billing.actualCostUsd,
       usageSource: usage.usageSource,
+      billingStatus: billing.billingStatus,
     });
   }
 }

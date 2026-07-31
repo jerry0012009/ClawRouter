@@ -48,6 +48,10 @@ export type AlphaGatewayOptions = {
     load(range: MonitorRange): Promise<Record<string, unknown>>;
     pause(channelId: string, durationMinutes: 30 | 120, actor: string): Promise<Record<string, unknown>>;
   };
+  adminSelectionCorridor?: {
+    token: string;
+    load(inputTokens: number, expectedOutputTokens: number): Promise<Record<string, unknown>>;
+  };
   models?: string[];
   requirePrivateNetwork?: boolean;
   healthCheck?(): Promise<Record<string, unknown>>;
@@ -170,6 +174,28 @@ export function createAlphaGatewayServer(options: AlphaGatewayOptions): Server {
         response.end(JSON.stringify(result));
       } catch (error) {
         jsonError(response, 400, error instanceof Error ? error.message : "Channel monitor request failed");
+      }
+      return;
+    }
+    if (url.pathname === "/internal/admin/selection-corridor" && request.method === "GET") {
+      if (!options.adminSelectionCorridor) {
+        jsonError(response, 404, "Unsupported ACU endpoint");
+        return;
+      }
+      const token = adminBearerToken(request);
+      if (!token || !tokenMatches(token, options.adminSelectionCorridor.token)) {
+        jsonError(response, token ? 403 : 401, token ? "Administrator identity is not authorized" : "Administrator bearer token is required");
+        return;
+      }
+      try {
+        const inputTokens = Math.max(1, Math.min(1_000_000, Number(url.searchParams.get("inputTokens")) || 100_000));
+        const expectedOutputTokens = Math.max(1, Math.min(100_000, Number(url.searchParams.get("expectedOutputTokens")) || 4_000));
+        const result = await options.adminSelectionCorridor.load(inputTokens, expectedOutputTokens);
+        response.setHeader("cache-control", "no-store");
+        response.setHeader("content-type", "application/json");
+        response.end(JSON.stringify(result));
+      } catch (error) {
+        jsonError(response, 503, error instanceof Error ? error.message : "ACU selection corridor is unavailable");
       }
       return;
     }

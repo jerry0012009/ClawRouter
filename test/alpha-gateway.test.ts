@@ -50,6 +50,31 @@ afterEach(async () => {
 });
 
 describe("Alpha native protocol gateway", () => {
+  it("serves an authenticated zero-call selection corridor projection", async () => {
+    const calls: Array<{ inputTokens: number; expectedOutputTokens: number }> = [];
+    const gatewayPort = await listen(createAlphaGatewayServer({
+      trustedIdentitySecret: sharedSecret,
+      adminSelectionCorridor: {
+        token: "corridor-token",
+        async load(inputTokens, expectedOutputTokens) {
+          calls.push({ inputTokens, expectedOutputTokens });
+          return { formulaVersion: "acu-routing-model-v0.3", series: { balanced: [] } };
+        },
+      },
+      async resolveExecution() { throw new Error("corridor projection must not route an execution"); },
+    }));
+    const unauthorized = await fetch(`http://127.0.0.1:${gatewayPort}/internal/admin/selection-corridor`);
+    expect(unauthorized.status).toBe(401);
+    const response = await fetch(
+      `http://127.0.0.1:${gatewayPort}/internal/admin/selection-corridor?inputTokens=24000&expectedOutputTokens=1200`,
+      { headers: { authorization: "Bearer corridor-token" } },
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(await response.json()).toMatchObject({ formulaVersion: "acu-routing-model-v0.3" });
+    expect(calls).toEqual([{ inputTokens: 24000, expectedOutputTokens: 1200 }]);
+  });
+
   it("protects Channel Monitor and records an authorized manual pause", async () => {
     const pauses: Array<{ channelId: string; durationMinutes: number; actor: string }> = [];
     const gatewayPort = await listen(createAlphaGatewayServer({

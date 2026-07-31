@@ -21,6 +21,7 @@ import type { NativeProviderAdapter } from "./provider.js";
 import type { TrustedNewApiIdentity } from "./trusted-identity.js";
 import { parseProviderUsage } from "./usage.js";
 import { buildModelCurve, getAcuModel } from "../acu/catalog.js";
+import { ACU_ROUTING_MODEL_VERSION } from "../acu/config.js";
 import { AcuJudgeClientCancelledError, AcuJudgeContextLengthError } from "../acu/judge.js";
 import { cashCnyPerNominalUsd, providerCostBreakdown, type ProviderEconomics } from "./provider-economics.js";
 import {
@@ -403,7 +404,7 @@ export class AlphaRequestProcessor {
     this.expectedOutputTokens = options.expectedOutputTokens ?? 800;
   }
 
-  private async effectiveProfiles(allowedProfileIds: string[] = []): Promise<{ profiles: AlphaExecutionProfile[]; probeClaims: Array<{ scope: "channel" | "profile"; id: string }> }> {
+  private async effectiveProfiles(allowedProfileIds: string[] = [], wakeProbe = true): Promise<{ profiles: AlphaExecutionProfile[]; probeClaims: Array<{ scope: "channel" | "profile"; id: string }> }> {
     const repository = new AlphaRepository(this.options.database);
     const channelIds = this.options.profiles.map((profile) => profile.channelId ?? profile.channel);
     const executionProfileIds = this.options.profiles.map((profile) => profile.executionProfileId);
@@ -448,8 +449,95 @@ export class AlphaRequestProcessor {
           || profile.webSearchFailureReason,
       };
     });
-    if (probeCandidateId) this.options.wakeProbe?.(probeCandidateId);
+    if (wakeProbe && probeCandidateId) this.options.wakeProbe?.(probeCandidateId);
     return { profiles, probeClaims: [] };
+  }
+
+  async selectionCorridor(inputTokens: number, expectedOutputTokens: number): Promise<Record<string, unknown>> {
+    const { profiles } = await this.effectiveProfiles([], false);
+    const preferences = ["economy", "balanced", "quality"] as const;
+    const factors = {
+      reasoningDepth: 0,
+      taskScope: 0,
+      constraintDensity: 0,
+      toolDependency: 0,
+      verificationBurden: 0,
+      contextBurden: 0,
+    };
+    const series = Object.fromEntries(preferences.map((preference) => {
+      const points = Array.from({ length: 51 }, (_, index) => index * 2).flatMap((difficulty) => {
+        try {
+          const route = routeWithCurrentAcuFormula({
+            judge: {
+              pLow: 0.25,
+              pMid: 0.25,
+              pMidHigh: 0.25,
+              pHigh: 0.25,
+              confidence: 1,
+              difficultyScoreRaw: difficulty,
+              factors,
+              factorComposite: difficulty,
+              difficultyIndex: difficulty,
+              difficultyMethodVersion: "acu-difficulty-index-v1",
+              difficultyScore: difficulty,
+              signals: [],
+              explanation: "",
+            },
+            judgeCost: 0,
+            inputTokens,
+            expectedOutputTokens,
+            effectiveQualityTarget: 80,
+            routingPreference: preference,
+            profiles,
+            requirements: {
+              protocol: "responses",
+              requireTools: false,
+              requireThinking: false,
+              contextTokens: inputTokens + expectedOutputTokens,
+              expectedOutputTokens,
+              webIntent: "not_required",
+            },
+          });
+          const candidates = [...route.candidateEstimates]
+            .filter((candidate) => candidate.paretoEfficient)
+            .sort((left, right) => right.valueUtility - left.valueUtility)
+            .slice(0, 3);
+          return [{
+            difficulty,
+            selectedModelId: route.recommendation.recommended.modelId,
+            selectedQuality: route.recommendation.recommended.estimatedQuality * 100,
+            selectedCostCny: route.recommendation.recommended.estimatedCallCost,
+            qualityLower: Math.min(...candidates.map((candidate) => candidate.qualityLower * 100)),
+            qualityUpper: Math.max(...candidates.map((candidate) => candidate.qualityUpper * 100)),
+            candidates: candidates.map((candidate) => ({
+              modelId: candidate.modelId,
+              quality: candidate.estimatedQuality * 100,
+              costCny: candidate.estimatedCallCost,
+              valueUtility: candidate.valueUtility,
+            })),
+          }];
+        } catch {
+          return [];
+        }
+      });
+      return [preference, points];
+    }));
+    return {
+      formulaVersion: ACU_ROUTING_MODEL_VERSION,
+      generatedAt: new Date().toISOString(),
+      inputTokens,
+      expectedOutputTokens,
+      assumptions: {
+        protocol: "responses",
+        tools: false,
+        webIntent: "not_required",
+        baseQualityTarget: 80,
+        judgeCostIncluded: false,
+        currentHealthApplied: true,
+        candidateDefinition: "top_3_pareto_by_value_utility",
+      },
+      series,
+    };
   }
 
   private async releaseUnusedProbeClaims(

@@ -537,6 +537,10 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
         };
       },
     },
+    adminSelectionCorridor: {
+      token: serviceConfig.adminTraceToken,
+      load: (inputTokens, expectedOutputTokens) => processor.selectionCorridor(inputTokens, expectedOutputTokens),
+    },
     models: profiles.map((item) => item.profile.modelId),
     maxRequestBytes: serviceConfig.maxRequestBytes,
     resolveExecution: processor.resolveExecution.bind(processor),

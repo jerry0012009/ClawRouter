@@ -1,6 +1,6 @@
 export const ACU_PROMPT_VERSION = "acu-tier-requirement-v4";
 export const ACU_DIFFICULTY_METHOD_VERSION = "acu-difficulty-index-v1" as const;
-export const ACU_ROUTING_MODEL_VERSION = "acu-routing-model-v0.3";
+export const ACU_ROUTING_MODEL_VERSION = "acu-routing-model-v0.4";
 export const ACU_DEFAULT_JUDGE_MODEL = "mimo-v2.5-pro";
 export const ACU_DEFAULT_JUDGE_BASE_URL = "https://token-plan-cn.xiaomimimo.com/v1";
 export const ACU_DEFAULT_JUDGE_MODE = "non-thinking" as const;

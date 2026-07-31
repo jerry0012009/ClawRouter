@@ -25,8 +25,8 @@ export type RoutingPreferenceParameters = {
 };
 
 export const ROUTING_PREFERENCE_PARAMETERS: Record<RoutingPreference, RoutingPreferenceParameters> = {
-  economy: { qualityTargetOffset: -8, costSensitivity: 2.4, fallbackRiskScale: 0.15 },
-  balanced: { qualityTargetOffset: 0, costSensitivity: 1, fallbackRiskScale: 1 },
+  economy: { qualityTargetOffset: -12, costSensitivity: 3, fallbackRiskScale: 0 },
+  balanced: { qualityTargetOffset: -3, costSensitivity: 1.4, fallbackRiskScale: 0.25 },
   quality: { qualityTargetOffset: 8, costSensitivity: 0.45, fallbackRiskScale: 1.25 },
 };
 

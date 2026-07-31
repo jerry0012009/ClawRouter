@@ -4190,7 +4190,7 @@ import { createHash as createHash5, randomUUID } from "crypto";
 // src/acu/config.ts
 var ACU_PROMPT_VERSION = "acu-tier-requirement-v4";
 var ACU_DIFFICULTY_METHOD_VERSION = "acu-difficulty-index-v1";
-var ACU_ROUTING_MODEL_VERSION = "acu-routing-model-v0.3";
+var ACU_ROUTING_MODEL_VERSION = "acu-routing-model-v0.4";
 var ACU_DEFAULT_JUDGE_MODEL = "mimo-v2.5-pro";
 var ACU_DEFAULT_JUDGE_BASE_URL = "https://token-plan-cn.xiaomimimo.com/v1";
 var ACU_DEFAULT_JUDGE_MODE = "non-thinking";

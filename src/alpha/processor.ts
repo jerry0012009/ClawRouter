@@ -524,8 +524,12 @@ export class AlphaRequestProcessor {
               webIntent: "not_required",
             },
           });
+          const selectedUtility = route.recommendation.recommended.valueUtility;
           const candidates = [...route.candidateEstimates]
-            .filter((candidate) => candidate.paretoEfficient)
+            .filter((candidate) => candidate.paretoEfficient && (
+              candidate.modelId === route.recommendation.recommended.modelId
+              || candidate.valueUtility >= selectedUtility * 0.85
+            ))
             .sort((left, right) => right.valueUtility - left.valueUtility)
             .slice(0, 3);
           return [{
@@ -560,7 +564,7 @@ export class AlphaRequestProcessor {
         baseQualityTarget: 80,
         judgeCostIncluded: false,
         currentHealthApplied: true,
-        candidateDefinition: "top_3_pareto_by_value_utility",
+        candidateDefinition: "selected_and_near_optimal_pareto_within_15pct_value",
       },
       series,
     };
@@ -957,6 +961,7 @@ export class AlphaRequestProcessor {
     const storedProfile = selectedProfileFromSegment(storedSegment, effectiveProfiles);
     const previousJudge = record(storedSegmentMetadata.judgeRun) as AlphaJudgeRun | undefined;
     const policyVersionMatches = metadata(storedSegment).userRoutingPolicyVersion === identity.routingPolicyVersion;
+    const formulaVersionMatches = storedSegmentMetadata.routingModelVersion === ACU_ROUTING_MODEL_VERSION;
     const storedAllowedProfileIds = Array.isArray(storedSegmentMetadata.allowedProfileIds)
       ? storedSegmentMetadata.allowedProfileIds.filter((value): value is string => typeof value === "string").sort()
       : [];
@@ -964,6 +969,7 @@ export class AlphaRequestProcessor {
       !== JSON.stringify([...identity.allowedProfileIds].sort());
     const reused = storedProfile
       && policyVersionMatches
+      && formulaVersionMatches
       && identity.routingPolicy !== "explicit_only"
       && (identity.routingPolicy !== "custom_allowlist" || identity.allowedModelIds.includes(storedProfile.modelId))
       && (identity.allowedProfileIds.length === 0 || identity.allowedProfileIds.includes(storedProfile.executionProfileId))
@@ -1021,7 +1027,9 @@ export class AlphaRequestProcessor {
     }
 
     const reusedJudgeEvaluationId = stringValue(storedSegment?.judge_evaluation_id);
-    const routeRefreshReason = profilePolicyChanged ? "profile_policy_changed" : "profile_health";
+    const routeRefreshReason = profilePolicyChanged
+      ? "profile_policy_changed"
+      : !formulaVersionMatches ? "routing_formula_changed" : "profile_health";
     const profileHealthRefresh = !state.decision.runJudge
       && Boolean(reusedJudgeEvaluationId)
       && Boolean(previousJudge)
@@ -1139,6 +1147,7 @@ export class AlphaRequestProcessor {
           userRoutingPolicyVersion: identity.routingPolicyVersion,
           allowedProfileIds: identity.allowedProfileIds,
           routingPreference: identity.routingPreference,
+          routingModelVersion: ACU_ROUTING_MODEL_VERSION,
           routeRefreshReason,
         },
       });
@@ -1634,6 +1643,7 @@ export class AlphaRequestProcessor {
         userRoutingPolicyVersion: identity.routingPolicyVersion,
         allowedProfileIds: identity.allowedProfileIds,
         routingPreference: identity.routingPreference,
+        routingModelVersion: ACU_ROUTING_MODEL_VERSION,
       },
     });
     await this.releaseUnusedProbeClaims(probeClaims, route.selectedProfile);

@@ -98,7 +98,9 @@ describe("Alpha current-formula routing", () => {
       inputTokens: 12_000,
       expectedOutputTokens: 1_000,
       judgeCost: 0.001,
-      qualityTarget: 0.88,
+      qualityTarget: 0.85,
+      costSensitivity: 1.4,
+      fallbackRiskScale: 0.25,
       eligibleModelIds: ["gpt-5.4-mini", "gpt-5.5"],
       requireToolCallSupport: true,
     });
@@ -321,7 +323,7 @@ describe("Alpha current-formula routing", () => {
         ));
         decisions.forEach((decision, index) => {
           selected[(["economy", "balanced", "quality"] as const)[index]].add(decision.selectedProfile.modelId);
-          expect(decision.formulaVersion).toBe("acu-routing-model-v0.3");
+          expect(decision.formulaVersion).toBe("acu-routing-model-v0.4");
         });
         const balancedQuality = decisions[1].recommendation.recommended.estimatedQuality;
         const qualityQuality = decisions[2].recommendation.recommended.estimatedQuality;

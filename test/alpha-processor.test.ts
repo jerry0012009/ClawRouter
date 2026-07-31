@@ -478,7 +478,7 @@ run("Alpha PostgreSQL request processor", () => {
       pareto_models: "1",
       excluded_profiles: [],
       routing_preference: "balanced",
-      routing_model_version: "acu-routing-model-v0.3",
+      routing_model_version: "acu-routing-model-v0.4",
     });
     const payloadKinds = await database.query<{ payload_kind: string }>(
       "SELECT payload_kind FROM acu_payloads WHERE newapi_user_id='user-auto' ORDER BY created_at,payload_kind",

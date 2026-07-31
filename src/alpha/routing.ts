@@ -30,7 +30,7 @@ export type RoutingPreferenceParameters = {
 };
 
 export const ROUTING_PREFERENCE_PARAMETERS: Record<RoutingPreference, RoutingPreferenceParameters> = {
-  economy: { qualityTargetOffset: -12, costSensitivity: 3, fallbackRiskScale: 0 },
+  economy: { qualityTargetOffset: -6, costSensitivity: 1.8, fallbackRiskScale: 0.35 },
   balanced: { qualityTargetOffset: -3, costSensitivity: 1.4, fallbackRiskScale: 0.25 },
   quality: { qualityTargetOffset: 8, costSensitivity: 0.45, fallbackRiskScale: 1.25 },
 };
@@ -182,6 +182,7 @@ export type AlphaRouteDecision = {
   }>;
   paretoFrontier: string[];
   excludedProfiles: ExcludedProfile[];
+  eligibleProfileIds: string[];
 };
 
 function nominalPrice(modelId: string): { inputPricePerMillion: number; outputPricePerMillion: number } {
@@ -463,6 +464,7 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
       .filter((estimate) => estimate.paretoEfficient)
       .map((estimate) => estimate.modelId),
     excludedProfiles,
+    eligibleProfileIds: eligibleProfiles.map((profile) => profile.executionProfileId),
   };
 }
 

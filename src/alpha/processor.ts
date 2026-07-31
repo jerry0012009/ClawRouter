@@ -140,6 +140,7 @@ type PreparedState = {
   effectiveQualityTarget: number;
   isNewTask: boolean;
   rootGoalText?: string;
+  effectiveReasoningEffort?: string;
 };
 
 function metadata(row: JsonObject | undefined): JsonObject {
@@ -354,18 +355,20 @@ export function prepareProviderBody(
   model: string,
   envelope: CanonicalEnvelope,
   profile: AlphaExecutionProfile,
+  reasoningEffortOverride?: string,
 ): { body: Buffer; webToolPruned: boolean; pruneReason?: string } {
-  void envelope;
-  void profile;
   const parsed = JSON.parse(Buffer.from(rawBody).toString("utf8")) as JsonObject;
-  const providerModel = typeof parsed.model === "string" ? parsed.model : "";
-  if (providerModel === model) {
-    return { body: Buffer.from(rawBody), webToolPruned: false };
+  const next: JsonObject = { ...parsed, model };
+  if (reasoningEffortOverride === "high" && profile.thinkingSupport) {
+    if (envelope.protocol === "responses") {
+      const existing = record(parsed.reasoning) ?? {};
+      next.reasoning = { ...existing, effort: "high" };
+    } else if (envelope.protocol === "messages") {
+      const existing = record(parsed.thinking) ?? {};
+      next.thinking = { type: "enabled", ...existing, budget_tokens: numberValue(existing.budget_tokens, 16_000) };
+    }
   }
-  return {
-    body: Buffer.from(JSON.stringify({ ...parsed, model })),
-    webToolPruned: false,
-  };
+  return { body: Buffer.from(JSON.stringify(next)), webToolPruned: false };
 }
 
 function responseContentType(headers: Record<string, string>): string {
@@ -439,9 +442,9 @@ export class AlphaRequestProcessor {
         || runtime?.state === "open" || runtime?.state === "half_open")) probeCandidateId = profile.executionProfileId;
       const unavailable = channel?.state === "disabled" || runtime?.state === "disabled"
         || channel?.state === "open" || channel?.state === "half_open"
-        || runtime?.state === "open" || runtime?.state === "half_open"
-        || staleFreshnessRequired;
-      const degraded = [channel?.state, runtime?.state].some((state) => state === "degraded");
+        || runtime?.state === "open" || runtime?.state === "half_open";
+      const degraded = staleFreshnessRequired
+        || [channel?.state, runtime?.state].some((state) => state === "degraded");
       return {
         ...profile,
         health: unavailable ? "cooldown" as const : degraded ? "degraded" as const : profile.health,
@@ -798,6 +801,10 @@ export class AlphaRequestProcessor {
         taskBaseQualityTarget: baseQualityTarget,
         capabilityEscalationFloor: capabilityFloor,
         effectiveQualityTarget,
+        effectiveReasoningEffort: (decision.reason === "plan_started" || nextMetadata.planningActive === true)
+          && envelope.reasoningEffort !== "low"
+          ? "high"
+          : envelope.reasoningEffort,
         isNewTask,
         rootGoalText: stringValue(taskRow.root_goal_text),
       };
@@ -862,7 +869,7 @@ export class AlphaRequestProcessor {
         requireTools: envelope.requiredToolTypes.length > 0,
         requiredToolTypes: envelope.requiredToolTypes,
         requireThinking: envelope.containsThinking,
-        reasoningEffort: envelope.reasoningEffort,
+        reasoningEffort: state.effectiveReasoningEffort,
         context: contextAdmission,
         expectedOutputTokens: this.expectedOutputTokens,
         allowedProfileIds: identity.allowedProfileIds.length > 0 ? identity.allowedProfileIds : undefined,
@@ -911,7 +918,7 @@ export class AlphaRequestProcessor {
           formulaInputs: {
             requestedModel: envelope.requestedModel,
             judgeCalls: 0,
-            reasoningEffort: envelope.reasoningEffort,
+            reasoningEffort: state.effectiveReasoningEffort,
             requiredToolTypes: envelope.requiredToolTypes,
             ...webIntentMetadata(webIntentDecision),
             userRoutingPolicy: identity.routingPolicy,
@@ -1000,7 +1007,7 @@ export class AlphaRequestProcessor {
         requireTools: envelope.requiredToolTypes.length > 0,
         requiredToolTypes: envelope.requiredToolTypes,
         requireThinking: envelope.containsThinking,
-        reasoningEffort: envelope.reasoningEffort,
+        reasoningEffort: state.effectiveReasoningEffort,
         context: contextAdmission,
         expectedOutputTokens: this.expectedOutputTokens,
         allowedModelIds: identity.routingPolicy === "custom_allowlist" ? identity.allowedModelIds : undefined,
@@ -1073,7 +1080,7 @@ export class AlphaRequestProcessor {
             requireTools: envelope.requiredToolTypes.length > 0,
             requiredToolTypes: envelope.requiredToolTypes,
             requireThinking: envelope.containsThinking,
-            reasoningEffort: envelope.reasoningEffort,
+            reasoningEffort: state.effectiveReasoningEffort,
             context: contextAdmission,
             expectedOutputTokens: this.expectedOutputTokens,
             allowedModelIds: identity.routingPolicy === "all_routing_eligible"
@@ -1145,6 +1152,7 @@ export class AlphaRequestProcessor {
           allowedProfileIds: identity.allowedProfileIds,
           providerCandidateEstimates: route.providerCandidateEstimates,
           excludedProfiles: route.excludedProfiles,
+          eligibleProfileIds: route.eligibleProfileIds,
           costUnit: "CNY",
           ...webIntentMetadata(previousJudge.webIntentDecision),
         },
@@ -1491,7 +1499,7 @@ export class AlphaRequestProcessor {
         requireTools: envelope.requiredToolTypes.length > 0,
         requiredToolTypes: envelope.requiredToolTypes,
         requireThinking: envelope.containsThinking,
-        reasoningEffort: envelope.reasoningEffort,
+        reasoningEffort: state.effectiveReasoningEffort,
         context: contextAdmission,
         expectedOutputTokens: this.expectedOutputTokens,
         allowedModelIds: identity.routingPolicy === "all_routing_eligible"
@@ -1581,6 +1589,7 @@ export class AlphaRequestProcessor {
         exclusionReason: exclusionCategory(profile.reasons[0] ?? "adapter"),
         exclusionDetail: profile.reasons[0] ?? "adapter",
       })),
+      eligibleProfileIds: route.eligibleProfileIds,
       selectedModel: route.selectedProfile.modelId,
       selectedChannel: route.selectedProfile.channelId ?? route.selectedProfile.channel,
       modelSelectionReason: route.recommendation.reason,
@@ -1635,10 +1644,11 @@ export class AlphaRequestProcessor {
         hardFilteredCandidateModelCount: route.candidateEstimates.length,
         paretoFrontierCandidateCount: route.paretoFrontier.length,
         excludedProfiles: route.excludedProfiles,
+        eligibleProfileIds: route.eligibleProfileIds,
         costUnit: "CNY",
         providerSelectionReason: route.providerSelectionReason,
         providerCandidateEstimates: route.providerCandidateEstimates,
-        reasoningEffort: envelope.reasoningEffort,
+        reasoningEffort: state.effectiveReasoningEffort,
         requiredToolTypes: envelope.requiredToolTypes,
         clientDeclaredWebTool: envelope.clientDeclaredWebTool,
         hostedWebRequired: envelope.hostedWebRequired,
@@ -2008,7 +2018,7 @@ export class AlphaRequestProcessor {
         newapiLogId: identity.newapiLogId,
         requestBodySha256: identity.bodySha256,
         requestIdentityVersion: "trusted-request-instance-v1",
-        reasoningEffort: envelope.reasoningEffort,
+        reasoningEffort: state.effectiveReasoningEffort,
         clientDeclaredWebTool: envelope.clientDeclaredWebTool,
         hostedWebRequired: envelope.hostedWebRequired,
         webIntent: envelope.webIntent,
@@ -2050,7 +2060,7 @@ export class AlphaRequestProcessor {
             newapiLogId: identity.newapiLogId,
             protocol: envelope.protocol,
             requestedModel: envelope.requestedModel,
-            reasoningEffort: envelope.reasoningEffort,
+            reasoningEffort: state.effectiveReasoningEffort,
             selectedProfile: replayProfile,
             judgeCostUsd: "0.0000000000",
             judgeCashCostCny: "0.0000000000",
@@ -2201,6 +2211,7 @@ export class AlphaRequestProcessor {
       mode === "explicit" ? envelope.requestedModel : result.profile.providerModelId ?? result.profile.modelId,
       envelope,
       result.profile,
+      state.effectiveReasoningEffort,
     );
     const providerBody = prepared.body;
     const initialAttempt = await this.startProviderAttempt({
@@ -2230,7 +2241,7 @@ export class AlphaRequestProcessor {
       newapiLogId: identity.newapiLogId,
       protocol: envelope.protocol,
       requestedModel: envelope.requestedModel,
-      reasoningEffort: envelope.reasoningEffort,
+      reasoningEffort: state.effectiveReasoningEffort,
       selectedProfile: result.profile,
       networkEndpoint: initialAttempt.networkEndpoint,
       judgeCostUsd: result.judge?.costUsd ?? "0.0000000000",
@@ -2401,6 +2412,7 @@ export class AlphaRequestProcessor {
           mode === "explicit" ? envelope.requestedModel : profile.providerModelId ?? profile.modelId,
           envelope,
           profile,
+          state.effectiveReasoningEffort,
         );
         const retryBody = retryPrepared.body;
         const next = await this.startProviderAttempt({

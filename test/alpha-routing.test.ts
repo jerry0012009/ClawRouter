@@ -202,6 +202,7 @@ describe("Alpha current-formula routing", () => {
     });
     expect(result.candidateEstimates).toHaveLength(1);
     expect(result.candidateEstimates[0]?.executionProfileIds).toEqual(["verified", "optimistic"]);
+    expect(result.eligibleProfileIds).toEqual(["verified", "optimistic"]);
     expect(result.selectedProfile.executionProfileId).toBe("verified");
     expect(result.excludedProfiles).toEqual([]);
   });

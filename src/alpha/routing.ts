@@ -479,6 +479,16 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
     effectivePrices,
     switchCost: effectiveSwitchCost,
   });
+  const expectedCandidateModelIds = eligibleModelIds
+    .filter((modelId) => getAcuModel(modelId)?.routingEligible === true)
+    .sort();
+  const actualCandidateModelIds = recommendation.estimates.map((estimate) => estimate.modelId).sort();
+  if (expectedCandidateModelIds.length !== actualCandidateModelIds.length
+    || expectedCandidateModelIds.some((modelId, index) => modelId !== actualCandidateModelIds[index])) {
+    const message = `Router model candidate conservation failed: expected=${expectedCandidateModelIds.join(",")} actual=${actualCandidateModelIds.join(",")}`;
+    if (process.env.NODE_ENV === "test") throw new Error(message);
+    console.error(message);
+  }
   const selectedProfile = bestProfileByModel.get(recommendation.recommended.modelId);
   if (!selectedProfile) throw new Error("Selected model has no compatible execution profile");
   const providerCandidateEstimates = eligibleProfiles

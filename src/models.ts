@@ -45,13 +45,13 @@ export const BLOCKRUN_MODELS: ExtendedModelDefinition[] = [
 
   // ── OpenAI (GPT-5 series, need max_completion_tokens) ──
   // GPT-5.6 prices are official list prices. The current proxy exposes no
-  // billing metadata; text and streaming were verified on 2026-07-27, while
-  // tool calling was not verified and is therefore disabled conservatively.
-  { id: "gpt-5.6-sol", name: "GPT-5.6 Sol", upstream: "proxy", useMaxCompletionTokens: true, toolCalling: false, reasoning: true, input: ["text"],
+  // billing metadata; execution-profile preflight is the source of truth for
+  // per-Channel routing capability.
+  { id: "gpt-5.6-sol", name: "GPT-5.6 Sol", upstream: "proxy", useMaxCompletionTokens: true, reasoning: true, input: ["text", "image"],
     cost: { input: 5, output: 30, cacheRead: 0.5, cacheWrite: 5 }, contextWindow: 1_050_000, maxTokens: 128_000 },
-  { id: "gpt-5.6-terra", name: "GPT-5.6 Terra", upstream: "proxy", useMaxCompletionTokens: true, toolCalling: false, reasoning: true, input: ["text"],
+  { id: "gpt-5.6-terra", name: "GPT-5.6 Terra", upstream: "proxy", useMaxCompletionTokens: true, reasoning: true, input: ["text", "image"],
     cost: { input: 2.5, output: 15, cacheRead: 0.25, cacheWrite: 2.5 }, contextWindow: 1_050_000, maxTokens: 128_000 },
-  { id: "gpt-5.6-luna", name: "GPT-5.6 Luna", upstream: "proxy", useMaxCompletionTokens: true, toolCalling: false, reasoning: true, input: ["text"],
+  { id: "gpt-5.6-luna", name: "GPT-5.6 Luna", upstream: "proxy", useMaxCompletionTokens: true, reasoning: true, input: ["text", "image"],
     cost: { input: 1, output: 6, cacheRead: 0.1, cacheWrite: 1 }, contextWindow: 1_050_000, maxTokens: 128_000 },
   { id: "gpt-5.5", name: "GPT-5.5", upstream: "proxy", useMaxCompletionTokens: true, reasoning: true, input: ["text", "image"],
     cost: { input: 5, output: 30, cacheRead: 2.5, cacheWrite: 5 }, contextWindow: 1_048_576, maxTokens: 65_536 },

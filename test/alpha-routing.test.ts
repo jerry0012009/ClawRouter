@@ -82,6 +82,55 @@ const requirements: AlphaRouteRequirements = {
 };
 
 describe("Alpha current-formula routing", () => {
+  it("uses eligible execution Profiles as the capability source", () => {
+    const gpt56Profiles = ["sol", "terra", "luna"].map((tier): AlphaExecutionProfile => ({
+      executionProfileId: `verified:gpt-5.6-${tier}:responses`,
+      modelId: `gpt-5.6-${tier}`,
+      providerModelId: `gpt-5.6-${tier}`,
+      provider: "verified",
+      channel: tier,
+      protocols: ["responses"],
+      toolCallSupport: true,
+      supportedToolTypes: ["function", "custom", "local_tool"],
+      thinkingSupport: true,
+      contextWindow: 1_000_000,
+      health: "healthy",
+      enabled: true,
+      administratorAllowed: true,
+      usageTrusted: true,
+    }));
+    const result = routeWithCurrentAcuFormula({
+      judge,
+      judgeCost: 0,
+      inputTokens: 10_000,
+      expectedOutputTokens: 1_000,
+      effectiveQualityTarget: 80,
+      profiles: gpt56Profiles,
+      requirements: {
+        protocol: "responses",
+        requireTools: true,
+        requiredToolTypes: ["function", "custom", "local_tool"],
+        requireThinking: false,
+        contextTokens: 11_000,
+      },
+    });
+    expect(result.candidateEstimates.map((candidate) => candidate.modelId).sort()).toEqual([
+      "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra",
+    ]);
+  });
+
+  it("does not reapply Catalog vision capability after eligible model IDs are supplied", () => {
+    const result = recommendModel({
+      probabilities: judge,
+      difficultyScore: judge.difficultyIndex,
+      inputTokens: 1_000,
+      expectedOutputTokens: 100,
+      eligibleModelIds: ["deepseek-v4-flash"],
+      requireVisionSupport: true,
+    });
+    expect(result.estimates.map((estimate) => estimate.modelId)).toEqual(["deepseek-v4-flash"]);
+  });
+
   it("does not let shared Judge overhead change model selection or Pareto membership", () => {
     const input = {
       probabilities: judge,
@@ -156,6 +205,16 @@ describe("Alpha current-formula routing", () => {
     expect(result.utilities.get("cheap")?.costUtility).toBe(1);
     expect(result.utilities.get("expensive")?.costUtility).toBe(0);
     expect(result.selected.modelId).toBe("cheap");
+  });
+
+  it.each(["glm-5.2", "kimi-k3"])("does not select %s when Sol strictly dominates it", (dominatedModelId) => {
+    const candidates = [
+      { modelId: "gpt-5.6-sol", displayName: "Sol", predictedScore: 90, conservativeScore: 85, riskAdjustedCost: 0.04 },
+      { modelId: dominatedModelId, displayName: dominatedModelId, predictedScore: 80, conservativeScore: 75, riskAdjustedCost: 0.05 },
+    ];
+    const result = selectValueRoute(candidates, 80, 1.8);
+    expect(result.selected.modelId).toBe("gpt-5.6-sol");
+    expect(result.utilities.has(dominatedModelId)).toBe(false);
   });
 
   it("does not use meetsQualityTarget as a hard filter", () => {

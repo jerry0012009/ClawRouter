@@ -56,6 +56,7 @@ services:
       - ../../migrations/acu/0012_profile_policy_probe_worker.sql:/migration/0012_profile_policy_probe_worker.sql:ro
       - ../../migrations/acu/0013_full_pool_probe_runs.sql:/migration/0013_full_pool_probe_runs.sql:ro
       - ../../migrations/acu/0014_judge_same_model_failover.sql:/migration/0014_judge_same_model_failover.sql:ro
+      - ../../migrations/acu/0015_judge_profile_attempt_limit.sql:/migration/0015_judge_profile_attempt_limit.sql:ro
     networks: [alpha-backend]
     command:
       - /bin/sh
@@ -77,6 +78,7 @@ services:
         psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0012_profile_policy_probe_worker.sql
         psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0013_full_pool_probe_runs.sql
         psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0014_judge_same_model_failover.sql
+        psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0015_judge_profile_attempt_limit.sql
 
   newapi-codex-pool-sync:
     image: postgres:16-alpine
@@ -105,7 +107,7 @@ services:
         BUILD_COMMIT_SHA: ${CLAWROUTER_BUILD_COMMIT_SHA:-unknown}
         BUILD_TIME: ${BUILD_TIME:-unknown}
         BUILD_BRANCH: ${CLAWROUTER_BUILD_BRANCH:-unknown}
-        SCHEMA_VERSION: 0014_judge_same_model_failover
+        SCHEMA_VERSION: 0015_judge_profile_attempt_limit
     restart: unless-stopped
     depends_on:
       acu-migrate:

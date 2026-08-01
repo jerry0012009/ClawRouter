@@ -15,6 +15,7 @@ import {
   routeWithCurrentAcuFormula,
   type AlphaExecutionProfile,
   type AlphaRouteDecision,
+  type AlphaRouteRequirements,
 } from "./routing.js";
 import type { AlphaGatewayTrace, AlphaIngressContext, AlphaExecutionResolution } from "./gateway.js";
 import type { NativeProviderAdapter } from "./provider.js";
@@ -47,6 +48,21 @@ import { buildJudgeNativeContext } from "./judge-context-policy.js";
 const POLICY_VERSION = "alpha-p0-policy-v1";
 const QUALITY_CURVE_VERSION = "acu-catalog-v0.1";
 const PRICE_VERSION = "acu-catalog-v0.1";
+
+export function codexSelectionCorridorRequirements(
+  inputTokens: number,
+  expectedOutputTokens: number,
+): AlphaRouteRequirements {
+  return {
+    protocol: "responses" as const,
+    requireTools: true,
+    requiredToolTypes: ["function", "custom", "local_tool"],
+    requireThinking: false,
+    contextTokens: inputTokens + expectedOutputTokens,
+    expectedOutputTokens,
+    webIntent: "not_required" as const,
+  };
+}
 
 type JsonObject = Record<string, unknown>;
 
@@ -550,14 +566,7 @@ export class AlphaRequestProcessor {
             effectiveQualityTarget: 80,
             routingPreference: preference,
             profiles,
-            requirements: {
-              protocol: "responses",
-              requireTools: false,
-              requireThinking: false,
-              contextTokens: inputTokens + expectedOutputTokens,
-              expectedOutputTokens,
-              webIntent: "not_required",
-            },
+            requirements: codexSelectionCorridorRequirements(inputTokens, expectedOutputTokens),
           });
           const selectedUtility = route.recommendation.recommended.valueUtility;
           const candidates = [...route.candidateEstimates]
@@ -593,8 +602,11 @@ export class AlphaRequestProcessor {
       inputTokens,
       expectedOutputTokens,
       assumptions: {
+        workload: "Codex Agent",
         protocol: "responses",
-        tools: false,
+        tools: true,
+        requiredToolTypes: ["function", "custom", "local_tool"],
+        hostedWebRequired: false,
         webIntent: "not_required",
         baseQualityTarget: 80,
         judgeCostIncluded: false,

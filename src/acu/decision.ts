@@ -178,8 +178,10 @@ export function recommendModel(input: AcuDecisionInput): AcuRecommendation {
   const costSensitivity = Math.max(0, input.costSensitivity ?? 1);
   const fallbackRiskScale = Math.max(0, input.fallbackRiskScale ?? 1);
   let models = getRoutingEligibleModels(input.eligibleModelIds);
-  if (input.requireToolCallSupport) models = models.filter((model) => model.toolCallSupport);
-  if (input.requireVisionSupport) models = models.filter((model) => model.visionSupport);
+  if (input.eligibleModelIds === undefined) {
+    if (input.requireToolCallSupport) models = models.filter((model) => model.toolCallSupport);
+    if (input.requireVisionSupport) models = models.filter((model) => model.visionSupport);
+  }
   if (models.length === 0) throw new Error("No ACU catalog model is eligible for this request");
 
   const flagship = models.reduce((best, model) => (

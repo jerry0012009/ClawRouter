@@ -66,6 +66,14 @@ run("Alpha PostgreSQL foundation", () => {
     expect(versions.rows.map((row) => row.migration_version)).toContain("0006_rc21_cost_semantics");
     expect(versions.rows.map((row) => row.migration_version)).toContain("0007_rc22_judge_cutover");
     expect(versions.rows.map((row) => row.migration_version)).toContain("0008_alpha_final_user_loop");
+    expect(versions.rows.map((row) => row.migration_version)).toContain("0015_judge_profile_attempt_limit");
+    const judgeAttemptConstraint = await database.query<{ definition: string }>(
+      `SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint
+       WHERE conrelid='acu_judge_attempts'::regclass
+       AND conname='acu_judge_attempts_attempt_index_check'`,
+    );
+    expect(judgeAttemptConstraint.rows[0]?.definition).toContain("attempt_index >= 1");
+    expect(judgeAttemptConstraint.rows[0]?.definition).toContain("attempt_index <= 3");
     const columns = await database.query<{ column_name: string }>(
       `SELECT column_name FROM information_schema.columns
        WHERE table_schema='public' AND table_name='acu_usage_reports'`,

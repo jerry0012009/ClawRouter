@@ -1,7 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
-import { AlphaRequestProcessor } from "../src/alpha/processor.js";
+import { AlphaRequestProcessor, codexSelectionCorridorRequirements } from "../src/alpha/processor.js";
 
 describe("selection corridor cache", () => {
+  it("uses ordinary Codex Agent tool requirements", () => {
+    expect(codexSelectionCorridorRequirements(10_000, 1_000)).toEqual({
+      protocol: "responses",
+      requireTools: true,
+      requiredToolTypes: ["function", "custom", "local_tool"],
+      requireThinking: false,
+      contextTokens: 11_000,
+      expectedOutputTokens: 1_000,
+      webIntent: "not_required",
+    });
+  });
+
   it("coalesces identical work and keeps token assumptions as part of the key", async () => {
     const processor = new AlphaRequestProcessor({} as never);
     const calculate = vi.fn(async (inputTokens: number, expectedOutputTokens: number) => ({

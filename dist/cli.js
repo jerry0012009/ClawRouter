@@ -1685,16 +1685,15 @@ var BLOCKRUN_MODELS = [
   },
   // ── OpenAI (GPT-5 series, need max_completion_tokens) ──
   // GPT-5.6 prices are official list prices. The current proxy exposes no
-  // billing metadata; text and streaming were verified on 2026-07-27, while
-  // tool calling was not verified and is therefore disabled conservatively.
+  // billing metadata; execution-profile preflight is the source of truth for
+  // per-Channel routing capability.
   {
     id: "gpt-5.6-sol",
     name: "GPT-5.6 Sol",
     upstream: "proxy",
     useMaxCompletionTokens: true,
-    toolCalling: false,
     reasoning: true,
-    input: ["text"],
+    input: ["text", "image"],
     cost: { input: 5, output: 30, cacheRead: 0.5, cacheWrite: 5 },
     contextWindow: 105e4,
     maxTokens: 128e3
@@ -1704,9 +1703,8 @@ var BLOCKRUN_MODELS = [
     name: "GPT-5.6 Terra",
     upstream: "proxy",
     useMaxCompletionTokens: true,
-    toolCalling: false,
     reasoning: true,
-    input: ["text"],
+    input: ["text", "image"],
     cost: { input: 2.5, output: 15, cacheRead: 0.25, cacheWrite: 2.5 },
     contextWindow: 105e4,
     maxTokens: 128e3
@@ -1716,9 +1714,8 @@ var BLOCKRUN_MODELS = [
     name: "GPT-5.6 Luna",
     upstream: "proxy",
     useMaxCompletionTokens: true,
-    toolCalling: false,
     reasoning: true,
-    input: ["text"],
+    input: ["text", "image"],
     cost: { input: 1, output: 6, cacheRead: 0.1, cacheWrite: 1 },
     contextWindow: 105e4,
     maxTokens: 128e3
@@ -5368,8 +5365,8 @@ var model_catalog_default = {
       cacheWritePricePerMillion: 5,
       contextWindow: 105e4,
       maxOutputTokens: 128e3,
-      toolCallSupport: false,
-      visionSupport: false,
+      toolCallSupport: true,
+      visionSupport: true,
       provider: "OpenAI",
       availability: "callable_preflight_or_repository",
       routingEligible: true,
@@ -5435,8 +5432,8 @@ var model_catalog_default = {
       cacheWritePricePerMillion: 2.5,
       contextWindow: 105e4,
       maxOutputTokens: 128e3,
-      toolCallSupport: false,
-      visionSupport: false,
+      toolCallSupport: true,
+      visionSupport: true,
       provider: "OpenAI",
       availability: "callable_preflight_or_repository",
       routingEligible: true,
@@ -5500,8 +5497,8 @@ var model_catalog_default = {
       cacheWritePricePerMillion: 1,
       contextWindow: 105e4,
       maxOutputTokens: 128e3,
-      toolCallSupport: false,
-      visionSupport: false,
+      toolCallSupport: true,
+      visionSupport: true,
       provider: "OpenAI",
       availability: "callable_preflight_or_repository",
       routingEligible: true,
@@ -6331,8 +6328,10 @@ function recommendModel(input) {
   const costSensitivity = Math.max(0, input.costSensitivity ?? 1);
   const fallbackRiskScale = Math.max(0, input.fallbackRiskScale ?? 1);
   let models = getRoutingEligibleModels(input.eligibleModelIds);
-  if (input.requireToolCallSupport) models = models.filter((model) => model.toolCallSupport);
-  if (input.requireVisionSupport) models = models.filter((model) => model.visionSupport);
+  if (input.eligibleModelIds === void 0) {
+    if (input.requireToolCallSupport) models = models.filter((model) => model.toolCallSupport);
+    if (input.requireVisionSupport) models = models.filter((model) => model.visionSupport);
+  }
   if (models.length === 0) throw new Error("No ACU catalog model is eligible for this request");
   const flagship = models.reduce((best, model) => model.abilityAnchor > best.abilityAnchor ? model : best);
   const fallback = flagship;

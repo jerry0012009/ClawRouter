@@ -331,6 +331,40 @@ describe("Alpha native protocol gateway", () => {
     expect(traces.at(-1)?.response?.body.toString()).toBe(expected);
   });
 
+  it("treats a protocol-complete SSE response as completed when the client closes immediately", async () => {
+    const expected = [
+      'data: {"type":"response.output_item.added","item":{"type":"function_call","call_id":"call-1"}}\n\n',
+      'data: {"type":"response.completed","response":{"usage":{"input_tokens":1,"output_tokens":1}}}\n\n',
+    ].join("");
+    const upstreamPort = await listen(createServer((_request, response) => {
+      response.setHeader("content-type", "text/event-stream");
+      response.write(expected);
+      setTimeout(() => response.end(), 30);
+    }));
+    const adapter = createNativeProviderAdapter({
+      provider: "test", channel: "test", baseUrl: `http://127.0.0.1:${upstreamPort}`,
+      apiKey: "test-key", authMode: "bearer",
+    });
+    const traces: AlphaGatewayTrace[] = [];
+    const gatewayPort = await listen(createAlphaGatewayServer({
+      trustedIdentitySecret: sharedSecret,
+      async resolveExecution(envelope) {
+        return { adapter, requestedModel: envelope.requestedModel, actualModel: envelope.requestedModel, provider: "test", channel: "test" };
+      },
+      onTrace(trace) { traces.push({ ...trace }); },
+    }));
+    const body = Buffer.from('{"model":"gpt-test","input":"use shell","stream":true}');
+    const controller = new AbortController();
+    const response = await fetch(`http://127.0.0.1:${gatewayPort}/v1/responses`, {
+      method: "POST", headers: signedHeaders(body), body, signal: controller.signal,
+    });
+    const reader = response.body!.getReader();
+    await reader.read();
+    controller.abort();
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    expect(traces.at(-1)).toMatchObject({ status: "completed", response: { complete: true, clientCancelled: false, protocolCompleted: true } });
+  });
+
   it("keeps relaying a stream while valid chunks continue", async () => {
     const upstreamPort = await listen(createServer(async (_request, response) => {
       response.setHeader("content-type", "text/event-stream");

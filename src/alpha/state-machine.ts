@@ -8,6 +8,7 @@ export type TriggerReason =
   | "plan_started"
   | "plan_finished"
   | "repeated_failure"
+  | "accepted_response_limit"
   | "lease_expired"
   | "reuse_route";
 
@@ -103,11 +104,14 @@ export function decideTrigger(input: TriggerInput): TriggerDecision {
   if (Object.values(counters).some((counter) => counter.count >= 2 && !counter.progressSinceLast)) {
     return decision("repeated_failure", { phase: "recovery", routeDirection: "hold_or_upgrade" });
   }
+  if (input.events.some((item) => item.type === "plan_finished")) {
+    return decision("plan_finished", { phase: "execution" });
+  }
+  if ((input.segment?.acceptedModelResponsesSinceJudge ?? 0) >= 8) {
+    return decision("accepted_response_limit", { phase: "execution" });
+  }
   if (input.routingLeaseExpired) {
     return decision("lease_expired", { phase: input.segment?.phase ?? "execution" });
-  }
-  if (input.events.some((item) => item.type === "plan_finished")) {
-    return decision("plan_finished", { runJudge: false, createSegment: true, phase: "execution" });
   }
   return decision("reuse_route", {
     phase: input.segment?.phase ?? "execution",

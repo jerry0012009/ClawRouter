@@ -222,6 +222,30 @@ describe("Alpha Judge triggers", () => {
       .toMatchObject({ runJudge: false, reason: "reuse_route" });
   });
 
+  it("refreshes after eight accepted responses but not seven", () => {
+    expect(decideTrigger({
+      mode: "acu-auto", isNewTask: false, events: [],
+      segment: segment({ acceptedModelResponsesSinceJudge: 7 }),
+    })).toMatchObject({ runJudge: false, reason: "reuse_route", createSegment: false });
+    expect(decideTrigger({
+      mode: "acu-auto", isNewTask: false, events: [],
+      segment: segment({ acceptedModelResponsesSinceJudge: 8 }),
+    })).toMatchObject({ runJudge: true, reason: "accepted_response_limit", createSegment: true, phase: "execution" });
+  });
+
+  it("Judges plan completion and gives explicit events priority over the accepted response limit", () => {
+    const planFinished = { type: "plan_finished" as const, hash: "plan-finished", evidenceStrength: "high" as const, metadata: {} };
+    const human = { type: "human_message" as const, hash: "human", evidenceStrength: "high" as const, metadata: { text: "continue" } };
+    expect(decideTrigger({
+      mode: "acu-auto", isNewTask: false, events: [planFinished],
+      segment: segment({ acceptedModelResponsesSinceJudge: 8 }),
+    })).toMatchObject({ runJudge: true, reason: "plan_finished", createSegment: true });
+    expect(decideTrigger({
+      mode: "acu-auto", isNewTask: false, events: [human],
+      segment: segment({ acceptedModelResponsesSinceJudge: 8 }),
+    })).toMatchObject({ runJudge: true, reason: "human_message" });
+  });
+
   it("does not Judge ordinary tool loops, first failure, Provider error, or Retry", () => {
     const firstFailure = {
       type: "execution_failure" as const,
@@ -281,12 +305,13 @@ describe("Alpha Judge triggers", () => {
       .toMatchObject({ runJudge: false, reason: "reuse_route" });
   });
 
-  it("does not periodically Judge after 20 accepted ordinary responses", () => {
+  it("counts only accepted responses and refreshes after the fixed budget", () => {
     let current = segment();
-    for (let index = 0; index < 20; index += 1) current = incrementAcceptedResponse(current, true);
+    for (let index = 0; index < 8; index += 1) current = incrementAcceptedResponse(current, true);
     current = incrementAcceptedResponse(current, false);
+    expect(current.acceptedModelResponsesSinceJudge).toBe(8);
     expect(decideTrigger({ mode: "acu-auto", isNewTask: false, events: [], segment: current }))
-      .toMatchObject({ runJudge: false, reason: "reuse_route" });
+      .toMatchObject({ runJudge: true, reason: "accepted_response_limit" });
   });
 
   it("retains the 10-minute Routing Lease rejudge trigger", () => {
@@ -299,10 +324,10 @@ describe("Alpha Judge triggers", () => {
     })).toMatchObject({ runJudge: true, createSegment: true, reason: "lease_expired" });
   });
 
-  it("creates an Execution Segment without Judge for ordinary PlanFinished", () => {
+  it("creates and Judges a new Execution Segment for ordinary PlanFinished", () => {
     const finished = { type: "plan_finished" as const, hash: "plan-finished", evidenceStrength: "high" as const, metadata: {} };
     expect(decideTrigger({ mode: "acu-auto", isNewTask: false, events: [finished], segment: segment({ planningActive: true }) }))
-      .toMatchObject({ runJudge: false, createSegment: true, reason: "plan_finished", phase: "execution", temporaryPhaseOverride: 0 });
+      .toMatchObject({ runJudge: true, createSegment: true, reason: "plan_finished", phase: "execution", temporaryPhaseOverride: 0 });
   });
 
   it("Judges once at PlanStarted and reuses it through 10 Planning steps", () => {

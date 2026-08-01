@@ -13,6 +13,7 @@ export type RelayResult = {
   modelVisibleOutputBytes: number;
   firstModelEventAt?: string;
   firstModelEventLatencyMs?: number;
+  protocolCompleted: boolean;
   responseStarted: boolean;
   webSearch: WebSearchEvidence;
 };
@@ -71,16 +72,18 @@ export async function relayProviderResponse(upstream: Response, response: Server
   }
   const body = Buffer.concat(chunks);
   const observed = modelObserver.result();
+  const protocolCompleted = preObserved?.protocolCompleted === true || observed.protocolCompleted === true;
   return {
     body,
     httpStatus: upstream.status,
     responseHeaders: decodedResponseHeaders(upstream),
-    complete,
-    clientCancelled,
+    complete: complete || protocolCompleted,
+    clientCancelled: clientCancelled && !protocolCompleted,
     rawResponseBytes: observed.rawResponseBytes,
     modelVisibleOutputBytes: observed.modelVisibleOutputBytes,
     firstModelEventAt: preObserved?.firstModelEventAt?.toISOString() ?? observed.firstModelEventAt?.toISOString(),
     firstModelEventLatencyMs: preObserved?.firstModelEventLatencyMs ?? observed.firstModelEventLatencyMs,
+    protocolCompleted,
     responseStarted: response.headersSent,
     webSearch: webObserver?.evidence() ?? inspectWebSearchEvidence(body, contentType),
   };

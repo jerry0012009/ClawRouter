@@ -16,6 +16,9 @@ type AcuRuntimeConfig = {
     backupJudgeProvider?: string;
     backupMaxContextTokens: number;
     syncBackupEnabled: boolean;
+    sameModelFailoverEnabled: boolean;
+    maxProfileAttempts: number;
+    primaryProfileId?: string;
     cachePath?: string;
     allowMock: boolean;
     shadowMode: boolean;
@@ -1063,7 +1066,7 @@ declare class AcuJudgeClient {
     private readonly config;
     private readonly fetchImplementation;
     constructor(config: AcuRuntimeConfig, fetchImplementation?: typeof fetch);
-    judge(messages: AcuVisibleMessage[], tools?: unknown[], forceRefresh?: boolean, rawNative?: RawNativeJudgeContext, clientSignal?: AbortSignal): Promise<JudgeRequestResult>;
+    judge(messages: AcuVisibleMessage[], tools?: unknown[], forceRefresh?: boolean, rawNative?: RawNativeJudgeContext, clientSignal?: AbortSignal, deadlineAt?: number): Promise<JudgeRequestResult>;
 }
 
 declare function rulesFallbackJudge(decision: RoutingDecision): AcuJudgeResult;

@@ -1,4 +1,4 @@
-import { AcuJudgeAttemptError, AcuJudgeClient, AcuJudgeClientCancelledError, AcuJudgeContextLengthError, judgeNominalCostUsd, type JudgeRequestResult, type RawNativeJudgeContext } from "../acu/judge.js";
+import { AcuJudgeAttemptError, AcuJudgeClient, AcuJudgeClientCancelledError, AcuJudgeContextLengthError, estimateVisibleTokens, judgeNominalCostUsd, type JudgeRequestResult, type RawNativeJudgeContext } from "../acu/judge.js";
 import { normalizedEntropy } from "../acu/math.js";
 import { rulesFallbackJudge } from "../acu/strategy.js";
 import type { AcuRuntimeConfig } from "../acu/config.js";
@@ -9,9 +9,23 @@ import type { TriggerReason } from "./state-machine.js";
 import { classifyWebIntentFallback, type WebIntentFallbackInput, withWebIntentSource } from "./web-intent.js";
 import { getEligibleLunaJudgeProfiles } from "./judge-profile-selector.js";
 import type { AlphaExecutionProfile } from "./routing.js";
+import { cashCnyPerNominalUsd } from "./provider-economics.js";
 
 const MIMO_JUDGE_BLENDED_COST_FACTOR = 0.5;
 const MIMO_JUDGE_COST_SOURCE = "midpoint_openrouter_payg_and_mimo99_plan_v1";
+const MIN_FAILOVER_ATTEMPT_WINDOW_MS = 8_000;
+
+export function judgeProfileAttemptDeadline(input: {
+  now: number;
+  globalDeadlineAt?: number;
+  profilesRemaining: number;
+}): number | undefined {
+  if (input.globalDeadlineAt === undefined) return undefined;
+  const remainingMs = Math.max(0, input.globalDeadlineAt - input.now);
+  const reserveMs = input.profilesRemaining > 0 && remainingMs >= MIN_FAILOVER_ATTEMPT_WINDOW_MS * 2
+    ? MIN_FAILOVER_ATTEMPT_WINDOW_MS : 0;
+  return input.globalDeadlineAt - reserveMs;
+}
 
 export type AlphaJudgeRun = {
   judge: AcuJudgeResult;
@@ -47,6 +61,11 @@ export type AlphaJudgeRun = {
     primaryContextTokens: number;
   };
   webIntentDecision: WebIntentDecision;
+  preferredProfileId?: string;
+  selectedProfileId?: string;
+  profileAttemptCount: number;
+  sameModelFailoverUsed: boolean;
+  sameModelFailoverChain: string[];
 };
 
 export type AlphaJudgeAttempt = {
@@ -108,6 +127,7 @@ export type AcuJudgeRunnerOptions = {
   backupClient?: AcuJudgeClient;
   backupCashCnyPerNominalUsd?: number;
   profiles?: AlphaExecutionProfile[];
+  loadProfiles?: () => Promise<AlphaExecutionProfile[]>;
   profileClients?: Map<string, AcuJudgeClient>;
 };
 
@@ -160,18 +180,23 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
     const officialPaygEquivalentCostCny = isMimo
       ? (((input.promptTokens - cached) * 3) + (cached * 0.025) + (input.completionTokens * 6)) / 1_000_000
       : 0;
+    const profile = input.executionProfileId
+      ? options.profiles?.find((candidate) => candidate.executionProfileId === input.executionProfileId)
+      : undefined;
+    const cashRate = profile?.economics ? cashCnyPerNominalUsd(profile.economics) : options.backupCashCnyPerNominalUsd;
     const effectiveCostCny = isMimo
       ? officialPaygEquivalentCostCny * MIMO_JUDGE_BLENDED_COST_FACTOR
-      : nominalCostUsd * (options.backupCashCnyPerNominalUsd ?? 0);
+      : nominalCostUsd * (cashRate ?? 0);
+    const usageKnown = input.usageStatus === "reported";
     return {
       ...input,
       nominalCostUsd: nominalCostUsd.toFixed(10),
       officialPaygEquivalentCostCny: officialPaygEquivalentCostCny.toFixed(10),
       effectiveCostCny: effectiveCostCny.toFixed(10),
       currency: "CNY",
-      costStatus: isMimo ? "estimated_blended" : options.backupCashCnyPerNominalUsd ? "verified" : "unavailable",
-      costSource: isMimo ? MIMO_JUDGE_COST_SOURCE : options.backupCashCnyPerNominalUsd
-        ? "closeai_verified_credit_cash_conversion" : "backup_cost_unavailable",
+      costStatus: !usageKnown ? "unavailable" : isMimo ? "estimated_blended" : cashRate ? "verified" : "unavailable",
+      costSource: !usageKnown ? "provider_cost_unknown" : isMimo ? MIMO_JUDGE_COST_SOURCE : cashRate
+        ? `${profile?.provider ?? "judge"}_profile_cash_conversion` : "provider_cost_unknown",
     };
   };
 
@@ -235,6 +260,11 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
       costStatus: aggregateCostStatus(attempts),
       costSource: [...new Set(attempts.map((attempt) => attempt.costSource))].join("+"),
       attempts,
+      preferredProfileId: options.config.primaryProfileId,
+      selectedProfileId: [...attempts].reverse().find((attempt) => attempt.status === "success")?.executionProfileId,
+      profileAttemptCount: attempts.length,
+      sameModelFailoverUsed: attempts.some((attempt) => attempt.role === "same_model_failover"),
+      sameModelFailoverChain: attempts.flatMap((attempt) => attempt.executionProfileId ? [attempt.executionProfileId] : []),
       entropy: normalizedEntropy(result.result),
       webIntentDecision: {
         intent: result.result.webIntent!, confidence: result.result.webIntentConfidence!,
@@ -247,8 +277,9 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
       const attempts: AlphaJudgeAttempt[] = [];
       const deadlineAt = options.config.timeoutMs > 0 ? Date.now() + options.config.timeoutMs : undefined;
       try {
-        const profiles = options.profiles?.length
-          ? getEligibleLunaJudgeProfiles({ profiles: options.profiles, requiredContextTokens: Math.ceil(input.rawNative.rawRequest.length / 4), preferredProfileId: options.config.primaryProfileId, maxProfiles: options.config.maxProfileAttempts })
+        const availableProfiles = options.loadProfiles ? await options.loadProfiles() : options.profiles;
+        const profiles = availableProfiles?.length
+          ? getEligibleLunaJudgeProfiles({ profiles: availableProfiles, requiredContextTokens: estimateVisibleTokens(input.rawNative.rawRequest), preferredProfileId: options.config.primaryProfileId, maxProfiles: options.config.sameModelFailoverEnabled ? options.config.maxProfileAttempts : 1 })
           : [];
         const candidates: Array<{ profile?: AlphaExecutionProfile; client: AcuJudgeClient }> = profiles.length
           ? profiles.map((profile) => ({ profile, client: profileClients.get(profile.executionProfileId)! })).filter((candidate) => candidate.client)
@@ -260,7 +291,12 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
           const candidateClient = candidate.profile ? profileClients.get(candidate.profile.executionProfileId) : candidate.client;
           if (!candidateClient) continue;
           try {
-            const result = await candidateClient.judge(input.messages, [], false, input.rawNative, input.signal, deadlineAt);
+            const attemptDeadlineAt = judgeProfileAttemptDeadline({
+              now: Date.now(),
+              globalDeadlineAt: deadlineAt,
+              profilesRemaining: candidates.length - index - 1,
+            });
+            const result = await candidateClient.judge(input.messages, [], false, input.rawNative, input.signal, attemptDeadlineAt);
             if (result.status === "live") attempts.push(successfulAttempt(result, index + 1, index === 0 ? "primary" : "same_model_failover", candidate.profile));
             return completeRun(result, attempts, result.status);
           } catch (error) {
@@ -339,6 +375,10 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
           costStatus: aggregateCostStatus(attempts),
           costSource: [...new Set(attempts.map((attempt) => attempt.costSource))].join("+") || "not_applicable",
           attempts,
+          preferredProfileId: options.config.primaryProfileId,
+          profileAttemptCount: attempts.length,
+          sameModelFailoverUsed: attempts.some((attempt) => attempt.role === "same_model_failover"),
+          sameModelFailoverChain: attempts.flatMap((attempt) => attempt.executionProfileId ? [attempt.executionProfileId] : []),
           entropy: normalizedEntropy(judge),
           errorCategory: error instanceof Error ? error.message.slice(0, 160) : "judge_error",
           webIntentDecision: fallback,
@@ -382,6 +422,10 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
       costStatus: aggregateCostStatus(attempts),
       costSource: [...new Set(attempts.map((attempt) => attempt.costSource))].join("+") || "not_applicable",
       attempts,
+      preferredProfileId: options.config.primaryProfileId,
+      profileAttemptCount: attempts.length,
+      sameModelFailoverUsed: attempts.some((attempt) => attempt.role === "same_model_failover"),
+      sameModelFailoverChain: attempts.flatMap((attempt) => attempt.executionProfileId ? [attempt.executionProfileId] : []),
       entropy: normalizedEntropy(judge),
       errorCategory: "context_length_exceeded",
       terminalError: {

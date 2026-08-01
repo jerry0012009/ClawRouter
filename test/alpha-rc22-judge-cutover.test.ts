@@ -290,7 +290,7 @@ describe("RC2.2 Judge cutover", () => {
     expect(Number(result.costCny)).toBeGreaterThan(0);
     expect(result.attempts[0]).toMatchObject({
       costStatus: "verified",
-      costSource: "closeai_verified_credit_cash_conversion",
+      costSource: "judge_profile_cash_conversion",
     });
   });
 });

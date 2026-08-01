@@ -36,7 +36,7 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
       };
       receivedModels.push(body.model);
       receivedRequests.push({ model: body.model, enable_thinking: body.enable_thinking });
-      if (body.model === "deepseek-v4-flash") {
+      if (body.model === "gpt-5.6-luna") {
         const visible = JSON.stringify(body.messages);
         const content = visible.includes("JUDGE_FAILURE")
           ? "not valid judge json"
@@ -240,7 +240,7 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
       };
     };
     expect(payload.acu_trace?.acu_demo?.judgeStatus).toBe("live");
-    expect(receivedModels[0]).toBe("deepseek-v4-flash");
+    expect(receivedModels[0]).toBe("gpt-5.6-luna");
     expect(receivedModels).toHaveLength(2);
     expect(receivedModels[1]).toBe(payload.acu_trace?.selected_model);
     if (receivedModels[1] === "qwen3.6-plus") {
@@ -292,7 +292,7 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
     expect(plan.planningOnly).toBe(true);
     expect(plan.databaseWrites).toBe(0);
     expect((await summary()).realRequestCount).toBe(before.realRequestCount);
-    expect(receivedModels).toEqual(["deepseek-v4-flash"]);
+    expect(receivedModels).toEqual(["gpt-5.6-luna"]);
     const compatibleScores = plan.displayCandidates.filter((item) => item.routingEligible).map((item) => Number(item.predictedScore.toFixed(1)));
     expect(Number(plan.qualityCeilingModel.predictedScore.toFixed(1))).toBe(Math.max(...compatibleScores));
 
@@ -304,7 +304,7 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
     expect(routedResponse.status).toBe(200);
     const routed = await routedResponse.json() as { acu_trace?: { acu_demo?: { judgeStatus: string } } };
     expect(routed.acu_trace?.acu_demo?.judgeStatus).toBe("live");
-    expect(receivedModels.filter((model) => model === "deepseek-v4-flash")).toHaveLength(1);
+    expect(receivedModels.filter((model) => model === "gpt-5.6-luna")).toHaveLength(1);
     expect(receivedModels).toHaveLength(2);
     expect((await summary()).realRequestCount).toBe(before.realRequestCount + 1);
   });

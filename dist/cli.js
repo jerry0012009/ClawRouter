@@ -4191,11 +4191,12 @@ import { createHash as createHash5, randomUUID } from "crypto";
 var ACU_PROMPT_VERSION = "acu-tier-requirement-v4";
 var ACU_DIFFICULTY_METHOD_VERSION = "acu-difficulty-index-v1";
 var ACU_ROUTING_MODEL_VERSION = "acu-routing-model-v0.4";
-var ACU_DEFAULT_JUDGE_MODEL = "mimo-v2.5-pro";
-var ACU_DEFAULT_JUDGE_BASE_URL = "https://token-plan-cn.xiaomimimo.com/v1";
+var ACU_DEFAULT_JUDGE_MODEL = "gpt-5.6-luna";
+var ACU_DEFAULT_JUDGE_BASE_URL = "https://lucen.cc/v1";
 var ACU_DEFAULT_JUDGE_MODE = "non-thinking";
 var ACU_DEFAULT_JUDGE_FIRST_BYTE_TIMEOUT_MS = 0;
-var ACU_DEFAULT_JUDGE_TOTAL_TIMEOUT_MS = 12e3;
+var ACU_DEFAULT_JUDGE_TOTAL_TIMEOUT_MS = 25e3;
+var ACU_DEFAULT_JUDGE_MAX_PROFILE_ATTEMPTS = 3;
 var ACU_DEFAULT_MAX_CONTEXT_TOKENS = 1e6;
 var ACU_DEFAULT_BACKUP_MAX_CONTEXT_TOKENS = 1e6;
 var ACU_DEFAULT_MAX_OUTPUT_TOKENS = 300;
@@ -4244,7 +4245,7 @@ function readAcuRuntimeConfig(overrides = {}) {
     ),
     maxOutputTokens: ACU_DEFAULT_MAX_OUTPUT_TOKENS,
     apiKey: process.env.ACU_JUDGE_API_KEY?.trim(),
-    judgeProvider: process.env.ACU_JUDGE_PROVIDER?.trim() || "openai_compatible",
+    judgeProvider: process.env.ACU_JUDGE_PROVIDER?.trim() || "lucen",
     backupJudgeModel: process.env.ACU_JUDGE_BACKUP_MODEL?.trim() || void 0,
     backupJudgeBaseUrl: process.env.ACU_JUDGE_BACKUP_BASE_URL?.trim() || void 0,
     backupApiKey: process.env.ACU_JUDGE_BACKUP_API_KEY?.trim() || void 0,
@@ -4254,6 +4255,9 @@ function readAcuRuntimeConfig(overrides = {}) {
       ACU_DEFAULT_BACKUP_MAX_CONTEXT_TOKENS
     ),
     syncBackupEnabled: booleanValue(process.env.ACU_JUDGE_SYNC_BACKUP_ENABLED, false),
+    sameModelFailoverEnabled: booleanValue(process.env.ACU_JUDGE_SAME_MODEL_FAILOVER_ENABLED, true),
+    maxProfileAttempts: Math.max(1, Math.min(3, positiveInteger(process.env.ACU_JUDGE_MAX_PROFILE_ATTEMPTS, ACU_DEFAULT_JUDGE_MAX_PROFILE_ATTEMPTS))),
+    primaryProfileId: process.env.ACU_JUDGE_PRIMARY_PROFILE_ID?.trim() || void 0,
     cachePath: process.env.ACU_JUDGE_CACHE_PATH?.trim(),
     allowMock: booleanValue(process.env.ACU_ALLOW_MOCK),
     shadowMode: booleanValue(process.env.ACU_SHADOW_MODE, true),
@@ -6792,7 +6796,7 @@ var AcuJudgeClient = class {
   }
   config;
   fetchImplementation;
-  async judge(messages, tools = [], forceRefresh = false, rawNative, clientSignal) {
+  async judge(messages, tools = [], forceRefresh = false, rawNative, clientSignal, deadlineAt) {
     if (!this.config.apiKey) throw new Error("ACU Judge API key is not configured");
     if (this.config.promptVersion !== twin_few_shots_default.promptVersion) throw new Error("ACU Judge prompt version does not match frozen few-shot data");
     const rawRequestBytes = rawNative ? Buffer.byteLength(rawNative.rawRequest, "utf8") : 0;
@@ -6840,7 +6844,8 @@ ${contextSha256}`).digest("hex");
     const metadata = endpointMetadata(this.config.judgeBaseUrl, this.config.judgeProvider);
     const controller = new AbortController();
     const firstByteTimeout = this.config.firstByteTimeoutMs > 0 ? setTimeout(() => controller.abort(new Error("Judge first-byte timeout")), this.config.firstByteTimeoutMs) : void 0;
-    const totalTimeout = this.config.timeoutMs > 0 ? setTimeout(() => controller.abort(new Error("Judge total timeout")), this.config.timeoutMs) : void 0;
+    const remainingTimeout = deadlineAt ? Math.max(1, deadlineAt - Date.now()) : this.config.timeoutMs;
+    const totalTimeout = remainingTimeout > 0 ? setTimeout(() => controller.abort(new Error("Judge total timeout")), remainingTimeout) : void 0;
     const started = Date.now();
     try {
       let payload;

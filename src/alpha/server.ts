@@ -20,6 +20,7 @@ import { getAcuModel } from "../acu/catalog.js";
 import { combinedMonitorState, mergeSupplyInventory, monitorRangeSpec, monitorRoutingStatus, type MonitorRange } from "./channel-monitor.js";
 import { AdaptiveProbeWorker, probeBackoffMinutes } from "./adaptive-probe.js";
 import { deriveRuntimeEligibility } from "./channel-health.js";
+import { isRecoveredSupplyProfile } from "./channel-registry.js";
 
 export type ConfiguredExecutionProfile = AlphaExecutionProfile & {
   baseUrl?: string;
@@ -234,6 +235,7 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
     };
   });
   const judgeConfig = readAcuRuntimeConfig();
+  const runtimeRepository = new AlphaRepository(database);
   const judgeEconomics = serviceConfig.judgeEconomicsProviderId ? serviceConfig.providerEconomics.find((item) => item.providerId === serviceConfig.judgeEconomicsProviderId) : undefined;
   if (serviceConfig.judgeEconomicsProviderId && !judgeEconomics) {
     throw new Error(`No Provider Economics for Judge ${serviceConfig.judgeEconomicsProviderId}`);
@@ -243,6 +245,30 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
     rulesDecision: rulesFallbackDecision(),
     backupCashCnyPerNominalUsd: judgeEconomics ? cashCnyPerNominalUsd(judgeEconomics) : undefined,
     profiles: profiles.map((item) => item.profile),
+    loadProfiles: async () => {
+      const baseProfiles = profiles.map((item) => item.profile);
+      const [channels, runtimes] = await Promise.all([
+        runtimeRepository.batchChannelHealth(baseProfiles.map((profile) => profile.channelId ?? profile.channel)),
+        runtimeRepository.batchProfileHealth(baseProfiles.map((profile) => profile.executionProfileId)),
+      ]);
+      return baseProfiles.map((profile) => {
+        const runtime = runtimes.get(profile.executionProfileId);
+        const profileState = runtime?.state;
+        const channelState = channels.get(profile.channelId ?? profile.channel)?.state;
+        const runtimeRecovered = profile.autoRouteEnabled === false && isRecoveredSupplyProfile(runtime ?? {});
+        return {
+          ...profile,
+          autoRouteEnabled: profile.autoRouteEnabled !== false || runtimeRecovered,
+          usageTrusted: runtime?.usageTrusted ?? profile.usageTrusted,
+          runtimeHealth: deriveRuntimeEligibility({
+            profileState,
+            channelState,
+            enabled: profile.enabled,
+            administratorAllowed: profile.administratorAllowed,
+          }),
+        };
+      });
+    },
     profileClients: new Map(profiles.map((item) => {
       const profileConfig = {
       ...judgeConfig,

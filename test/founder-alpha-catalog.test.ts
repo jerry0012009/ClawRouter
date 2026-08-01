@@ -100,6 +100,6 @@ describe("Founder Alpha New API catalog export", () => {
     expect(syncSql).toContain(`model_limits = '${expected.join(",")}'`);
     expect(compose).toContain("0004_rc2_context_ledger.sql");
     expect(compose).toContain("0005_rc2_judge_reconciliation.sql");
-    expect(compose).toContain("ACU_JUDGE_ECONOMICS_PROVIDER_ID: closeai");
+    expect(compose).toContain("ACU_JUDGE_ECONOMICS_PROVIDER_ID: lucen");
   });
 });

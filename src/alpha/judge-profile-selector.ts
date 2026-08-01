@@ -14,6 +14,7 @@ export function getEligibleLunaJudgeProfiles(input: {
     && profile.enabled
     && profile.administratorAllowed
     && profile.verificationStatus !== "rejected"
+    && profile.autoRouteEnabled === true
     && profile.usageTrusted === true
     && profile.health !== "disabled"
     && profile.health !== "open"

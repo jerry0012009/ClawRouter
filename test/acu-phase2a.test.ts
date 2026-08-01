@@ -301,7 +301,7 @@ describe("Phase 2A Judge transport", () => {
     const request = fetchMock.mock.calls[0][1];
     const body = JSON.parse(String(request?.body)) as Record<string, unknown>;
     expect(body).toMatchObject({
-      model: "deepseek-v4-flash",
+      model: "gpt-5.6-luna",
       max_tokens: 300,
       stream: false,
       thinking: { type: "disabled" },

@@ -18,7 +18,10 @@ describe("Judge native context policy", () => {
     expect(result.compacted).toBe(true);
     expect(result.compactedItemCount).toBe(1);
     expect(result.body).toContain("root goal");
-    expect(result.body).toContain("COMPACTED_CONTEXT_ITEM");
+    expect(result.body).toContain("compacted_context_item");
+    expect(result.body).toContain("x".repeat(2_000));
+    expect(result.body).toContain("sha256");
+    expect(result.body).toContain("originalBytes");
   });
 
   it("does not compact failed or rejected evidence", () => {

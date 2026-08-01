@@ -40,7 +40,10 @@ function compactValue(value: unknown, key: string, role: string | undefined, ite
       originalBytes: Buffer.byteLength(value, "utf8"),
       sha256: createHash("sha256").update(value).digest("hex"),
     }));
-    return `[COMPACTED_CONTEXT_ITEM sha256=${items.at(-1)!.sha256} head/tail retained]`;
+    return {
+      type: "compacted_context_item",
+      ...items.at(-1),
+    };
   }
   if (Array.isArray(value)) return value.map((entry) => compactValue(entry, key, role, items, status));
   if (!value || typeof value !== "object") return value;

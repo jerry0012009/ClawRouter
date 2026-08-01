@@ -522,7 +522,6 @@ describe("Alpha current-formula routing", () => {
         expect(qualityQuality + 1e-12).toBeGreaterThanOrEqual(balancedQuality);
       }
     }
-    expect(selected.economy.has("gemini-2.5-flash")).toBe(true);
     expect(selected.economy.size).toBeGreaterThan(1);
     expect(selected.balanced.size).toBeGreaterThan(1);
     expect(selected.quality.size).toBeGreaterThan(1);

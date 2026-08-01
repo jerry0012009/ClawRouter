@@ -936,7 +936,7 @@
     "authMode": "bearer",
     "stripV1Path": true,
     "economicsProviderId": "lucen",
-    "observedBillingMultiplier": null,
+    "observedBillingMultiplier": 0.2,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
     "requiresFreshProbe": true
@@ -975,7 +975,7 @@
     "authMode": "bearer",
     "stripV1Path": true,
     "economicsProviderId": "lucen",
-    "observedBillingMultiplier": null,
+    "observedBillingMultiplier": 0.2,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
     "requiresFreshProbe": true
@@ -1092,7 +1092,7 @@
     "authMode": "bearer",
     "stripV1Path": true,
     "economicsProviderId": "lucen",
-    "observedBillingMultiplier": null,
+    "observedBillingMultiplier": 0.03,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
     "requiresFreshProbe": true
@@ -1131,7 +1131,7 @@
     "authMode": "bearer",
     "stripV1Path": true,
     "economicsProviderId": "lucen",
-    "observedBillingMultiplier": null,
+    "observedBillingMultiplier": 0.03,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
     "requiresFreshProbe": true
@@ -1170,7 +1170,7 @@
     "authMode": "bearer",
     "stripV1Path": true,
     "economicsProviderId": "lucen",
-    "observedBillingMultiplier": null,
+    "observedBillingMultiplier": 0.03,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
     "requiresFreshProbe": true
@@ -1209,7 +1209,7 @@
     "authMode": "bearer",
     "stripV1Path": true,
     "economicsProviderId": "lucen",
-    "observedBillingMultiplier": null,
+    "observedBillingMultiplier": 0.03,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
     "requiresFreshProbe": true
@@ -1454,7 +1454,7 @@
     "authMode": "bearer",
     "stripV1Path": true,
     "economicsProviderId": "lucen",
-    "observedBillingMultiplier": 0.06,
+    "observedBillingMultiplier": 0.1,
     "effectiveCostStatus": "estimated",
     "webToolDeclarationAccepted": true,
     "webSearchExecutionVerified": true,
@@ -1510,7 +1510,7 @@
     "authMode": "bearer",
     "stripV1Path": true,
     "economicsProviderId": "lucen",
-    "observedBillingMultiplier": 0.06,
+    "observedBillingMultiplier": 0.1,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": true,
     "requiresFreshProbe": false
@@ -1557,7 +1557,7 @@
     "authMode": "bearer",
     "stripV1Path": true,
     "economicsProviderId": "lucen",
-    "observedBillingMultiplier": 0.06,
+    "observedBillingMultiplier": 0.1,
     "effectiveCostStatus": "estimated",
     "webToolDeclarationAccepted": true,
     "webSearchExecutionVerified": true,
@@ -1604,7 +1604,7 @@
     "authMode": "bearer",
     "stripV1Path": true,
     "economicsProviderId": "lucen",
-    "observedBillingMultiplier": 0.06,
+    "observedBillingMultiplier": 0.1,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
     "requiresFreshProbe": true
@@ -1651,7 +1651,7 @@
     "authMode": "bearer",
     "stripV1Path": true,
     "economicsProviderId": "lucen",
-    "observedBillingMultiplier": 0.06,
+    "observedBillingMultiplier": 0.1,
     "effectiveCostStatus": "estimated",
     "webToolDeclarationAccepted": true,
     "webSearchExecutionVerified": true,
@@ -4199,7 +4199,7 @@
     "authMode": "bearer",
     "stripV1Path": true,
     "economicsProviderId": "lucen",
-    "observedBillingMultiplier": 0.1,
+    "observedBillingMultiplier": 0.4,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
     "requiresFreshProbe": true
@@ -4238,7 +4238,7 @@
     "authMode": "bearer",
     "stripV1Path": true,
     "economicsProviderId": "lucen",
-    "observedBillingMultiplier": 0.1,
+    "observedBillingMultiplier": 0.4,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
     "requiresFreshProbe": true

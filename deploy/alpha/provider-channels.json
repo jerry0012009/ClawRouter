@@ -1,6 +1,6 @@
 {
   "schemaVersion": "acu-provider-channel-registry-v1",
-  "generatedAt": "2026-07-29T15:34:49.552Z",
+  "generatedAt": "2026-08-01T00:00:00Z",
   "channels": [
     {
       "channelId": "blackai-codex-mix-low",
@@ -225,7 +225,7 @@
       "providerId": "lucen",
       "providerAccountId": "founder-lucen-account",
       "displayName": "Lucen / 稳定grok-020-0.2x",
-      "routingGroupName": "稳定grok-020-0.2x",
+      "routingGroupName": "稳定grok-025",
       "routingGroupSlug": "grok_020",
       "protocolCandidates": [
         "responses"
@@ -236,13 +236,14 @@
       "rechargeCashRatioCnyPerCreditUsd": 1,
       "effectiveCostStatus": "estimated",
       "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
-      "observedBillingMultiplier": 0.2,
+      "observedBillingMultiplier": 0.25,
       "multiplierStatus": "observed",
       "enabled": true,
       "discoveryStatus": "success",
       "activationStatus": "inactive",
       "notes": [
-        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+        "Directory discovery does not imply protocol compatibility or Active Pool admission",
+        "Multiplier refreshed from Lucen live /groups/available on 2026-08-01"
       ]
     },
     {
@@ -325,7 +326,7 @@
       "providerId": "lucen",
       "providerAccountId": "founder-lucen-account",
       "displayName": "Lucen / cc-高仿山寨0.2",
-      "routingGroupName": "cc-高仿山寨0.2",
+      "routingGroupName": "cc-高仿山寨(0.2)",
       "routingGroupSlug": "claude_clone_020",
       "protocolCandidates": [
         "messages"
@@ -336,13 +337,14 @@
       "rechargeCashRatioCnyPerCreditUsd": 1,
       "effectiveCostStatus": "estimated",
       "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
-      "observedBillingMultiplier": null,
-      "multiplierStatus": "unknown",
+      "observedBillingMultiplier": 0.2,
+      "multiplierStatus": "observed",
       "enabled": true,
       "discoveryStatus": "success",
       "activationStatus": "inactive",
       "notes": [
-        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+        "Directory discovery does not imply protocol compatibility or Active Pool admission",
+        "Multiplier refreshed from Lucen live /groups/available on 2026-08-01"
       ]
     },
     {
@@ -386,13 +388,14 @@
       "rechargeCashRatioCnyPerCreditUsd": 1,
       "effectiveCostStatus": "estimated",
       "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
-      "observedBillingMultiplier": null,
-      "multiplierStatus": "unknown",
+      "observedBillingMultiplier": 0.03,
+      "multiplierStatus": "observed",
       "enabled": true,
       "discoveryStatus": "success",
       "activationStatus": "inactive",
       "notes": [
-        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+        "Directory discovery does not imply protocol compatibility or Active Pool admission",
+        "Multiplier refreshed from Lucen live /groups/available on 2026-08-01"
       ]
     },
     {
@@ -425,7 +428,7 @@
       "providerId": "lucen",
       "providerAccountId": "founder-lucen-account",
       "displayName": "Lucen / cx006-性价比-动态调价-0.06x",
-      "routingGroupName": "cx006-性价比-动态调价-0.06x",
+      "routingGroupName": "cx010-性价比-动态调价",
       "routingGroupSlug": "cx006_value_dynamic",
       "protocolCandidates": [
         "responses"
@@ -436,13 +439,14 @@
       "rechargeCashRatioCnyPerCreditUsd": 1,
       "effectiveCostStatus": "estimated",
       "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
-      "observedBillingMultiplier": 0.06,
+      "observedBillingMultiplier": 0.1,
       "multiplierStatus": "observed",
       "enabled": true,
       "discoveryStatus": "success",
       "activationStatus": "active",
       "notes": [
-        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+        "Directory discovery does not imply protocol compatibility or Active Pool admission",
+        "Multiplier refreshed from Lucen live /groups/available on 2026-08-01"
       ]
     },
     {
@@ -900,7 +904,7 @@
       "providerId": "lucen",
       "providerAccountId": "founder-lucen-account",
       "displayName": "Lucen / qwen官方key专线-cc协议-0.1x",
-      "routingGroupName": "qwen官方key专线-cc协议-0.1x",
+      "routingGroupName": "no.21-qwen官key专线-cc-0.4",
       "routingGroupSlug": "qwen_official_claude_010",
       "protocolCandidates": [
         "messages"
@@ -911,13 +915,14 @@
       "rechargeCashRatioCnyPerCreditUsd": 1,
       "effectiveCostStatus": "estimated",
       "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
-      "observedBillingMultiplier": 0.1,
+      "observedBillingMultiplier": 0.4,
       "multiplierStatus": "observed",
       "enabled": true,
       "discoveryStatus": "success",
       "activationStatus": "inactive",
       "notes": [
-        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+        "Directory discovery does not imply protocol compatibility or Active Pool admission",
+        "Multiplier refreshed from Lucen live /groups/available on 2026-08-01"
       ]
     },
     {
@@ -925,7 +930,7 @@
       "providerId": "lucen",
       "providerAccountId": "founder-lucen-account",
       "displayName": "Lucen / qwen官方key-openai协议-0.1x",
-      "routingGroupName": "qwen官方key-openai协议-0.1x",
+      "routingGroupName": "no.22-qwen官key专线-openai-0.4",
       "routingGroupSlug": "qwen_official_openai_010",
       "protocolCandidates": [
         "responses"
@@ -936,13 +941,14 @@
       "rechargeCashRatioCnyPerCreditUsd": 1,
       "effectiveCostStatus": "estimated",
       "effectiveCostSource": "Founder Lucen recharge batch CNY 500 for USD 500; group multiplier parsed from operator label",
-      "observedBillingMultiplier": 0.1,
+      "observedBillingMultiplier": 0.4,
       "multiplierStatus": "observed",
       "enabled": true,
       "discoveryStatus": "success",
       "activationStatus": "inactive",
       "notes": [
-        "Directory discovery does not imply protocol compatibility or Active Pool admission"
+        "Directory discovery does not imply protocol compatibility or Active Pool admission",
+        "Multiplier refreshed from Lucen live /groups/available on 2026-08-01"
       ]
     },
     {

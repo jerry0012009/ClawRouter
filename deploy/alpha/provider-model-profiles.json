@@ -758,7 +758,8 @@
       "activeInRouting": false,
       "lastProbeStatus": "failed",
       "consecutiveProbeFailures": 1,
-      "statusReason": "invalid_sse_content_type"
+      "statusReason": "invalid_sse_content_type",
+      "observedBillingMultiplier": 0.2
     },
     {
       "executionProfileId": "lucen-claude-clone-020:claude-sonnet-5:messages",
@@ -790,7 +791,8 @@
       "activeInRouting": false,
       "lastProbeStatus": "failed",
       "consecutiveProbeFailures": 1,
-      "statusReason": "invalid_sse_content_type"
+      "statusReason": "invalid_sse_content_type",
+      "observedBillingMultiplier": 0.2
     },
     {
       "executionProfileId": "lucen-claude-cursor-reverse-030:claude-opus-4-8:messages",
@@ -886,7 +888,8 @@
       "activeInRouting": false,
       "lastProbeStatus": "failed",
       "consecutiveProbeFailures": 1,
-      "statusReason": "provider_http_502"
+      "statusReason": "provider_http_502",
+      "observedBillingMultiplier": 0.03
     },
     {
       "executionProfileId": "lucen-cx003-low:gpt-5.6-luna:responses",
@@ -918,7 +921,8 @@
       "activeInRouting": false,
       "lastProbeStatus": "failed",
       "consecutiveProbeFailures": 1,
-      "statusReason": "provider_http_502"
+      "statusReason": "provider_http_502",
+      "observedBillingMultiplier": 0.03
     },
     {
       "executionProfileId": "lucen-cx003-low:gpt-5.6-sol:responses",
@@ -950,7 +954,8 @@
       "activeInRouting": false,
       "lastProbeStatus": "failed",
       "consecutiveProbeFailures": 1,
-      "statusReason": "provider_http_502"
+      "statusReason": "provider_http_502",
+      "observedBillingMultiplier": 0.03
     },
     {
       "executionProfileId": "lucen-cx003-low:gpt-5.6-terra:responses",
@@ -982,7 +987,8 @@
       "activeInRouting": false,
       "lastProbeStatus": "failed",
       "consecutiveProbeFailures": 1,
-      "statusReason": "provider_http_502"
+      "statusReason": "provider_http_502",
+      "observedBillingMultiplier": 0.03
     },
     {
       "executionProfileId": "lucen-cx004-low-dedicated:gpt-5.4-mini:responses",
@@ -1193,7 +1199,8 @@
       "activeInRouting": true,
       "lastProbeStatus": "passed",
       "consecutiveProbeFailures": 0,
-      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed",
+      "observedBillingMultiplier": 0.1
     },
     {
       "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.5:responses",
@@ -1234,7 +1241,8 @@
       "activeInRouting": true,
       "lastProbeStatus": "passed",
       "consecutiveProbeFailures": 0,
-      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed"
+      "statusReason": "full_pool_native_tool_sse_usage_preflight_passed",
+      "observedBillingMultiplier": 0.1
     },
     {
       "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.6-luna:responses",
@@ -1282,7 +1290,8 @@
       "activeInRouting": true,
       "lastProbeStatus": "failed",
       "consecutiveProbeFailures": 1,
-      "statusReason": "timeout"
+      "statusReason": "timeout",
+      "observedBillingMultiplier": 0.1
     },
     {
       "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.6-sol:responses",
@@ -1314,7 +1323,8 @@
       "activeInRouting": false,
       "lastProbeStatus": "failed",
       "consecutiveProbeFailures": 1,
-      "statusReason": "timeout"
+      "statusReason": "timeout",
+      "observedBillingMultiplier": 0.1
     },
     {
       "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.6-terra:responses",
@@ -1362,7 +1372,8 @@
       "activeInRouting": true,
       "lastProbeStatus": "failed",
       "consecutiveProbeFailures": 1,
-      "statusReason": "timeout"
+      "statusReason": "timeout",
+      "observedBillingMultiplier": 0.1
     },
     {
       "executionProfileId": "lucen-cx006-plus:gpt-5.4-mini:responses",
@@ -3503,7 +3514,8 @@
       "activeInRouting": false,
       "lastProbeStatus": "failed",
       "consecutiveProbeFailures": 1,
-      "statusReason": "invalid_sse_content_type"
+      "statusReason": "invalid_sse_content_type",
+      "observedBillingMultiplier": 0.4
     },
     {
       "executionProfileId": "lucen-qwen-official-openai-010:qwen3.7-max:responses",
@@ -3535,7 +3547,8 @@
       "activeInRouting": false,
       "lastProbeStatus": "failed",
       "consecutiveProbeFailures": 1,
-      "statusReason": "provider_http_502"
+      "statusReason": "provider_http_502",
+      "observedBillingMultiplier": 0.4
     },
     {
       "executionProfileId": "lucen-grok-006:claude-opus-4-8:responses",

@@ -89,6 +89,10 @@ export function filterObservedContextFailures(
   });
 }
 
+export function contextModelRerouteReason(previousModelId: string, nextModelId: string): string {
+  return `context_model_reroute:${previousModelId}->${nextModelId}`;
+}
+
 export type AlphaProcessorOptions = {
   database: AlphaDatabase;
   profiles: AlphaExecutionProfile[];
@@ -2588,6 +2592,7 @@ export class AlphaRequestProcessor {
           reasoningControlMode: retryPrepared.reasoningControlMode,
         });
         await repository.selectLogicalRequestProfile(logical.logicalRequestId, identity.newapiUserId, next.profile.executionProfileId);
+        const previousModelId = resolutionContext.selectedProfile.modelId;
         resolutionContext.attemptId = next.attemptId;
         resolutionContext.attemptIndex = next.attemptIndex;
         resolutionContext.selectedProfile = next.profile;
@@ -2614,7 +2619,7 @@ export class AlphaRequestProcessor {
         resolutionContext.routeSummary.providerSelectionReason = [
           resolutionContext.routeSummary.providerSelectionReason,
           target?.reason === "context_model_reroute"
-            ? `context_model_reroute:${resolutionContext.selectedProfile.modelId}->${next.profile.modelId}`
+            ? contextModelRerouteReason(previousModelId, next.profile.modelId)
             : `${target?.reason ?? "same_model_channel_fallback"}:${next.profile.channel}:${next.networkEndpoint ?? "primary"}`,
         ].filter(Boolean).join("; ");
         if (target?.reason === "context_model_reroute") {

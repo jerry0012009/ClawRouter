@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { classifyProviderContextOverflow, contextOverflowRecoveryEligible, createRecoveringProviderAdapter, type ProviderAttemptHandle } from "../src/alpha/execution.js";
-import { filterObservedContextFailures, learnContextFailureThreshold } from "../src/alpha/processor.js";
+import { contextModelRerouteReason, filterObservedContextFailures, learnContextFailureThreshold } from "../src/alpha/processor.js";
 import type { NativeProviderRequest } from "../src/alpha/provider.js";
 import { routeWithCurrentAcuFormula, type AlphaExecutionProfile } from "../src/alpha/routing.js";
 import type { AcuJudgeResult } from "../src/acu/types.js";
@@ -61,6 +61,27 @@ describe("context overflow recovery", () => {
       startRetry: async (selected, index) => handle(index, selected), recordFailedAttempt: async () => {} });
     expect(await (await adapter.execute(request())).text()).toBe("success");
     expect(calls).toEqual(["glm-5.2", "gpt-5.6-sol"]);
+  });
+
+  it("classifies a context overflow carried by an HTTP 500 before recovering", async () => {
+    const first = profile("glm", "glm-5.2");
+    const second = profile("sol", "gpt-5.6-sol");
+    let classified = false;
+    const handle = (index: number, selected: AlphaExecutionProfile): ProviderAttemptHandle => ({ attemptId: `a-${index}`, attemptIndex: index, profile: selected,
+      adapter: { async execute() { return selected === first
+        ? new Response(JSON.stringify({ error: { code: "context_length_exceeded" } }), { status: 500 })
+        : new Response("recovered"); } } });
+    const adapter = createRecoveringProviderAdapter({ initial: handle(1, first), maxAttempts: 3,
+      isRecoverableFailure: (failure) => { classified = classifyProviderContextOverflow(failure).isContextOverflow; return classified; },
+      selectRecoveryTarget: () => classified ? { profile: second, reason: "context_model_reroute" } : undefined,
+      startRetry: async (selected, index) => handle(index, selected), recordFailedAttempt: async () => {} });
+    expect(await (await adapter.execute(request())).text()).toBe("recovered");
+    expect(classified).toBe(true);
+  });
+
+  it("records the context reroute from the previous model to the next model", () => {
+    expect(contextModelRerouteReason("glm-5.2", "gpt-5.6-sol"))
+      .toBe("context_model_reroute:glm-5.2->gpt-5.6-sol");
   });
 
   it("excludes all Profiles of the failed model only at and above the learned threshold", () => {

@@ -222,7 +222,8 @@ export function createRecoveringProviderAdapter(options: ProviderRecoveryOptions
             return response;
           }
           const failure = await bufferFailure(response);
-          const recoverable = responseRecoverable || options.isRecoverableFailure?.(failure, current) === true;
+          const failureRecoverable = options.isRecoverableFailure?.(failure, current) === true;
+          const recoverable = responseRecoverable || failureRecoverable;
           if (!recoverable) {
             options.onRecoveryDecision?.("not_recoverable");
             options.onSelected?.(current);

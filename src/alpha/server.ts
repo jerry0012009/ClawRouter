@@ -263,7 +263,11 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
         const runtime = runtimes.get(profile.executionProfileId);
         const profileState = runtime?.state;
         const channelState = channels.get(profile.channelId ?? profile.channel)?.state;
-        const runtimeRecovered = profile.autoRouteEnabled === false && isRecoveredSupplyProfile(runtime ?? {});
+        const fresh = Boolean(runtime?.lastSuccessAt
+          && Date.now() - runtime.lastSuccessAt.getTime() <= 120 * 60_000);
+        const runtimeRecovered = profile.autoRouteEnabled === false
+          && isRecoveredSupplyProfile(runtime ?? {})
+          && (!profile.requiresFreshProbe || fresh);
         return {
           ...profile,
           autoRouteEnabled: profile.autoRouteEnabled !== false || runtimeRecovered,

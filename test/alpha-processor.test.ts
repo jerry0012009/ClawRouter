@@ -10,7 +10,7 @@ import type { AlphaJudgeRunner } from "../src/alpha/judge-runner.js";
 import { createNativeProviderAdapter } from "../src/alpha/provider.js";
 import { AlphaRequestProcessor } from "../src/alpha/processor.js";
 import { AlphaRepository } from "../src/alpha/repository.js";
-import type { AlphaExecutionProfile } from "../src/alpha/routing.js";
+import { evaluateProfiles, type AlphaExecutionProfile } from "../src/alpha/routing.js";
 import { bodySha256, trustedIdentityHeaders } from "../src/alpha/trusted-identity.js";
 
 const databaseUrl = process.env.ACU_PROCESSOR_TEST_DATABASE_URL;
@@ -401,6 +401,78 @@ run("Alpha PostgreSQL request processor", () => {
     primaryProfile.requiresFreshProbe = false;
     await database.query("DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id=$1", [primaryProfile.executionProfileId]);
     await database.query("DELETE FROM acu_channel_health WHERE channel_id=$1", [channelId]);
+  });
+
+  it("requires a fresh exact success before dynamically enabling a freshness-gated Profile", async () => {
+    const repository = new AlphaRepository(database);
+    const channelId = primaryProfile.channelId ?? primaryProfile.channel;
+    const originalAutoRouteEnabled = primaryProfile.autoRouteEnabled;
+    const originalRequiresFreshProbe = primaryProfile.requiresFreshProbe;
+    primaryProfile.autoRouteEnabled = false;
+    primaryProfile.requiresFreshProbe = true;
+    await database.query("DELETE FROM acu_profile_probe_queue WHERE execution_profile_id=$1", [primaryProfile.executionProfileId]);
+    await database.query("DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id=$1", [primaryProfile.executionProfileId]);
+    const staleSuccess = new Date(Date.now() - 121 * 60_000);
+    await repository.saveProfileHealth({
+      executionProfileId: primaryProfile.executionProfileId,
+      channelId,
+      providerId: primaryProfile.provider,
+      canonicalModelId: primaryProfile.modelId,
+      protocol: "responses",
+      snapshot: {
+        state: "healthy", consecutiveFailures: 0, recentSuccessRate: 1,
+        lastAttemptAt: staleSuccess, lastSuccessAt: staleSuccess,
+      },
+      usageTrusted: true,
+      actualModelVerified: true,
+    });
+    const invokeEffectiveProfiles = (wake: boolean) => (processor as unknown as {
+      effectiveProfiles(
+        allowed: string[], wake: boolean, demandedModelId?: string,
+      ): Promise<{ profiles: AlphaExecutionProfile[] }>;
+    }).effectiveProfiles([], wake, primaryProfile.modelId);
+
+    const wakesBefore = probeWakeCount;
+    const stale = (await invokeEffectiveProfiles(true)).profiles
+      .find((profile) => profile.executionProfileId === primaryProfile.executionProfileId)!;
+    expect(stale.autoRouteEnabled).toBe(false);
+    expect(evaluateProfiles({
+      judge: judgeResult,
+      judgeCost: 0,
+      inputTokens: 10,
+      expectedOutputTokens: 10,
+      effectiveQualityTarget: 0.5,
+      profiles: [stale],
+      requirements: { protocol: "responses", requireTools: false, requireThinking: false, webIntent: "not_required" },
+    })[0]).toMatchObject({ eligible: false, reasons: expect.arrayContaining(["auto_route_disabled"]) });
+    expect((await database.query(
+      "SELECT 1 FROM acu_profile_probe_queue WHERE execution_profile_id=$1", [primaryProfile.executionProfileId],
+    )).rowCount).toBe(1);
+    expect(probeWakeCount).toBe(wakesBefore + 1);
+
+    const freshSuccess = new Date();
+    await repository.saveProfileHealth({
+      executionProfileId: primaryProfile.executionProfileId,
+      channelId,
+      providerId: primaryProfile.provider,
+      canonicalModelId: primaryProfile.modelId,
+      protocol: "responses",
+      snapshot: {
+        state: "healthy", consecutiveFailures: 0, recentSuccessRate: 1,
+        lastAttemptAt: freshSuccess, lastSuccessAt: freshSuccess,
+      },
+      usageTrusted: true,
+      actualModelVerified: true,
+    });
+    const fresh = (await invokeEffectiveProfiles(false)).profiles
+      .find((profile) => profile.executionProfileId === primaryProfile.executionProfileId)!;
+    expect(fresh.autoRouteEnabled).toBe(true);
+    expect(fresh.runtimeHealth?.effectiveState).toBe("eligible");
+
+    primaryProfile.autoRouteEnabled = originalAutoRouteEnabled;
+    primaryProfile.requiresFreshProbe = originalRequiresFreshProbe;
+    await database.query("DELETE FROM acu_profile_probe_queue WHERE execution_profile_id=$1", [primaryProfile.executionProfileId]);
+    await database.query("DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id=$1", [primaryProfile.executionProfileId]);
   });
 
   it("does not change health, enqueue recovery, or wake probes for client cancellation", async () => {

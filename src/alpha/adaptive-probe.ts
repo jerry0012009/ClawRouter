@@ -34,12 +34,12 @@ export function recoveryCooldownDue(health: Pick<HealthSnapshot, "state" | "cool
 }
 
 export function activeRecoveryRequired(input: {
-  lastFailureAt?: Date;
+  recoveryStartedAt: Date;
   recentModelDemand: boolean;
   now?: number;
 }): boolean {
-  return input.recentModelDemand || Boolean(input.lastFailureAt
-    && (input.now ?? Date.now()) - input.lastFailureAt.getTime() <= ACTIVE_RECOVERY_WINDOW_MS);
+  return input.recentModelDemand
+    || (input.now ?? Date.now()) - input.recoveryStartedAt.getTime() <= ACTIVE_RECOVERY_WINDOW_MS;
 }
 
 export function fullPoolProbeDue(input: {
@@ -144,8 +144,9 @@ export class AdaptiveProbeWorker {
   }
 
   private async runTargetedRecoveryIfEligible(): Promise<boolean> {
-    const queued = await this.options.database.query<{ execution_profile_id: string }>(
-      "SELECT execution_profile_id FROM acu_profile_probe_queue WHERE execution_profile_id<>$1 ORDER BY enqueued_at LIMIT 100",
+    const queued = await this.options.database.query<{ execution_profile_id: string; enqueued_at: Date }>(
+      `SELECT execution_profile_id,enqueued_at FROM acu_profile_probe_queue
+       WHERE execution_profile_id<>$1 ORDER BY enqueued_at LIMIT 100`,
       [MANUAL_FULL_POOL_QUEUE_ID],
     );
     if (!queued.rowCount) return false;
@@ -171,9 +172,7 @@ export class AdaptiveProbeWorker {
         .filter((candidate) => candidate.modelId === profile.modelId)
         .map((candidate) => candidate.executionProfileId);
       const recentModelDemand = await repository.hasRecentModelDemand(profile.modelId, sameModelProfileIds);
-      const lastFailureAt = runtime?.lastFailureAt
-        ?? (channelBlocked ? channel?.lastFailureAt : undefined);
-      if (!activeRecoveryRequired({ lastFailureAt, recentModelDemand })) {
+      if (!activeRecoveryRequired({ recoveryStartedAt: new Date(row.enqueued_at), recentModelDemand })) {
         await repository.deleteProfileProbe(profile.executionProfileId);
         continue;
       }

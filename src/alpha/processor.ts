@@ -495,9 +495,11 @@ export class AlphaRequestProcessor {
       const channelId = profile.channelId ?? profile.channel;
       const channel = channelHealth.get(channelId);
       const runtime = profileHealth.get(profile.executionProfileId);
-      const runtimeRecovered = profile.autoRouteEnabled === false && isRecoveredSupplyProfile(runtime ?? {});
       const lastSuccessAt = runtime?.lastSuccessAt;
       const fresh = Boolean(lastSuccessAt && Date.now() - lastSuccessAt.getTime() <= 120 * 60_000);
+      const runtimeRecovered = profile.autoRouteEnabled === false
+        && isRecoveredSupplyProfile(runtime ?? {})
+        && (!profile.requiresFreshProbe || fresh);
       const staleFreshnessRequired = profile.requiresFreshProbe === true && !fresh;
       const runtimeHealth = deriveRuntimeEligibility({
         profileState: runtime?.state ?? profile.health,

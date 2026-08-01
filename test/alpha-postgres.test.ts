@@ -401,14 +401,14 @@ run("Alpha PostgreSQL foundation", () => {
     expect(second.rowCount).toBe(0);
   });
 
-  it("stops inactive recovery after six hours without changing open health", async () => {
+  it("stops a seven-hour-old recovery queue even when the last probe failure is recent", async () => {
     const profile = recoveryProfile("inactive-recovery-profile", "inactive-recovery-model", "inactive-recovery-channel");
     await database.query(
       "UPDATE acu_probe_worker_lease SET holder_id=null,lease_until=now()-interval '1 second' WHERE singleton=true",
     );
     await database.query("DELETE FROM acu_profile_probe_queue WHERE execution_profile_id=$1", [profile.executionProfileId]);
     await database.query("DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id=$1", [profile.executionProfileId]);
-    const oldFailure = new Date(Date.now() - 7 * 60 * 60_000);
+    const recentFailure = new Date(Date.now() - 60_000);
     await repository.saveProfileHealth({
       executionProfileId: profile.executionProfileId,
       channelId: profile.channelId!,
@@ -417,12 +417,16 @@ run("Alpha PostgreSQL foundation", () => {
       protocol: "responses",
       snapshot: {
         state: "open", consecutiveFailures: 4, recentSuccessRate: 0,
-        lastAttemptAt: oldFailure, lastFailureAt: oldFailure, cooldownUntil: new Date(Date.now() - 1_000),
+        lastAttemptAt: recentFailure, lastFailureAt: recentFailure, cooldownUntil: new Date(Date.now() - 1_000),
       },
       usageTrusted: true,
       actualModelVerified: true,
     });
     await repository.enqueueProfileProbe(profile.executionProfileId);
+    await database.query(
+      "UPDATE acu_profile_probe_queue SET enqueued_at=now()-interval '7 hours' WHERE execution_profile_id=$1",
+      [profile.executionProfileId],
+    );
     expect(await repository.hasRecentModelDemand(profile.modelId, [profile.executionProfileId])).toBe(false);
     await database.query(
       `INSERT INTO acu_full_pool_probe_runs
@@ -448,6 +452,58 @@ run("Alpha PostgreSQL foundation", () => {
       "SELECT 1 FROM acu_profile_probe_queue WHERE execution_profile_id=$1", [profile.executionProfileId],
     )).rowCount).toBe(0);
     expect(await repository.profileHealth(profile.executionProfileId)).toMatchObject({ state: "open" });
+  });
+
+  it("keeps the original queue start while a recent recovery probe fails", async () => {
+    const profile = recoveryProfile("recent-queue-profile", "recent-queue-model", "recent-queue-channel");
+    await database.query(
+      "UPDATE acu_probe_worker_lease SET holder_id=null,lease_until=now()-interval '1 second' WHERE singleton=true",
+    );
+    await database.query("DELETE FROM acu_profile_probe_queue WHERE execution_profile_id=$1", [profile.executionProfileId]);
+    await database.query("DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id=$1", [profile.executionProfileId]);
+    const failureAt = new Date(Date.now() - 60_000);
+    await repository.saveProfileHealth({
+      executionProfileId: profile.executionProfileId,
+      channelId: profile.channelId!,
+      providerId: profile.provider,
+      canonicalModelId: profile.modelId,
+      protocol: "responses",
+      snapshot: {
+        state: "open", consecutiveFailures: 1, recentSuccessRate: 0,
+        lastAttemptAt: failureAt, lastFailureAt: failureAt, cooldownUntil: new Date(Date.now() - 1_000),
+      },
+      usageTrusted: true,
+      actualModelVerified: true,
+    });
+    await repository.enqueueProfileProbe(profile.executionProfileId);
+    await database.query(
+      "UPDATE acu_profile_probe_queue SET enqueued_at=now()-interval '5 hours' WHERE execution_profile_id=$1",
+      [profile.executionProfileId],
+    );
+    const queuedBefore = await database.query<{ enqueued_at: Date }>(
+      "SELECT enqueued_at FROM acu_profile_probe_queue WHERE execution_profile_id=$1",
+      [profile.executionProfileId],
+    );
+    const worker = new AdaptiveProbeWorker({
+      database,
+      profiles: [profile],
+      adapters: new Map([[profile.executionProfileId, failedProbeAdapter(500)]]),
+      dailyBudgetCny: 1,
+    });
+
+    await worker.runOnce();
+
+    const queuedAfter = await database.query<{ enqueued_at: Date }>(
+      "SELECT enqueued_at FROM acu_profile_probe_queue WHERE execution_profile_id=$1",
+      [profile.executionProfileId],
+    );
+    expect(queuedAfter.rows[0]?.enqueued_at.getTime()).toBe(queuedBefore.rows[0]?.enqueued_at.getTime());
+    expect((await database.query(
+      "SELECT 1 FROM acu_profile_probe_attempts WHERE execution_profile_id=$1", [profile.executionProfileId],
+    )).rowCount).toBe(1);
+    expect(await repository.profileHealth(profile.executionProfileId)).toMatchObject({
+      state: "open", consecutiveFailures: 2, errorClass: "provider_5xx",
+    });
   });
 
   it("keeps probing at the thirty-minute cap while the canonical model has demand", async () => {

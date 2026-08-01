@@ -35,16 +35,16 @@ describe("adaptive Probe scheduling", () => {
       lastCompletedAt: new Date(now) })).toBe(true);
   });
 
-  it("continues targeted recovery for recent failures or active model demand", () => {
+  it("continues targeted recovery for a recent queue or active model demand", () => {
     const now = Date.parse("2026-08-01T12:00:00Z");
     expect(activeRecoveryRequired({
-      lastFailureAt: new Date(now - ACTIVE_RECOVERY_WINDOW_MS), recentModelDemand: false, now,
+      recoveryStartedAt: new Date(now - ACTIVE_RECOVERY_WINDOW_MS), recentModelDemand: false, now,
     })).toBe(true);
     expect(activeRecoveryRequired({
-      lastFailureAt: new Date(now - ACTIVE_RECOVERY_WINDOW_MS - 1), recentModelDemand: true, now,
+      recoveryStartedAt: new Date(now - ACTIVE_RECOVERY_WINDOW_MS - 1), recentModelDemand: true, now,
     })).toBe(true);
     expect(activeRecoveryRequired({
-      lastFailureAt: new Date(now - ACTIVE_RECOVERY_WINDOW_MS - 1), recentModelDemand: false, now,
+      recoveryStartedAt: new Date(now - ACTIVE_RECOVERY_WINDOW_MS - 1), recentModelDemand: false, now,
     })).toBe(false);
   });
 

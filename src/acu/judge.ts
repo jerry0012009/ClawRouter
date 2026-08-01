@@ -465,6 +465,7 @@ export class AcuJudgeClient {
     forceRefresh = false,
     rawNative?: RawNativeJudgeContext,
     clientSignal?: AbortSignal,
+    deadlineAt?: number,
   ): Promise<JudgeRequestResult> {
     if (!this.config.apiKey) throw new Error("ACU Judge API key is not configured");
     if (this.config.promptVersion !== fewShotData.promptVersion) throw new Error("ACU Judge prompt version does not match frozen few-shot data");
@@ -500,8 +501,9 @@ export class AcuJudgeClient {
     const firstByteTimeout = this.config.firstByteTimeoutMs > 0
       ? setTimeout(() => controller.abort(new Error("Judge first-byte timeout")), this.config.firstByteTimeoutMs)
       : undefined;
-    const totalTimeout = this.config.timeoutMs > 0
-      ? setTimeout(() => controller.abort(new Error("Judge total timeout")), this.config.timeoutMs)
+    const remainingTimeout = deadlineAt ? Math.max(1, deadlineAt - Date.now()) : this.config.timeoutMs;
+    const totalTimeout = remainingTimeout > 0
+      ? setTimeout(() => controller.abort(new Error("Judge total timeout")), remainingTimeout)
       : undefined;
     const started = Date.now();
     try {

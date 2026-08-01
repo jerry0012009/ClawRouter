@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { readAcuRuntimeConfig } from "../acu/config.js";
+import { AcuJudgeClient } from "../acu/judge.js";
 import type { RoutingDecision } from "../router/types.js";
 import { AlphaDatabase } from "./database.js";
 import { createAlphaGatewayServer } from "./gateway.js";
@@ -228,6 +229,8 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
       profile: safeProfile,
       adapter: adapters[0].adapter,
       adapters,
+      judgeBaseUrl: baseUrl,
+      judgeApiKey: apiKey,
     };
   });
   const judgeConfig = readAcuRuntimeConfig();
@@ -239,6 +242,21 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
     config: judgeConfig,
     rulesDecision: rulesFallbackDecision(),
     backupCashCnyPerNominalUsd: judgeEconomics ? cashCnyPerNominalUsd(judgeEconomics) : undefined,
+    profiles: profiles.map((item) => item.profile),
+    profileClients: new Map(profiles.map((item) => {
+      const profileConfig = {
+      ...judgeConfig,
+      judgeModel: "gpt-5.6-luna",
+      judgeProvider: item.profile.provider,
+      judgeBaseUrl: item.judgeBaseUrl,
+      apiKey: item.judgeApiKey,
+      backupJudgeModel: undefined,
+      backupJudgeBaseUrl: undefined,
+      backupApiKey: undefined,
+      syncBackupEnabled: false,
+      };
+      return [item.profile.executionProfileId, new AcuJudgeClient(profileConfig)] as const;
+    })),
   });
   const adapterMap = new Map(profiles.map((item) => [item.profile.executionProfileId, item.adapter]));
   const adaptiveProbe = new AdaptiveProbeWorker({

@@ -7,6 +7,8 @@ import type { RoutingDecision } from "../router/types.js";
 import type { WebIntentDecision } from "./protocol/types.js";
 import type { TriggerReason } from "./state-machine.js";
 import { classifyWebIntentFallback, type WebIntentFallbackInput, withWebIntentSource } from "./web-intent.js";
+import { getEligibleLunaJudgeProfiles } from "./judge-profile-selector.js";
+import type { AlphaExecutionProfile } from "./routing.js";
 
 const MIMO_JUDGE_BLENDED_COST_FACTOR = 0.5;
 const MIMO_JUDGE_COST_SOURCE = "midpoint_openrouter_payg_and_mimo99_plan_v1";
@@ -48,8 +50,8 @@ export type AlphaJudgeRun = {
 };
 
 export type AlphaJudgeAttempt = {
-  attemptIndex: 1 | 2;
-  role: "primary" | "backup";
+  attemptIndex: number;
+  role: "primary" | "same_model_failover" | "backup";
   status: "success" | "error";
   provider: string;
   model: string;
@@ -79,6 +81,8 @@ export type AlphaJudgeAttempt = {
   rawRequestBytes?: number;
   rawRequestTokenEstimate?: number;
   judgeContextLimit?: number;
+  executionProfileId?: string;
+  channel?: string;
 };
 
 export type AlphaJudgeInput = {
@@ -103,6 +107,8 @@ export type AcuJudgeRunnerOptions = {
   client?: AcuJudgeClient;
   backupClient?: AcuJudgeClient;
   backupCashCnyPerNominalUsd?: number;
+  profiles?: AlphaExecutionProfile[];
+  profileClients?: Map<string, AcuJudgeClient>;
 };
 
 function canReuseRecent(trigger: TriggerReason): boolean {
@@ -125,10 +131,11 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
     : undefined;
   const backupClient = options.backupClient ?? (backupConfig ? new AcuJudgeClient(backupConfig) : undefined);
   const policyVersion = options.policyVersion ?? "alpha-judge-policy-v1";
+  const profileClients = options.profileClients ?? new Map<string, AcuJudgeClient>();
 
   const attemptCost = (input: {
-    attemptIndex: 1 | 2;
-    role: "primary" | "backup";
+    attemptIndex: number;
+    role: "primary" | "same_model_failover" | "backup";
     provider: string;
     model: string;
     endpointHost: string;
@@ -142,6 +149,8 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
     errorCategory?: string;
     httpStatus?: number;
     nominalCostUsd?: number;
+    executionProfileId?: string;
+    channel?: string;
   }): AlphaJudgeAttempt => {
     const nominalCostUsd = input.nominalCostUsd ?? judgeNominalCostUsd(
       input.model, input.promptTokens, input.cachedPromptTokens, input.completionTokens,
@@ -168,8 +177,9 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
 
   const successfulAttempt = (
     result: JudgeRequestResult,
-    attemptIndex: 1 | 2,
-    role: "primary" | "backup",
+    attemptIndex: number,
+    role: "primary" | "same_model_failover" | "backup",
+    profile?: AlphaExecutionProfile,
   ): AlphaJudgeAttempt => attemptCost({
     attemptIndex, role, status: "success", provider: result.provider, model: result.model,
     endpointHost: result.endpointHost, upstreamRequestId: result.upstreamRequestId,
@@ -178,10 +188,12 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
     completionTokens: result.status === "cache_hit" ? 0 : result.completionTokens,
     latencyMs: result.latencyMs, usageStatus: result.status === "cache_hit" ? "usage_missing" : result.usageStatus,
     nominalCostUsd: result.cost,
+    ...(profile ? { executionProfileId: profile.executionProfileId, channel: profile.channel } : {}),
   });
 
-  const failedAttempt = (error: AcuJudgeAttemptError, attemptIndex: 1 | 2, role: "primary" | "backup") => attemptCost({
+  const failedAttempt = (error: AcuJudgeAttemptError, attemptIndex: number, role: "primary" | "same_model_failover" | "backup", profile?: AlphaExecutionProfile) => attemptCost({
     attemptIndex, role, status: "error", ...error.attempt,
+    ...(profile ? { executionProfileId: profile.executionProfileId, channel: profile.channel } : {}),
   });
 
   const aggregateCostStatus = (attempts: AlphaJudgeAttempt[]): AlphaJudgeRun["costStatus"] => {
@@ -233,14 +245,36 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
   return {
     async run(input) {
       const attempts: AlphaJudgeAttempt[] = [];
+      const deadlineAt = options.config.timeoutMs > 0 ? Date.now() + options.config.timeoutMs : undefined;
       try {
-        const result = await client.judge(input.messages, [], false, input.rawNative, input.signal);
-        if (result.status === "live") attempts.push(successfulAttempt(result, 1, "primary"));
-        return completeRun(result, attempts, result.status);
+        const profiles = options.profiles?.length
+          ? getEligibleLunaJudgeProfiles({ profiles: options.profiles, requiredContextTokens: Math.ceil(input.rawNative.rawRequest.length / 4), preferredProfileId: options.config.primaryProfileId, maxProfiles: options.config.maxProfileAttempts })
+          : [];
+        const candidates: Array<{ profile?: AlphaExecutionProfile; client: AcuJudgeClient }> = profiles.length
+          ? profiles.map((profile) => ({ profile, client: profileClients.get(profile.executionProfileId)! })).filter((candidate) => candidate.client)
+          : [{ profile: undefined, client }];
+        let lastError: unknown;
+        for (let index = 0; index < candidates.length; index += 1) {
+          if (deadlineAt && Date.now() >= deadlineAt) break;
+          const candidate = candidates[index];
+          const candidateClient = candidate.profile ? profileClients.get(candidate.profile.executionProfileId) : candidate.client;
+          if (!candidateClient) continue;
+          try {
+            const result = await candidateClient.judge(input.messages, [], false, input.rawNative, input.signal, deadlineAt);
+            if (result.status === "live") attempts.push(successfulAttempt(result, index + 1, index === 0 ? "primary" : "same_model_failover", candidate.profile));
+            return completeRun(result, attempts, result.status);
+          } catch (error) {
+            lastError = error;
+            if (error instanceof AcuJudgeClientCancelledError) throw error;
+            if (error instanceof AcuJudgeContextLengthError) continue;
+            if (error instanceof AcuJudgeAttemptError) attempts.push(failedAttempt(error, index + 1, index === 0 ? "primary" : "same_model_failover", candidate.profile));
+          }
+        }
+        throw lastError ?? new Error("No eligible Luna Judge Profile");
       } catch (error) {
         if (error instanceof AcuJudgeClientCancelledError) throw error;
         if (error instanceof AcuJudgeContextLengthError) throw error;
-        if (error instanceof AcuJudgeAttemptError) attempts.push(failedAttempt(error, 1, "primary"));
+        if (error instanceof AcuJudgeAttemptError && attempts.length === 0) attempts.push(failedAttempt(error, 1, "primary"));
         const primaryContextError = error instanceof AcuJudgeAttemptError
           && error.attempt.errorCategory === "context_length_exceeded";
         if (error instanceof AcuJudgeAttemptError && error.attempt.backupEligible

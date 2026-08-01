@@ -309,8 +309,8 @@ export type JudgeAttemptRecord = {
   judgeAttemptId: string;
   judgeEvaluationId: string;
   logicalRequestId?: string;
-  attemptIndex: 1 | 2;
-  attemptRole: "primary" | "backup";
+  attemptIndex: number;
+  attemptRole: "primary" | "same_model_failover" | "backup";
   provider: string;
   model: string;
   endpointHost: string;

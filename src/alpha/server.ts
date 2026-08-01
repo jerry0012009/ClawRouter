@@ -21,6 +21,10 @@ import { combinedMonitorState, mergeSupplyInventory, monitorRangeSpec, monitorRo
 import { AdaptiveProbeWorker, probeBackoffMinutes } from "./adaptive-probe.js";
 import { deriveRuntimeEligibility } from "./channel-health.js";
 import { isRecoveredSupplyProfile } from "./channel-registry.js";
+import {
+  DEFAULT_BILLING_POLICY_VERSION,
+  parseRetailMarkupMultiplier,
+} from "./retail-charge.js";
 
 export type ConfiguredExecutionProfile = AlphaExecutionProfile & {
   baseUrl?: string;
@@ -64,6 +68,8 @@ export type AlphaServiceConfig = {
   providerEconomics: ProviderEconomics[];
   judgeEconomicsProviderId?: string;
   maxRequestBytes: number;
+  retailMarkupMultiplier: number;
+  billingPolicyVersion: string;
 };
 
 function requiredEnvironment(name: string): string {
@@ -131,6 +137,8 @@ export async function readAlphaServiceConfig(): Promise<AlphaServiceConfig> {
     providerEconomics: (await readProviderEconomicsCatalog(economicsPath)).providers,
     judgeEconomicsProviderId: process.env.ACU_JUDGE_ECONOMICS_PROVIDER_ID?.trim() || undefined,
     maxRequestBytes: requestBodyBytes(process.env.ACU_MAX_REQUEST_BODY_MB),
+    retailMarkupMultiplier: parseRetailMarkupMultiplier(process.env.ACU_RETAIL_MARKUP_MULTIPLIER),
+    billingPolicyVersion: process.env.ACU_BILLING_POLICY_VERSION?.trim() || DEFAULT_BILLING_POLICY_VERSION,
   };
 }
 
@@ -298,6 +306,8 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
     networkAdapters: new Map(profiles.map((item) => [item.profile.executionProfileId, item.adapters])),
     judgeRunner,
     judgeEconomics,
+    retailMarkupMultiplier: serviceConfig.retailMarkupMultiplier,
+    billingPolicyVersion: serviceConfig.billingPolicyVersion,
     wakeProbe: (executionProfileId) => executionProfileId ? adaptiveProbe.enqueue(executionProfileId) : adaptiveProbe.wake(),
   });
   adaptiveProbe.start();

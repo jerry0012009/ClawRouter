@@ -44,6 +44,11 @@ import { compareWebPreference, resolveWebEligibility } from "./web-capability.js
 import { isRecoveredSupplyProfile } from "./channel-registry.js";
 import { classifyExecutionOutcome, costCompletenessStatus, type RecoveryDecisionReason } from "./execution-outcome.js";
 import { buildJudgeNativeContext } from "./judge-context-policy.js";
+import {
+  calculateRetailCharge,
+  DEFAULT_BILLING_POLICY_VERSION,
+  DEFAULT_RETAIL_MARKUP_MULTIPLIER,
+} from "./retail-charge.js";
 
 const POLICY_VERSION = "alpha-p0-policy-v1";
 const QUALITY_CURVE_VERSION = "acu-catalog-v0.1";
@@ -75,6 +80,8 @@ export type AlphaProcessorOptions = {
   judgeEconomics?: ProviderEconomics;
   expectedOutputTokens?: number;
   wakeProbe?: (executionProfileId?: string) => void;
+  retailMarkupMultiplier?: number;
+  billingPolicyVersion?: string;
 };
 
 export type AlphaResolutionContext = {
@@ -2553,7 +2560,7 @@ export class AlphaRequestProcessor {
     usageSource: string;
     billingStatus?: string;
   }): Promise<void> {
-    const providerCostUsd = input.providerCostUsd ?? "0.0000000000";
+    const attemptedProviderCostUsd = input.providerCostUsd ?? "0.0000000000";
     const billingStatus = input.billingStatus ?? (input.usageSource === "provider_usage"
       ? "provider_usage_verified" : "unknown");
     const costStatus = costCompletenessStatus({
@@ -2561,14 +2568,14 @@ export class AlphaRequestProcessor {
       estimated: false,
     });
     const economics = input.context.selectedProfile.economics;
-    const providerCash = economics
-      ? providerCostBreakdown(economics, Number(providerCostUsd))
+    let providerCash = economics
+      ? providerCostBreakdown(economics, Number(attemptedProviderCostUsd))
       : {
-          nominalProviderCostUsd: Number(providerCostUsd),
-          providerBalanceCharge: Number(providerCostUsd),
+          nominalProviderCostUsd: Number(attemptedProviderCostUsd),
+          providerBalanceCharge: Number(attemptedProviderCostUsd),
           providerBalanceCurrency: "USD-denominated credits" as const,
           providerCreditCashCostCny: 1,
-          effectiveCashCostCny: Number(providerCostUsd),
+          effectiveCashCostCny: Number(attemptedProviderCostUsd),
           effectiveCostSource: "missing_provider_economics",
           effectiveCostVersion: "missing_provider_economics",
         };
@@ -2578,7 +2585,7 @@ export class AlphaRequestProcessor {
       actual_cost_usd: string;
     }>(
       `SELECT provider,channel,actual_cost_usd FROM acu_attempts
-       WHERE logical_request_id=$1 AND attempt_kind='provider' AND status='error'
+       WHERE logical_request_id=$1 AND attempt_kind='provider' AND status<>'success'
          AND provider_billed=true AND actual_cost_usd>0`,
       [input.context.logicalRequestId],
     );
@@ -2607,6 +2614,19 @@ export class AlphaRequestProcessor {
       [input.context.logicalRequestId],
     );
     const logicalRow = logicalTiming.rows[0];
+    const providerCostUsd = logicalRow?.status === "completed"
+      ? attemptedProviderCostUsd
+      : "0.0000000000";
+    if (logicalRow?.status !== "completed") {
+      providerCash = economics
+        ? providerCostBreakdown(economics, 0)
+        : {
+            ...providerCash,
+            nominalProviderCostUsd: 0,
+            providerBalanceCharge: 0,
+            effectiveCashCostCny: 0,
+          };
+    }
     const endToEndLatencyMs = logicalRow?.completed_at
       ? Math.max(0, logicalRow.completed_at.getTime() - logicalRow.started_at.getTime())
       : channelAttempts.rows.reduce((total, attempt) => total + Number(attempt.latency_ms ?? 0), 0) + (input.context.judgeLatencyMs ?? 0);
@@ -2649,7 +2669,13 @@ export class AlphaRequestProcessor {
         : Number(attempt.actual_cost_usd));
     }, 0);
     const judgeCashCostCny = Number(input.context.judgeCashCostCny);
-    const actualTotalCashCostCny = providerCash.effectiveCashCostCny + judgeCashCostCny + failedAttemptCashCostCny;
+    const retailCharge = calculateRetailCharge({
+      successfulProviderCashCostCny: providerCash.effectiveCashCostCny,
+      judgeCashCostCny,
+      failedAttemptCashCostCny,
+      retailMarkupMultiplier: this.options.retailMarkupMultiplier ?? DEFAULT_RETAIL_MARKUP_MULTIPLIER,
+    });
+    const billingPolicyVersion = this.options.billingPolicyVersion ?? DEFAULT_BILLING_POLICY_VERSION;
     const counterfactualQualityCeilingCostCny = input.context.routeSummary.counterfactualQualityCeilingCostCny;
     await new AlphaRepository(this.options.database).createUsageReport({
       usageReportId: alphaId("usage"),
@@ -2676,8 +2702,8 @@ export class AlphaRequestProcessor {
       effectiveProviderCashCostCny: providerCash.effectiveCashCostCny.toFixed(10),
       judgeCashCostCny: judgeCashCostCny.toFixed(10),
       failedAttemptCashCostCny: failedAttemptCashCostCny.toFixed(10),
-      actualTotalCashCostCny: actualTotalCashCostCny.toFixed(10),
-      userChargeCny: actualTotalCashCostCny.toFixed(10),
+      actualTotalCashCostCny: retailCharge.actualTotalCashCostCny.toFixed(10),
+      userChargeCny: retailCharge.userChargeCny.toFixed(10),
       counterfactualQualityCeilingCostCny: counterfactualQualityCeilingCostCny?.toFixed(10),
       judgeInputTokens: BigInt(input.context.judgeInputTokens),
       judgeOutputTokens: BigInt(input.context.judgeOutputTokens),
@@ -2689,6 +2715,8 @@ export class AlphaRequestProcessor {
       judgeModel: input.context.judgeModel,
       costBreakdown: {
         billing_version: "founder-alpha-actual-cash-v2",
+        billing_policy_version: billingPolicyVersion,
+        retail_markup_multiplier: retailCharge.retailMarkupMultiplier,
         logical_request_status: recovered && logicalRow?.status === "completed" ? "completed_with_recovery" : logicalRow?.status,
         end_to_end_latency_ms: endToEndLatencyMs,
         judge_latency_ms: input.context.judgeLatencyMs ?? 0,
@@ -2709,6 +2737,7 @@ export class AlphaRequestProcessor {
         provider_balance_currency: providerCash.providerBalanceCurrency,
         provider_credit_cash_cost_cny: providerCash.providerCreditCashCostCny,
         effective_provider_cash_cost_cny: providerCash.effectiveCashCostCny,
+        successful_provider_cash_cost_cny: retailCharge.successfulProviderCashCostCny.toFixed(10),
         judge_cash_cost_cny: judgeCashCostCny,
         judge_input_tokens: input.context.judgeInputTokens,
         judge_output_tokens: input.context.judgeOutputTokens,
@@ -2718,10 +2747,13 @@ export class AlphaRequestProcessor {
         judge_cost_source: input.context.judgeCostSource,
         judge_provider: input.context.judgeProvider,
         judge_model: input.context.judgeModel,
-        failed_attempt_cash_cost_cny: failedAttemptCashCostCny,
+        failed_attempt_cash_cost_cny: failedAttemptCashCostCny.toFixed(10),
         failed_attempt_nominal_cost_usd: failedBilledCostUsd,
-        actual_total_cash_cost_cny: actualTotalCashCostCny,
-        user_charge_cny: actualTotalCashCostCny,
+        billable_base_cost_cny: retailCharge.billableBaseCostCny.toFixed(10),
+        actual_total_cash_cost_cny: retailCharge.actualTotalCashCostCny.toFixed(10),
+        user_charge_cny: retailCharge.userChargeCny.toFixed(10),
+        gross_profit_cny: retailCharge.grossProfitCny.toFixed(10),
+        gross_margin_rate: retailCharge.grossMarginRate.toFixed(10),
         counterfactual_quality_ceiling_cost_cny: counterfactualQualityCeilingCostCny,
         usageSource: input.usageSource,
         billing_status: billingStatus,
@@ -2820,7 +2852,7 @@ export class AlphaRequestProcessor {
             effective_cash_cost_cny: actual.effectiveCashCostCny,
             effective_cost_source: actual.effectiveCostSource,
             effective_cost_version: actual.effectiveCostVersion,
-            user_charge: actualTotalCashCostCny,
+            user_charge: retailCharge.userChargeCny,
             user_charge_currency: "CNY",
             reference_provider: reference?.provider,
             reference_effective_cash_cost_cny: referenceCost,
@@ -2840,7 +2872,14 @@ export class AlphaRequestProcessor {
     error: AlphaAdmissionError;
   }): Promise<void> {
     const judgeCostUsd = String(input.error.details.judge_cost_usd ?? "0.0000000000");
-    const judgeCashCostCny = String(input.error.details.judge_cash_cost_cny ?? "0.0000000000");
+    const judgeCashCostCny = Number(input.error.details.judge_cash_cost_cny ?? 0);
+    const retailCharge = calculateRetailCharge({
+      successfulProviderCashCostCny: 0,
+      judgeCashCostCny,
+      failedAttemptCashCostCny: 0,
+      retailMarkupMultiplier: this.options.retailMarkupMultiplier ?? DEFAULT_RETAIL_MARKUP_MULTIPLIER,
+    });
+    const billingPolicyVersion = this.options.billingPolicyVersion ?? DEFAULT_BILLING_POLICY_VERSION;
     await new AlphaRepository(this.options.database).createUsageReport({
       usageReportId: alphaId("usage"),
       logicalRequestId: input.logicalRequestId,
@@ -2860,20 +2899,27 @@ export class AlphaRequestProcessor {
       providerBalanceCurrency: "USD-denominated credits",
       providerCreditCashCostCny: "0.0000000000",
       effectiveProviderCashCostCny: "0.0000000000",
-      judgeCashCostCny,
+      judgeCashCostCny: judgeCashCostCny.toFixed(10),
       failedAttemptCashCostCny: "0.0000000000",
-      actualTotalCashCostCny: judgeCashCostCny,
-      userChargeCny: judgeCashCostCny,
+      actualTotalCashCostCny: retailCharge.actualTotalCashCostCny.toFixed(10),
+      userChargeCny: retailCharge.userChargeCny.toFixed(10),
       costBreakdown: {
         billing_version: "founder-alpha-actual-cash-v2",
+        billing_policy_version: billingPolicyVersion,
+        retail_markup_multiplier: retailCharge.retailMarkupMultiplier,
         admission_error_type: input.error.errorType,
         admission_trace_id: input.error.details.admission_trace_id,
         judge_evaluation_id: input.error.details.judge_evaluation_id,
         judge_model: input.error.details.judge_model,
         judge_nominal_cost_usd: judgeCostUsd,
-        judge_cash_cost_cny: judgeCashCostCny,
-        actual_total_cash_cost_cny: judgeCashCostCny,
-        user_charge_cny: judgeCashCostCny,
+        successful_provider_cash_cost_cny: "0.0000000000",
+        judge_cash_cost_cny: retailCharge.judgeCashCostCny.toFixed(10),
+        failed_attempt_cash_cost_cny: "0.0000000000",
+        billable_base_cost_cny: retailCharge.billableBaseCostCny.toFixed(10),
+        actual_total_cash_cost_cny: retailCharge.actualTotalCashCostCny.toFixed(10),
+        user_charge_cny: retailCharge.userChargeCny.toFixed(10),
+        gross_profit_cny: retailCharge.grossProfitCny.toFixed(10),
+        gross_margin_rate: retailCharge.grossMarginRate.toFixed(10),
       },
     });
   }

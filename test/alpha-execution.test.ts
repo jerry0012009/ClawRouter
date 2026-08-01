@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  classifyProviderContextOverflow,
   computeFirstModelEventDeadlineMs,
+  contextOverflowRecoveryEligible,
   createRecoveringProviderAdapter,
   isRecoverableProviderStatus,
   type ProviderAttemptHandle,
@@ -34,6 +36,99 @@ function request(): NativeProviderRequest {
 }
 
 describe("Alpha Provider attempt recovery", () => {
+  it("classifies only explicit Provider context overflow evidence", () => {
+    expect(classifyProviderContextOverflow(JSON.stringify({
+      error: { type: "invalid_request_error", code: "context_length_exceeded", message: "Maximum context length is 128,000 tokens" },
+    }))).toEqual({ isContextOverflow: true, reportedContextLimit: 128000 });
+    expect(classifyProviderContextOverflow("input exceeds the context window")).toEqual({ isContextOverflow: true });
+    expect(classifyProviderContextOverflow(JSON.stringify({
+      error: { type: "invalid_request_error", message: "unsupported parameter" },
+    }))).toEqual({ isContextOverflow: false });
+  });
+
+  it("allows context reroute only for automatic zero-output connected requests", () => {
+    expect(contextOverflowRecoveryEligible({
+      isContextOverflow: true, modelVisibleOutputBytes: 0, clientDisconnected: false, automaticRouting: true,
+    })).toBe(true);
+    expect(contextOverflowRecoveryEligible({
+      isContextOverflow: true, modelVisibleOutputBytes: 12, clientDisconnected: false, automaticRouting: true,
+    })).toBe(false);
+    expect(contextOverflowRecoveryEligible({
+      isContextOverflow: true, modelVisibleOutputBytes: 0, clientDisconnected: false, automaticRouting: false,
+    })).toBe(false);
+    expect(contextOverflowRecoveryEligible({
+      isContextOverflow: true, modelVisibleOutputBytes: 0, clientDisconnected: true, automaticRouting: true,
+    })).toBe(false);
+  });
+
+  it("reroutes a zero-output context overflow across canonical models", async () => {
+    const alternate = { ...profile, executionProfileId: "alternate:sol", modelId: "gpt-5.6-sol", channel: "sol" };
+    const calls: string[] = [];
+    const failed: string[] = [];
+    const handle = (attemptIndex: number, selected: AlphaExecutionProfile): ProviderAttemptHandle => ({
+      attemptId: `attempt-${attemptIndex}`, attemptIndex, startedAt: new Date(), profile: selected,
+      adapter: { async execute() {
+        calls.push(selected.modelId);
+        return selected.modelId === profile.modelId
+          ? new Response(JSON.stringify({ error: { code: "context_length_exceeded", message: "prompt is too long" } }), { status: 400 })
+          : new Response("success", { status: 200 });
+      } },
+    });
+    const adapter = createRecoveringProviderAdapter({
+      initial: handle(1, profile), maxAttempts: 3,
+      isRecoverableFailure: (failure) => classifyProviderContextOverflow(failure).isContextOverflow,
+      selectRecoveryTarget: () => ({ profile: alternate, reason: "context_model_reroute" }),
+      startRetry: async (selected, attemptIndex) => handle(attemptIndex, selected),
+      recordFailedAttempt: async ({ attempt }) => { failed.push(attempt.profile.modelId); },
+    });
+    expect(await (await adapter.execute(request())).text()).toBe("success");
+    expect(calls).toEqual(["test-model", "gpt-5.6-sol"]);
+    expect(failed).toEqual(["test-model"]);
+  });
+
+  it("does not retry an ordinary Provider 400", async () => {
+    let retries = 0;
+    const adapter = createRecoveringProviderAdapter({
+      initial: {
+        attemptId: "attempt-1", attemptIndex: 1, startedAt: new Date(), profile,
+        adapter: { async execute() { return new Response(JSON.stringify({ error: { type: "invalid_request_error", message: "unsupported parameter" } }), { status: 400 }); } },
+      },
+      isRecoverableFailure: (failure) => classifyProviderContextOverflow(failure).isContextOverflow,
+      selectRecoveryProfile: () => profile,
+      startRetry: async () => { retries += 1; throw new Error("must not retry"); },
+      recordFailedAttempt: async () => {},
+    });
+    expect((await adapter.execute(request())).status).toBe(400);
+    expect(retries).toBe(0);
+  });
+
+  it("limits repeated context overflow reroutes to three Provider Attempts", async () => {
+    let calls = 0;
+    let recorded = 0;
+    const models = [profile, { ...profile, executionProfileId: "terra", modelId: "gpt-5.6-terra" }, { ...profile, executionProfileId: "luna", modelId: "gpt-5.6-luna" }];
+    const handle = (attemptIndex: number, selected: AlphaExecutionProfile): ProviderAttemptHandle => ({
+      attemptId: `attempt-${attemptIndex}`, attemptIndex, startedAt: new Date(), profile: selected,
+      adapter: { async execute() {
+        calls += 1;
+        return new Response(JSON.stringify({ error: { code: "context_length_exceeded", message: "input exceeds the context window" } }), { status: 400 });
+      } },
+    });
+    const adapter = createRecoveringProviderAdapter({
+      initial: handle(1, models[0]!), maxAttempts: 3,
+      isRecoverableFailure: (failure) => classifyProviderContextOverflow(failure).isContextOverflow,
+      selectRecoveryTarget: (current) => {
+        const next = models[current.attemptIndex];
+        return next ? { profile: next, reason: "context_model_reroute" } : undefined;
+      },
+      startRetry: async (selected, attemptIndex) => handle(attemptIndex, selected),
+      recordFailedAttempt: async () => { recorded += 1; },
+    });
+    const response = await adapter.execute(request());
+    expect(response.status).toBe(400);
+    expect(calls).toBe(3);
+    expect(recorded).toBe(2);
+  });
+
   it("tries a Channel network fallback before a same-model Channel", async () => {
     const secondaryProfile = { ...profile, executionProfileId: "test:model:secondary", channel: "secondary" };
     const visited: string[] = [];

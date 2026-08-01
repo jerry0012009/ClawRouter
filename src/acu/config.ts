@@ -1,11 +1,11 @@
 export const ACU_PROMPT_VERSION = "acu-tier-requirement-v4";
 export const ACU_DIFFICULTY_METHOD_VERSION = "acu-difficulty-index-v1" as const;
 export const ACU_ROUTING_MODEL_VERSION = "acu-routing-model-v0.4";
-export const ACU_DEFAULT_JUDGE_MODEL = "mimo-v2.5-pro";
-export const ACU_DEFAULT_JUDGE_BASE_URL = "https://token-plan-cn.xiaomimimo.com/v1";
+export const ACU_DEFAULT_JUDGE_MODEL = "gpt-5.6-luna";
+export const ACU_DEFAULT_JUDGE_BASE_URL = "https://lucen.cc/v1";
 export const ACU_DEFAULT_JUDGE_MODE = "non-thinking" as const;
 export const ACU_DEFAULT_JUDGE_FIRST_BYTE_TIMEOUT_MS = 0;
-export const ACU_DEFAULT_JUDGE_TOTAL_TIMEOUT_MS = 12_000;
+export const ACU_DEFAULT_JUDGE_TOTAL_TIMEOUT_MS = 25_000;
 export const ACU_DEFAULT_MAX_CONTEXT_TOKENS = 1_000_000;
 export const ACU_DEFAULT_BACKUP_MAX_CONTEXT_TOKENS = 1_000_000;
 export const ACU_DEFAULT_MAX_OUTPUT_TOKENS = 300;
@@ -99,7 +99,7 @@ export function readAcuRuntimeConfig(overrides: Partial<AcuRuntimeConfig> = {}):
     ),
     maxOutputTokens: ACU_DEFAULT_MAX_OUTPUT_TOKENS,
     apiKey: process.env.ACU_JUDGE_API_KEY?.trim(),
-    judgeProvider: process.env.ACU_JUDGE_PROVIDER?.trim() || "openai_compatible",
+    judgeProvider: process.env.ACU_JUDGE_PROVIDER?.trim() || "lucen",
     backupJudgeModel: process.env.ACU_JUDGE_BACKUP_MODEL?.trim() || undefined,
     backupJudgeBaseUrl: process.env.ACU_JUDGE_BACKUP_BASE_URL?.trim() || undefined,
     backupApiKey: process.env.ACU_JUDGE_BACKUP_API_KEY?.trim() || undefined,

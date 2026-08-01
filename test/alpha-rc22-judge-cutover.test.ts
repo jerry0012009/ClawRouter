@@ -30,7 +30,7 @@ const validJudgePayload = {
 function judgeResponse(overrides: Record<string, unknown> = {}): Response {
   return new Response(JSON.stringify({
     id: "judge-fixture",
-    model: "mimo-v2.5-pro",
+    model: "gpt-5.6-luna",
     choices: [{ message: { content: JSON.stringify(validJudgePayload) } }],
     usage: { prompt_tokens: 1_000, completion_tokens: 100 },
     ...overrides,
@@ -43,22 +43,27 @@ function config() {
     enabled: true,
     apiKey: "primary-fixture",
     allowMock: true,
-    judgeModel: "mimo-v2.5-pro",
-    judgeProvider: "xiaomi_mimo",
-    judgeBaseUrl: "https://mimo.invalid/v1",
-    backupJudgeModel: "deepseek-v4-flash",
-    backupJudgeProvider: "closeai",
-    backupJudgeBaseUrl: "https://closeai.invalid/v1",
+    judgeModel: "gpt-5.6-luna",
+    judgeProvider: "lucen",
+    judgeBaseUrl: "https://lucen.invalid/v1",
+    backupJudgeModel: "mimo-v2.5-pro",
+    backupJudgeProvider: "xiaomi_mimo",
+    backupJudgeBaseUrl: "https://mimo.invalid/v1",
     backupApiKey: "backup-fixture",
-    syncBackupEnabled: true,
+    syncBackupEnabled: false,
     cachePath,
   });
 }
 
-it("defaults synchronous Judge backup to disabled", () => {
+it("defaults Luna Judge to 25 seconds with synchronous cross-model backup disabled", () => {
   const runtime = readAcuRuntimeConfig({});
-  expect(runtime.syncBackupEnabled).toBe(false);
-  expect(runtime.timeoutMs).toBe(12_000);
+  expect(runtime).toMatchObject({
+    judgeModel: "gpt-5.6-luna",
+    judgeProvider: "lucen",
+    judgeBaseUrl: "https://lucen.cc/v1",
+    syncBackupEnabled: false,
+    timeoutMs: 25_000,
+  });
 });
 
 function runner(primaryFetch: typeof fetch, backupFetch: typeof fetch) {
@@ -66,9 +71,9 @@ function runner(primaryFetch: typeof fetch, backupFetch: typeof fetch) {
   const primary = new AcuJudgeClient(runtime, primaryFetch);
   const backup = new AcuJudgeClient({
     ...runtime,
-    judgeModel: "deepseek-v4-flash",
-    judgeProvider: "closeai",
-    judgeBaseUrl: "https://closeai.invalid/v1",
+    judgeModel: "mimo-v2.5-pro",
+    judgeProvider: "xiaomi_mimo",
+    judgeBaseUrl: "https://mimo.invalid/v1",
     apiKey: "backup-fixture",
     cachePath: runtime.cachePath?.replace(/\.json$/, "-backup.json"),
   }, backupFetch);
@@ -97,14 +102,14 @@ const runInput = {
 };
 
 describe("RC2.2 Judge cutover", () => {
-  it("supports a one-step rollback to the configured DeepSeek backup", () => {
+  it("supports a one-step manual rollback to configured MiMo", () => {
     const previous = process.env.ACU_JUDGE_ROLLBACK_TO_BACKUP;
     process.env.ACU_JUDGE_ROLLBACK_TO_BACKUP = "true";
     try {
       expect(config()).toMatchObject({
-        judgeModel: "deepseek-v4-flash",
-        judgeProvider: "closeai",
-        judgeBaseUrl: "https://closeai.invalid/v1",
+        judgeModel: "mimo-v2.5-pro",
+        judgeProvider: "xiaomi_mimo",
+        judgeBaseUrl: "https://mimo.invalid/v1",
         backupJudgeModel: undefined,
       });
     } finally {
@@ -222,14 +227,15 @@ describe("RC2.2 Judge cutover", () => {
     });
   });
 
-  it("preserves the raw HTTP 200 body and exact JSON parser error before one Backup", async () => {
+  it("preserves the raw HTTP 200 body and parser error without invoking MiMo", async () => {
     const raw = "not-json from fixture";
-    const backupFetch = vi.fn<typeof fetch>().mockResolvedValue(judgeResponse({ model: "deepseek-v4-flash" }));
+    const backupFetch = vi.fn<typeof fetch>();
     const result = await runner(
       vi.fn<typeof fetch>().mockResolvedValue(new Response(raw, { status: 200, headers: { "x-request-id": "bad-json" } })),
       backupFetch,
     ).run(runInput);
-    expect(backupFetch).toHaveBeenCalledTimes(1);
+    expect(backupFetch).not.toHaveBeenCalled();
+    expect(result.status).toBe("rules_fallback");
     expect(result.attempts[0]).toMatchObject({
       errorCategory: "invalid_response",
       rawResponseBody: raw,
@@ -245,20 +251,17 @@ describe("RC2.2 Judge cutover", () => {
     ["http_429", () => new Response("rate limited", { status: 429 })],
     ["http_500", () => new Response("failed", { status: 500 })],
     ["timeout", () => Promise.reject(new DOMException("timed out", "AbortError"))],
-  ])("uses DeepSeek Backup once for %s", async (_name, primaryResult) => {
+  ])("does not use synchronous MiMo backup for %s", async (_name, primaryResult) => {
     const primaryFetch = vi.fn<typeof fetch>().mockImplementation(async () => primaryResult() as Awaited<ReturnType<typeof fetch>>);
-    const backupFetch = vi.fn<typeof fetch>().mockResolvedValue(judgeResponse({
-      model: "deepseek-v4-flash",
-    }));
+    const backupFetch = vi.fn<typeof fetch>();
     const result = await runner(primaryFetch, backupFetch).run(runInput);
     expect(primaryFetch).toHaveBeenCalledTimes(1);
-    expect(backupFetch).toHaveBeenCalledTimes(1);
-    expect(result.status).toBe("backup_live");
-    expect(result.attempts).toHaveLength(2);
-    expect(result.attempts.map((attempt) => attempt.role)).toEqual(["primary", "backup"]);
+    expect(backupFetch).not.toHaveBeenCalled();
+    expect(result.status).toBe("rules_fallback");
+    expect(result.attempts).toHaveLength(1);
   });
 
-  it("does not invoke Backup when MiMo returns a different valid Difficulty", async () => {
+  it("does not invoke MiMo when Luna returns a valid Difficulty", async () => {
     const primaryFetch = vi.fn<typeof fetch>().mockResolvedValue(judgeResponse({
       choices: [{ message: { content: JSON.stringify({
         ...validJudgePayload,
@@ -277,17 +280,17 @@ describe("RC2.2 Judge cutover", () => {
     expect(result.attempts).toHaveLength(1);
   });
 
-  it("uses the versioned midpoint estimate while retaining the full PAYG equivalent", async () => {
+  it("records Luna nominal cost without MiMo blended pricing", async () => {
     const result = await runner(
       vi.fn<typeof fetch>().mockResolvedValue(judgeResponse()),
       vi.fn<typeof fetch>(),
     ).run(runInput);
-    expect(result.costStatus).toBe("estimated_blended");
-    expect(Number(result.officialPaygEquivalentCostCny)).toBeGreaterThan(0);
-    expect(Number(result.costCny)).toBeCloseTo(Number(result.officialPaygEquivalentCostCny) * 0.5, 10);
+    expect(result.costStatus).toBe("verified");
+    expect(Number(result.officialPaygEquivalentCostCny)).toBe(0);
+    expect(Number(result.costCny)).toBeGreaterThan(0);
     expect(result.attempts[0]).toMatchObject({
-      costStatus: "estimated_blended",
-      costSource: "midpoint_openrouter_payg_and_mimo99_plan_v1",
+      costStatus: "verified",
+      costSource: "closeai_verified_credit_cash_conversion",
     });
   });
 });

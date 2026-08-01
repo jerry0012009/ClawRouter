@@ -1,0 +1,4 @@
+interface:
+  display_name: "Lucen Billing Reconciliation"
+  short_description: "Reconcile Lucen token billing with ACU execution-profile costs"
+  default_prompt: "Use $lucen-billing-reconciliation to collect, normalize, and reconcile Lucen usage bills against ACU model and channel economics."

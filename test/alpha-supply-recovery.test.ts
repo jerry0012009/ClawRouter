@@ -1,17 +1,20 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { continuousTierProbabilities } from "../src/acu/math.js";
-import { probeBackoffMinutes } from "../src/alpha/adaptive-probe.js";
-import { deriveProbeValidation } from "../src/alpha/adaptive-probe.js";
+import { deriveProbeValidation, recoveryCooldownDue } from "../src/alpha/adaptive-probe.js";
 import { deriveRuntimeEligibility } from "../src/alpha/channel-health.js";
 import { assertSupplyProfileConservation, type ProviderModelProfileRegistry } from "../src/alpha/channel-registry.js";
 import { routeWithCurrentAcuFormula, type AlphaExecutionProfile } from "../src/alpha/routing.js";
 
-function profile(id: string, health: AlphaExecutionProfile["health"] = "healthy"): AlphaExecutionProfile {
+function profile(
+  id: string,
+  health: AlphaExecutionProfile["health"] = "healthy",
+  modelId = "gpt-5.6-terra",
+): AlphaExecutionProfile {
   return {
     executionProfileId: id,
-    modelId: "gpt-5.6-terra",
-    providerModelId: "gpt-5.6-terra",
+    modelId,
+    providerModelId: modelId,
     provider: "lucen",
     channel: id.split(":")[0]!,
     channelId: id.split(":")[0]!,
@@ -52,8 +55,10 @@ describe("Supply Profile recovery", () => {
     expect(() => assertSupplyProfileConservation(cx012.map((item) => item.executionProfileId), cx012)).not.toThrow();
   });
 
-  it("uses bounded retry backoff without permanently stopping", () => {
-    expect([0, 1, 2, 3, 4, 20].map(probeBackoffMinutes)).toEqual([0, 5, 15, 60, 360, 360]);
+  it("uses health cooldown as the only targeted recovery deadline", () => {
+    const now = Date.parse("2026-08-01T00:00:00Z");
+    expect(recoveryCooldownDue({ state: "open", cooldownUntil: new Date(now - 1) }, now)).toBe(true);
+    expect(recoveryCooldownDue({ state: "open", cooldownUntil: new Date(now + 1) }, now)).toBe(false);
   });
 });
 
@@ -93,6 +98,51 @@ describe("Runtime health and Router conservation", () => {
       .toBe(inputIds.length);
     expect(route.modelAvailability).toEqual([{
       canonicalModelId: "gpt-5.6-terra", available: true, eligibleProfileCount: 1, excludedProfileCount: 1,
+    }]);
+  });
+
+  it("keeps Terra eligible when a Sol Profile on the same Channel is open", () => {
+    const profiles = [
+      profile("shared-channel:gpt-5.6-sol:responses", "cooldown", "gpt-5.6-sol"),
+      profile("shared-channel:gpt-5.6-terra:responses", "healthy", "gpt-5.6-terra"),
+    ];
+    const route = routeWithCurrentAcuFormula({
+      judge: {
+        ...continuousTierProbabilities(0.7), confidence: 1,
+        difficultyScoreRaw: 70, factorComposite: 70, difficultyIndex: 70,
+        difficultyMethodVersion: "test", difficultyScore: 70, signals: [], explanation: "test",
+        factors: { reasoningDepth: 7, taskScope: 7, constraintDensity: 7, toolDependency: 7,
+          verificationBurden: 7, contextBurden: 7 },
+      },
+      judgeCost: 0, inputTokens: 1_000, expectedOutputTokens: 100, effectiveQualityTarget: 70,
+      profiles,
+      requirements: { protocol: "responses", requireTools: false, requireThinking: false, webIntent: "not_required" },
+    });
+    expect(route.eligibleProfileIds).toContain("shared-channel:gpt-5.6-terra:responses");
+    expect(route.excludedProfiles).toContainEqual({
+      executionProfileId: "shared-channel:gpt-5.6-sol:responses", reasons: ["health_cooldown"],
+    });
+  });
+
+  it("keeps Sol available while at least one compatible Sol Profile is healthy", () => {
+    const profiles = [
+      profile("sol-a:gpt-5.6-sol:responses", "cooldown", "gpt-5.6-sol"),
+      profile("sol-b:gpt-5.6-sol:responses", "healthy", "gpt-5.6-sol"),
+    ];
+    const route = routeWithCurrentAcuFormula({
+      judge: {
+        ...continuousTierProbabilities(0.8), confidence: 1,
+        difficultyScoreRaw: 80, factorComposite: 80, difficultyIndex: 80,
+        difficultyMethodVersion: "test", difficultyScore: 80, signals: [], explanation: "test",
+        factors: { reasoningDepth: 8, taskScope: 8, constraintDensity: 8, toolDependency: 8,
+          verificationBurden: 8, contextBurden: 8 },
+      },
+      judgeCost: 0, inputTokens: 1_000, expectedOutputTokens: 100, effectiveQualityTarget: 75,
+      profiles,
+      requirements: { protocol: "responses", requireTools: false, requireThinking: false, webIntent: "not_required" },
+    });
+    expect(route.modelAvailability).toEqual([{
+      canonicalModelId: "gpt-5.6-sol", available: true, eligibleProfileCount: 1, excludedProfileCount: 1,
     }]);
   });
 });

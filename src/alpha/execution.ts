@@ -6,6 +6,7 @@ import type { RecoveryDecisionReason } from "./execution-outcome.js";
 export type ProviderAttemptHandle = {
   attemptId: string;
   attemptIndex: number;
+  startedAt: Date;
   adapter: NativeProviderAdapter;
   profile: AlphaExecutionProfile;
   networkEndpointIndex?: number;
@@ -50,7 +51,10 @@ export function isRecoverableProviderStatus(status: number): boolean {
   return status === 429 || (status >= 500 && status <= 599);
 }
 
-export type ContextOverflowClassification = { isContextOverflow: boolean; reportedContextLimit?: number };
+export type ContextOverflowClassification = {
+  isContextOverflow: boolean;
+  reportedContextLimit?: number;
+};
 
 export function contextOverflowRecoveryEligible(input: {
   isContextOverflow: boolean;
@@ -58,8 +62,10 @@ export function contextOverflowRecoveryEligible(input: {
   clientDisconnected: boolean;
   automaticRouting: boolean;
 }): boolean {
-  return input.isContextOverflow && input.modelVisibleOutputBytes === 0
-    && !input.clientDisconnected && input.automaticRouting;
+  return input.isContextOverflow
+    && input.modelVisibleOutputBytes === 0
+    && !input.clientDisconnected
+    && input.automaticRouting;
 }
 
 export function classifyProviderContextOverflow(
@@ -70,16 +76,21 @@ export function classifyProviderContextOverflow(
   try {
     const parsed = JSON.parse(raw) as { error?: { type?: unknown; code?: unknown; message?: unknown } };
     const structured = [parsed.error?.type, parsed.error?.code, parsed.error?.message]
-      .filter((value): value is string => typeof value === "string").join(" ");
+      .filter((value): value is string => typeof value === "string")
+      .join(" ");
     if (structured) evidence = structured;
   } catch {
     // Some Providers return plain text or HTML error bodies.
   }
-  const isContextOverflow = /context[_ -]length[_ -]exceeded|context[_ -]window[_ -]exceeded|maximum context length|context window exceeded|prompt is too long|input exceeds the context window|too many tokens for this model/.test(evidence.toLowerCase());
+  const normalized = evidence.toLowerCase();
+  const isContextOverflow = /context[_ -]length[_ -]exceeded|context[_ -]window[_ -]exceeded|maximum context length|context window exceeded|prompt is too long|input exceeds the context window|too many tokens for this model/.test(normalized);
   if (!isContextOverflow) return { isContextOverflow: false };
   const limitMatch = /(?:maximum|max(?:imum)?|limit|context window)[^0-9]{0,32}([0-9][0-9,]{3,})/i.exec(evidence);
   const reportedContextLimit = limitMatch?.[1] ? Number(limitMatch[1].replaceAll(",", "")) : undefined;
-  return { isContextOverflow: true, reportedContextLimit: Number.isFinite(reportedContextLimit) ? reportedContextLimit : undefined };
+  return {
+    isContextOverflow: true,
+    reportedContextLimit: Number.isFinite(reportedContextLimit) ? reportedContextLimit : undefined,
+  };
 }
 
 export type FirstModelEventDeadlineInput = {

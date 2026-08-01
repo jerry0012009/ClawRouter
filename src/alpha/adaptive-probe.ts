@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { applyAttemptOutcome, classifyAttemptOutcome, type AttemptOutcome, type HealthSnapshot } from "./channel-health.js";
+import { applyAttemptOutcome, classifyAttemptOutcome, type AttemptOutcome, type HealthScope, type HealthSnapshot } from "./channel-health.js";
 import type { AlphaDatabase } from "./database.js";
 import type { NativeProviderAdapter } from "./provider.js";
 import { providerCostBreakdown } from "./provider-economics.js";
@@ -16,12 +16,30 @@ export function adaptiveProbeIntervalMinutes(userRequestsLast30Minutes: number):
   return 15;
 }
 
-export function probeBackoffMinutes(consecutiveFailures: number): number {
-  if (consecutiveFailures <= 0) return 0;
-  if (consecutiveFailures === 1) return 5;
-  if (consecutiveFailures === 2) return 15;
-  if (consecutiveFailures === 3) return 60;
-  return 360;
+export const FULL_POOL_BUDGET_FRACTION = 0.8;
+export const ACTIVE_RECOVERY_WINDOW_MS = 6 * 60 * 60_000;
+
+export function fullPoolBudgetLimit(dailyBudgetCny: number, manual: boolean): number {
+  return manual ? dailyBudgetCny : dailyBudgetCny * FULL_POOL_BUDGET_FRACTION;
+}
+
+export function recoveredAfterLastFailure(health: Pick<HealthSnapshot, "lastSuccessAt" | "lastFailureAt">): boolean {
+  return Boolean(health.lastSuccessAt
+    && (!health.lastFailureAt || health.lastSuccessAt.getTime() > health.lastFailureAt.getTime()));
+}
+
+export function recoveryCooldownDue(health: Pick<HealthSnapshot, "state" | "cooldownUntil">, now = Date.now()): boolean {
+  return ["open", "half_open"].includes(health.state)
+    && (!health.cooldownUntil || health.cooldownUntil.getTime() <= now);
+}
+
+export function activeRecoveryRequired(input: {
+  lastFailureAt?: Date;
+  recentModelDemand: boolean;
+  now?: number;
+}): boolean {
+  return input.recentModelDemand || Boolean(input.lastFailureAt
+    && (input.now ?? Date.now()) - input.lastFailureAt.getTime() <= ACTIVE_RECOVERY_WINDOW_MS);
 }
 
 export function fullPoolProbeDue(input: {
@@ -54,8 +72,10 @@ export function deriveProbeValidation(input: {
     && input.actualModel.length > 0
     && input.acceptedModels.has(input.actualModel);
   const actualModelMismatch = Boolean(input.actualModel && !actualModelVerified);
-  const errorCode = !input.actualModel
-    ? "actual_model_missing"
+  const errorCode = !input.responseOk
+    ? undefined
+    : !input.actualModel
+      ? "actual_model_missing"
     : actualModelMismatch
       ? "actual_model_mismatch"
       : !input.validStream
@@ -99,12 +119,8 @@ export class AdaptiveProbeWorker {
   }
 
   enqueue(executionProfileId: string): void {
-    void this.options.database.query(
-      `INSERT INTO acu_profile_probe_queue (execution_profile_id,enqueued_at)
-       VALUES ($1,now()) ON CONFLICT (execution_profile_id) DO UPDATE
-       SET enqueued_at=LEAST(acu_profile_probe_queue.enqueued_at,excluded.enqueued_at)`,
-      [executionProfileId],
-    ).then(() => this.wake()).catch(() => undefined);
+    void new AlphaRepository(this.options.database).enqueueProfileProbe(executionProfileId)
+      .then(() => this.wake()).catch(() => undefined);
   }
 
   async runOnce(): Promise<void> {
@@ -117,7 +133,7 @@ export class AdaptiveProbeWorker {
         [this.workerId],
       );
       if (!lease.rowCount) return;
-      await this.runEligibleProbe();
+      if (!await this.runTargetedRecoveryIfEligible()) await this.runFullPoolIfEligible();
     } finally {
       await this.options.database.query(
         "UPDATE acu_probe_worker_lease SET lease_until=now(),updated_at=now() WHERE singleton=true AND holder_id=$1",
@@ -127,74 +143,65 @@ export class AdaptiveProbeWorker {
     }
   }
 
-  private async runEligibleProbe(): Promise<void> {
-    if (await this.runFullPoolIfEligible()) return;
+  private async runTargetedRecoveryIfEligible(): Promise<boolean> {
     const queued = await this.options.database.query<{ execution_profile_id: string }>(
-      "SELECT execution_profile_id FROM acu_profile_probe_queue ORDER BY enqueued_at LIMIT 100",
+      "SELECT execution_profile_id FROM acu_profile_probe_queue WHERE execution_profile_id<>$1 ORDER BY enqueued_at LIMIT 100",
+      [MANUAL_FULL_POOL_QUEUE_ID],
     );
-    const targetedQueued = queued.rows.some((row) => row.execution_profile_id !== MANUAL_FULL_POOL_QUEUE_ID);
-    const activity = await this.options.database.query<{ request_count: number }>(
-      "SELECT count(*)::int request_count FROM acu_logical_requests WHERE started_at>=now()-interval '30 minutes'",
-    );
-    const intervalMinutes = adaptiveProbeIntervalMinutes(Number(activity.rows[0]?.request_count ?? 0));
-    if (intervalMinutes === null && !targetedQueued) return;
-    const budget = await this.options.database.query<{ spend: string; last_probe_at: Date | null }>(
-      `SELECT coalesce(sum(cost_cny) FILTER (WHERE started_at>=date_trunc('day',now())),0)::text spend,
-        max(started_at) last_probe_at FROM acu_profile_probe_attempts`,
-    );
-    if (Number(budget.rows[0]?.spend ?? 0) >= this.options.dailyBudgetCny) return;
-    const lastProbeAt = budget.rows[0]?.last_probe_at;
-    if (!targetedQueued && intervalMinutes !== null && lastProbeAt
-      && Date.now() - new Date(lastProbeAt).getTime() < intervalMinutes * 60_000) return;
-
+    if (!queued.rowCount) return false;
     const repository = new AlphaRepository(this.options.database);
-    const [channels, runtimes] = await Promise.all([
-      repository.batchChannelHealth(this.options.profiles.map((profile) => profile.channelId ?? profile.channel)),
-      repository.batchProfileHealth(this.options.profiles.map((profile) => profile.executionProfileId)),
-    ]);
-    const queuedOrder = new Map(queued.rows.map((row, index) => [row.execution_profile_id, index]));
-    const candidates = this.options.profiles.filter((profile) => {
-      if (profile.verificationStatus === "rejected") return false;
-      if (!profile.enabled || !profile.administratorAllowed || !this.options.adapters.has(profile.executionProfileId)) return false;
-      const channel = channels.get(profile.channelId ?? profile.channel);
-      const runtime = runtimes.get(profile.executionProfileId);
-      const lastAttemptAt = runtime?.lastAttemptAt ?? channel?.lastAttemptAt;
-      const consecutiveFailures = Math.max(runtime?.consecutiveFailures ?? 0, channel?.consecutiveFailures ?? 0);
-      const retryAt = lastAttemptAt
-        ? lastAttemptAt.getTime() + probeBackoffMinutes(consecutiveFailures) * 60_000
-        : 0;
-      if (retryAt > Date.now()) return false;
-      const cooldownExpired = [channel, runtime].some((health) =>
-        health && ["open", "half_open"].includes(health.state)
-          && (!health.cooldownUntil || health.cooldownUntil.getTime() <= Date.now()));
-      const lastSuccessAt = profile.requiresFreshProbe ? runtime?.lastSuccessAt
-        : runtime?.lastSuccessAt ?? channel?.lastSuccessAt;
-      const stale = !lastSuccessAt || Date.now() - lastSuccessAt.getTime() > 120 * 60_000;
-      return cooldownExpired || (profile.requiresFreshProbe === true && stale);
-    }).sort((left, right) => (queuedOrder.get(left.executionProfileId) ?? Number.MAX_SAFE_INTEGER)
-      - (queuedOrder.get(right.executionProfileId) ?? Number.MAX_SAFE_INTEGER));
-    for (const profile of candidates) {
-      const recent = await this.options.database.query(
-        `SELECT 1 FROM acu_attempts WHERE attempt_kind='provider' AND execution_profile_id=$1
-          AND status='success' AND started_at>=now()-interval '60 minutes' LIMIT 1`,
-        [profile.executionProfileId],
-      );
-      if (recent.rowCount) {
-        await this.options.database.query("DELETE FROM acu_profile_probe_queue WHERE execution_profile_id=$1", [profile.executionProfileId]);
+    for (const row of queued.rows) {
+      const profile = this.options.profiles.find((candidate) => candidate.executionProfileId === row.execution_profile_id);
+      if (!profile || profile.verificationStatus === "rejected" || !profile.enabled
+        || !profile.administratorAllowed || !this.options.adapters.has(profile.executionProfileId)) {
+        await repository.deleteProfileProbe(row.execution_profile_id);
         continue;
       }
       const channelId = profile.channelId ?? profile.channel;
-      const channel = channels.get(channelId);
-      const runtime = runtimes.get(profile.executionProfileId);
-      if (channel && ["open", "half_open"].includes(channel.state)
-        && !await repository.claimHalfOpenProbe("channel", channelId)) continue;
+      const [channel, runtime] = await Promise.all([
+        repository.channelHealth(channelId),
+        repository.profileHealth(profile.executionProfileId),
+      ]);
+      const channelBlocked = channel && ["open", "half_open"].includes(channel.state);
+      if (runtime && recoveredAfterLastFailure(runtime) && !channelBlocked) {
+        await repository.deleteProfileProbeIfRecovered(profile.executionProfileId);
+        continue;
+      }
+      const sameModelProfileIds = this.options.profiles
+        .filter((candidate) => candidate.modelId === profile.modelId)
+        .map((candidate) => candidate.executionProfileId);
+      const recentModelDemand = await repository.hasRecentModelDemand(profile.modelId, sameModelProfileIds);
+      const lastFailureAt = runtime?.lastFailureAt
+        ?? (channelBlocked ? channel?.lastFailureAt : undefined);
+      if (!activeRecoveryRequired({ lastFailureAt, recentModelDemand })) {
+        await repository.deleteProfileProbe(profile.executionProfileId);
+        continue;
+      }
+      const blocked = [channel, runtime].filter((health): health is HealthSnapshot => (
+        health !== undefined && ["open", "half_open"].includes(health.state)
+      ));
+      if (blocked.some((health) => !recoveryCooldownDue(health))) continue;
+      const budget = await this.options.database.query<{ spend: string }>(
+        `SELECT coalesce(sum(cost_cny) FILTER (WHERE started_at>=date_trunc('day',now())),0)::text spend
+         FROM acu_profile_probe_attempts`,
+      );
+      if (Number(budget.rows[0]?.spend ?? 0) >= this.options.dailyBudgetCny) return false;
+      let channelClaimed = false;
+      if (channel && ["open", "half_open"].includes(channel.state)) {
+        channelClaimed = await repository.claimHalfOpenProbe("channel", channelId);
+        if (!channelClaimed) continue;
+      }
       if (runtime && ["open", "half_open"].includes(runtime.state)
-        && !await repository.claimHalfOpenProbe("profile", profile.executionProfileId)) continue;
-      await this.probe(profile, repository, channel ?? { state: "healthy", consecutiveFailures: 0, recentSuccessRate: 1 },
+        && !await repository.claimHalfOpenProbe("profile", profile.executionProfileId)) {
+        if (channelClaimed) await repository.releaseHalfOpenProbe("channel", channelId);
+        continue;
+      }
+      const result = await this.probe(profile, repository, channel ?? { state: "healthy", consecutiveFailures: 0, recentSuccessRate: 1 },
         runtime ?? { state: "healthy", consecutiveFailures: 0, recentSuccessRate: 1 });
-      await this.options.database.query("DELETE FROM acu_profile_probe_queue WHERE execution_profile_id=$1", [profile.executionProfileId]);
-      return;
+      if (result.success) await repository.deleteProfileProbe(profile.executionProfileId);
+      return true;
     }
+    return false;
   }
 
   private async runFullPoolIfEligible(): Promise<boolean> {
@@ -221,7 +228,8 @@ export class AdaptiveProbeWorker {
       `SELECT coalesce(sum(cost_cny) FILTER (WHERE started_at>=date_trunc('day',now())),0)::text spend
        FROM acu_profile_probe_attempts`,
     );
-    if (Number(budget.rows[0]?.spend ?? 0) >= this.options.dailyBudgetCny) return false;
+    const budgetLimit = fullPoolBudgetLimit(this.options.dailyBudgetCny, manual);
+    if (Number(budget.rows[0]?.spend ?? 0) >= budgetLimit) return false;
     const runId = `full_pool_${randomUUID().replaceAll("-", "")}`;
     const lastProbes = await this.options.database.query<{ execution_profile_id: string; last_probe_at: Date }>(
       `SELECT execution_profile_id,max(started_at) last_probe_at FROM acu_profile_probe_attempts
@@ -230,8 +238,14 @@ export class AdaptiveProbeWorker {
     const lastProbeByProfile = new Map(lastProbes.rows.map((row) => [
       row.execution_profile_id, new Date(row.last_probe_at).getTime(),
     ]));
+    const queuedProfiles = await this.options.database.query<{ execution_profile_id: string }>(
+      "SELECT execution_profile_id FROM acu_profile_probe_queue WHERE execution_profile_id<>$1",
+      [MANUAL_FULL_POOL_QUEUE_ID],
+    );
+    const queuedIds = new Set(queuedProfiles.rows.map((row) => row.execution_profile_id));
     const profiles = this.options.profiles.filter((profile) => profile.enabled && profile.administratorAllowed
-      && this.options.adapters.has(profile.executionProfileId))
+      && profile.verificationStatus !== "rejected" && this.options.adapters.has(profile.executionProfileId)
+      && (manual || profile.autoRouteEnabled !== false || profile.requiresFreshProbe === true))
       .sort((left, right) => (lastProbeByProfile.get(left.executionProfileId) ?? 0)
         - (lastProbeByProfile.get(right.executionProfileId) ?? 0));
     await this.options.database.query(
@@ -252,8 +266,17 @@ export class AdaptiveProbeWorker {
       for (const profile of profiles) {
         const channelId = profile.channelId ?? profile.channel;
         if (failedChannels.has(channelId)) continue;
+        const [channels, runtimes] = await Promise.all([
+          repository.batchChannelHealth([channelId]),
+          repository.batchProfileHealth([profile.executionProfileId]),
+        ]);
+        const channelHealth = channels.get(channelId);
+        const profileHealth = runtimes.get(profile.executionProfileId);
+        if (queuedIds.has(profile.executionProfileId)
+          && [channelHealth, profileHealth].some((health) => health
+            && ["open", "half_open"].includes(health.state))) continue;
         const currentSpend = Number(budget.rows[0]?.spend ?? 0) + costCny;
-        if (currentSpend >= this.options.dailyBudgetCny) {
+        if (currentSpend >= budgetLimit) {
           status = "budget_exhausted";
           break;
         }
@@ -262,23 +285,30 @@ export class AdaptiveProbeWorker {
            WHERE singleton=true AND holder_id=$1`,
           [this.workerId],
         );
-        const [channels, runtimes] = await Promise.all([
-          repository.batchChannelHealth([profile.channelId ?? profile.channel]),
-          repository.batchProfileHealth([profile.executionProfileId]),
-        ]);
         const result = await this.probe(
           profile,
           repository,
-          channels.get(profile.channelId ?? profile.channel) ?? { state: "healthy", consecutiveFailures: 0, recentSuccessRate: 1 },
-          runtimes.get(profile.executionProfileId) ?? { state: "healthy", consecutiveFailures: 0, recentSuccessRate: 1 },
+          channelHealth ?? { state: "healthy", consecutiveFailures: 0, recentSuccessRate: 1 },
+          profileHealth ?? { state: "healthy", consecutiveFailures: 0, recentSuccessRate: 1 },
           { probeMode: "full_pool", fullPoolProbeRunId: runId, trigger: manual ? "manual" : "scheduled_activity" },
         );
         attempted += 1;
         costCny += result.costCny;
-        if (result.success) success += 1;
+        if (result.success) {
+          success += 1;
+          await repository.deleteProfileProbe(profile.executionProfileId);
+        }
         else {
           failed += 1;
-          failedChannels.add(channelId);
+          const sameModelProfileIds = this.options.profiles
+            .filter((candidate) => candidate.modelId === profile.modelId)
+            .map((candidate) => candidate.executionProfileId);
+          if (await repository.hasRecentModelDemand(profile.modelId, sameModelProfileIds)) {
+            await repository.enqueueProfileProbe(profile.executionProfileId);
+          } else {
+            await repository.deleteProfileProbe(profile.executionProfileId);
+          }
+          if (result.failureScope === "channel") failedChannels.add(channelId);
         }
         await this.options.database.query(
           `UPDATE acu_full_pool_probe_runs SET attempted_count=$2,success_count=$3,failed_count=$4,cost_cny=$5
@@ -313,7 +343,7 @@ export class AdaptiveProbeWorker {
     channelHealth: HealthSnapshot,
     profileHealth: HealthSnapshot,
     probeMetadata: Json = {},
-  ): Promise<{ success: boolean; costCny: number }> {
+  ): Promise<{ success: boolean; costCny: number; failureScope: HealthScope }> {
     const protocol = profile.protocols.includes("responses") ? "responses" : profile.protocols[0];
     const providerModel = profile.providerModelId ?? profile.modelId;
     const payload = protocol === "messages"
@@ -358,7 +388,17 @@ export class AdaptiveProbeWorker {
       usageTrusted = usage.usageSource === "provider_usage";
       const acceptedModels = new Set([profile.modelId, providerModel, ...(profile.actualModelAliases ?? [])]);
       const validStream = (response.headers.get("content-type") ?? "").toLowerCase().includes("text/event-stream")
-        && responseBody.toString("utf8").split(/\r?\n/).some((line) => line.startsWith("data:") && line.slice(5).trim().length > 0);
+        && responseBody.toString("utf8").split(/\r?\n/).some((line) => {
+          if (!line.startsWith("data:")) return false;
+          const data = line.slice(5).trim();
+          if (!data || data === "[DONE]") return false;
+          try {
+            const event = JSON.parse(data) as Json;
+            return protocol === "messages" ? event.type === "message_stop" : event.type === "response.completed";
+          } catch {
+            return false;
+          }
+        });
       const probeValidation = deriveProbeValidation({
         responseOk: response.ok,
         validStream,
@@ -410,17 +450,20 @@ export class AdaptiveProbeWorker {
         totalLatencyMs: Date.now() - startedAt.getTime(),
       };
     }
-    const classified = classifyAttemptOutcome(outcome, channelHealth.consecutiveFailures);
+    let classified = classifyAttemptOutcome(outcome, profileHealth.consecutiveFailures);
+    if (classified.scope === "channel") classified = classifyAttemptOutcome(outcome, channelHealth.consecutiveFailures);
     const validProbe = classified.errorClass === "none"
       && outcome.success
       && outcome.usageTrusted === true
       && outcome.actualModelVerified === true;
     const updates: Array<Promise<void>> = [];
-    if (classified.scope === "channel" || validProbe) {
+    const channelWasBlocked = ["open", "half_open"].includes(channelHealth.state);
+    const profileWasBlocked = ["open", "half_open"].includes(profileHealth.state);
+    if (classified.scope === "channel" || (validProbe && channelWasBlocked)) {
       updates.push(repository.saveChannelHealth({
         channelId: profile.channelId ?? profile.channel,
         providerId: profile.provider,
-        snapshot: applyAttemptOutcome(channelHealth, outcome),
+        snapshot: applyAttemptOutcome(channelHealth, outcome, startedAt),
       }));
     }
     if (classified.scope === "profile" || validProbe) {
@@ -430,7 +473,7 @@ export class AdaptiveProbeWorker {
         providerId: profile.provider,
         canonicalModelId: profile.modelId,
         protocol,
-        snapshot: applyAttemptOutcome(profileHealth, outcome),
+        snapshot: applyAttemptOutcome(profileHealth, outcome, startedAt),
         usageTrusted: classified.usageTrusted && usageTrusted && profile.usageTrusted !== false,
         actualModelVerified: outcome.actualModelVerified === true,
         healthReason: classified.errorClass,
@@ -462,6 +505,12 @@ export class AdaptiveProbeWorker {
           }), startedAt],
       ),
     ]);
-    return { success: validProbe, costCny };
+    if (!validProbe && classified.scope !== "channel" && channelWasBlocked) {
+      await repository.releaseHalfOpenProbe("channel", profile.channelId ?? profile.channel);
+    }
+    if (!validProbe && classified.scope !== "profile" && profileWasBlocked) {
+      await repository.releaseHalfOpenProbe("profile", profile.executionProfileId);
+    }
+    return { success: validProbe, costCny, failureScope: validProbe ? "none" : classified.scope };
   }
 }

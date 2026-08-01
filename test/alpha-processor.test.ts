@@ -9,6 +9,7 @@ import { createAlphaGatewayServer } from "../src/alpha/gateway.js";
 import type { AlphaJudgeRunner } from "../src/alpha/judge-runner.js";
 import { createNativeProviderAdapter } from "../src/alpha/provider.js";
 import { AlphaRequestProcessor } from "../src/alpha/processor.js";
+import { AlphaRepository } from "../src/alpha/repository.js";
 import type { AlphaExecutionProfile } from "../src/alpha/routing.js";
 import { bodySha256, trustedIdentityHeaders } from "../src/alpha/trusted-identity.js";
 
@@ -78,9 +79,11 @@ run("Alpha PostgreSQL request processor", () => {
   let gateway: Server;
   let gatewayPort: number;
   let judgeCalls = 0;
+  let probeWakeCount = 0;
   let cancelledJudgeStarted: (() => void) | undefined;
   let releaseCancelledJudge: (() => void) | undefined;
   let primaryProfile: AlphaExecutionProfile;
+  let processor: AlphaRequestProcessor;
   let recoveryProfile: AlphaExecutionProfile;
   let crossProviderRecoveryProfile: AlphaExecutionProfile;
   let alternateModelProfile: AlphaExecutionProfile;
@@ -212,11 +215,15 @@ run("Alpha PostgreSQL request processor", () => {
       channel: "test-channel",
       protocols: ["responses", "messages"],
       toolCallSupport: true,
+      supportedToolTypes: ["function", "custom", "local_tool"],
       thinkingSupport: true,
+      supportedReasoningEfforts: ["low", "medium", "high"],
+      reasoningControlMode: "standard_effort",
       contextWindow: 1_000_000,
       health: "healthy",
       enabled: true,
       administratorAllowed: true,
+      usageTrusted: true,
       webToolDeclarationAccepted: true,
       webSearchExecutionVerified: true,
       webSearchStreamingVerified: true,
@@ -309,7 +316,7 @@ run("Alpha PostgreSQL request processor", () => {
         };
       },
     };
-    const processor = new AlphaRequestProcessor({
+    processor = new AlphaRequestProcessor({
       database,
       profiles: [profile, recoveryProfile, crossProviderRecoveryProfile, alternateModelProfile],
       adapters: new Map([
@@ -319,6 +326,7 @@ run("Alpha PostgreSQL request processor", () => {
         [alternateModelProfile.executionProfileId, adapter],
       ]),
       judgeRunner,
+      wakeProbe: () => { probeWakeCount += 1; },
     });
     gateway = createAlphaGatewayServer({
       trustedIdentitySecret: sharedSecret,
@@ -345,6 +353,79 @@ run("Alpha PostgreSQL request processor", () => {
     return sendProtocol("responses", bodyValue, requestId, userId, "codex");
   }
 
+  it("uses only exact Profile evidence for freshness, success rate, and latency", async () => {
+    const repository = new AlphaRepository(database);
+    const channelId = primaryProfile.channelId ?? primaryProfile.channel;
+    const now = new Date();
+    await repository.saveChannelHealth({
+      channelId,
+      providerId: primaryProfile.provider,
+      snapshot: {
+        state: "healthy", consecutiveFailures: 0, recentSuccessRate: 0.1,
+        lastAttemptAt: now, lastSuccessAt: now, totalLatencyMs: 9_999,
+      },
+    });
+    await database.query(
+      "DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id=$1",
+      [primaryProfile.executionProfileId],
+    );
+    primaryProfile.requiresFreshProbe = true;
+    const invokeEffectiveProfiles = () => (processor as unknown as {
+      effectiveProfiles(allowed: string[], wake: boolean): Promise<{ profiles: AlphaExecutionProfile[] }>;
+    }).effectiveProfiles([], false);
+    const channelOnly = (await invokeEffectiveProfiles()).profiles
+      .find((profile) => profile.executionProfileId === primaryProfile.executionProfileId)!;
+    expect(channelOnly.runtimeHealth?.probeState).toBe("stale");
+    expect(channelOnly.recentSuccessRate).toBe(1);
+    expect(channelOnly.observedLatencyMs).toBeUndefined();
+
+    await repository.saveProfileHealth({
+      executionProfileId: primaryProfile.executionProfileId,
+      channelId,
+      providerId: primaryProfile.provider,
+      canonicalModelId: primaryProfile.modelId,
+      protocol: "responses",
+      snapshot: {
+        state: "healthy", consecutiveFailures: 0, recentSuccessRate: 0.9,
+        lastAttemptAt: now, lastSuccessAt: now, totalLatencyMs: 100,
+      },
+      usageTrusted: true,
+      actualModelVerified: true,
+    });
+    const exact = (await invokeEffectiveProfiles()).profiles
+      .find((profile) => profile.executionProfileId === primaryProfile.executionProfileId)!;
+    expect(exact.runtimeHealth?.probeState).toBe("fresh");
+    expect(exact.recentSuccessRate).toBe(0.9);
+    expect(exact.observedLatencyMs).toBe(100);
+
+    primaryProfile.requiresFreshProbe = false;
+    await database.query("DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id=$1", [primaryProfile.executionProfileId]);
+    await database.query("DELETE FROM acu_channel_health WHERE channel_id=$1", [channelId]);
+  });
+
+  it("does not change health, enqueue recovery, or wake probes for client cancellation", async () => {
+    const channelId = primaryProfile.channelId ?? primaryProfile.channel;
+    await database.query("DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id=$1", [primaryProfile.executionProfileId]);
+    await database.query("DELETE FROM acu_channel_health WHERE channel_id=$1", [channelId]);
+    await database.query("DELETE FROM acu_profile_probe_queue WHERE execution_profile_id=$1", [primaryProfile.executionProfileId]);
+    const wakesBefore = probeWakeCount;
+    await (processor as unknown as {
+      recordRuntimeHealth(
+        profile: AlphaExecutionProfile,
+        protocol: "responses",
+        outcome: { success: boolean; clientCancelled: boolean },
+      ): Promise<unknown>;
+    }).recordRuntimeHealth(primaryProfile, "responses", { success: false, clientCancelled: true });
+    expect((await database.query(
+      "SELECT 1 FROM acu_provider_model_profile_health WHERE execution_profile_id=$1", [primaryProfile.executionProfileId],
+    )).rowCount).toBe(0);
+    expect((await database.query("SELECT 1 FROM acu_channel_health WHERE channel_id=$1", [channelId])).rowCount).toBe(0);
+    expect((await database.query(
+      "SELECT 1 FROM acu_profile_probe_queue WHERE execution_profile_id=$1", [primaryProfile.executionProfileId],
+    )).rowCount).toBe(0);
+    expect(probeWakeCount).toBe(wakesBefore);
+  });
+
   async function sendProtocol(
     protocol: "responses" | "messages",
     bodyValue: Record<string, unknown>,
@@ -358,7 +439,8 @@ run("Alpha PostgreSQL request processor", () => {
       headers: signedHeaders(body, requestId, userId, client),
       body,
     });
-    expect(response.status).toBe(200);
+    const errorBody = response.status === 200 ? "" : await response.clone().text();
+    expect(response.status, errorBody).toBe(200);
     return response.text();
   }
 
@@ -496,7 +578,7 @@ run("Alpha PostgreSQL request processor", () => {
       pareto_models: "1",
       excluded_profiles: [{
         executionProfileId: "test:gpt-5.6-luna:alternate",
-        reasons: ["disabled"],
+        reasons: ["disabled", "health_disabled"],
       }],
       routing_preference: "balanced",
       routing_model_version: "acu-routing-model-v0.4",
@@ -787,7 +869,7 @@ run("Alpha PostgreSQL request processor", () => {
     expect(recovery.rows[0]).toEqual({ creation_reason: "repeated_failure", phase: "recovery" });
   });
 
-  it("Judges PlanStarted once, reuses through 10 steps, and does not Judge ordinary PlanFinished", async () => {
+  it("reuses PlanStarted until the accepted-response limit and Judges PlanFinished", async () => {
     const userId = "user-planning-state";
     const beforeJudge = judgeCalls;
     const history: Array<Record<string, unknown>> = [
@@ -803,7 +885,7 @@ run("Alpha PostgreSQL request processor", () => {
         { type: "function_call_output", call_id: `planning-read-${index}`, output: `fixture-${index}` },
       );
       await send({ model: "acu-auto", input: history, stream: true }, `planning-step-${index}`, userId);
-      expect(judgeCalls).toBe(beforeJudge + 1);
+      expect(judgeCalls, `planning step ${index}`).toBe(beforeJudge + (index < 7 ? 1 : 2));
     }
 
     history.push(
@@ -812,7 +894,7 @@ run("Alpha PostgreSQL request processor", () => {
       { type: "function_call", call_id: "plan-execute", name: "apply_patch", arguments: "{}" },
     );
     await send({ model: "acu-auto", input: history, stream: true }, "planning-finished", userId);
-    expect(judgeCalls).toBe(beforeJudge + 1);
+    expect(judgeCalls).toBe(beforeJudge + 3);
 
     const state = await database.query<{
       segments: string; judges: string; judge_ids: string[]; overrides: number[]; reasons: string[];
@@ -827,15 +909,15 @@ run("Alpha PostgreSQL request processor", () => {
       [userId],
     );
     expect(state.rows[0]).toMatchObject({
-      segments: "2",
-      judges: "1",
-      overrides: [88, 0],
-      reasons: ["task_start", "plan_finished"],
+      segments: "3",
+      judges: "3",
+      overrides: [88, 0, 0],
+      reasons: ["task_start", "accepted_response_limit", "plan_finished"],
     });
-    expect(new Set(state.rows[0].judge_ids).size).toBe(1);
+    expect(new Set(state.rows[0].judge_ids).size).toBe(3);
   });
 
-  it("backs off a 502 Channel and recovers on the same model without duplicating the Logical Request", async () => {
+  it("isolates a 502 to the exact Profile and keeps same-model recovery independent", async () => {
     const beforeJudge = judgeCalls;
     const body = {
       model: "acu-auto",
@@ -879,18 +961,28 @@ run("Alpha PostgreSQL request processor", () => {
       final_model: "gpt-5.4-mini",
     });
     const health = await database.query<{
-      channel_id: string;
+      execution_profile_id: string;
       circuit_state: string;
       error_class: string;
       cooldown_active: boolean;
     }>(
-      `SELECT channel_id,circuit_state,error_class,coalesce(cooldown_until>now(),false) cooldown_active
-       FROM acu_channel_health WHERE channel_id IN ('test-channel','test-recovery-channel') ORDER BY channel_id`,
+      `SELECT execution_profile_id,circuit_state,error_class,coalesce(cooldown_until>now(),false) cooldown_active
+       FROM acu_provider_model_profile_health
+       WHERE execution_profile_id IN ('test:gpt-5.4-mini:responses','test:gpt-5.4-mini:recovery')
+       ORDER BY execution_profile_id`,
     );
     expect(health.rows).toEqual([
-      { channel_id: "test-channel", circuit_state: "open", error_class: "provider_5xx", cooldown_active: true },
-      { channel_id: "test-recovery-channel", circuit_state: "healthy", error_class: "none", cooldown_active: false },
+      { execution_profile_id: "test:gpt-5.4-mini:recovery", circuit_state: "healthy", error_class: "none", cooldown_active: false },
+      { execution_profile_id: "test:gpt-5.4-mini:responses", circuit_state: "open", error_class: "provider_5xx", cooldown_active: true },
     ]);
+    const channelHealth = await database.query(
+      "SELECT 1 FROM acu_channel_health WHERE channel_id IN ('test-channel','test-recovery-channel')",
+    );
+    expect(channelHealth.rowCount).toBe(0);
+    const queued = await database.query<{ execution_profile_id: string }>(
+      "SELECT execution_profile_id FROM acu_profile_probe_queue WHERE execution_profile_id='test:gpt-5.4-mini:responses'",
+    );
+    expect(queued.rows).toEqual([{ execution_profile_id: "test:gpt-5.4-mini:responses" }]);
     const events = await database.query<{ event_type: string }>(
       `SELECT event_type FROM acu_events WHERE task_id=(SELECT task_id FROM acu_tasks WHERE newapi_user_id='user-retry')`,
     );
@@ -906,6 +998,10 @@ run("Alpha PostgreSQL request processor", () => {
     const retriedBodies = upstreamBodies.filter((item) => item.test_case === "retry-once");
     expect(retriedBodies).toHaveLength(2);
     expect(retriedBodies[0]).toEqual(retriedBodies[1]);
+    await database.query(
+      "DELETE FROM acu_profile_probe_queue WHERE execution_profile_id='test:gpt-5.4-mini:responses'",
+    );
+    const wakesBeforeDemand = probeWakeCount;
 
     const segmentBeforeRefresh = await database.query<{ route_decision_id: string; judge_evaluation_id: string }>(
       `SELECT route_decision_id,judge_evaluation_id FROM acu_segments
@@ -937,6 +1033,10 @@ run("Alpha PostgreSQL request processor", () => {
       judgeReused: true,
       routeRefreshReason: "profile_health",
     });
+    expect((await database.query(
+      "SELECT 1 FROM acu_profile_probe_queue WHERE execution_profile_id='test:gpt-5.4-mini:responses'",
+    )).rowCount).toBe(1);
+    expect(probeWakeCount).toBeGreaterThan(wakesBeforeDemand);
   });
 
   it("uses a different Provider for the third same-model Channel after two Lucen failures", async () => {
@@ -974,6 +1074,9 @@ run("Alpha PostgreSQL request processor", () => {
 
   it("never recovers through a Profile outside the Token allowlist", async () => {
     await database.query("DELETE FROM acu_channel_health WHERE channel_id IN ('test-channel','test-recovery-channel','test-cross-provider-channel')");
+    await database.query(
+      "DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id IN ('test:gpt-5.4-mini:responses','test:gpt-5.4-mini:recovery','test:gpt-5.4-mini:cross-provider-recovery')",
+    );
     const body = Buffer.from(JSON.stringify({
       model: "acu-auto",
       input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "Do not escape the Profile policy" }] }],
@@ -999,6 +1102,9 @@ run("Alpha PostgreSQL request processor", () => {
 
   it("reuses Judge and only reroutes when the Token Profile policy changes", async () => {
     await database.query("DELETE FROM acu_channel_health WHERE channel_id IN ('test-channel','test-recovery-channel')");
+    await database.query(
+      "DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id IN ('test:gpt-5.4-mini:responses','test:gpt-5.4-mini:recovery')",
+    );
     const firstBody = Buffer.from(JSON.stringify({
       model: "acu-auto",
       input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "Start Profile policy task" }] }],
@@ -1069,6 +1175,9 @@ run("Alpha PostgreSQL request processor", () => {
 
   it("keeps a Web-specific 422 out of normal Profile health and falls back within the same model", async () => {
     await database.query("DELETE FROM acu_channel_health WHERE channel_id IN ('test-channel','test-recovery-channel')");
+    await database.query(
+      "DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id IN ('test:gpt-5.4-mini:responses','test:gpt-5.4-mini:recovery')",
+    );
     await database.query(
       "DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id IN ('test:gpt-5.4-mini:responses','test:gpt-5.4-mini:recovery')",
     );

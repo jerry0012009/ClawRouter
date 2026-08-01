@@ -75,7 +75,9 @@ export function deriveRuntimeEligibility(input: {
 
 export type AttemptOutcome = {
   success: boolean;
+  attemptedAt?: Date;
   clientCancelled?: boolean;
+  clientRequestError?: boolean;
   httpStatus?: number;
   errorCode?: string;
   errorMessage?: string;
@@ -110,28 +112,34 @@ function networkBackoff(failures: number): number {
   return 1_800;
 }
 
+function accountWideRateLimit(code: string): boolean {
+  return /(?:account|api[_ -]?key|organization|project|tenant|subscription)[^\n]{0,80}(?:rate[_ -]?limit|too many requests)|(?:rate[_ -]?limit|too many requests)[^\n]{0,80}(?:account|api[_ -]?key|organization|project|tenant|subscription)/.test(code);
+}
+
 export function classifyAttemptOutcome(outcome: AttemptOutcome, consecutiveFailures: number): ClassifiedOutcome {
   if (outcome.clientCancelled) return classified({ errorClass: "client_cancelled", scope: "none", permanent: false, cooldownSeconds: 0, recoverableBeforeModelOutput: false, respectRetryAfter: false, countsAsChannelFailure: false });
+  if (outcome.clientRequestError) return classified({ errorClass: "other_provider_error", scope: "none", permanent: false, cooldownSeconds: 0, recoverableBeforeModelOutput: false, respectRetryAfter: false, countsAsChannelFailure: false });
   if (outcome.errorCode === "actual_model_missing") return classified({ errorClass: "actual_model_missing", scope: "profile", permanent: false, cooldownSeconds: 1_800, usageTrusted: false, recoverableBeforeModelOutput: false, respectRetryAfter: false, countsAsChannelFailure: false });
-  if (outcome.success && outcome.actualModelMismatch) return classified({ errorClass: "actual_model_mismatch", scope: "profile", permanent: true, cooldownSeconds: 0, recoverableBeforeModelOutput: false, respectRetryAfter: false, countsAsChannelFailure: false });
-  if (outcome.success && outcome.usageTrusted === false) return classified({ errorClass: "usage_untrusted", scope: "profile", permanent: false, cooldownSeconds: 1_800, usageTrusted: false, recoverableBeforeModelOutput: false, respectRetryAfter: false, countsAsChannelFailure: false });
+  if (outcome.actualModelMismatch === true || outcome.errorCode === "actual_model_mismatch") return classified({ errorClass: "actual_model_mismatch", scope: "profile", permanent: false, cooldownSeconds: 1_800, recoverableBeforeModelOutput: false, respectRetryAfter: false, countsAsChannelFailure: false });
+  if (outcome.errorCode === "usage_untrusted" || (outcome.success && outcome.usageTrusted === false)) return classified({ errorClass: "usage_untrusted", scope: "profile", permanent: false, cooldownSeconds: 1_800, usageTrusted: false, recoverableBeforeModelOutput: false, respectRetryAfter: false, countsAsChannelFailure: false });
   if (outcome.success) return classified({ errorClass: "none", scope: "none", permanent: false, cooldownSeconds: 0, recoverableBeforeModelOutput: false, respectRetryAfter: false, countsAsChannelFailure: false });
   const code = `${outcome.errorCode ?? ""} ${outcome.errorMessage ?? ""}`.toLowerCase();
-  if (outcome.httpStatus === 401 || outcome.httpStatus === 403) return classified({ errorClass: "authentication", scope: "channel", permanent: true, cooldownSeconds: 0, recoverableBeforeModelOutput: true, respectRetryAfter: false, countsAsChannelFailure: true });
-  if (/insufficient.*(?:quota|balance|credit)|quota.*exhaust|余额不足|额度/.test(code)) return classified({ errorClass: "quota_exhausted", scope: "channel", permanent: false, cooldownSeconds: Math.max(1, outcome.retryAfterSeconds ?? 1_800), recoverableBeforeModelOutput: true, respectRetryAfter: true, countsAsChannelFailure: true });
-  if (outcome.httpStatus === 429) return classified({ errorClass: "rate_limited", scope: "channel", permanent: false, cooldownSeconds: Math.max(1, outcome.retryAfterSeconds ?? networkBackoff(consecutiveFailures + 1)), recoverableBeforeModelOutput: true, respectRetryAfter: true, countsAsChannelFailure: true });
-  if (/model[_ -]?not[_ -]?found|unknown model|does not exist/.test(code)) return classified({ errorClass: "model_not_found", scope: "profile", permanent: true, cooldownSeconds: 0, recoverableBeforeModelOutput: true, respectRetryAfter: false, countsAsChannelFailure: false });
-  if (/tool.*(?:unsupported|not supported)|unsupported.*tool/.test(code)) return classified({ errorClass: "tool_incompatible", scope: "profile", permanent: true, cooldownSeconds: 0, recoverableBeforeModelOutput: true, respectRetryAfter: false, countsAsChannelFailure: false });
-  if (/protocol|unsupported.*(?:responses|messages)|invalid.*schema/.test(code)) return classified({ errorClass: "protocol_incompatible", scope: "profile", permanent: true, cooldownSeconds: 0, recoverableBeforeModelOutput: true, respectRetryAfter: false, countsAsChannelFailure: false });
+  if (outcome.httpStatus === 401 || outcome.httpStatus === 403) return classified({ errorClass: "authentication", scope: "channel", permanent: false, cooldownSeconds: 1_800, recoverableBeforeModelOutput: true, respectRetryAfter: false, countsAsChannelFailure: true });
+  if (/insufficient.*(?:quota|balance|credit)|(?:quota|credit).*exhaust|余额不足|额度/.test(code)) return classified({ errorClass: "quota_exhausted", scope: "channel", permanent: false, cooldownSeconds: Math.max(1, outcome.retryAfterSeconds ?? 1_800), recoverableBeforeModelOutput: true, respectRetryAfter: true, countsAsChannelFailure: true });
+  if (outcome.httpStatus === 429) return classified({ errorClass: "rate_limited", scope: accountWideRateLimit(code) ? "channel" : "profile", permanent: false, cooldownSeconds: Math.max(1, outcome.retryAfterSeconds ?? networkBackoff(consecutiveFailures + 1)), recoverableBeforeModelOutput: true, respectRetryAfter: true, countsAsChannelFailure: accountWideRateLimit(code) });
+  if (/model[_ -]?not[_ -]?found|unknown model|does not exist/.test(code)) return classified({ errorClass: "model_not_found", scope: "profile", permanent: false, cooldownSeconds: 1_800, recoverableBeforeModelOutput: true, respectRetryAfter: false, countsAsChannelFailure: false });
+  if (/tool.*(?:unsupported|not supported)|unsupported.*tool/.test(code)) return classified({ errorClass: "tool_incompatible", scope: "profile", permanent: false, cooldownSeconds: 1_800, recoverableBeforeModelOutput: true, respectRetryAfter: false, countsAsChannelFailure: false });
+  if (/protocol|unsupported.*(?:responses|messages)|invalid.*schema/.test(code)) return classified({ errorClass: "protocol_incompatible", scope: "profile", permanent: false, cooldownSeconds: 1_800, recoverableBeforeModelOutput: true, respectRetryAfter: false, countsAsChannelFailure: false });
   if (outcome.httpStatus === 200 && /upstream_failed_before_output|stream_ended_before_model_event/.test(code)) {
     return classified({ errorClass: "protocol_incompatible", scope: "profile", permanent: false, cooldownSeconds: 1_800, recoverableBeforeModelOutput: true, respectRetryAfter: false, countsAsChannelFailure: false });
   }
-  if (outcome.httpStatus === 524) return classified({ errorClass: "provider_edge_timeout", scope: "channel", permanent: false, cooldownSeconds: Math.max(1, outcome.retryAfterSeconds ?? networkBackoff(consecutiveFailures + 1)), recoverableBeforeModelOutput: true, respectRetryAfter: true, countsAsChannelFailure: true });
-  if (outcome.httpStatus && outcome.httpStatus >= 500 && outcome.httpStatus <= 599) return classified({ errorClass: "provider_5xx", scope: "channel", permanent: false, cooldownSeconds: Math.max(1, outcome.retryAfterSeconds ?? networkBackoff(consecutiveFailures + 1)), recoverableBeforeModelOutput: true, respectRetryAfter: true, countsAsChannelFailure: true });
-  if (/slow_first_model_event/.test(code)) return classified({ errorClass: "slow_first_model_event", scope: "channel", permanent: false, cooldownSeconds: networkBackoff(consecutiveFailures + 1), recoverableBeforeModelOutput: true, respectRetryAfter: false, countsAsChannelFailure: true });
-  if (/timeout|timed out|aborterror/.test(code)) return classified({ errorClass: "timeout", scope: "channel", permanent: false, cooldownSeconds: networkBackoff(consecutiveFailures + 1), recoverableBeforeModelOutput: true, respectRetryAfter: false, countsAsChannelFailure: true });
-  if (/econn|enotfound|network|fetch failed|socket/.test(code)) return classified({ errorClass: "network", scope: "channel", permanent: false, cooldownSeconds: networkBackoff(consecutiveFailures + 1), recoverableBeforeModelOutput: true, respectRetryAfter: false, countsAsChannelFailure: true });
-  return classified({ errorClass: "other_provider_error", scope: "channel", permanent: false, cooldownSeconds: networkBackoff(consecutiveFailures + 1), recoverableBeforeModelOutput: true, respectRetryAfter: false, countsAsChannelFailure: true });
+  if (outcome.httpStatus === 400) return classified({ errorClass: "other_provider_error", scope: "profile", permanent: false, cooldownSeconds: 1_800, recoverableBeforeModelOutput: true, respectRetryAfter: false, countsAsChannelFailure: false });
+  if (outcome.httpStatus === 524) return classified({ errorClass: "provider_edge_timeout", scope: "profile", permanent: false, cooldownSeconds: Math.max(1, outcome.retryAfterSeconds ?? networkBackoff(consecutiveFailures + 1)), recoverableBeforeModelOutput: true, respectRetryAfter: true, countsAsChannelFailure: false });
+  if (outcome.httpStatus && outcome.httpStatus >= 500 && outcome.httpStatus <= 599) return classified({ errorClass: "provider_5xx", scope: "profile", permanent: false, cooldownSeconds: Math.max(1, outcome.retryAfterSeconds ?? networkBackoff(consecutiveFailures + 1)), recoverableBeforeModelOutput: true, respectRetryAfter: true, countsAsChannelFailure: false });
+  if (/slow_first_model_event/.test(code)) return classified({ errorClass: "slow_first_model_event", scope: "profile", permanent: false, cooldownSeconds: networkBackoff(consecutiveFailures + 1), recoverableBeforeModelOutput: true, respectRetryAfter: false, countsAsChannelFailure: false });
+  if (/timeout|timed out|aborterror/.test(code)) return classified({ errorClass: "timeout", scope: "profile", permanent: false, cooldownSeconds: networkBackoff(consecutiveFailures + 1), recoverableBeforeModelOutput: true, respectRetryAfter: false, countsAsChannelFailure: false });
+  if (/econn|enotfound|network|fetch failed|socket/.test(code)) return classified({ errorClass: "network", scope: "profile", permanent: false, cooldownSeconds: networkBackoff(consecutiveFailures + 1), recoverableBeforeModelOutput: true, respectRetryAfter: false, countsAsChannelFailure: false });
+  return classified({ errorClass: "other_provider_error", scope: "profile", permanent: false, cooldownSeconds: networkBackoff(consecutiveFailures + 1), recoverableBeforeModelOutput: true, respectRetryAfter: false, countsAsChannelFailure: false });
 }
 
 function ewma(previous: number, sample: number): number {
@@ -140,7 +148,6 @@ function ewma(previous: number, sample: number): number {
 
 export function applyAttemptOutcome(snapshot: HealthSnapshot, outcome: AttemptOutcome, now = new Date()): HealthSnapshot {
   const classified = classifyAttemptOutcome(outcome, snapshot.consecutiveFailures);
-  if (classified.scope === "none" && classified.errorClass === "client_cancelled") return { ...snapshot, lastAttemptAt: now };
   if (outcome.success && classified.errorClass === "none") return {
     ...snapshot,
     state: "healthy",
@@ -154,6 +161,7 @@ export function applyAttemptOutcome(snapshot: HealthSnapshot, outcome: AttemptOu
     errorClass: "none",
     httpStatus: outcome.httpStatus,
   };
+  if (classified.scope === "none") return snapshot;
   return {
     ...snapshot,
     state: classified.permanent ? "disabled" : "open",

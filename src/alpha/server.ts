@@ -18,7 +18,7 @@ import { canonicalAdvertisedContextWindow } from "./context-admission.js";
 import { ACU_ROUTING_MODEL_VERSION } from "../acu/config.js";
 import { getAcuModel } from "../acu/catalog.js";
 import { combinedMonitorState, mergeSupplyInventory, monitorRangeSpec, monitorRoutingStatus, type MonitorRange } from "./channel-monitor.js";
-import { AdaptiveProbeWorker, probeBackoffMinutes } from "./adaptive-probe.js";
+import { AdaptiveProbeWorker } from "./adaptive-probe.js";
 import { deriveRuntimeEligibility } from "./channel-health.js";
 import { isRecoveredSupplyProfile } from "./channel-registry.js";
 import {
@@ -297,7 +297,7 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
     database,
     profiles: profiles.map((item) => item.profile),
     adapters: adapterMap,
-    dailyBudgetCny: Number(process.env.ACU_PROBE_DAILY_BUDGET_CNY ?? "0.05"),
+    dailyBudgetCny: Number(process.env.ACU_PROBE_DAILY_BUDGET_CNY ?? "1.00"),
   });
   const processor = new AlphaRequestProcessor({
     database,
@@ -476,13 +476,13 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
             channelState: channel.circuit_state ?? "healthy",
             profileState: runtime.circuit_state ?? profile.health,
             usageTrusted: runtime.usage_trusted ?? profile.usageTrusted,
-            recentSuccessRate: Number(channel.recent_success_rate ?? runtime.recent_success_rate ?? 0),
-            consecutiveFailures: Number(channel.consecutive_failures ?? runtime.consecutive_failures ?? 0),
+            recentSuccessRate: Number(runtime.recent_success_rate ?? 0),
+            consecutiveFailures: Number(runtime.consecutive_failures ?? 0),
             p50FirstModelEventLatencyMs: Number(aggregate.p50_first_model_event_ms ?? 0),
             p95FirstModelEventLatencyMs: Number(aggregate.p95_first_model_event_ms ?? 0),
-            lastError: channel.error_class ?? runtime.error_class,
-            lastSuccessAt: channel.last_success_at ?? runtime.last_success_at,
-            cooldownUntil: channel.cooldown_until ?? runtime.cooldown_until,
+            lastError: runtime.error_class ?? channel.error_class,
+            lastSuccessAt: runtime.last_success_at,
+            cooldownUntil: runtime.cooldown_until ?? channel.cooldown_until,
             requiresFreshProbe: profile.requiresFreshProbe === true,
             lastProbeAt: probe.started_at,
             probeStatus: probe.status,
@@ -494,10 +494,7 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
             probeFreshness: profile.requiresFreshProbe
               ? probe.started_at && Date.now() - new Date(String(probe.started_at)).getTime() <= 120 * 60_000 ? "fresh" : "stale"
               : "not_required",
-            nextEligibleProbeAt: probe.started_at
-              ? new Date(new Date(String(probe.started_at)).getTime()
-                + probeBackoffMinutes(Math.max(Number(runtime.consecutive_failures ?? 0),
-                  Number(channel.consecutive_failures ?? 0))) * 60_000).toISOString() : null,
+            nextEligibleProbeAt: runtime.cooldown_until ?? channel.cooldown_until ?? null,
           };
         });
         const activeModelPool = [...new Set(serviceConfig.profiles.map((profile) => profile.modelId))]

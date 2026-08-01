@@ -135,6 +135,7 @@ export type AttemptRecord = {
   outputPricePerMillion?: string;
   actualCostUsd?: string;
   providerBilled?: boolean;
+  startedAt?: Date;
   metadata?: Record<string, unknown>;
 };
 
@@ -955,14 +956,14 @@ export class AlphaRepository {
         provider_request_id,status,error_category,http_status,usage_source,actual_cost_usd,
         input_price_per_million,output_price_per_million,provider_billed,started_at,metadata_json,
         channel_id,network_endpoint)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,now(),$22,$23,$24)`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)`,
       [input.attemptId, input.logicalRequestId, input.attemptIndex, input.attemptKind,
         input.retryOwner, input.routeDecisionId ?? null, input.judgeEvaluationId ?? null,
         input.executionProfileId ?? null, input.requestedModel ?? null, input.actualModel ?? null,
         input.provider, input.channel ?? null, input.providerRequestId ?? null, input.status,
         input.errorCategory ?? null, input.httpStatus ?? null, input.usageSource ?? null,
         input.actualCostUsd ?? "0", input.inputPricePerMillion ?? null,
-        input.outputPricePerMillion ?? null, input.providerBilled ?? null,
+        input.outputPricePerMillion ?? null, input.providerBilled ?? null, input.startedAt ?? new Date(),
         json(input.metadata), input.channelId ?? input.channel ?? null, input.networkEndpoint ?? null],
     );
   }
@@ -1047,6 +1048,51 @@ export class AlphaRepository {
     );
   }
 
+  async enqueueProfileProbe(executionProfileId: string): Promise<void> {
+    await this.database.query(
+      `INSERT INTO acu_profile_probe_queue (execution_profile_id,enqueued_at)
+       VALUES ($1,now()) ON CONFLICT (execution_profile_id) DO NOTHING`,
+      [executionProfileId],
+    );
+  }
+
+  async deleteProfileProbeIfRecovered(executionProfileId: string): Promise<boolean> {
+    const result = await this.database.query(
+      `DELETE FROM acu_profile_probe_queue q USING acu_provider_model_profile_health h
+       WHERE q.execution_profile_id=$1 AND h.execution_profile_id=q.execution_profile_id
+         AND h.last_success_at IS NOT NULL
+         AND (h.last_failure_at IS NULL OR h.last_success_at>h.last_failure_at)`,
+      [executionProfileId],
+    );
+    return result.rowCount === 1;
+  }
+
+  async deleteProfileProbe(executionProfileId: string): Promise<void> {
+    await this.database.query(
+      "DELETE FROM acu_profile_probe_queue WHERE execution_profile_id=$1",
+      [executionProfileId],
+    );
+  }
+
+  async hasRecentModelDemand(canonicalModelId: string, executionProfileIds: string[]): Promise<boolean> {
+    const result = await this.database.query<{ present: boolean }>(
+      `SELECT EXISTS(
+         SELECT 1 FROM acu_logical_requests request
+         WHERE request.started_at>=now()-interval '6 hours'
+           AND (request.requested_model=$1
+             OR request.selected_profile_id=ANY($2::text[])
+             OR EXISTS (
+               SELECT 1 FROM acu_attempts attempt
+               WHERE attempt.logical_request_id=request.logical_request_id
+                 AND attempt.attempt_kind='provider'
+                 AND attempt.execution_profile_id=ANY($2::text[])
+             ))
+       ) present`,
+      [canonicalModelId, [...new Set(executionProfileIds)]],
+    );
+    return result.rows[0]?.present === true;
+  }
+
   async saveChannelHealth(input: { channelId: string; providerId: string; snapshot: HealthSnapshot }): Promise<void> {
     await this.database.query(
       `INSERT INTO acu_channel_health
@@ -1058,7 +1104,9 @@ export class AlphaRepository {
         last_failure_at=excluded.last_failure_at,consecutive_failures=excluded.consecutive_failures,
         recent_success_rate=excluded.recent_success_rate,first_token_latency_ms=excluded.first_token_latency_ms,
         total_latency_ms=excluded.total_latency_ms,error_class=excluded.error_class,http_status=excluded.http_status,
-        half_open_probe_in_flight=false,updated_at=now()`,
+        half_open_probe_in_flight=false,updated_at=now()
+       WHERE acu_channel_health.last_attempt_at IS NULL
+         OR excluded.last_attempt_at>=acu_channel_health.last_attempt_at`,
       healthValues(input.channelId, input.providerId, input.snapshot),
     );
   }
@@ -1078,7 +1126,9 @@ export class AlphaRepository {
         recent_success_rate=excluded.recent_success_rate,first_token_latency_ms=excluded.first_token_latency_ms,
         total_latency_ms=excluded.total_latency_ms,error_class=excluded.error_class,http_status=excluded.http_status,
         actual_model_verified=excluded.actual_model_verified,usage_trusted=excluded.usage_trusted,
-        health_reason=excluded.health_reason,half_open_probe_in_flight=false,updated_at=now()`,
+        health_reason=excluded.health_reason,half_open_probe_in_flight=false,updated_at=now()
+       WHERE acu_provider_model_profile_health.last_attempt_at IS NULL
+         OR excluded.last_attempt_at>=acu_provider_model_profile_health.last_attempt_at`,
       [input.executionProfileId, input.channelId, input.providerId, input.canonicalModelId, input.protocol,
         input.snapshot.state, input.snapshot.cooldownUntil ?? null, input.snapshot.lastAttemptAt ?? null,
         input.snapshot.lastSuccessAt ?? null, input.snapshot.lastFailureAt ?? null,

@@ -9,6 +9,48 @@ import type { AlphaExecutionProfile } from "../src/alpha/routing.js";
 const databaseUrl = process.env.ACU_TEST_DATABASE_URL;
 const run = databaseUrl ? describe : describe.skip;
 
+function recoveryProfile(executionProfileId: string, modelId: string, channelId: string): AlphaExecutionProfile {
+  return {
+    executionProfileId,
+    modelId,
+    providerModelId: modelId,
+    provider: "probe-provider",
+    channel: channelId,
+    channelId,
+    protocols: ["responses"],
+    toolCallSupport: true,
+    thinkingSupport: true,
+    contextWindow: 128_000,
+    health: "healthy",
+    enabled: true,
+    administratorAllowed: true,
+    usageTrusted: true,
+  };
+}
+
+function successfulProbeAdapter(modelId: string): NativeProviderAdapter {
+  return {
+    async execute() {
+      return new Response(
+        `data: ${JSON.stringify({
+          type: "response.completed",
+          response: { model: modelId, usage: { input_tokens: 10, output_tokens: 1 } },
+        })}\n\n`,
+        { status: 200, headers: { "content-type": "text/event-stream" } },
+      );
+    },
+  };
+}
+
+const failedProbeAdapter = (status = 500): NativeProviderAdapter => ({
+  async execute() {
+    return new Response('{"error":{"message":"probe fixture failure"}}', {
+      status,
+      headers: { "content-type": "application/json" },
+    });
+  },
+});
+
 run("Alpha PostgreSQL foundation", () => {
   let database: AlphaDatabase;
   let repository: AlphaRepository;
@@ -359,6 +401,267 @@ run("Alpha PostgreSQL foundation", () => {
     expect(second.rowCount).toBe(0);
   });
 
+  it("stops inactive recovery after six hours without changing open health", async () => {
+    const profile = recoveryProfile("inactive-recovery-profile", "inactive-recovery-model", "inactive-recovery-channel");
+    await database.query(
+      "UPDATE acu_probe_worker_lease SET holder_id=null,lease_until=now()-interval '1 second' WHERE singleton=true",
+    );
+    await database.query("DELETE FROM acu_profile_probe_queue WHERE execution_profile_id=$1", [profile.executionProfileId]);
+    await database.query("DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id=$1", [profile.executionProfileId]);
+    const oldFailure = new Date(Date.now() - 7 * 60 * 60_000);
+    await repository.saveProfileHealth({
+      executionProfileId: profile.executionProfileId,
+      channelId: profile.channelId!,
+      providerId: profile.provider,
+      canonicalModelId: profile.modelId,
+      protocol: "responses",
+      snapshot: {
+        state: "open", consecutiveFailures: 4, recentSuccessRate: 0,
+        lastAttemptAt: oldFailure, lastFailureAt: oldFailure, cooldownUntil: new Date(Date.now() - 1_000),
+      },
+      usageTrusted: true,
+      actualModelVerified: true,
+    });
+    await repository.enqueueProfileProbe(profile.executionProfileId);
+    expect(await repository.hasRecentModelDemand(profile.modelId, [profile.executionProfileId])).toBe(false);
+    await database.query(
+      `INSERT INTO acu_full_pool_probe_runs
+       (full_pool_probe_run_id,status,trigger,profile_count,started_at,completed_at)
+       VALUES ('recent-full-pool-gate','completed','scheduled_activity',0,now(),now())
+       ON CONFLICT (full_pool_probe_run_id) DO UPDATE SET started_at=now(),completed_at=now()`,
+    );
+    let calls = 0;
+    const worker = new AdaptiveProbeWorker({
+      database,
+      profiles: [profile],
+      adapters: new Map([[profile.executionProfileId, { async execute() { calls += 1; return successfulProbeAdapter(profile.modelId).execute({} as never); } }]]),
+      dailyBudgetCny: 1,
+    });
+
+    await worker.runOnce();
+
+    expect((await database.query(
+      "SELECT 1 FROM acu_profile_probe_attempts WHERE execution_profile_id=$1", [profile.executionProfileId],
+    )).rowCount).toBe(0);
+    expect(calls).toBe(0);
+    expect((await database.query(
+      "SELECT 1 FROM acu_profile_probe_queue WHERE execution_profile_id=$1", [profile.executionProfileId],
+    )).rowCount).toBe(0);
+    expect(await repository.profileHealth(profile.executionProfileId)).toMatchObject({ state: "open" });
+  });
+
+  it("keeps probing at the thirty-minute cap while the canonical model has demand", async () => {
+    const profile = recoveryProfile("active-recovery-profile", "active-recovery-model", "active-recovery-channel");
+    await database.query(
+      "UPDATE acu_probe_worker_lease SET holder_id=null,lease_until=now()-interval '1 second' WHERE singleton=true",
+    );
+    await repository.createLogicalRequest({
+      logicalRequestId: "active_recovery_request",
+      newapiUserId: "user_a",
+      sessionId: "ses_user_a",
+      taskId: "task_user_a",
+      segmentId: "seg_user_a_1",
+      ingressIdempotencyKey: "active-recovery-demand",
+      requestProtocol: "responses",
+      requestedModel: profile.modelId,
+      streaming: true,
+    });
+    const oldFailure = new Date(Date.now() - 7 * 60 * 60_000);
+    await repository.saveProfileHealth({
+      executionProfileId: profile.executionProfileId,
+      channelId: profile.channelId!,
+      providerId: profile.provider,
+      canonicalModelId: profile.modelId,
+      protocol: "responses",
+      snapshot: {
+        state: "open", consecutiveFailures: 4, recentSuccessRate: 0,
+        lastAttemptAt: oldFailure, lastFailureAt: oldFailure, cooldownUntil: new Date(Date.now() - 1_000),
+      },
+      usageTrusted: true,
+      actualModelVerified: true,
+    });
+    await repository.enqueueProfileProbe(profile.executionProfileId);
+    const worker = new AdaptiveProbeWorker({
+      database,
+      profiles: [profile],
+      adapters: new Map([[profile.executionProfileId, failedProbeAdapter(500)]]),
+      dailyBudgetCny: 1,
+    });
+
+    await worker.runOnce();
+
+    const health = await repository.profileHealth(profile.executionProfileId);
+    expect(health).toMatchObject({ state: "open", consecutiveFailures: 5, errorClass: "provider_5xx" });
+    expect(health!.cooldownUntil!.getTime() - Date.now()).toBeGreaterThan(29 * 60_000);
+    expect((await database.query(
+      "SELECT 1 FROM acu_profile_probe_queue WHERE execution_profile_id=$1", [profile.executionProfileId],
+    )).rowCount).toBe(1);
+  });
+
+  it("lets targeted strict success recover actual-model mismatch before full-pool", async () => {
+    const profile = recoveryProfile("strict-recovery-profile", "strict-recovery-model", "strict-recovery-channel");
+    await database.query(
+      "UPDATE acu_probe_worker_lease SET holder_id=null,lease_until=now()-interval '1 second' WHERE singleton=true",
+    );
+    const failureAt = new Date(Date.now() - 60_000);
+    await repository.saveProfileHealth({
+      executionProfileId: profile.executionProfileId,
+      channelId: profile.channelId!,
+      providerId: profile.provider,
+      canonicalModelId: profile.modelId,
+      protocol: "responses",
+      snapshot: {
+        state: "open", consecutiveFailures: 1, recentSuccessRate: 0,
+        lastAttemptAt: failureAt, lastFailureAt: failureAt, cooldownUntil: new Date(Date.now() - 1_000),
+        errorClass: "actual_model_mismatch",
+      },
+      usageTrusted: true,
+      actualModelVerified: false,
+    });
+    await repository.enqueueProfileProbe(profile.executionProfileId);
+    await repository.enqueueProfileProbe("__full_pool__");
+    const fullPoolCount = await database.query<{ count: number }>("SELECT count(*)::int count FROM acu_full_pool_probe_runs");
+    const worker = new AdaptiveProbeWorker({
+      database,
+      profiles: [profile],
+      adapters: new Map([[profile.executionProfileId, successfulProbeAdapter(profile.modelId)]]),
+      dailyBudgetCny: 1,
+    });
+
+    await worker.runOnce();
+
+    const strictAttempt = await database.query<{
+      status: string; error_class: string; usage_trusted: boolean; actual_model: string;
+    }>(
+      `SELECT status,error_class,usage_trusted,actual_model
+       FROM acu_profile_probe_attempts WHERE execution_profile_id=$1 ORDER BY started_at DESC LIMIT 1`,
+      [profile.executionProfileId],
+    );
+    expect(strictAttempt.rows[0]).toEqual({
+      status: "success", error_class: "none", usage_trusted: true, actual_model: profile.modelId,
+    });
+    expect(await repository.profileHealth(profile.executionProfileId)).toMatchObject({
+      state: "healthy", consecutiveFailures: 0, errorClass: "none", actualModelVerified: true,
+    });
+    expect((await database.query(
+      "SELECT 1 FROM acu_profile_probe_queue WHERE execution_profile_id=$1", [profile.executionProfileId],
+    )).rowCount).toBe(0);
+    expect((await database.query(
+      "SELECT 1 FROM acu_profile_probe_queue WHERE execution_profile_id='__full_pool__'",
+    )).rowCount).toBe(1);
+    expect((await database.query<{ count: number }>("SELECT count(*)::int count FROM acu_full_pool_probe_runs")).rows[0]?.count)
+      .toBe(fullPoolCount.rows[0]?.count);
+    await repository.deleteProfileProbe("__full_pool__");
+  });
+
+  it("does not use an old exact success to clear a newer Channel failure", async () => {
+    await database.query(
+      "UPDATE acu_probe_worker_lease SET holder_id=null,lease_until=now()-interval '1 second' WHERE singleton=true",
+    );
+    const profile = recoveryProfile("channel-recovery-profile", "channel-recovery-model", "channel-recovery-gate");
+    const channelFailureAt = new Date(Date.now() - 60_000);
+    const oldProfileSuccess = new Date(channelFailureAt.getTime() - 60_000);
+    await repository.saveProfileHealth({
+      executionProfileId: profile.executionProfileId,
+      channelId: profile.channelId!, providerId: profile.provider,
+      canonicalModelId: profile.modelId, protocol: "responses",
+      snapshot: {
+        state: "healthy", consecutiveFailures: 0, recentSuccessRate: 1,
+        lastAttemptAt: oldProfileSuccess, lastSuccessAt: oldProfileSuccess,
+      },
+      usageTrusted: true, actualModelVerified: true,
+    });
+    await repository.saveChannelHealth({
+      channelId: profile.channelId!, providerId: profile.provider,
+      snapshot: {
+        state: "open", consecutiveFailures: 1, recentSuccessRate: 0,
+        lastAttemptAt: channelFailureAt, lastFailureAt: channelFailureAt,
+        cooldownUntil: new Date(Date.now() - 1_000), errorClass: "authentication", httpStatus: 401,
+      },
+    });
+    await repository.enqueueProfileProbe(profile.executionProfileId);
+    let calls = 0;
+    const successAdapter = successfulProbeAdapter(profile.modelId);
+    const worker = new AdaptiveProbeWorker({
+      database,
+      profiles: [profile],
+      adapters: new Map([[profile.executionProfileId, {
+        async execute(request) { calls += 1; return successAdapter.execute(request); },
+      }]]),
+      dailyBudgetCny: 1,
+    });
+
+    await worker.runOnce();
+
+    expect(calls).toBe(1);
+    expect(await repository.channelHealth(profile.channelId!)).toMatchObject({ state: "healthy", consecutiveFailures: 0 });
+    expect(await repository.profileHealth(profile.executionProfileId)).toMatchObject({ state: "healthy", consecutiveFailures: 0 });
+    expect((await database.query(
+      "SELECT 1 FROM acu_profile_probe_queue WHERE execution_profile_id=$1", [profile.executionProfileId],
+    )).rowCount).toBe(0);
+  });
+
+  it("does not let an older health write overwrite a newer exact snapshot", async () => {
+    const profile = recoveryProfile("ordered-health-profile", "ordered-health-model", "ordered-health-channel");
+    const newer = new Date("2026-08-01T12:00:00Z");
+    const older = new Date("2026-08-01T11:00:00Z");
+    const save = (snapshot: Parameters<AlphaRepository["saveProfileHealth"]>[0]["snapshot"]) => repository.saveProfileHealth({
+      executionProfileId: profile.executionProfileId,
+      channelId: profile.channelId!,
+      providerId: profile.provider,
+      canonicalModelId: profile.modelId,
+      protocol: "responses",
+      snapshot,
+      usageTrusted: true,
+      actualModelVerified: true,
+    });
+    await save({ state: "healthy", consecutiveFailures: 0, recentSuccessRate: 1, lastAttemptAt: newer, lastSuccessAt: newer });
+    await save({ state: "open", consecutiveFailures: 1, recentSuccessRate: 0, lastAttemptAt: older, lastFailureAt: older });
+    expect(await repository.profileHealth(profile.executionProfileId)).toMatchObject({
+      state: "healthy", consecutiveFailures: 0, lastAttemptAt: newer, lastSuccessAt: newer,
+    });
+    await repository.saveChannelHealth({
+      channelId: profile.channelId!, providerId: profile.provider,
+      snapshot: { state: "healthy", consecutiveFailures: 0, recentSuccessRate: 1, lastAttemptAt: newer, lastSuccessAt: newer },
+    });
+    await repository.saveChannelHealth({
+      channelId: profile.channelId!, providerId: profile.provider,
+      snapshot: { state: "open", consecutiveFailures: 1, recentSuccessRate: 0, lastAttemptAt: older, lastFailureAt: older },
+    });
+    expect(await repository.channelHealth(profile.channelId!)).toMatchObject({
+      state: "healthy", consecutiveFailures: 0, lastAttemptAt: newer, lastSuccessAt: newer,
+    });
+  });
+
+  it("only deletes the exact queue after success newer than its last failure", async () => {
+    const profile = recoveryProfile("queue-boundary-profile", "queue-boundary-model", "queue-boundary-channel");
+    const failureAt = new Date("2026-08-01T10:00:00Z");
+    await repository.saveProfileHealth({
+      executionProfileId: profile.executionProfileId,
+      channelId: profile.channelId!, providerId: profile.provider,
+      canonicalModelId: profile.modelId, protocol: "responses",
+      snapshot: {
+        state: "open", consecutiveFailures: 1, recentSuccessRate: 0,
+        lastAttemptAt: failureAt, lastFailureAt: failureAt, lastSuccessAt: new Date("2026-08-01T09:00:00Z"),
+      },
+      usageTrusted: true, actualModelVerified: true,
+    });
+    await repository.enqueueProfileProbe(profile.executionProfileId);
+    expect(await repository.deleteProfileProbeIfRecovered(profile.executionProfileId)).toBe(false);
+    const successAt = new Date("2026-08-01T11:00:00Z");
+    await repository.saveProfileHealth({
+      executionProfileId: profile.executionProfileId,
+      channelId: profile.channelId!, providerId: profile.provider,
+      canonicalModelId: profile.modelId, protocol: "responses",
+      snapshot: {
+        state: "healthy", consecutiveFailures: 0, recentSuccessRate: 1,
+        lastAttemptAt: successAt, lastFailureAt: failureAt, lastSuccessAt: successAt,
+      },
+      usageTrusted: true, actualModelVerified: true,
+    });
+    expect(await repository.deleteProfileProbeIfRecovered(profile.executionProfileId)).toBe(true);
+  });
+
   it("runs one full-pool Probe serially and records reproducible cost metadata", async () => {
     await database.query("TRUNCATE acu_full_pool_probe_runs,acu_profile_probe_attempts,acu_profile_probe_queue");
     await database.query(
@@ -464,6 +767,143 @@ run("Alpha PostgreSQL foundation", () => {
     expect(Number(failedCost.rows[0]?.cost_cny)).toBe(0);
     const marker = await database.query("SELECT 1 FROM acu_profile_probe_queue WHERE execution_profile_id='__full_pool__'");
     expect(marker.rowCount).toBe(0);
+    expect((await database.query(
+      "SELECT 1 FROM acu_profile_probe_queue WHERE execution_profile_id='full-pool-profile-3'",
+    )).rowCount).toBe(0);
+  });
+
+  it("continues full-pool siblings after Profile failure but skips them after Channel failure", async () => {
+    const first = recoveryProfile("scope-pool-first", "scope-pool-model", "scope-pool-channel");
+    const sibling = recoveryProfile("scope-pool-sibling", "scope-pool-model", "scope-pool-channel");
+    const runPool = async (status: number) => {
+      await database.query("TRUNCATE acu_full_pool_probe_runs,acu_profile_probe_attempts,acu_profile_probe_queue");
+      await database.query(
+        "UPDATE acu_probe_worker_lease SET holder_id=null,lease_until=now()-interval '1 second' WHERE singleton=true",
+      );
+      await repository.enqueueProfileProbe("__full_pool__");
+      const worker = new AdaptiveProbeWorker({
+        database,
+        profiles: [first, sibling],
+        adapters: new Map([
+          [first.executionProfileId, failedProbeAdapter(status)],
+          [sibling.executionProfileId, successfulProbeAdapter(sibling.modelId)],
+        ]),
+        dailyBudgetCny: 1,
+      });
+      await worker.runOnce();
+      return database.query<{ execution_profile_id: string }>(
+        "SELECT execution_profile_id FROM acu_profile_probe_attempts ORDER BY started_at,execution_profile_id",
+      );
+    };
+
+    expect((await runPool(500)).rows.map((row) => row.execution_profile_id)).toEqual([
+      first.executionProfileId,
+      sibling.executionProfileId,
+    ]);
+    expect((await runPool(401)).rows.map((row) => row.execution_profile_id)).toEqual([
+      first.executionProfileId,
+    ]);
+  });
+
+  it("full-pool queues only demanded failures and preserves other active recovery", async () => {
+    await database.query("TRUNCATE acu_full_pool_probe_runs,acu_profile_probe_attempts,acu_profile_probe_queue");
+    await database.query(
+      "UPDATE acu_probe_worker_lease SET holder_id=null,lease_until=now()-interval '1 second' WHERE singleton=true",
+    );
+    const demanded = recoveryProfile("demanded-pool-failure", "demanded-pool-model", "demanded-pool-channel");
+    const idle = recoveryProfile("idle-pool-failure", "idle-pool-model", "idle-pool-channel");
+    const active = recoveryProfile("other-active-recovery", "other-active-model", "other-active-channel");
+    await repository.createLogicalRequest({
+      logicalRequestId: "demanded_pool_request",
+      newapiUserId: "user_a",
+      sessionId: "ses_user_a",
+      taskId: "task_user_a",
+      segmentId: "seg_user_a_1",
+      ingressIdempotencyKey: "demanded-pool-request",
+      requestProtocol: "responses",
+      requestedModel: demanded.modelId,
+      streaming: true,
+    });
+    const recentFailure = new Date(Date.now() - 60_000);
+    await repository.saveProfileHealth({
+      executionProfileId: active.executionProfileId,
+      channelId: active.channelId!, providerId: active.provider,
+      canonicalModelId: active.modelId, protocol: "responses",
+      snapshot: {
+        state: "open", consecutiveFailures: 1, recentSuccessRate: 0,
+        lastAttemptAt: recentFailure, lastFailureAt: recentFailure,
+        cooldownUntil: new Date(Date.now() + 30 * 60_000),
+      },
+      usageTrusted: true, actualModelVerified: true,
+    });
+    await repository.enqueueProfileProbe(active.executionProfileId);
+    await repository.enqueueProfileProbe("__full_pool__");
+    const worker = new AdaptiveProbeWorker({
+      database,
+      profiles: [demanded, idle, active],
+      adapters: new Map([
+        [demanded.executionProfileId, failedProbeAdapter(500)],
+        [idle.executionProfileId, failedProbeAdapter(500)],
+        [active.executionProfileId, successfulProbeAdapter(active.modelId)],
+      ]),
+      dailyBudgetCny: 1,
+    });
+
+    await worker.runOnce();
+
+    const queued = await database.query<{ execution_profile_id: string }>(
+      "SELECT execution_profile_id FROM acu_profile_probe_queue ORDER BY execution_profile_id",
+    );
+    expect(queued.rows.map((row) => row.execution_profile_id)).toEqual([
+      demanded.executionProfileId,
+      active.executionProfileId,
+    ].sort());
+    const attempted = await database.query<{ execution_profile_id: string }>(
+      "SELECT execution_profile_id FROM acu_profile_probe_attempts ORDER BY execution_profile_id",
+    );
+    expect(attempted.rows.map((row) => row.execution_profile_id)).toEqual([
+      demanded.executionProfileId,
+      idle.executionProfileId,
+    ].sort());
+  });
+
+  it("full-pool success removes only its exact recovery queue", async () => {
+    await database.query("TRUNCATE acu_full_pool_probe_runs,acu_profile_probe_attempts,acu_profile_probe_queue");
+    const recovered = recoveryProfile("pool-success-queued", "pool-success-model", "pool-success-channel");
+    const untouched = recoveryProfile("pool-untouched-queued", "pool-untouched-model", "pool-untouched-channel");
+    const failureAt = new Date(Date.now() - 60_000);
+    await repository.saveProfileHealth({
+      executionProfileId: untouched.executionProfileId,
+      channelId: untouched.channelId!, providerId: untouched.provider,
+      canonicalModelId: untouched.modelId, protocol: "responses",
+      snapshot: {
+        state: "open", consecutiveFailures: 1, recentSuccessRate: 0,
+        lastAttemptAt: failureAt, lastFailureAt: failureAt,
+        cooldownUntil: new Date(Date.now() + 30 * 60_000),
+      },
+      usageTrusted: true, actualModelVerified: true,
+    });
+    await repository.enqueueProfileProbe(recovered.executionProfileId);
+    await repository.enqueueProfileProbe(untouched.executionProfileId);
+    await repository.enqueueProfileProbe("__full_pool__");
+    const worker = new AdaptiveProbeWorker({
+      database,
+      profiles: [recovered, untouched],
+      adapters: new Map([
+        [recovered.executionProfileId, successfulProbeAdapter(recovered.modelId)],
+        [untouched.executionProfileId, successfulProbeAdapter(untouched.modelId)],
+      ]),
+      dailyBudgetCny: 1,
+    });
+
+    await (worker as unknown as { runFullPoolIfEligible(): Promise<boolean> }).runFullPoolIfEligible();
+
+    const queued = await database.query<{ execution_profile_id: string }>(
+      "SELECT execution_profile_id FROM acu_profile_probe_queue ORDER BY execution_profile_id",
+    );
+    expect(queued.rows).toEqual([{ execution_profile_id: untouched.executionProfileId }]);
+    expect(await repository.profileHealth(recovered.executionProfileId)).toMatchObject({ state: "healthy" });
+    expect(await repository.profileHealth(untouched.executionProfileId)).toMatchObject({ state: "open" });
   });
 
   it("returns the complete logical request chain only through the explicit admin lookup", async () => {

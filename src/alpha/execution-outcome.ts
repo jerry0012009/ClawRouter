@@ -76,7 +76,6 @@ export function classifyExecutionOutcome(input: {
     recoveryStatus: input.recoveryExecuted ? "executed" : input.recoveryTargetAvailable === false
       ? "no_compatible_target" : "eligible",
     billingStatus,
-    healthImpact: input.httpStatus === 429 || (input.httpStatus !== undefined && input.httpStatus >= 500)
-      ? "channel_failure" : "profile_failure",
+    healthImpact: "profile_failure",
   };
 }

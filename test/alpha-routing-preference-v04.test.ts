@@ -95,7 +95,7 @@ describe("routing preference v0.4", () => {
       costSensitivity: 0.45,
       fallbackRiskScale: 1.25,
     });
-    expect(economyMidHard.selectedProfile.modelId).toBe("gpt-5.6-luna");
+    expect(economyMidHard.selectedProfile.modelId).toBe("gpt-5.6-sol");
     expect(economyHard.selectedProfile.modelId).toBe("gpt-5.6-sol");
     expect(balancedExtreme.selectedProfile.modelId).toBe("gpt-5.6-sol");
     expect(qualityExtreme.selectedProfile.modelId).toBe("kimi-k3");

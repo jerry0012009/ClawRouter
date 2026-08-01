@@ -47,7 +47,7 @@ import { buildJudgeNativeContext } from "./judge-context-policy.js";
 
 const POLICY_VERSION = "alpha-p0-policy-v1";
 const QUALITY_CURVE_VERSION = "acu-catalog-v0.1";
-const PRICE_VERSION = "acu-catalog-v0.1";
+const PRICE_VERSION = "acu-price-2026-08-01-lucen-v1";
 
 export function codexSelectionCorridorRequirements(
   inputTokens: number,

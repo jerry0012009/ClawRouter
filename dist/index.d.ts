@@ -626,7 +626,7 @@ type OpenClawPluginDefinition = {
 };
 
 /**
- * Model Definitions — Dual Upstream (2026-07-02 updated)
+ * Model Definitions — Dual Upstream (2026-08-01 Lucen reconciliation)
  *
  * "proxy": api.openai-proxy.org (OpenAI, Anthropic, Google, DeepSeek, Kimi, Qwen, GLM)
  * "openrouter": openrouter.ai (DeepSeek, Meta, Qwen, Grok, free models)

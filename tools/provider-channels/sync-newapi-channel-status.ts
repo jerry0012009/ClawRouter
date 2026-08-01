@@ -1,17 +1,33 @@
 #!/usr/bin/env node
+import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { buildModelCurve, getAcuCatalog, getAcuModel } from "../../src/acu/catalog.js";
 
 const catalogPath = resolve("deploy/alpha/newapi-acu-catalog.json");
+const sourceCatalogPath = resolve("src/acu/catalog/model-catalog.json");
+const sourceCatalogBody = await readFile(sourceCatalogPath);
+const sourceCatalog = JSON.parse(sourceCatalogBody.toString("utf8")) as {
+  schemaVersion: string;
+  generatedAt: string;
+  priceVersion: string;
+};
 const profiles = JSON.parse(await readFile(resolve("deploy/alpha/execution-profiles.json"), "utf8")) as Array<Record<string, unknown>>;
 const economicsCatalog = JSON.parse(await readFile(resolve("deploy/alpha/provider-economics.json"), "utf8")) as {
   providers: Array<Record<string, unknown>>;
 };
 const catalog = JSON.parse(await readFile(catalogPath, "utf8")) as {
+  sourceCatalogVersion: string;
+  sourceCatalogContentSha256?: string;
+  pricingVersion: string;
+  generatedAt?: string;
   responses: Array<Record<string, unknown>>;
   curveModelStatuses: Array<Record<string, unknown>>;
 };
+catalog.sourceCatalogVersion = sourceCatalog.schemaVersion;
+catalog.sourceCatalogContentSha256 = createHash("sha256").update(sourceCatalogBody).digest("hex");
+catalog.pricingVersion = sourceCatalog.priceVersion;
+catalog.generatedAt = sourceCatalog.generatedAt;
 const economicsByProvider = new Map(economicsCatalog.providers.map((provider) => [String(provider.providerId), provider]));
 function activeProfiles(modelId: string, responsesOnly: boolean): Array<Record<string, unknown>> {
   return profiles.filter((profile) => profile.modelId === modelId
@@ -102,7 +118,9 @@ catalog.responses = activeModelIds.map((modelId) => {
     costCurrency: "CNY",
     costSemantics: "estimated_user_cash_cost",
     costBasis: "current_reference_execution_profile",
+    costBasisLabel: "Reference channel price; actual route may select another eligible profile",
     costExecutionProfileId: String(costProfile?.executionProfileId ?? ""),
+    costObservedBillingMultiplier: Number(costProfile?.observedBillingMultiplier),
     costProvider: displayProvider(costProfile ? [String(costProfile.provider)] : []),
     costChannel: String(costProfile?.channel ?? ""),
     effectiveCostStatus,

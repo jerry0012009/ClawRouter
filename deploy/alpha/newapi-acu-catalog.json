@@ -1,7 +1,7 @@
 {
   "schemaVersion": "acu-newapi-catalog-v1",
   "sourceCatalogVersion": "acu-model-catalog-v2",
-  "pricingVersion": "acu-catalog-v0.2-cny-curves",
+  "pricingVersion": "acu-price-2026-08-01-lucen-v1",
   "provider": "CloseAI",
   "auto": {
     "modelId": "acu-auto",
@@ -24,7 +24,9 @@
       "costCurrency": "CNY",
       "costSemantics": "estimated_user_cash_cost",
       "costBasis": "current_reference_execution_profile",
+      "costBasisLabel": "Reference channel price; actual route may select another eligible profile",
       "costExecutionProfileId": "lucen-kiro-cache70-claude-006:claude-fable-5:messages",
+      "costObservedBillingMultiplier": 0.06,
       "costProvider": "Lucen",
       "costChannel": "lucen-kiro-cache70-claude-006",
       "effectiveCostStatus": "estimated",
@@ -662,9 +664,11 @@
       "costCurrency": "CNY",
       "costSemantics": "estimated_user_cash_cost",
       "costBasis": "current_reference_execution_profile",
-      "costExecutionProfileId": "lucen-kiro-cache70-claude-006:claude-opus-4-8:messages",
+      "costBasisLabel": "Reference channel price; actual route may select another eligible profile",
+      "costExecutionProfileId": "lucen-kiro-cache90-claude-006:claude-opus-4-8:messages",
+      "costObservedBillingMultiplier": 0.06,
       "costProvider": "Lucen",
-      "costChannel": "lucen-kiro-cache70-claude-006",
+      "costChannel": "lucen-kiro-cache90-claude-006",
       "effectiveCostStatus": "estimated",
       "curveProfile": "frontier_resilient",
       "profileConfidence": "medium",
@@ -1292,18 +1296,20 @@
       "modelId": "claude-sonnet-5",
       "displayName": "Claude Sonnet 5",
       "role": "Verified",
-      "inputPricePerMillion": 3,
-      "outputPricePerMillion": 15,
-      "cachedInputPricePerMillion": 0.3,
-      "effectiveInputPriceCnyPerMillion": 0.18,
-      "effectiveOutputPriceCnyPerMillion": 0.8999999999999999,
-      "effectiveCachedInputPriceCnyPerMillion": 0.018,
+      "inputPricePerMillion": 2,
+      "outputPricePerMillion": 10,
+      "cachedInputPricePerMillion": 0.2,
+      "effectiveInputPriceCnyPerMillion": 0.12,
+      "effectiveOutputPriceCnyPerMillion": 0.6,
+      "effectiveCachedInputPriceCnyPerMillion": 0.012,
       "costCurrency": "CNY",
       "costSemantics": "estimated_user_cash_cost",
       "costBasis": "current_reference_execution_profile",
-      "costExecutionProfileId": "lucen-kiro-cache70-claude-006:claude-sonnet-5:messages",
+      "costBasisLabel": "Reference channel price; actual route may select another eligible profile",
+      "costExecutionProfileId": "lucen-kiro-cache90-claude-006:claude-sonnet-5:messages",
+      "costObservedBillingMultiplier": 0.06,
       "costProvider": "Lucen",
-      "costChannel": "lucen-kiro-cache70-claude-006",
+      "costChannel": "lucen-kiro-cache90-claude-006",
       "effectiveCostStatus": "estimated",
       "curveProfile": "balanced_frontier",
       "profileConfidence": "low",
@@ -1931,16 +1937,18 @@
       "modelId": "deepseek-v4-flash",
       "displayName": "DeepSeek V4 Flash",
       "role": "Verified",
-      "inputPricePerMillion": 0.15,
-      "outputPricePerMillion": 0.3,
+      "inputPricePerMillion": 1,
+      "outputPricePerMillion": 2,
       "cachedInputPricePerMillion": 0.07,
-      "effectiveInputPriceCnyPerMillion": 0.075,
-      "effectiveOutputPriceCnyPerMillion": 0.15,
+      "effectiveInputPriceCnyPerMillion": 0.5,
+      "effectiveOutputPriceCnyPerMillion": 1,
       "effectiveCachedInputPriceCnyPerMillion": 0.035,
       "costCurrency": "CNY",
       "costSemantics": "estimated_user_cash_cost",
       "costBasis": "current_reference_execution_profile",
+      "costBasisLabel": "Reference channel price; actual route may select another eligible profile",
       "costExecutionProfileId": "lucen-deepseek-claude-050:deepseek-v4-flash:messages",
+      "costObservedBillingMultiplier": 0.5,
       "costProvider": "Lucen",
       "costChannel": "lucen-deepseek-claude-050",
       "effectiveCostStatus": "estimated",
@@ -2569,16 +2577,18 @@
       "modelId": "gemini-2.5-flash",
       "displayName": "Gemini 2.5 Flash",
       "role": "Verified",
-      "inputPricePerMillion": 0.15,
-      "outputPricePerMillion": 0.6,
+      "inputPricePerMillion": 0.3,
+      "outputPricePerMillion": 2.5,
       "cachedInputPricePerMillion": 0.0375,
-      "effectiveInputPriceCnyPerMillion": 0.045,
-      "effectiveOutputPriceCnyPerMillion": 0.18,
+      "effectiveInputPriceCnyPerMillion": 0.09,
+      "effectiveOutputPriceCnyPerMillion": 0.75,
       "effectiveCachedInputPriceCnyPerMillion": 0.01125,
       "costCurrency": "CNY",
       "costSemantics": "estimated_user_cash_cost",
       "costBasis": "current_reference_execution_profile",
+      "costBasisLabel": "Reference channel price; actual route may select another eligible profile",
       "costExecutionProfileId": "lucen-gemini-openai-030:gemini-2.5-flash:responses",
+      "costObservedBillingMultiplier": 0.3,
       "costProvider": "Lucen",
       "costChannel": "lucen-gemini-openai-030",
       "effectiveCostStatus": "estimated",
@@ -3216,7 +3226,9 @@
       "costCurrency": "CNY",
       "costSemantics": "estimated_user_cash_cost",
       "costBasis": "current_reference_execution_profile",
+      "costBasisLabel": "Reference channel price; actual route may select another eligible profile",
       "costExecutionProfileId": "lucen-glm-official-openai-030:glm-5.1:responses",
+      "costObservedBillingMultiplier": 0.3,
       "costProvider": "Lucen",
       "costChannel": "lucen-glm-official-openai-030",
       "effectiveCostStatus": "estimated",
@@ -3845,18 +3857,20 @@
       "modelId": "glm-5.2",
       "displayName": "GLM 5.2",
       "role": "Verified",
-      "inputPricePerMillion": 1.2,
-      "outputPricePerMillion": 4.2,
-      "cachedInputPricePerMillion": 0.6,
-      "effectiveInputPriceCnyPerMillion": 0.36,
-      "effectiveOutputPriceCnyPerMillion": 1.26,
-      "effectiveCachedInputPriceCnyPerMillion": 0.18,
+      "inputPricePerMillion": 8,
+      "outputPricePerMillion": 28,
+      "cachedInputPricePerMillion": 2,
+      "effectiveInputPriceCnyPerMillion": 2.4,
+      "effectiveOutputPriceCnyPerMillion": 8.4,
+      "effectiveCachedInputPriceCnyPerMillion": 0.6,
       "costCurrency": "CNY",
       "costSemantics": "estimated_user_cash_cost",
       "costBasis": "current_reference_execution_profile",
-      "costExecutionProfileId": "lucen-glm-official-claude-030:glm-5.2:messages",
+      "costBasisLabel": "Reference channel price; actual route may select another eligible profile",
+      "costExecutionProfileId": "lucen-mainstream-cn-claude-030:glm-5.2:messages",
+      "costObservedBillingMultiplier": 0.3,
       "costProvider": "Lucen",
-      "costChannel": "lucen-glm-official-claude-030",
+      "costChannel": "lucen-mainstream-cn-claude-030",
       "effectiveCostStatus": "estimated",
       "curveProfile": "balanced_frontier",
       "profileConfidence": "medium",
@@ -3881,8 +3895,8 @@
         },
         {
           "difficultyScore": 3,
-          "estimatedQuality": 0.9812172205902837,
-          "qualityLower": 0.8812172205902837,
+          "estimatedQuality": 0.9812172205902838,
+          "qualityLower": 0.8812172205902838,
           "qualityUpper": 1
         },
         {
@@ -3905,8 +3919,8 @@
         },
         {
           "difficultyScore": 7,
-          "estimatedQuality": 0.980135632586821,
-          "qualityLower": 0.880135632586821,
+          "estimatedQuality": 0.9801356325868208,
+          "qualityLower": 0.8801356325868208,
           "qualityUpper": 1
         },
         {
@@ -3929,8 +3943,8 @@
         },
         {
           "difficultyScore": 11,
-          "estimatedQuality": 0.9784517405310448,
-          "qualityLower": 0.8784517405310448,
+          "estimatedQuality": 0.9784517405310449,
+          "qualityLower": 0.8784517405310449,
           "qualityUpper": 1
         },
         {
@@ -3953,8 +3967,8 @@
         },
         {
           "difficultyScore": 15,
-          "estimatedQuality": 0.975909614688032,
-          "qualityLower": 0.875909614688032,
+          "estimatedQuality": 0.9759096146880318,
+          "qualityLower": 0.8759096146880319,
           "qualityUpper": 1
         },
         {
@@ -4049,8 +4063,8 @@
         },
         {
           "difficultyScore": 31,
-          "estimatedQuality": 0.9521856054962841,
-          "qualityLower": 0.8521856054962841,
+          "estimatedQuality": 0.9521856054962842,
+          "qualityLower": 0.8521856054962842,
           "qualityUpper": 1
         },
         {
@@ -4157,9 +4171,9 @@
         },
         {
           "difficultyScore": 49,
-          "estimatedQuality": 0.8763993818943088,
-          "qualityLower": 0.7763993818943088,
-          "qualityUpper": 0.9763993818943087
+          "estimatedQuality": 0.876399381894309,
+          "qualityLower": 0.776399381894309,
+          "qualityUpper": 0.976399381894309
         },
         {
           "difficultyScore": 50,
@@ -4169,9 +4183,9 @@
         },
         {
           "difficultyScore": 51,
-          "estimatedQuality": 0.8625647971241491,
-          "qualityLower": 0.7625647971241492,
-          "qualityUpper": 0.9625647971241491
+          "estimatedQuality": 0.862564797124149,
+          "qualityLower": 0.762564797124149,
+          "qualityUpper": 0.962564797124149
         },
         {
           "difficultyScore": 52,
@@ -4485,16 +4499,18 @@
       "role": "Economy",
       "inputPricePerMillion": 0.75,
       "outputPricePerMillion": 4.5,
-      "cachedInputPricePerMillion": 0.375,
+      "cachedInputPricePerMillion": 0.075,
       "effectiveInputPriceCnyPerMillion": 0.045,
       "effectiveOutputPriceCnyPerMillion": 0.27,
-      "effectiveCachedInputPriceCnyPerMillion": 0.0225,
+      "effectiveCachedInputPriceCnyPerMillion": 0.0045,
       "costCurrency": "CNY",
       "costSemantics": "estimated_user_cash_cost",
       "costBasis": "current_reference_execution_profile",
-      "costExecutionProfileId": "lucen-cx006-plus:gpt-5.4-mini:responses",
+      "costBasisLabel": "Reference channel price; actual route may select another eligible profile",
+      "costExecutionProfileId": "lucen-cx006-value-dynamic:gpt-5.4-mini:responses",
+      "costObservedBillingMultiplier": 0.06,
       "costProvider": "Lucen",
-      "costChannel": "lucen-cx006-plus",
+      "costChannel": "lucen-cx006-value-dynamic",
       "effectiveCostStatus": "estimated",
       "curveProfile": "efficient_fast",
       "profileConfidence": "low",
@@ -5131,9 +5147,11 @@
       "costCurrency": "CNY",
       "costSemantics": "estimated_user_cash_cost",
       "costBasis": "current_reference_execution_profile",
-      "costExecutionProfileId": "lucen-cx006-plus:gpt-5.5:responses",
+      "costBasisLabel": "Reference channel price; actual route may select another eligible profile",
+      "costExecutionProfileId": "lucen-cx006-value-dynamic:gpt-5.5:responses",
+      "costObservedBillingMultiplier": 0.06,
       "costProvider": "Lucen",
-      "costChannel": "lucen-cx006-plus",
+      "costChannel": "lucen-cx006-value-dynamic",
       "effectiveCostStatus": "estimated",
       "curveProfile": "balanced_frontier",
       "profileConfidence": "low",
@@ -5761,18 +5779,20 @@
       "modelId": "gpt-5.6-luna",
       "displayName": "GPT-5.6 Luna",
       "role": "Value",
-      "inputPricePerMillion": 1,
-      "outputPricePerMillion": 6,
-      "cachedInputPricePerMillion": 0.1,
-      "effectiveInputPriceCnyPerMillion": 0.06,
-      "effectiveOutputPriceCnyPerMillion": 0.36,
-      "effectiveCachedInputPriceCnyPerMillion": 0.006,
+      "inputPricePerMillion": 0.2,
+      "outputPricePerMillion": 1.2,
+      "cachedInputPricePerMillion": 0.02,
+      "effectiveInputPriceCnyPerMillion": 0.012,
+      "effectiveOutputPriceCnyPerMillion": 0.072,
+      "effectiveCachedInputPriceCnyPerMillion": 0.0012,
       "costCurrency": "CNY",
       "costSemantics": "estimated_user_cash_cost",
       "costBasis": "current_reference_execution_profile",
-      "costExecutionProfileId": "lucen-cx006-plus:gpt-5.6-luna:responses",
+      "costBasisLabel": "Reference channel price; actual route may select another eligible profile",
+      "costExecutionProfileId": "lucen-cx006-value-dynamic:gpt-5.6-luna:responses",
+      "costObservedBillingMultiplier": 0.06,
       "costProvider": "Lucen",
-      "costChannel": "lucen-cx006-plus",
+      "costChannel": "lucen-cx006-value-dynamic",
       "effectiveCostStatus": "estimated",
       "curveProfile": "efficient_fast",
       "profileConfidence": "low",
@@ -6409,7 +6429,9 @@
       "costCurrency": "CNY",
       "costSemantics": "estimated_user_cash_cost",
       "costBasis": "current_reference_execution_profile",
+      "costBasisLabel": "Reference channel price; actual route may select another eligible profile",
       "costExecutionProfileId": "lucen-cx006-plus:gpt-5.6-sol:responses",
+      "costObservedBillingMultiplier": 0.06,
       "costProvider": "Lucen",
       "costChannel": "lucen-cx006-plus",
       "effectiveCostStatus": "estimated",
@@ -6436,8 +6458,8 @@
         },
         {
           "difficultyScore": 3,
-          "estimatedQuality": 0.9694809656649246,
-          "qualityLower": 0.8694809656649246,
+          "estimatedQuality": 0.9694809656649247,
+          "qualityLower": 0.8694809656649247,
           "qualityUpper": 1
         },
         {
@@ -6448,8 +6470,8 @@
         },
         {
           "difficultyScore": 5,
-          "estimatedQuality": 0.969082396785698,
-          "qualityLower": 0.869082396785698,
+          "estimatedQuality": 0.9690823967856979,
+          "qualityLower": 0.8690823967856979,
           "qualityUpper": 1
         },
         {
@@ -6460,8 +6482,8 @@
         },
         {
           "difficultyScore": 7,
-          "estimatedQuality": 0.9685826906216721,
-          "qualityLower": 0.8685826906216721,
+          "estimatedQuality": 0.968582690621672,
+          "qualityLower": 0.868582690621672,
           "qualityUpper": 1
         },
         {
@@ -6484,8 +6506,8 @@
         },
         {
           "difficultyScore": 11,
-          "estimatedQuality": 0.9671898848740393,
-          "qualityLower": 0.8671898848740394,
+          "estimatedQuality": 0.9671898848740395,
+          "qualityLower": 0.8671898848740395,
           "qualityUpper": 1
         },
         {
@@ -6508,8 +6530,8 @@
         },
         {
           "difficultyScore": 15,
-          "estimatedQuality": 0.965101290428878,
-          "qualityLower": 0.8651012904288781,
+          "estimatedQuality": 0.9651012904288779,
+          "qualityLower": 0.865101290428878,
           "qualityUpper": 1
         },
         {
@@ -6574,8 +6596,8 @@
         },
         {
           "difficultyScore": 26,
-          "estimatedQuality": 0.9543155488667164,
-          "qualityLower": 0.8543155488667165,
+          "estimatedQuality": 0.9543155488667163,
+          "qualityLower": 0.8543155488667163,
           "qualityUpper": 1
         },
         {
@@ -6604,8 +6626,8 @@
         },
         {
           "difficultyScore": 31,
-          "estimatedQuality": 0.9466791862465269,
-          "qualityLower": 0.8466791862465269,
+          "estimatedQuality": 0.9466791862465271,
+          "qualityLower": 0.8466791862465272,
           "qualityUpper": 1
         },
         {
@@ -6628,8 +6650,8 @@
         },
         {
           "difficultyScore": 35,
-          "estimatedQuality": 0.9391944221300829,
-          "qualityLower": 0.8391944221300829,
+          "estimatedQuality": 0.9391944221300828,
+          "qualityLower": 0.8391944221300828,
           "qualityUpper": 1
         },
         {
@@ -6640,20 +6662,20 @@
         },
         {
           "difficultyScore": 37,
-          "estimatedQuality": 0.9348731638990497,
-          "qualityLower": 0.8348731638990498,
+          "estimatedQuality": 0.9348731638990496,
+          "qualityLower": 0.8348731638990496,
           "qualityUpper": 1
         },
         {
           "difficultyScore": 38,
-          "estimatedQuality": 0.932536988510557,
-          "qualityLower": 0.832536988510557,
+          "estimatedQuality": 0.9325369885105569,
+          "qualityLower": 0.8325369885105569,
           "qualityUpper": 1
         },
         {
           "difficultyScore": 39,
-          "estimatedQuality": 0.9300701209391672,
-          "qualityLower": 0.8300701209391672,
+          "estimatedQuality": 0.9300701209391671,
+          "qualityLower": 0.8300701209391671,
           "qualityUpper": 1
         },
         {
@@ -6664,8 +6686,8 @@
         },
         {
           "difficultyScore": 41,
-          "estimatedQuality": 0.9247027951486444,
-          "qualityLower": 0.8247027951486444,
+          "estimatedQuality": 0.9247027951486443,
+          "qualityLower": 0.8247027951486443,
           "qualityUpper": 1
         },
         {
@@ -6682,8 +6704,8 @@
         },
         {
           "difficultyScore": 44,
-          "estimatedQuality": 0.915428787284759,
-          "qualityLower": 0.815428787284759,
+          "estimatedQuality": 0.9154287872847588,
+          "qualityLower": 0.8154287872847589,
           "qualityUpper": 1
         },
         {
@@ -6724,27 +6746,27 @@
         },
         {
           "difficultyScore": 51,
-          "estimatedQuality": 0.8875163600970414,
-          "qualityLower": 0.7875163600970414,
-          "qualityUpper": 0.9875163600970414
+          "estimatedQuality": 0.8875163600970413,
+          "qualityLower": 0.7875163600970413,
+          "qualityUpper": 0.9875163600970412
         },
         {
           "difficultyScore": 52,
-          "estimatedQuality": 0.8828484979300947,
-          "qualityLower": 0.7828484979300947,
-          "qualityUpper": 0.9828484979300947
+          "estimatedQuality": 0.8828484979300946,
+          "qualityLower": 0.7828484979300946,
+          "qualityUpper": 0.9828484979300945
         },
         {
           "difficultyScore": 53,
-          "estimatedQuality": 0.8780316594800792,
-          "qualityLower": 0.7780316594800792,
-          "qualityUpper": 0.9780316594800792
+          "estimatedQuality": 0.878031659480079,
+          "qualityLower": 0.778031659480079,
+          "qualityUpper": 0.978031659480079
         },
         {
           "difficultyScore": 54,
-          "estimatedQuality": 0.8730733305925709,
-          "qualityLower": 0.7730733305925709,
-          "qualityUpper": 0.9730733305925708
+          "estimatedQuality": 0.8730733305925706,
+          "qualityLower": 0.7730733305925707,
+          "qualityUpper": 0.9730733305925706
         },
         {
           "difficultyScore": 55,
@@ -6754,15 +6776,15 @@
         },
         {
           "difficultyScore": 56,
-          "estimatedQuality": 0.8627545471765696,
-          "qualityLower": 0.7627545471765697,
-          "qualityUpper": 0.9627545471765696
+          "estimatedQuality": 0.8627545471765695,
+          "qualityLower": 0.7627545471765695,
+          "qualityUpper": 0.9627545471765695
         },
         {
           "difficultyScore": 57,
-          "estimatedQuality": 0.8573995618562213,
-          "qualityLower": 0.7573995618562214,
-          "qualityUpper": 0.9573995618562213
+          "estimatedQuality": 0.8573995618562212,
+          "qualityLower": 0.7573995618562213,
+          "qualityUpper": 0.9573995618562212
         },
         {
           "difficultyScore": 58,
@@ -6772,255 +6794,255 @@
         },
         {
           "difficultyScore": 59,
-          "estimatedQuality": 0.8462904614083799,
-          "qualityLower": 0.74629046140838,
-          "qualityUpper": 0.9462904614083799
+          "estimatedQuality": 0.8462904614083797,
+          "qualityLower": 0.7462904614083797,
+          "qualityUpper": 0.9462904614083797
         },
         {
           "difficultyScore": 60,
-          "estimatedQuality": 0.8405238940225169,
-          "qualityLower": 0.740523894022517,
-          "qualityUpper": 0.9405238940225169
+          "estimatedQuality": 0.8405238940225168,
+          "qualityLower": 0.7405238940225168,
+          "qualityUpper": 0.9405238940225168
         },
         {
           "difficultyScore": 61,
-          "estimatedQuality": 0.8346029309092816,
-          "qualityLower": 0.7346029309092816,
-          "qualityUpper": 0.9346029309092816
+          "estimatedQuality": 0.8346029309092814,
+          "qualityLower": 0.7346029309092814,
+          "qualityUpper": 0.9346029309092814
         },
         {
           "difficultyScore": 62,
-          "estimatedQuality": 0.8285149803952941,
-          "qualityLower": 0.7285149803952942,
-          "qualityUpper": 0.9285149803952941
+          "estimatedQuality": 0.828514980395294,
+          "qualityLower": 0.728514980395294,
+          "qualityUpper": 0.928514980395294
         },
         {
           "difficultyScore": 63,
-          "estimatedQuality": 0.822246141108175,
-          "qualityLower": 0.722246141108175,
-          "qualityUpper": 0.9222461411081749
+          "estimatedQuality": 0.8222461411081748,
+          "qualityLower": 0.7222461411081749,
+          "qualityUpper": 0.9222461411081748
         },
         {
           "difficultyScore": 64,
-          "estimatedQuality": 0.8157822114174509,
-          "qualityLower": 0.7157822114174509,
-          "qualityUpper": 0.9157822114174509
+          "estimatedQuality": 0.8157822114174508,
+          "qualityLower": 0.7157822114174508,
+          "qualityUpper": 0.9157822114174508
         },
         {
           "difficultyScore": 65,
-          "estimatedQuality": 0.809109848260322,
-          "qualityLower": 0.709109848260322,
-          "qualityUpper": 0.9091098482603219
+          "estimatedQuality": 0.8091098482603217,
+          "qualityLower": 0.7091098482603218,
+          "qualityUpper": 0.9091098482603217
         },
         {
           "difficultyScore": 66,
-          "estimatedQuality": 0.8022178204910791,
-          "qualityLower": 0.7022178204910792,
-          "qualityUpper": 0.9022178204910791
+          "estimatedQuality": 0.8022178204910789,
+          "qualityLower": 0.702217820491079,
+          "qualityUpper": 0.9022178204910789
         },
         {
           "difficultyScore": 67,
-          "estimatedQuality": 0.7950982927657078,
-          "qualityLower": 0.6950982927657078,
-          "qualityUpper": 0.8950982927657077
+          "estimatedQuality": 0.7950982927657075,
+          "qualityLower": 0.6950982927657076,
+          "qualityUpper": 0.8950982927657075
         },
         {
           "difficultyScore": 68,
-          "estimatedQuality": 0.7877480681822068,
-          "qualityLower": 0.6877480681822068,
-          "qualityUpper": 0.8877480681822068
+          "estimatedQuality": 0.7877480681822064,
+          "qualityLower": 0.6877480681822065,
+          "qualityUpper": 0.8877480681822064
         },
         {
           "difficultyScore": 69,
-          "estimatedQuality": 0.7801697122063933,
-          "qualityLower": 0.6801697122063933,
-          "qualityUpper": 0.8801697122063933
+          "estimatedQuality": 0.780169712206393,
+          "qualityLower": 0.680169712206393,
+          "qualityUpper": 0.880169712206393
         },
         {
           "difficultyScore": 70,
-          "estimatedQuality": 0.7723724781121395,
-          "qualityLower": 0.6723724781121395,
-          "qualityUpper": 0.8723724781121395
+          "estimatedQuality": 0.7723724781121392,
+          "qualityLower": 0.6723724781121392,
+          "qualityUpper": 0.8723724781121391
         },
         {
           "difficultyScore": 71,
-          "estimatedQuality": 0.7643729568784405,
-          "qualityLower": 0.6643729568784406,
-          "qualityUpper": 0.8643729568784405
+          "estimatedQuality": 0.7643729568784403,
+          "qualityLower": 0.6643729568784403,
+          "qualityUpper": 0.8643729568784403
         },
         {
           "difficultyScore": 72,
-          "estimatedQuality": 0.7561953838026139,
-          "qualityLower": 0.6561953838026139,
-          "qualityUpper": 0.8561953838026138
+          "estimatedQuality": 0.7561953838026136,
+          "qualityLower": 0.6561953838026137,
+          "qualityUpper": 0.8561953838026136
         },
         {
           "difficultyScore": 73,
-          "estimatedQuality": 0.7478715510730767,
-          "qualityLower": 0.6478715510730767,
-          "qualityUpper": 0.8478715510730767
+          "estimatedQuality": 0.7478715510730765,
+          "qualityLower": 0.6478715510730765,
+          "qualityUpper": 0.8478715510730764
         },
         {
           "difficultyScore": 74,
-          "estimatedQuality": 0.7394403002317056,
-          "qualityLower": 0.6394403002317056,
-          "qualityUpper": 0.8394403002317056
+          "estimatedQuality": 0.7394403002317054,
+          "qualityLower": 0.6394403002317054,
+          "qualityUpper": 0.8394403002317053
         },
         {
           "difficultyScore": 75,
-          "estimatedQuality": 0.7309465994784153,
-          "qualityLower": 0.6309465994784154,
-          "qualityUpper": 0.8309465994784153
+          "estimatedQuality": 0.7309465994784151,
+          "qualityLower": 0.6309465994784151,
+          "qualityUpper": 0.8309465994784151
         },
         {
           "difficultyScore": 76,
-          "estimatedQuality": 0.7224402452644922,
-          "qualityLower": 0.6224402452644923,
-          "qualityUpper": 0.8224402452644922
+          "estimatedQuality": 0.722440245264492,
+          "qualityLower": 0.622440245264492,
+          "qualityUpper": 0.822440245264492
         },
         {
           "difficultyScore": 77,
-          "estimatedQuality": 0.7139742614998836,
-          "qualityLower": 0.6139742614998837,
-          "qualityUpper": 0.8139742614998836
+          "estimatedQuality": 0.7139742614998834,
+          "qualityLower": 0.6139742614998834,
+          "qualityUpper": 0.8139742614998834
         },
         {
           "difficultyScore": 78,
-          "estimatedQuality": 0.7056030983067976,
-          "qualityLower": 0.6056030983067976,
-          "qualityUpper": 0.8056030983067975
+          "estimatedQuality": 0.7056030983067973,
+          "qualityLower": 0.6056030983067974,
+          "qualityUpper": 0.8056030983067973
         },
         {
           "difficultyScore": 79,
-          "estimatedQuality": 0.6973807512682952,
-          "qualityLower": 0.5973807512682953,
-          "qualityUpper": 0.7973807512682952
+          "estimatedQuality": 0.697380751268295,
+          "qualityLower": 0.597380751268295,
+          "qualityUpper": 0.797380751268295
         },
         {
           "difficultyScore": 80,
-          "estimatedQuality": 0.6893589285015773,
-          "qualityLower": 0.5893589285015773,
-          "qualityUpper": 0.7893589285015773
+          "estimatedQuality": 0.6893589285015771,
+          "qualityLower": 0.5893589285015771,
+          "qualityUpper": 0.7893589285015771
         },
         {
           "difficultyScore": 81,
-          "estimatedQuality": 0.6815853855683933,
-          "qualityLower": 0.5815853855683933,
-          "qualityUpper": 0.7815853855683933
+          "estimatedQuality": 0.6815853855683931,
+          "qualityLower": 0.5815853855683931,
+          "qualityUpper": 0.7815853855683931
         },
         {
           "difficultyScore": 82,
-          "estimatedQuality": 0.6741025284025595,
-          "qualityLower": 0.5741025284025595,
-          "qualityUpper": 0.7741025284025594
+          "estimatedQuality": 0.6741025284025591,
+          "qualityLower": 0.5741025284025592,
+          "qualityUpper": 0.7741025284025591
         },
         {
           "difficultyScore": 83,
-          "estimatedQuality": 0.6669463552571899,
-          "qualityLower": 0.56694635525719,
-          "qualityUpper": 0.7669463552571899
+          "estimatedQuality": 0.6669463552571897,
+          "qualityLower": 0.5669463552571897,
+          "qualityUpper": 0.7669463552571897
         },
         {
           "difficultyScore": 84,
-          "estimatedQuality": 0.6601457746061208,
-          "qualityLower": 0.5601457746061208,
-          "qualityUpper": 0.7601457746061208
+          "estimatedQuality": 0.6601457746061205,
+          "qualityLower": 0.5601457746061205,
+          "qualityUpper": 0.7601457746061204
         },
         {
           "difficultyScore": 85,
-          "estimatedQuality": 0.6537223017745553,
-          "qualityLower": 0.5537223017745553,
-          "qualityUpper": 0.7537223017745552
+          "estimatedQuality": 0.6537223017745549,
+          "qualityLower": 0.553722301774555,
+          "qualityUpper": 0.7537223017745549
         },
         {
           "difficultyScore": 86,
-          "estimatedQuality": 0.6476901070538067,
-          "qualityLower": 0.5476901070538067,
-          "qualityUpper": 0.7476901070538067
+          "estimatedQuality": 0.6476901070538064,
+          "qualityLower": 0.5476901070538064,
+          "qualityUpper": 0.7476901070538063
         },
         {
           "difficultyScore": 87,
-          "estimatedQuality": 0.6420563651678945,
-          "qualityLower": 0.5420563651678946,
-          "qualityUpper": 0.7420563651678945
+          "estimatedQuality": 0.6420563651678942,
+          "qualityLower": 0.5420563651678942,
+          "qualityUpper": 0.7420563651678942
         },
         {
           "difficultyScore": 88,
-          "estimatedQuality": 0.6368218416598687,
-          "qualityLower": 0.5368218416598687,
-          "qualityUpper": 0.7368218416598686
+          "estimatedQuality": 0.6368218416598683,
+          "qualityLower": 0.5368218416598683,
+          "qualityUpper": 0.7368218416598683
         },
         {
           "difficultyScore": 89,
-          "estimatedQuality": 0.6319816460289303,
-          "qualityLower": 0.5319816460289303,
-          "qualityUpper": 0.7319816460289302
+          "estimatedQuality": 0.6319816460289299,
+          "qualityLower": 0.5319816460289299,
+          "qualityUpper": 0.7319816460289299
         },
         {
           "difficultyScore": 90,
-          "estimatedQuality": 0.6275260831038114,
-          "qualityLower": 0.5275260831038114,
-          "qualityUpper": 0.7275260831038114
+          "estimatedQuality": 0.6275260831038112,
+          "qualityLower": 0.5275260831038112,
+          "qualityUpper": 0.7275260831038112
         },
         {
           "difficultyScore": 91,
-          "estimatedQuality": 0.6234415413251742,
-          "qualityLower": 0.5234415413251742,
-          "qualityUpper": 0.7234415413251741
+          "estimatedQuality": 0.6234415413251738,
+          "qualityLower": 0.5234415413251738,
+          "qualityUpper": 0.7234415413251738
         },
         {
           "difficultyScore": 92,
-          "estimatedQuality": 0.6197113672456098,
-          "qualityLower": 0.5197113672456098,
-          "qualityUpper": 0.7197113672456098
+          "estimatedQuality": 0.6197113672456094,
+          "qualityLower": 0.5197113672456094,
+          "qualityUpper": 0.7197113672456094
         },
         {
           "difficultyScore": 93,
-          "estimatedQuality": 0.6163166876965623,
-          "qualityLower": 0.5163166876965624,
-          "qualityUpper": 0.7163166876965623
+          "estimatedQuality": 0.616316687696562,
+          "qualityLower": 0.516316687696562,
+          "qualityUpper": 0.716316687696562
         },
         {
           "difficultyScore": 94,
-          "estimatedQuality": 0.6132371531460199,
-          "qualityLower": 0.5132371531460199,
-          "qualityUpper": 0.7132371531460199
+          "estimatedQuality": 0.6132371531460195,
+          "qualityLower": 0.5132371531460195,
+          "qualityUpper": 0.7132371531460194
         },
         {
           "difficultyScore": 95,
-          "estimatedQuality": 0.610451586678246,
-          "qualityLower": 0.510451586678246,
-          "qualityUpper": 0.7104515866782459
+          "estimatedQuality": 0.6104515866782456,
+          "qualityLower": 0.5104515866782456,
+          "qualityUpper": 0.7104515866782456
         },
         {
           "difficultyScore": 96,
-          "estimatedQuality": 0.6079385321292949,
-          "qualityLower": 0.507938532129295,
-          "qualityUpper": 0.7079385321292949
+          "estimatedQuality": 0.6079385321292946,
+          "qualityLower": 0.5079385321292946,
+          "qualityUpper": 0.7079385321292946
         },
         {
           "difficultyScore": 97,
-          "estimatedQuality": 0.6056767019613,
-          "qualityLower": 0.5056767019613,
-          "qualityUpper": 0.7056767019613
+          "estimatedQuality": 0.6056767019612996,
+          "qualityLower": 0.5056767019612997,
+          "qualityUpper": 0.7056767019612996
         },
         {
           "difficultyScore": 98,
-          "estimatedQuality": 0.6036453304931995,
-          "qualityLower": 0.5036453304931995,
-          "qualityUpper": 0.7036453304931994
+          "estimatedQuality": 0.6036453304931991,
+          "qualityLower": 0.5036453304931992,
+          "qualityUpper": 0.7036453304931991
         },
         {
           "difficultyScore": 99,
-          "estimatedQuality": 0.6018244413467221,
-          "qualityLower": 0.5018244413467221,
-          "qualityUpper": 0.7018244413467221
+          "estimatedQuality": 0.6018244413467218,
+          "qualityLower": 0.5018244413467218,
+          "qualityUpper": 0.7018244413467217
         },
         {
           "difficultyScore": 100,
-          "estimatedQuality": 0.6001950397281006,
-          "qualityLower": 0.5001950397281006,
-          "qualityUpper": 0.7001950397281006
+          "estimatedQuality": 0.6001950397281003,
+          "qualityLower": 0.5001950397281003,
+          "qualityUpper": 0.7001950397281003
         }
       ],
       "protocol": "Responses",
@@ -7039,16 +7061,18 @@
       "modelId": "gpt-5.6-terra",
       "displayName": "GPT-5.6 Terra",
       "role": "Strong",
-      "inputPricePerMillion": 2.5,
-      "outputPricePerMillion": 15,
-      "cachedInputPricePerMillion": 0.25,
-      "effectiveInputPriceCnyPerMillion": 0.15,
-      "effectiveOutputPriceCnyPerMillion": 0.8999999999999999,
-      "effectiveCachedInputPriceCnyPerMillion": 0.015,
+      "inputPricePerMillion": 2,
+      "outputPricePerMillion": 12,
+      "cachedInputPricePerMillion": 0.2,
+      "effectiveInputPriceCnyPerMillion": 0.12,
+      "effectiveOutputPriceCnyPerMillion": 0.72,
+      "effectiveCachedInputPriceCnyPerMillion": 0.012,
       "costCurrency": "CNY",
       "costSemantics": "estimated_user_cash_cost",
       "costBasis": "current_reference_execution_profile",
+      "costBasisLabel": "Reference channel price; actual route may select another eligible profile",
       "costExecutionProfileId": "lucen-cx006-value-dynamic:gpt-5.6-terra:responses",
+      "costObservedBillingMultiplier": 0.06,
       "costProvider": "Lucen",
       "costChannel": "lucen-cx006-value-dynamic",
       "effectiveCostStatus": "estimated",
@@ -7687,7 +7711,9 @@
       "costCurrency": "CNY",
       "costSemantics": "estimated_user_cash_cost",
       "costBasis": "current_reference_execution_profile",
+      "costBasisLabel": "Reference channel price; actual route may select another eligible profile",
       "costExecutionProfileId": "lucen-mainstream-cn-claude-030:kimi-k2.6:messages",
+      "costObservedBillingMultiplier": 0.3,
       "costProvider": "Lucen",
       "costChannel": "lucen-mainstream-cn-claude-030",
       "effectiveCostStatus": "estimated",
@@ -8325,7 +8351,9 @@
       "costCurrency": "CNY",
       "costSemantics": "estimated_user_cash_cost",
       "costBasis": "current_reference_execution_profile",
+      "costBasisLabel": "Reference channel price; actual route may select another eligible profile",
       "costExecutionProfileId": "lucen-mainstream-cn-claude-030:kimi-k2.7-code:messages",
+      "costObservedBillingMultiplier": 0.3,
       "costProvider": "Lucen",
       "costChannel": "lucen-mainstream-cn-claude-030",
       "effectiveCostStatus": "estimated",
@@ -8954,19 +8982,21 @@
       "modelId": "kimi-k3",
       "displayName": "Kimi K3",
       "role": "Verified Provisional",
-      "inputPricePerMillion": 3,
-      "outputPricePerMillion": 15,
-      "cachedInputPricePerMillion": 0.3,
-      "effectiveInputPriceCnyPerMillion": 7.999999999999998,
-      "effectiveOutputPriceCnyPerMillion": 39.99999999999999,
-      "effectiveCachedInputPriceCnyPerMillion": 0.7999999999999998,
+      "inputPricePerMillion": 20,
+      "outputPricePerMillion": 100,
+      "cachedInputPricePerMillion": 2,
+      "effectiveInputPriceCnyPerMillion": 8,
+      "effectiveOutputPriceCnyPerMillion": 40,
+      "effectiveCachedInputPriceCnyPerMillion": 0.8,
       "costCurrency": "CNY",
       "costSemantics": "estimated_user_cash_cost",
       "costBasis": "current_reference_execution_profile",
+      "costBasisLabel": "Reference channel price; actual route may select another eligible profile",
       "costExecutionProfileId": "lucen-kimi-k3-openai-040:kimi-k3:responses",
+      "costObservedBillingMultiplier": 0.4,
       "costProvider": "Lucen",
       "costChannel": "lucen-kimi-k3-openai-040",
-      "effectiveCostStatus": "verified",
+      "effectiveCostStatus": "estimated",
       "curveProfile": "frontier_resilient",
       "profileConfidence": "medium",
       "curve": [
@@ -9585,7 +9615,7 @@
       "status": "routing_active",
       "healthyChannelCount": 1,
       "effectiveCostStatuses": [
-        "verified"
+        "estimated"
       ]
     }
   ],
@@ -9728,6 +9758,17 @@
       "effectiveCostStatuses": []
     },
     {
+      "modelId": "claude-fable-5",
+      "statuses": [
+        "active_messages"
+      ],
+      "healthyChannelCount": 1,
+      "temporarilyUnavailableReason": null,
+      "effectiveCostStatuses": [
+        "estimated"
+      ]
+    },
+    {
       "modelId": "gpt-5.6-sol",
       "statuses": [
         "active_responses"
@@ -9789,6 +9830,17 @@
       ]
     },
     {
+      "modelId": "kimi-k3",
+      "statuses": [
+        "active_responses"
+      ],
+      "healthyChannelCount": 1,
+      "temporarilyUnavailableReason": null,
+      "effectiveCostStatuses": [
+        "estimated"
+      ]
+    },
+    {
       "modelId": "gemini-2.5-flash",
       "statuses": [
         "active_responses"
@@ -9834,28 +9886,8 @@
       "healthyChannelCount": 0,
       "temporarilyUnavailableReason": "No active verified Channel (blocked)",
       "effectiveCostStatuses": []
-    },
-    {
-      "modelId": "claude-fable-5",
-      "statuses": [
-        "active_messages"
-      ],
-      "healthyChannelCount": 1,
-      "temporarilyUnavailableReason": null,
-      "effectiveCostStatuses": [
-        "estimated"
-      ]
-    },
-    {
-      "modelId": "kimi-k3",
-      "statuses": [
-        "active_responses"
-      ],
-      "healthyChannelCount": 1,
-      "temporarilyUnavailableReason": null,
-      "effectiveCostStatuses": [
-        "verified"
-      ]
     }
-  ]
+  ],
+  "sourceCatalogContentSha256": "6cf568756a127eff8280d57f7fe7fc3cd615c0ffb4cc1ca5407085713232519b",
+  "generatedAt": "2026-08-01"
 }

@@ -1689,9 +1689,9 @@ var BLOCKRUN_MODELS = [
     maxTokens: 4096
   },
   // ── OpenAI (GPT-5 series, need max_completion_tokens) ──
-  // GPT-5.6 prices are official list prices. The current proxy exposes no
-  // billing metadata; execution-profile preflight is the source of truth for
-  // per-Channel routing capability.
+  // Nominal prices are provider-credit prices used by ACU economics. For the
+  // Lucen account, one RMB recharge buys one USD-denominated credit, so these
+  // numeric values map one-for-one to RMB before the execution multiplier.
   {
     id: "gpt-5.6-sol",
     name: "GPT-5.6 Sol",
@@ -1710,7 +1710,7 @@ var BLOCKRUN_MODELS = [
     useMaxCompletionTokens: true,
     reasoning: true,
     input: ["text", "image"],
-    cost: { input: 2.5, output: 15, cacheRead: 0.25, cacheWrite: 2.5 },
+    cost: { input: 2, output: 12, cacheRead: 0.2, cacheWrite: 2.5 },
     contextWindow: 105e4,
     maxTokens: 128e3
   },
@@ -1721,7 +1721,7 @@ var BLOCKRUN_MODELS = [
     useMaxCompletionTokens: true,
     reasoning: true,
     input: ["text", "image"],
-    cost: { input: 1, output: 6, cacheRead: 0.1, cacheWrite: 1 },
+    cost: { input: 0.2, output: 1.2, cacheRead: 0.02, cacheWrite: 1 },
     contextWindow: 105e4,
     maxTokens: 128e3
   },
@@ -1754,7 +1754,7 @@ var BLOCKRUN_MODELS = [
     useMaxCompletionTokens: true,
     reasoning: false,
     input: ["text", "image"],
-    cost: { input: 0.75, output: 4.5, cacheRead: 0.375, cacheWrite: 0.75 },
+    cost: { input: 0.75, output: 4.5, cacheRead: 0.075, cacheWrite: 0.75 },
     contextWindow: 1048576,
     maxTokens: 32768
   },
@@ -1798,7 +1798,7 @@ var BLOCKRUN_MODELS = [
     upstream: "proxy",
     reasoning: false,
     input: ["text", "image"],
-    cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
+    cost: { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
     contextWindow: 2e5,
     maxTokens: 16384
   },
@@ -1849,7 +1849,7 @@ var BLOCKRUN_MODELS = [
     upstream: "proxy",
     reasoning: true,
     input: ["text", "image"],
-    cost: { input: 0.15, output: 0.6, cacheRead: 0.0375, cacheWrite: 0.15 },
+    cost: { input: 0.3, output: 2.5, cacheRead: 0.0375, cacheWrite: 0.15 },
     contextWindow: 1048576,
     maxTokens: 65536
   },
@@ -1920,7 +1920,7 @@ var BLOCKRUN_MODELS = [
     upstream: "proxy",
     reasoning: false,
     input: ["text"],
-    cost: { input: 0.15, output: 0.3, cacheRead: 0.07, cacheWrite: 0.15 },
+    cost: { input: 1, output: 2, cacheRead: 0.07, cacheWrite: 0.15 },
     contextWindow: 1e6,
     maxTokens: 384e3
   },
@@ -1961,7 +1961,7 @@ var BLOCKRUN_MODELS = [
     upstream: "proxy",
     reasoning: true,
     input: ["text", "image"],
-    cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3 },
+    cost: { input: 20, output: 100, cacheRead: 2, cacheWrite: 3 },
     contextWindow: 1048576,
     maxTokens: 1048576
   },
@@ -2053,7 +2053,7 @@ var BLOCKRUN_MODELS = [
     upstream: "proxy",
     reasoning: false,
     input: ["text"],
-    cost: { input: 1.2, output: 4.2, cacheRead: 0.6, cacheWrite: 1.2 },
+    cost: { input: 8, output: 28, cacheRead: 2, cacheWrite: 1.2 },
     contextWindow: 128e3,
     maxTokens: 16384
   },
@@ -4399,7 +4399,7 @@ function continuousTierProbabilities(difficulty) {
 // src/acu/catalog/model-catalog.json
 var model_catalog_default = {
   schemaVersion: "acu-model-catalog-v2",
-  generatedAt: "2026-07-31",
+  generatedAt: "2026-08-01",
   estimateLabel: "public-benchmark constrained model score",
   disclaimer: "\u9884\u8BA1\u6A21\u578B\u5F97\u5206\u7528\u4E8E\u76F8\u5BF9\u5339\u914D\u6F14\u793A\uFF0C\u4E0D\u4EE3\u8868\u9010\u8BF7\u6C42\u5B9E\u6D4B\u6210\u529F\u7387\u3002",
   config: {
@@ -4494,7 +4494,7 @@ var model_catalog_default = {
       benchmark_date: "2026-06-30"
     },
     priceAndAvailabilitySource: "src/models.ts at build-time",
-    priceAndAvailabilitySourceSha256: "105e2ceb8c9795faf9cd226bef5d703164dfc3824bfa2fc9caaf2d0c45fbfd32",
+    priceAndAvailabilitySourceSha256: "83634ef3b97fb4ab9f4a0b6ab4caa271a2fc7f0129c564158919d84dfbd99e5a",
     crossBenchmarkCaveat: "Product-demo constrained connection; not strict statistical equivalence across benchmarks.",
     phase2aCatalogSha256: "f6104c065ee8f9acb92bc96ad4c6333f8aee61bccfdccda2857cb26b94293167",
     phase2bBuilder: "scripts/build-acu-phase2b-catalog.py",
@@ -4571,7 +4571,7 @@ var model_catalog_default = {
       upstream: "proxy",
       inputPricePerMillion: 0.75,
       outputPricePerMillion: 4.5,
-      cachedInputPricePerMillion: 0.375,
+      cachedInputPricePerMillion: 0.075,
       cacheWritePricePerMillion: 0.75,
       contextWindow: 1048576,
       maxOutputTokens: 32768,
@@ -4697,10 +4697,10 @@ var model_catalog_default = {
       modelId: "claude-sonnet-5",
       displayName: "Claude Sonnet 5",
       upstream: "proxy",
-      inputPricePerMillion: 3,
-      outputPricePerMillion: 15,
-      cachedInputPricePerMillion: 0.3,
-      cacheWritePricePerMillion: 3.75,
+      inputPricePerMillion: 2,
+      outputPricePerMillion: 10,
+      cachedInputPricePerMillion: 0.2,
+      cacheWritePricePerMillion: 2.5,
       contextWindow: 2e5,
       maxOutputTokens: 16384,
       toolCallSupport: true,
@@ -4824,8 +4824,8 @@ var model_catalog_default = {
       modelId: "deepseek-v4-flash",
       displayName: "DeepSeek V4 Flash",
       upstream: "proxy",
-      inputPricePerMillion: 0.15,
-      outputPricePerMillion: 0.3,
+      inputPricePerMillion: 1,
+      outputPricePerMillion: 2,
       cachedInputPricePerMillion: 0.07,
       cacheWritePricePerMillion: 0.15,
       contextWindow: 1e6,
@@ -5483,9 +5483,9 @@ var model_catalog_default = {
       modelId: "gpt-5.6-terra",
       displayName: "GPT-5.6 Terra",
       upstream: "proxy",
-      inputPricePerMillion: 2.5,
-      outputPricePerMillion: 15,
-      cachedInputPricePerMillion: 0.25,
+      inputPricePerMillion: 2,
+      outputPricePerMillion: 12,
+      cachedInputPricePerMillion: 0.2,
       cacheWritePricePerMillion: 2.5,
       contextWindow: 105e4,
       maxOutputTokens: 128e3,
@@ -5548,9 +5548,9 @@ var model_catalog_default = {
       modelId: "gpt-5.6-luna",
       displayName: "GPT-5.6 Luna",
       upstream: "proxy",
-      inputPricePerMillion: 1,
-      outputPricePerMillion: 6,
-      cachedInputPricePerMillion: 0.1,
+      inputPricePerMillion: 0.2,
+      outputPricePerMillion: 1.2,
+      cachedInputPricePerMillion: 0.02,
       cacheWritePricePerMillion: 1,
       contextWindow: 105e4,
       maxOutputTokens: 128e3,
@@ -5613,9 +5613,9 @@ var model_catalog_default = {
       modelId: "glm-5.2",
       displayName: "GLM 5.2",
       upstream: "proxy",
-      inputPricePerMillion: 1.2,
-      outputPricePerMillion: 4.2,
-      cachedInputPricePerMillion: 0.6,
+      inputPricePerMillion: 8,
+      outputPricePerMillion: 28,
+      cachedInputPricePerMillion: 2,
       cacheWritePricePerMillion: 1.2,
       contextWindow: 128e3,
       maxOutputTokens: 16384,
@@ -5743,9 +5743,9 @@ var model_catalog_default = {
       modelId: "kimi-k3",
       displayName: "Kimi K3",
       upstream: "proxy",
-      inputPricePerMillion: 3,
-      outputPricePerMillion: 15,
-      cachedInputPricePerMillion: 0.3,
+      inputPricePerMillion: 20,
+      outputPricePerMillion: 100,
+      cachedInputPricePerMillion: 2,
       cacheWritePricePerMillion: 3,
       contextWindow: 1048576,
       maxOutputTokens: 1048576,
@@ -5809,8 +5809,8 @@ var model_catalog_default = {
       modelId: "gemini-2.5-flash",
       displayName: "Gemini 2.5 Flash",
       upstream: "proxy",
-      inputPricePerMillion: 0.15,
-      outputPricePerMillion: 0.6,
+      inputPricePerMillion: 0.3,
+      outputPricePerMillion: 2.5,
       cachedInputPricePerMillion: 0.0375,
       cacheWritePricePerMillion: 0.15,
       contextWindow: 1048576,
@@ -6125,7 +6125,8 @@ var model_catalog_default = {
       ],
       profileConfidence: "low"
     }
-  ]
+  ],
+  priceVersion: "acu-price-2026-08-01-lucen-v1"
 };
 
 // src/acu/catalog/twin-product-presets.json

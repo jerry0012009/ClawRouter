@@ -1,5 +1,5 @@
 /**
- * Model Definitions — Dual Upstream (2026-07-02 updated)
+ * Model Definitions — Dual Upstream (2026-08-01 Lucen reconciliation)
  *
  * "proxy": api.openai-proxy.org (OpenAI, Anthropic, Google, DeepSeek, Kimi, Qwen, GLM)
  * "openrouter": openrouter.ai (DeepSeek, Meta, Qwen, Grok, free models)
@@ -44,21 +44,21 @@ export const BLOCKRUN_MODELS: ExtendedModelDefinition[] = [
     cost: { input: 10, output: 30, cacheRead: 5, cacheWrite: 10 }, contextWindow: 128_000, maxTokens: 4_096 },
 
   // ── OpenAI (GPT-5 series, need max_completion_tokens) ──
-  // GPT-5.6 prices are official list prices. The current proxy exposes no
-  // billing metadata; execution-profile preflight is the source of truth for
-  // per-Channel routing capability.
+  // Nominal prices are provider-credit prices used by ACU economics. For the
+  // Lucen account, one RMB recharge buys one USD-denominated credit, so these
+  // numeric values map one-for-one to RMB before the execution multiplier.
   { id: "gpt-5.6-sol", name: "GPT-5.6 Sol", upstream: "proxy", useMaxCompletionTokens: true, reasoning: true, input: ["text", "image"],
     cost: { input: 5, output: 30, cacheRead: 0.5, cacheWrite: 5 }, contextWindow: 1_050_000, maxTokens: 128_000 },
   { id: "gpt-5.6-terra", name: "GPT-5.6 Terra", upstream: "proxy", useMaxCompletionTokens: true, reasoning: true, input: ["text", "image"],
-    cost: { input: 2.5, output: 15, cacheRead: 0.25, cacheWrite: 2.5 }, contextWindow: 1_050_000, maxTokens: 128_000 },
+    cost: { input: 2, output: 12, cacheRead: 0.2, cacheWrite: 2.5 }, contextWindow: 1_050_000, maxTokens: 128_000 },
   { id: "gpt-5.6-luna", name: "GPT-5.6 Luna", upstream: "proxy", useMaxCompletionTokens: true, reasoning: true, input: ["text", "image"],
-    cost: { input: 1, output: 6, cacheRead: 0.1, cacheWrite: 1 }, contextWindow: 1_050_000, maxTokens: 128_000 },
+    cost: { input: 0.2, output: 1.2, cacheRead: 0.02, cacheWrite: 1 }, contextWindow: 1_050_000, maxTokens: 128_000 },
   { id: "gpt-5.5", name: "GPT-5.5", upstream: "proxy", useMaxCompletionTokens: true, reasoning: true, input: ["text", "image"],
     cost: { input: 5, output: 30, cacheRead: 2.5, cacheWrite: 5 }, contextWindow: 1_048_576, maxTokens: 65_536 },
   { id: "gpt-5.4-nano", name: "GPT-5.4 Nano", upstream: "proxy", useMaxCompletionTokens: true, reasoning: false, input: ["text", "image"],
     cost: { input: 0.2, output: 1.25, cacheRead: 0.1, cacheWrite: 0.2 }, contextWindow: 1_048_576, maxTokens: 32_768 },
   { id: "gpt-5.4-mini", name: "GPT-5.4 Mini", upstream: "proxy", useMaxCompletionTokens: true, reasoning: false, input: ["text", "image"],
-    cost: { input: 0.75, output: 4.5, cacheRead: 0.375, cacheWrite: 0.75 }, contextWindow: 1_048_576, maxTokens: 32_768 },
+    cost: { input: 0.75, output: 4.5, cacheRead: 0.075, cacheWrite: 0.75 }, contextWindow: 1_048_576, maxTokens: 32_768 },
 
   // ── OpenAI Reasoning (need max_completion_tokens) ──
   { id: "o3", name: "o3", upstream: "proxy", useMaxCompletionTokens: true, reasoning: true, input: ["text", "image"],
@@ -70,7 +70,7 @@ export const BLOCKRUN_MODELS: ExtendedModelDefinition[] = [
   { id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4", upstream: "proxy", reasoning: false, input: ["text", "image"],
     cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 }, contextWindow: 200_000, maxTokens: 16_384 },
   { id: "claude-sonnet-5", name: "Claude Sonnet 5", upstream: "proxy", reasoning: false, input: ["text", "image"],
-    cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 }, contextWindow: 200_000, maxTokens: 16_384 },
+    cost: { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 }, contextWindow: 200_000, maxTokens: 16_384 },
   { id: "claude-opus-4-20250514", name: "Claude Opus 4", upstream: "proxy", reasoning: true, input: ["text", "image"],
     cost: { input: 15, output: 75, cacheRead: 1.5, cacheWrite: 18.75 }, contextWindow: 200_000, maxTokens: 32_000 },
   { id: "claude-opus-4-7", name: "Claude Opus 4.7", upstream: "proxy", reasoning: true, input: ["text", "image"],
@@ -82,7 +82,7 @@ export const BLOCKRUN_MODELS: ExtendedModelDefinition[] = [
 
   // ── Google Gemini ──
   { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", upstream: "proxy", reasoning: true, input: ["text", "image"],
-    cost: { input: 0.15, output: 0.6, cacheRead: 0.0375, cacheWrite: 0.15 }, contextWindow: 1_048_576, maxTokens: 65_536 },
+    cost: { input: 0.3, output: 2.5, cacheRead: 0.0375, cacheWrite: 0.15 }, contextWindow: 1_048_576, maxTokens: 65_536 },
   { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", upstream: "proxy", reasoning: true, input: ["text", "image"],
     cost: { input: 1.25, output: 10, cacheRead: 0.3125, cacheWrite: 1.25 }, contextWindow: 1_048_576, maxTokens: 65_536 },
   { id: "gemini-3-pro-image", name: "Gemini 3 Pro Image", upstream: "proxy", reasoning: false, input: ["text", "image"],
@@ -98,7 +98,7 @@ export const BLOCKRUN_MODELS: ExtendedModelDefinition[] = [
 
   // ── DeepSeek (via proxy) ──
   { id: "deepseek-v4-flash", name: "DeepSeek V4 Flash", upstream: "proxy", reasoning: false, input: ["text"],
-    cost: { input: 0.15, output: 0.3, cacheRead: 0.07, cacheWrite: 0.15 }, contextWindow: 1_000_000, maxTokens: 384_000 },
+    cost: { input: 1, output: 2, cacheRead: 0.07, cacheWrite: 0.15 }, contextWindow: 1_000_000, maxTokens: 384_000 },
   { id: "deepseek-v4-pro", name: "DeepSeek V4 Pro", upstream: "proxy", reasoning: true, input: ["text"],
     cost: { input: 1.8, output: 3.6, cacheRead: 0.9, cacheWrite: 1.8 }, contextWindow: 163_840, maxTokens: 163_840 },
   { id: "deepseek-v3.2", name: "DeepSeek V3.2", upstream: "proxy", reasoning: false, input: ["text"],
@@ -108,7 +108,7 @@ export const BLOCKRUN_MODELS: ExtendedModelDefinition[] = [
   { id: "kimi-k2.7-code", name: "Kimi K2.7 Code", upstream: "proxy", reasoning: false, input: ["text"],
     cost: { input: 0.95, output: 4, cacheRead: 0.475, cacheWrite: 0.95 }, contextWindow: 256_000, maxTokens: 32_768 },
   { id: "kimi-k3", name: "Kimi K3", upstream: "proxy", reasoning: true, input: ["text", "image"],
-    cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3 }, contextWindow: 1_048_576, maxTokens: 1_048_576 },
+    cost: { input: 20, output: 100, cacheRead: 2, cacheWrite: 3 }, contextWindow: 1_048_576, maxTokens: 1_048_576 },
   { id: "kimi-k2.6", name: "Kimi K2.6", upstream: "proxy", reasoning: false, input: ["text"],
     cost: { input: 0.95, output: 4, cacheRead: 0.475, cacheWrite: 0.95 }, contextWindow: 256_000, maxTokens: 32_768 },
   { id: "kimi-k2.5", name: "Kimi K2.5", upstream: "proxy", reasoning: false, input: ["text"],
@@ -130,7 +130,7 @@ export const BLOCKRUN_MODELS: ExtendedModelDefinition[] = [
 
   // ── GLM ──
   { id: "glm-5.2", name: "GLM 5.2", upstream: "proxy", reasoning: false, input: ["text"],
-    cost: { input: 1.2, output: 4.2, cacheRead: 0.6, cacheWrite: 1.2 }, contextWindow: 128_000, maxTokens: 16_384 },
+    cost: { input: 8, output: 28, cacheRead: 2, cacheWrite: 1.2 }, contextWindow: 128_000, maxTokens: 16_384 },
   { id: "glm-5.1", name: "GLM 5.1", upstream: "proxy", reasoning: false, input: ["text"],
     cost: { input: 0.9, output: 3.5, cacheRead: 0.45, cacheWrite: 0.9 }, contextWindow: 128_000, maxTokens: 16_384 },
   { id: "glm-5", name: "GLM 5", upstream: "proxy", reasoning: false, input: ["text"],

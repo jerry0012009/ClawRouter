@@ -16,7 +16,7 @@ export type ProviderAttemptHandle = {
 export type ProviderRecoveryTarget = {
   profile: AlphaExecutionProfile;
   networkEndpointIndex?: number;
-  reason: "network_endpoint_fallback" | "same_model_channel_fallback";
+  reason: "network_endpoint_fallback" | "same_model_channel_fallback" | "context_model_reroute";
 };
 
 export type BufferedProviderFailure = {
@@ -34,6 +34,7 @@ export type ProviderRecoveryOptions = {
   hasRecoveryTarget?(current: ProviderAttemptHandle): boolean;
   firstModelEventDeadlineMs?(attempt: ProviderAttemptHandle, request: NativeProviderRequest): number;
   isRecoverableResponse?(response: Response, attempt: ProviderAttemptHandle): boolean;
+  isRecoverableFailure?(failure: BufferedProviderFailure, attempt: ProviderAttemptHandle): boolean;
   startRetry(profile: AlphaExecutionProfile, attemptIndex: number, target?: ProviderRecoveryTarget): Promise<ProviderAttemptHandle>;
   recordFailedAttempt(input: {
     attempt: ProviderAttemptHandle;
@@ -47,6 +48,38 @@ export type ProviderRecoveryOptions = {
 
 export function isRecoverableProviderStatus(status: number): boolean {
   return status === 429 || (status >= 500 && status <= 599);
+}
+
+export type ContextOverflowClassification = { isContextOverflow: boolean; reportedContextLimit?: number };
+
+export function contextOverflowRecoveryEligible(input: {
+  isContextOverflow: boolean;
+  modelVisibleOutputBytes: number;
+  clientDisconnected: boolean;
+  automaticRouting: boolean;
+}): boolean {
+  return input.isContextOverflow && input.modelVisibleOutputBytes === 0
+    && !input.clientDisconnected && input.automaticRouting;
+}
+
+export function classifyProviderContextOverflow(
+  failure: Pick<BufferedProviderFailure, "body"> | string,
+): ContextOverflowClassification {
+  const raw = typeof failure === "string" ? failure : failure.body.toString("utf8");
+  let evidence = raw;
+  try {
+    const parsed = JSON.parse(raw) as { error?: { type?: unknown; code?: unknown; message?: unknown } };
+    const structured = [parsed.error?.type, parsed.error?.code, parsed.error?.message]
+      .filter((value): value is string => typeof value === "string").join(" ");
+    if (structured) evidence = structured;
+  } catch {
+    // Some Providers return plain text or HTML error bodies.
+  }
+  const isContextOverflow = /context[_ -]length[_ -]exceeded|context[_ -]window[_ -]exceeded|maximum context length|context window exceeded|prompt is too long|input exceeds the context window|too many tokens for this model/.test(evidence.toLowerCase());
+  if (!isContextOverflow) return { isContextOverflow: false };
+  const limitMatch = /(?:maximum|max(?:imum)?|limit|context window)[^0-9]{0,32}([0-9][0-9,]{3,})/i.exec(evidence);
+  const reportedContextLimit = limitMatch?.[1] ? Number(limitMatch[1].replaceAll(",", "")) : undefined;
+  return { isContextOverflow: true, reportedContextLimit: Number.isFinite(reportedContextLimit) ? reportedContextLimit : undefined };
 }
 
 export type FirstModelEventDeadlineInput = {
@@ -179,15 +212,22 @@ export function createRecoveringProviderAdapter(options: ProviderRecoveryOptions
             const remaining = Math.max(1, deadline - (Date.now() - startedAt));
             response = await waitForFirstModelEvent(response, attemptSignal, remaining, startedAt);
           }
-          const recoverable = isRecoverableProviderStatus(response.status)
+          const responseRecoverable = isRecoverableProviderStatus(response.status)
             || options.isRecoverableResponse?.(response, current) === true;
-          if (!recoverable || current.attemptIndex >= maxAttempts || request.signal.aborted) {
-            options.onRecoveryDecision?.(!recoverable ? "not_recoverable"
+          const inspectFailure = !response.ok && options.isRecoverableFailure !== undefined;
+          if ((!responseRecoverable && !inspectFailure) || current.attemptIndex >= maxAttempts || request.signal.aborted) {
+            options.onRecoveryDecision?.(!responseRecoverable && !inspectFailure ? "not_recoverable"
               : request.signal.aborted ? "client_disconnected" : "max_attempts_reached");
             options.onSelected?.(current);
             return response;
           }
           const failure = await bufferFailure(response);
+          const recoverable = responseRecoverable || options.isRecoverableFailure?.(failure, current) === true;
+          if (!recoverable) {
+            options.onRecoveryDecision?.("not_recoverable");
+            options.onSelected?.(current);
+            return new Response(new Uint8Array(failure.body), { status: failure.status, headers: failure.headers });
+          }
           recoveryTarget = options.selectRecoveryTarget?.(current, failure) ?? legacyTarget(current.profile);
           if (!recoveryTarget) {
             options.onRecoveryDecision?.("no_compatible_profile");

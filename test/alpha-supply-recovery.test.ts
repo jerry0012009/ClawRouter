@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { continuousTierProbabilities } from "../src/acu/math.js";
 import { probeBackoffMinutes } from "../src/alpha/adaptive-probe.js";
+import { deriveProbeValidation } from "../src/alpha/adaptive-probe.js";
 import { deriveRuntimeEligibility } from "../src/alpha/channel-health.js";
 import { assertSupplyProfileConservation, type ProviderModelProfileRegistry } from "../src/alpha/channel-registry.js";
 import { routeWithCurrentAcuFormula, type AlphaExecutionProfile } from "../src/alpha/routing.js";
@@ -28,6 +29,16 @@ function profile(id: string, health: AlphaExecutionProfile["health"] = "healthy"
 }
 
 describe("Supply Profile recovery", () => {
+  it.each([
+    [{ responseOk: true, validStream: true, usageTrusted: true, actualModel: undefined }, false, "actual_model_missing"],
+    [{ responseOk: true, validStream: true, usageTrusted: true, actualModel: "other-model" }, false, "actual_model_mismatch"],
+    [{ responseOk: true, validStream: true, usageTrusted: false, actualModel: "gpt-5.6-terra" }, false, "usage_untrusted"],
+    [{ responseOk: true, validStream: true, usageTrusted: true, actualModel: "gpt-5.6-terra" }, true, undefined],
+  ] as const)("requires verified actual model and usage (%o)", (input, validProbe, errorCode) => {
+    const result = deriveProbeValidation({ ...input, acceptedModels: new Set(["gpt-5.6-terra"]) });
+    expect(result.validProbe).toBe(validProbe);
+    expect(result.errorCode).toBe(errorCode);
+  });
   it("keeps all five discovered cx012 Profiles classified and out of the Active Pool", async () => {
     const registry = JSON.parse(await readFile(
       new URL("../deploy/alpha/provider-model-profiles.json", import.meta.url), "utf8",

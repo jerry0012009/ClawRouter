@@ -41,7 +41,7 @@ import {
 } from "./web-intent.js";
 import { compareWebPreference, resolveWebEligibility } from "./web-capability.js";
 import { isRecoveredSupplyProfile } from "./channel-registry.js";
-import { classifyExecutionOutcome, type RecoveryDecisionReason } from "./execution-outcome.js";
+import { classifyExecutionOutcome, costCompletenessStatus, type RecoveryDecisionReason } from "./execution-outcome.js";
 import { buildJudgeNativeContext } from "./judge-context-policy.js";
 
 const POLICY_VERSION = "alpha-p0-policy-v1";
@@ -2544,6 +2544,10 @@ export class AlphaRequestProcessor {
     const providerCostUsd = input.providerCostUsd ?? "0.0000000000";
     const billingStatus = input.billingStatus ?? (input.usageSource === "provider_usage"
       ? "provider_usage_verified" : "unknown");
+    const costStatus = costCompletenessStatus({
+      providerUsageReported: input.usageSource === "provider_usage",
+      estimated: false,
+    });
     const economics = input.context.selectedProfile.economics;
     const providerCash = economics
       ? providerCostBreakdown(economics, Number(providerCostUsd))
@@ -2709,6 +2713,8 @@ export class AlphaRequestProcessor {
         counterfactual_quality_ceiling_cost_cny: counterfactualQualityCeilingCostCny,
         usageSource: input.usageSource,
         billing_status: billingStatus,
+        costCompletenessStatus: costStatus,
+        knownCostLowerBound: costStatus === "provider_cost_unknown",
         reasoning_effort: input.context.reasoningEffort,
         routing_preference: input.context.routeSummary.routingPreference,
         mode: input.context.routeSummary.mode,

@@ -17,6 +17,13 @@ export type ExecutionOutcome = {
   healthImpact: "success" | "none" | "profile_failure" | "channel_failure";
 };
 
+export type CostCompletenessStatus = "complete" | "provider_cost_unknown" | "partially_estimated";
+
+export function costCompletenessStatus(input: { providerUsageReported: boolean; estimated: boolean }): CostCompletenessStatus {
+  if (input.providerUsageReported) return "complete";
+  return input.estimated ? "partially_estimated" : "provider_cost_unknown";
+}
+
 export type RecoveryDecisionReason =
   | "not_recoverable"
   | "output_already_visible"

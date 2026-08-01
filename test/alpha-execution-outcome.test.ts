@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { classifyExecutionOutcome } from "../src/alpha/execution-outcome.js";
+import { classifyExecutionOutcome, costCompletenessStatus } from "../src/alpha/execution-outcome.js";
 import { isRecoveredSupplyProfile } from "../src/alpha/channel-registry.js";
 import { effectiveContextCeiling } from "../src/alpha/context-admission.js";
 import { classifyAttemptOutcome } from "../src/alpha/channel-health.js";
 
 describe("Alpha execution outcome boundaries", () => {
+  it("distinguishes verified, estimated, and unknown provider cost", () => {
+    expect(costCompletenessStatus({ providerUsageReported: true, estimated: false })).toBe("complete");
+    expect(costCompletenessStatus({ providerUsageReported: false, estimated: true })).toBe("partially_estimated");
+    expect(costCompletenessStatus({ providerUsageReported: false, estimated: false })).toBe("provider_cost_unknown");
+  });
   it("does not health-fail or erase billing when a client cancels after output", () => {
     expect(classifyExecutionOutcome({
       httpStatus: 200, complete: false, clientCancelled: true, modelVisibleOutputBytes: 1024,

@@ -38,6 +38,39 @@ export function fullPoolProbeDue(input: {
   return input.userRequestsLastSixHours > 0;
 }
 
+export function deriveProbeValidation(input: {
+  responseOk: boolean;
+  validStream: boolean;
+  usageTrusted: boolean;
+  actualModel?: string;
+  acceptedModels: Set<string>;
+}): {
+  actualModelVerified: boolean;
+  actualModelMismatch: boolean;
+  validProbe: boolean;
+  errorCode?: string;
+} {
+  const actualModelVerified = typeof input.actualModel === "string"
+    && input.actualModel.length > 0
+    && input.acceptedModels.has(input.actualModel);
+  const actualModelMismatch = Boolean(input.actualModel && !actualModelVerified);
+  const errorCode = !input.actualModel
+    ? "actual_model_missing"
+    : actualModelMismatch
+      ? "actual_model_mismatch"
+      : !input.validStream
+        ? "protocol_incompatible"
+        : !input.usageTrusted
+          ? "usage_untrusted"
+          : undefined;
+  return {
+    actualModelVerified,
+    actualModelMismatch,
+    validProbe: input.responseOk && input.validStream && input.usageTrusted && actualModelVerified,
+    errorCode,
+  };
+}
+
 export type AdaptiveProbeWorkerOptions = {
   database: AlphaDatabase;
   profiles: AlphaExecutionProfile[];
@@ -324,16 +357,23 @@ export class AdaptiveProbeWorker {
       actualModel = usage.actualModel;
       usageTrusted = usage.usageSource === "provider_usage";
       const acceptedModels = new Set([profile.modelId, providerModel, ...(profile.actualModelAliases ?? [])]);
-      const actualModelMismatch = Boolean(actualModel && !acceptedModels.has(actualModel));
       const validStream = (response.headers.get("content-type") ?? "").toLowerCase().includes("text/event-stream")
         && responseBody.toString("utf8").split(/\r?\n/).some((line) => line.startsWith("data:") && line.slice(5).trim().length > 0);
+      const probeValidation = deriveProbeValidation({
+        responseOk: response.ok,
+        validStream,
+        usageTrusted,
+        actualModel,
+        acceptedModels,
+      });
       outcome = {
-        success: response.ok && validStream,
+        success: probeValidation.validProbe,
         httpStatus: response.status,
-        errorCode: response.ok && !validStream ? "protocol_incompatible" : undefined,
+        errorCode: probeValidation.errorCode,
         errorMessage: response.ok && validStream ? undefined : responseBody.toString("utf8").slice(0, 512),
         usageTrusted,
-        actualModelMismatch,
+        actualModelMismatch: probeValidation.actualModelMismatch,
+        actualModelVerified: probeValidation.actualModelVerified,
         totalLatencyMs: Date.now() - startedAt.getTime(),
       };
       if (profile.economics && usageTrusted) {
@@ -371,7 +411,10 @@ export class AdaptiveProbeWorker {
       };
     }
     const classified = classifyAttemptOutcome(outcome, channelHealth.consecutiveFailures);
-    const validProbe = classified.errorClass === "none";
+    const validProbe = classified.errorClass === "none"
+      && outcome.success
+      && outcome.usageTrusted === true
+      && outcome.actualModelVerified === true;
     const updates: Array<Promise<void>> = [];
     if (classified.scope === "channel" || validProbe) {
       updates.push(repository.saveChannelHealth({
@@ -389,7 +432,7 @@ export class AdaptiveProbeWorker {
         protocol,
         snapshot: applyAttemptOutcome(profileHealth, outcome),
         usageTrusted: classified.usageTrusted && usageTrusted && profile.usageTrusted !== false,
-        actualModelVerified: !outcome.actualModelMismatch,
+        actualModelVerified: outcome.actualModelVerified === true,
         healthReason: classified.errorClass,
       }));
     }

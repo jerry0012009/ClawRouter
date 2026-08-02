@@ -1,5 +1,22 @@
 import { describe, expect, it, vi } from "vitest";
 import { AlphaRequestProcessor, codexSelectionCorridorRequirements } from "../src/alpha/processor.js";
+import type { AlphaExecutionProfile } from "../src/alpha/routing.js";
+
+const lunaProfile: AlphaExecutionProfile = {
+  executionProfileId: "verified:gpt-5.6-luna:responses",
+  modelId: "gpt-5.6-luna",
+  provider: "verified",
+  channel: "openai",
+  protocols: ["responses"],
+  toolCallSupport: true,
+  supportedToolTypes: ["function", "custom", "local_tool"],
+  thinkingSupport: true,
+  contextWindow: 1_048_576,
+  health: "healthy",
+  enabled: true,
+  administratorAllowed: true,
+  usageTrusted: true,
+};
 
 describe("selection corridor cache", () => {
   it("uses ordinary Codex Agent tool requirements", () => {
@@ -54,5 +71,41 @@ describe("selection corridor cache", () => {
     );
     await expect(processor.selectionCorridor(20_000, 2_000)).resolves.toEqual({ ok: true });
     expect(calculate).toHaveBeenCalledTimes(2);
+  });
+
+  it("publishes enabled execution presets as candidate-identity series", async () => {
+    const processor = new AlphaRequestProcessor({} as never);
+    const internal = processor as unknown as {
+      effectiveProfiles: () => Promise<{ profiles: AlphaExecutionProfile[]; probeClaims: [] }>;
+      calculateSelectionCorridor: (inputTokens: number, outputTokens: number) => Promise<Record<string, unknown>>;
+    };
+    internal.effectiveProfiles = async () => ({ profiles: [lunaProfile], probeClaims: [] });
+
+    const result = await internal.calculateSelectionCorridor(100_000, 4_000) as {
+      executionPresetSeries: Array<{
+        candidateId: string;
+        modelId: string;
+        displayName: string;
+        executionPresetId: string;
+        reasoningEffort: string;
+        calibrationStatus: string;
+        points: Array<{ difficulty: number; estimatedQuality: number; estimatedCallCost: number }>;
+      }>;
+    };
+
+    expect(result.executionPresetSeries).toHaveLength(1);
+    expect(result.executionPresetSeries[0]).toMatchObject({
+      candidateId: "gpt-5.6-luna@max",
+      modelId: "gpt-5.6-luna",
+      displayName: "GPT-5.6 Luna · Max",
+      executionPresetId: "gpt-5.6-luna:max",
+      reasoningEffort: "max",
+      calibrationStatus: "provisional",
+    });
+    expect(result.executionPresetSeries[0]?.points).toHaveLength(51);
+    expect(result.executionPresetSeries[0]?.points.map((point) => point.difficulty)).toEqual(
+      Array.from({ length: 51 }, (_, index) => index * 2),
+    );
+    expect(result.executionPresetSeries[0]?.points.every((point) => point.estimatedCallCost > 0)).toBe(true);
   });
 });

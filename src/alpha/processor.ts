@@ -24,6 +24,7 @@ import type { TrustedNewApiIdentity } from "./trusted-identity.js";
 import { parseProviderUsage, resolveProviderBilling } from "./usage.js";
 import { buildModelCurve, getAcuModel } from "../acu/catalog.js";
 import { ACU_ROUTING_MODEL_VERSION } from "../acu/config.js";
+import { enabledExecutionPresets } from "../acu/execution-presets.js";
 import { AcuJudgeClientCancelledError, AcuJudgeContextLengthError } from "../acu/judge.js";
 import { cashCnyPerNominalUsd, providerCostBreakdown, type ProviderEconomics } from "./provider-economics.js";
 import {
@@ -652,6 +653,12 @@ export class AlphaRequestProcessor {
   private async calculateSelectionCorridor(inputTokens: number, expectedOutputTokens: number): Promise<Record<string, unknown>> {
     const { profiles } = await this.effectiveProfiles([], false);
     const preferences = ["economy", "balanced", "quality"] as const;
+    const executionPresets = enabledExecutionPresets();
+    const executionPresetPoints = new Map(executionPresets.map((preset) => [preset.candidateId, [] as Array<{
+      difficulty: number;
+      estimatedQuality: number;
+      estimatedCallCost: number;
+    }>]));
     const factors = {
       reasoningDepth: 0,
       taskScope: 0,
@@ -687,6 +694,18 @@ export class AlphaRequestProcessor {
             profiles,
             requirements: codexSelectionCorridorRequirements(inputTokens, expectedOutputTokens),
           });
+          if (preference === "balanced") {
+            for (const preset of executionPresets) {
+              const estimate = route.candidateEstimates.find((candidate) => candidate.candidateId === preset.candidateId);
+              if (estimate) {
+                executionPresetPoints.get(preset.candidateId)?.push({
+                  difficulty,
+                  estimatedQuality: estimate.estimatedQuality * 100,
+                  estimatedCallCost: estimate.estimatedCallCost,
+                });
+              }
+            }
+          }
           const selectedUtility = route.recommendation.recommended.valueUtility;
           const candidates = [...route.candidateEstimates]
             .filter((candidate) => candidate.paretoEfficient && (
@@ -740,6 +759,15 @@ export class AlphaRequestProcessor {
         currentHealthApplied: true,
         candidateDefinition: "selected_and_near_optimal_pareto_within_15pct_value",
       },
+      executionPresetSeries: executionPresets.map((preset) => ({
+        candidateId: preset.candidateId,
+        modelId: preset.modelId,
+        displayName: preset.displayName,
+        executionPresetId: preset.presetId,
+        reasoningEffort: preset.canonicalReasoningEffort,
+        calibrationStatus: preset.calibrationStatus,
+        points: executionPresetPoints.get(preset.candidateId) ?? [],
+      })),
       series,
     };
   }

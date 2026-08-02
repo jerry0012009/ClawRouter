@@ -42,10 +42,11 @@ Current founder-confirmed conversions at the 2026-08-02 reconciliation:
 | --- | --- | ---: |
 | Lucen | CNY 1 for 1 credit | 1 CNY/credit |
 | BlackAI | CNY 140 for 1000 web credits | 0.14 CNY/credit |
-| CloseAI | Existing deployment value only until account ledger refresh | 7.2 CNY/credit |
+| CloseAI | USD base price x 1.5 service multiplier x 7.2 CNY/USD | 10.8 CNY per nominal USD |
 
-Do not relabel an existing CloseAI conversion as newly ledger-verified when
-login is blocked.
+For CloseAI, `1 CNY cash = 1 CNY account balance`; `7.2/1` models the USD base
+price conversion, while `1.5` is the explicit ordinary-row service multiplier.
+This verifies public list-price conversion, not per-request cache amounts.
 
 ## API Fields
 
@@ -87,6 +88,20 @@ CloseAI currently uses `/api/v1/account/usage/detail` and
 `prompt_price`, `completion_price`, optional `price_detail`, and
 `pricing_factor`. Treat these as CloseAI channel prices, not first-party vendor
 prices.
+
+For a saved rendered pricing page:
+
+1. Keep the HTML outside git and calculate its SHA-256.
+2. Produce a compact JSON snapshot with source URL, capture time, HTML SHA-256,
+   coverage, field legend, settlement semantics, limitations, and unique model
+   rows.
+3. Preserve displayed base price, all displayed values, explicit multiplier,
+   unit, status tags, and promotion label. Do not infer `1.5` when a promotion
+   row omits it.
+4. Commit only the compact snapshot under `reports/provider-pricing/` and
+   verify its recorded HTML SHA-256 against the temporary HTML.
+5. Apply overrides only to existing CloseAI execution profiles whose explicit
+   non-promotional page base price differs from the official catalog.
 
 ## Reconciliation Rules
 

@@ -35,6 +35,8 @@ provider-wide multiplier.
    user agents, request bodies, or request IDs.
 3. Capture the official public-price source manifest separately. Distinguish
    first-party vendor pages from provider/channel directories.
+   For CloseAI saved-page refreshes, keep raw HTML out of git and follow the
+   compact snapshot procedure in `references/billing-method.md`.
 4. Normalize each row into model, provider model, route group, token counts,
    component costs, `total_cost`, `actual_cost`, and `rate_multiplier`.
 5. Calculate a component price only when its token count and cost are positive:
@@ -88,6 +90,17 @@ node scripts/build-provider-billing-evidence.mjs \
   blackai=/tmp/black-ledger-sanitized.json \
   --output reports/provider-billing-evidence-YYYYMMDD.json
 ```
+
+Validate a CloseAI saved-page snapshot before using it:
+
+```bash
+python3 skills/lucen-billing-reconciliation/scripts/validate_closeai_snapshot.py \
+  --snapshot reports/provider-pricing/closeai-public-pricing-YYYYMMDD.json \
+  --html /tmp/closeai-pricing.html
+```
+
+The HTML is optional for later repository-only audits, but required while
+creating a new snapshot so its SHA-256 can be verified before deletion.
 
 Then regenerate and verify:
 

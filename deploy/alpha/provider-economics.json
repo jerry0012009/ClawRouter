@@ -49,15 +49,15 @@
       "balanceCurrency": "USD-denominated credits",
       "rechargeCashCny": 7.2,
       "creditsReceivedUsd": 1,
-      "observedBillingMultiplier": 1,
-      "priceSource": "deployed versioned ACU catalog acu-catalog-v0.1; account model directory observed 2026-07-29",
-      "priceObservedAt": "2026-07-29T00:00:00Z",
+      "observedBillingMultiplier": 1.5,
+      "priceSource": "CloseAI saved public pricing page captured 2026-08-02; ordinary rows display USD base prices with an explicit 1.5x service multiplier",
+      "priceObservedAt": "2026-08-02T02:14:15Z",
       "health": "healthy",
       "priority": 30,
       "enabled": true,
       "effectiveCostStatus": "verified",
-      "effectiveCostSource": "deployment operator USD/CNY settlement reference ACU_TEST_USD_TO_CNY=7.2",
-      "effectiveCostVersion": "closeai-deployment-fx-20260729-v1"
+      "effectiveCostSource": "2026-08-02 saved CloseAI pricing page: displayed USD base price times explicit 1.5 service multiplier times 7.2 CNY/USD; account settles against CNY balance and user-supplied bill sample agrees; per-request cache amounts remain unverified",
+      "effectiveCostVersion": "closeai-public-price-cny-settlement-20260802-v1"
     }
   ]
 }

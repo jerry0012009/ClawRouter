@@ -51,8 +51,8 @@ describe("Provider Economics and v0.3 Provider selection", () => {
   });
 
   it("converts Judge nominal USD with the configured CloseAI cash settlement", () => {
-    expect(cashCnyPerNominalUsd(closeai)).toBe(7.2);
-    expect(0.00124605 * cashCnyPerNominalUsd(closeai)).toBeCloseTo(0.00897156, 10);
+    expect(cashCnyPerNominalUsd(closeai)).toBe(10.8);
+    expect(0.00124605 * cashCnyPerNominalUsd(closeai)).toBeCloseTo(0.01345734, 10);
   });
 
   it("deduplicates model quality and selects the lower healthy effective-cash Provider", () => {

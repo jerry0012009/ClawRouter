@@ -5707,7 +5707,15 @@
     "contextCapabilityStatus": "provider_capped",
     "contextCapabilitySource": "legacy_profile_declared_hard_cap",
     "contextLastVerifiedAt": null,
-    "reasoningControlMode": "none"
+    "reasoningControlMode": "none",
+    "billingPrice": {
+      "inputPricePerMillion": 3,
+      "outputPricePerMillion": 15,
+      "currency": "USD_CREDIT",
+      "source": "CloseAI saved public pricing page; ordinary row displays USD base price with explicit 1.5x service multiplier",
+      "observedAt": "2026-08-02T02:14:15Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "closeai-gpt-5.4-mini-messages-economy",

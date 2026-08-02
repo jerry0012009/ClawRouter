@@ -61,6 +61,6 @@ Material shared-catalog corrections include OpenAI `o3` from `10/40` to `2/8`, G
 
 ## CloseAI status
 
-The public frontend states that model prices use official USD base prices plus a plan/model service factor. Its model directory and account usage APIs require authentication. The normal login precheck from this execution environment returned `country=FR, allow=false` and then required human verification. No region or CAPTCHA bypass was attempted.
+The saved 2026-08-02 CloseAI pricing page was later supplied with a byte-linked compact snapshot at `reports/provider-pricing/closeai-public-pricing-20260802.json`. It verifies that ordinary rows display USD base prices with an explicit `1.5x` service multiplier. Account settlement is `1 CNY cash = 1 CNY balance`, so the effective cash formula is `displayed USD base price * 1.5 * 7.2 CNY/USD`, or `10.8 CNY` per nominal USD.
 
-CloseAI's existing `7.2 CNY/credit` deployment economics therefore remain unchanged and are not relabelled as newly ledger-verified. Its account-specific model factors and usage ledger need a normal session from an allowed region before execution-profile overrides can be added.
+This evidence verifies the public list price, RMB conversion, and ordinary-row service multiplier. It does not verify per-request cache read/write amounts. Promotion rows without an explicit multiplier do not inherit `1.5`. Only existing CloseAI execution profiles may receive a base-price override, and only where the explicit non-promotional page price differs from the official catalog.

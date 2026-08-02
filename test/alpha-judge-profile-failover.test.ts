@@ -33,12 +33,12 @@ describe("Luna Judge Profile selector", () => {
     expect(judgeProfileAttemptDeadline({ now: 20_000, globalDeadlineAt: 26_000, profilesRemaining: 0 })).toBe(26_000);
   });
 
-  it("prefers Lucen and never includes other models", () => {
+  it("uses the shared score and only uses preferred Profile as a tie-breaker", () => {
     const selected = getEligibleLunaJudgeProfiles({
       preferredProfileId: "lucen-cx006-value-dynamic:gpt-5.6-luna:responses",
       profiles: [
-        profile("blackai:gpt-5.6-luna:responses", { provider: "blackai" }),
-        profile("lucen-cx006-value-dynamic:gpt-5.6-luna:responses"),
+        profile("blackai:gpt-5.6-luna:responses", { provider: "blackai", observedLatencyMs: 20 }),
+        profile("lucen-cx006-value-dynamic:gpt-5.6-luna:responses", { observedLatencyMs: 600_000 }),
         profile("sol:gpt-5.6-luna:responses", { modelId: "gpt-5.6-luna", providerModelId: "gpt-5.6-luna" }),
         profile("rejected:gpt-5.6-luna:responses", { verificationStatus: "rejected" }),
         profile("inactive:gpt-5.6-luna:responses", { autoRouteEnabled: false }),
@@ -48,10 +48,19 @@ describe("Luna Judge Profile selector", () => {
       maxProfiles: 3,
     });
     expect(selected.map((item) => item.executionProfileId)).toEqual([
-      "lucen-cx006-value-dynamic:gpt-5.6-luna:responses",
-      "blackai:gpt-5.6-luna:responses",
       "sol:gpt-5.6-luna:responses",
+      "blackai:gpt-5.6-luna:responses",
+      "lucen-cx006-value-dynamic:gpt-5.6-luna:responses",
     ]);
+  });
+
+  it("uses preferredProfileId only when shared scores are equal", () => {
+    const selected = getEligibleLunaJudgeProfiles({
+      profiles: [profile("a"), profile("b")],
+      preferredProfileId: "b",
+      requiredContextTokens: 100,
+    });
+    expect(selected.map((item) => item.executionProfileId)).toEqual(["b", "a"]);
   });
 
   it("fails over from preferred Lucen to another Luna without cross-model backup", async () => {
@@ -102,6 +111,37 @@ describe("Luna Judge Profile selector", () => {
     expect(result.attempts.map((attempt) => attempt.model)).toEqual(["gpt-5.6-luna", "gpt-5.6-luna"]);
   });
 
+  it.each([
+    ["timeout", () => Promise.reject(new DOMException("timed out", "AbortError")), "transport_failure"],
+    ["429", () => new Response("rate limited", { status: 429 }), "transport_failure"],
+    ["503", () => new Response("unavailable", { status: 503 }), "transport_failure"],
+    ["html", () => new Response("<!doctype html><html></html>", { status: 200, headers: { "content-type": "text/html" } }), "provider_protocol_failure"],
+  ])("writes shared health for %s", async (_name, response, failureLayer) => {
+    const selected = profile("selected");
+    const config = readAcuRuntimeConfig({
+      allowMock: true, apiKey: "fixture", judgeModel: selected.modelId,
+      judgeBaseUrl: "https://example.invalid/v1", judgeProtocol: "responses",
+      cachePath: `/tmp/judge-health-${randomUUID()}.json`, syncBackupEnabled: false,
+    });
+    const outcomes: Array<{ success: boolean; errorCode?: string; httpStatus?: number }> = [];
+    const runner = createAcuJudgeRunner({
+      config, profiles: [selected],
+      profileClients: new Map([[selected.executionProfileId, new AcuJudgeClient(config, async () => response() as Awaited<ReturnType<typeof fetch>>)] ]),
+      recordHealthOutcome: async (_profile, outcome) => {
+        outcomes.push(outcome);
+        return { errorClass: String(outcome.errorCode), scope: "profile" };
+      },
+      rulesDecision: { model: "rules", tier: "MEDIUM", confidence: 1, method: "rules", reasoning: "fixture", costEstimate: 0, baselineCost: 0, savings: 0 },
+    });
+    const result = await runner.run({
+      messages: [], tools: [], trigger: "new_task", contextHash: "fixture",
+      webIntentFallbackInput: { recentUserInputs: ["fixture"] },
+      rawNative: { stateMetadata: {}, rawRequest: "{}" },
+    });
+    expect(outcomes).toHaveLength(1);
+    expect(result.attempts[0]).toMatchObject({ failureLayer, healthOutcomeApplied: true, healthOutcomeScope: "profile" });
+  });
+
   it("excludes unhealthy, untrusted and context-ineligible Profiles", () => {
     const selected = getEligibleLunaJudgeProfiles({
       profiles: [
@@ -113,5 +153,39 @@ describe("Luna Judge Profile selector", () => {
       requiredContextTokens: 66_000,
     });
     expect(selected.map((item) => item.executionProfileId)).toEqual(["healthy"]);
+  });
+
+  it("writes a successful Judge attempt to shared health", async () => {
+    const selected = profile("selected");
+    const config = readAcuRuntimeConfig({
+      allowMock: true, apiKey: "fixture", judgeProtocol: "responses",
+      cachePath: `/tmp/judge-success-${randomUUID()}.json`, syncBackupEnabled: false,
+    });
+    const valid = {
+      difficulty_score_raw: 42,
+      factors: { reasoning_depth: 4, task_scope: 4, constraint_density: 4, tool_dependency: 4, verification_burden: 4, context_burden: 4 },
+      p_low: 0.1, p_mid: 0.7, p_mid_high: 0.15, p_high: 0.05, confidence: 0.9,
+      signals: [], explanation: "fixture", webIntent: "not_required", webIntentConfidence: 1,
+      webIntentReason: "local", webIntentEvidence: [],
+    };
+    const client = new AcuJudgeClient(config, async () => new Response(JSON.stringify({
+      model: "gpt-5.6-luna", output: [{ content: [{ type: "output_text", text: JSON.stringify(valid) }] }],
+      usage: { input_tokens: 100, output_tokens: 20 },
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    const outcomes: Array<{ success: boolean }> = [];
+    const result = await createAcuJudgeRunner({
+      config, profiles: [selected], profileClients: new Map([[selected.executionProfileId, client]]),
+      recordHealthOutcome: async (_profile, outcome) => {
+        outcomes.push(outcome);
+        return { errorClass: "none", scope: "none" };
+      },
+      rulesDecision: { model: "rules", tier: "MEDIUM", confidence: 1, method: "rules", reasoning: "fixture", costEstimate: 0, baselineCost: 0, savings: 0 },
+    }).run({
+      messages: [], tools: [], trigger: "new_task", contextHash: "fixture",
+      webIntentFallbackInput: { recentUserInputs: ["fixture"] },
+      rawNative: { stateMetadata: {}, rawRequest: "{}" },
+    });
+    expect(outcomes).toEqual([{ success: true, httpStatus: 200, usageTrusted: true, actualModelVerified: true, totalLatencyMs: expect.any(Number) }]);
+    expect(result.attempts[0]).toMatchObject({ status: "success", healthOutcomeApplied: true, healthOutcomeScope: "none" });
   });
 });

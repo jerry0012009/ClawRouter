@@ -285,13 +285,32 @@ function webReliabilityFactor(profile: AlphaExecutionProfile, requirements: Alph
   return 1;
 }
 
-function effectiveProviderSelectionScore(
+export function effectiveProviderSelectionScore(
   profile: AlphaExecutionProfile,
   requirements: AlphaRouteRequirements,
   inputTokens: number,
   outputTokens: number,
 ): number {
   return providerSelectionScore(profile, inputTokens, outputTokens) * webReliabilityFactor(profile, requirements);
+}
+
+export function compareExecutionProfiles(
+  left: AlphaExecutionProfile,
+  right: AlphaExecutionProfile,
+  inputTokens: number,
+  outputTokens: number,
+  requirements: AlphaRouteRequirements = {
+    protocol: "responses", requireTools: false, requireThinking: false,
+  },
+  preferredProfileId?: string,
+): number {
+  const scoreDifference = effectiveProviderSelectionScore(left, requirements, inputTokens, outputTokens)
+    - effectiveProviderSelectionScore(right, requirements, inputTokens, outputTokens);
+  if (scoreDifference !== 0) return scoreDifference;
+  const leftPreferred = left.executionProfileId === preferredProfileId;
+  const rightPreferred = right.executionProfileId === preferredProfileId;
+  if (leftPreferred !== rightPreferred) return leftPreferred ? -1 : 1;
+  return left.executionProfileId.localeCompare(right.executionProfileId);
 }
 
 function exclusionReasons(

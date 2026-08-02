@@ -35,7 +35,8 @@ import {
   type ProviderAttemptHandle,
   type ProviderRecoveryTarget,
 } from "./execution.js";
-import { applyAttemptOutcome, classifyAttemptOutcome, deriveRuntimeEligibility, type AttemptOutcome, type HealthSnapshot } from "./channel-health.js";
+import { classifyAttemptOutcome, deriveRuntimeEligibility, type AttemptOutcome } from "./channel-health.js";
+import { recordSharedRuntimeHealthOutcome } from "./runtime-health-outcome.js";
 import { estimateContextAdmission, effectiveContextCeiling } from "./context-admission.js";
 import {
   classifyWebIntentFallback,
@@ -1610,6 +1611,10 @@ export class AlphaRequestProcessor {
               httpStatus: attempt.httpStatus,
               upstreamRequestId: attempt.upstreamRequestId,
               errorCategory: attempt.errorCategory,
+              failureLayer: attempt.failureLayer,
+              responseContentType: attempt.responseContentType,
+              providerEnvelopeValid: attempt.providerEnvelopeValid,
+              assistantTextExtracted: attempt.assistantTextExtracted,
               parserExceptionType: attempt.parserExceptionType,
               parserExceptionMessage: attempt.parserExceptionMessage,
               promptTokens: attempt.promptTokens,
@@ -1620,6 +1625,10 @@ export class AlphaRequestProcessor {
               backupTriggered: attempt.role === "primary"
                 && judge.attempts.some((candidate) => candidate.role === "backup"),
               backupReason: attempt.backupReason,
+              executionProfileId: attempt.executionProfileId,
+              channel: attempt.channel,
+              healthOutcomeApplied: attempt.healthOutcomeApplied,
+              healthOutcomeScope: attempt.healthOutcomeScope,
             },
           });
         }
@@ -2004,56 +2013,13 @@ export class AlphaRequestProcessor {
     scope: "none" | "channel" | "profile";
     cooldownUntil?: Date;
   }> {
-    const repository = new AlphaRepository(this.options.database);
-    const channelId = profile.channelId ?? profile.channel;
-    const [channelCurrent, profileCurrent] = await Promise.all([
-      repository.channelHealth(channelId),
-      repository.profileHealth(profile.executionProfileId),
-    ]);
-    let classified = classifyAttemptOutcome(outcome, profileCurrent?.consecutiveFailures ?? 0);
-    if (classified.scope === "channel") {
-      classified = classifyAttemptOutcome(outcome, channelCurrent?.consecutiveFailures ?? 0);
-    }
-    const initial = (): HealthSnapshot => ({ state: "healthy", consecutiveFailures: 0, recentSuccessRate: 1 });
-    const attemptedAt = outcome.attemptedAt ?? new Date();
-    const channelWasBlocked = ["open", "half_open"].includes(channelCurrent?.state ?? "");
-    if (classified.scope === "channel" || (outcome.success && channelWasBlocked)) {
-      const current = channelCurrent ?? initial();
-      await repository.saveChannelHealth({ channelId, providerId: profile.provider,
-        snapshot: applyAttemptOutcome(current, outcome, attemptedAt) });
-    }
-    if (classified.scope === "profile" || outcome.success) {
-      const current = profileCurrent ?? initial();
-      const snapshot = applyAttemptOutcome(current, outcome, attemptedAt);
-      await repository.saveProfileHealth({
-        executionProfileId: profile.executionProfileId,
-        channelId,
-        providerId: profile.provider,
-        canonicalModelId: profile.modelId,
-        protocol,
-        snapshot,
-        usageTrusted: outcome.success
-          ? outcome.usageTrusted === true
-          : classified.usageTrusted && (profileCurrent?.usageTrusted ?? profile.usageTrusted !== false),
-        actualModelVerified: outcome.actualModelVerified
-          ?? (outcome.actualModelMismatch || outcome.errorCode === "actual_model_missing"
-            ? false : profileCurrent?.actualModelVerified ?? true),
-        healthReason: classified.errorClass,
-      });
-    }
-    if (!outcome.success && classified.scope !== "none") {
-      await repository.enqueueProfileProbe(profile.executionProfileId);
-      if (classified.scope === "profile") {
-        await repository.deleteProfileProbeIfRecovered(profile.executionProfileId);
-      }
-      this.options.wakeProbe?.();
-    } else if (outcome.success) {
-      await repository.deleteProfileProbeIfRecovered(profile.executionProfileId);
-    }
-    const persisted = classified.scope === "profile"
-      ? await repository.profileHealth(profile.executionProfileId)
-      : await repository.channelHealth(channelId);
-    return { errorClass: classified.errorClass, scope: classified.scope, cooldownUntil: persisted?.cooldownUntil };
+    return recordSharedRuntimeHealthOutcome({
+      repository: new AlphaRepository(this.options.database),
+      profile,
+      protocol,
+      outcome,
+      wakeProbe: this.options.wakeProbe,
+    });
   }
 
   private async recordProviderFailure(input: {

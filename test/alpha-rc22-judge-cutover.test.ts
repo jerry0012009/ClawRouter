@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { AcuJudgeClient, parseJudgeResult } from "../src/acu/judge.js";
 import { readAcuRuntimeConfig } from "../src/acu/config.js";
 import { createAcuJudgeRunner } from "../src/alpha/judge-runner.js";
+import type { AlphaExecutionProfile } from "../src/alpha/routing.js";
 
 const validJudgePayload = {
   difficulty_score_raw: 42,
@@ -26,6 +27,15 @@ const validJudgePayload = {
   webIntentReason: "The task only needs the local workspace.",
   webIntentEvidence: ["local_or_code_context"],
 };
+
+function profileFixture(): AlphaExecutionProfile {
+  return {
+    executionProfileId: "judge-profile", modelId: "gpt-5.6-luna", providerModelId: "gpt-5.6-luna",
+    provider: "fixture", channel: "fixture", protocols: ["responses"], toolCallSupport: true,
+    thinkingSupport: true, health: "healthy", enabled: true, administratorAllowed: true,
+    autoRouteEnabled: true, usageTrusted: true,
+  };
+}
 
 function judgeResponse(overrides: Record<string, unknown> = {}): Response {
   return new Response(JSON.stringify({
@@ -237,13 +247,64 @@ describe("RC2.2 Judge cutover", () => {
     expect(backupFetch).not.toHaveBeenCalled();
     expect(result.status).toBe("rules_fallback");
     expect(result.attempts[0]).toMatchObject({
-      errorCategory: "invalid_response",
+      errorCategory: "provider_protocol_failure",
+      failureLayer: "provider_protocol_failure",
+      providerEnvelopeValid: false,
+      assistantTextExtracted: false,
       rawResponseBody: raw,
-      parserExceptionType: "SyntaxError",
+      parserExceptionType: "JudgeProviderProtocolError",
       backupEligible: true,
-      backupReason: "primary_schema_or_json_invalid",
+      backupReason: "primary_provider_protocol_invalid",
     });
     expect(result.attempts[0].parserExceptionMessage).toMatch(/JSON/);
+  });
+
+  it("uses the Responses endpoint and parses a Responses envelope", async () => {
+    let requestedUrl = "";
+    let posted: Record<string, unknown> = {};
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (url, init) => {
+      requestedUrl = String(url);
+      posted = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return new Response(JSON.stringify({
+        id: "response-fixture", model: "gpt-5.6-luna",
+        output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(validJudgePayload) }] }],
+        usage: { input_tokens: 100, output_tokens: 20, input_tokens_details: { cached_tokens: 5 } },
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    });
+    const client = new AcuJudgeClient({ ...config(), judgeProtocol: "responses" }, fetchMock);
+    const result = await client.judge([], [], true, { stateMetadata: {}, rawRequest: "{}" });
+    expect(requestedUrl.endsWith("/responses")).toBe(true);
+    expect(posted).toHaveProperty("input");
+    expect(posted).not.toHaveProperty("response_format");
+    expect(result.result.difficultyScoreRaw).toBe(validJudgePayload.difficulty_score_raw);
+    expect(result.cachedPromptTokens).toBe(5);
+  });
+
+  it.each([
+    ["fenced", `\`\`\`json\n${JSON.stringify(validJudgePayload)}\n\`\`\``],
+    ["surrounded", `Judge result follows:\n${JSON.stringify(validJudgePayload)}\nDone.`],
+  ])("deterministically extracts %s Judge JSON", (_name, content) => {
+    expect(parseJudgeResult(content).difficultyScoreRaw).toBe(validJudgePayload.difficulty_score_raw);
+  });
+
+  it("classifies valid envelope with invalid Assistant JSON as semantic without health write", async () => {
+    const selected = profileFixture();
+    const configValue = { ...config(), judgeProtocol: "responses" as const };
+    const health = vi.fn();
+    const client = new AcuJudgeClient(configValue, async () => new Response(JSON.stringify({
+      model: "gpt-5.6-luna", output: [{ content: [{ type: "output_text", text: "not judge json" }] }],
+      usage: { input_tokens: 10, output_tokens: 4 },
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    const result = await createAcuJudgeRunner({
+      config: configValue, profiles: [selected], profileClients: new Map([[selected.executionProfileId, client]]),
+      recordHealthOutcome: health,
+      rulesDecision: { model: "rules", tier: "MEDIUM", confidence: 1, method: "rules", reasoning: "fixture", costEstimate: 0, baselineCost: 0, savings: 0 },
+    }).run(runInput);
+    expect(result.attempts[0]).toMatchObject({
+      failureLayer: "judge_semantic_parse_failure", providerEnvelopeValid: true,
+      assistantTextExtracted: true, healthOutcomeApplied: false, healthOutcomeScope: "none",
+    });
+    expect(health).not.toHaveBeenCalled();
   });
 
   it.each([

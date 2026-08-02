@@ -100,6 +100,10 @@ export type JudgeAttemptFailure = {
   rawRequestBytes: number;
   rawRequestTokenEstimate: number;
   judgeContextLimit: number;
+  failureLayer: "transport_failure" | "provider_protocol_failure" | "judge_semantic_parse_failure";
+  responseContentType?: string;
+  providerEnvelopeValid: boolean;
+  assistantTextExtracted: boolean;
 };
 
 export class AcuJudgeAttemptError extends Error {
@@ -107,6 +111,31 @@ export class AcuJudgeAttemptError extends Error {
     super(message);
     this.name = "AcuJudgeAttemptError";
   }
+}
+
+class JudgeProviderProtocolError extends Error {
+  override name = "JudgeProviderProtocolError";
+}
+class JudgeSemanticParseError extends Error {
+  override name = "JudgeSemanticParseError";
+}
+
+function looksLikeHtml(body: string, contentType: string): boolean {
+  return /text\/html/i.test(contentType) || /^\s*(?:<!doctype\s+html|<html\b)/i.test(body);
+}
+
+function extractResponsesAssistantText(payload: Record<string, unknown>): string | undefined {
+  const output = Array.isArray(payload.output) ? payload.output : [];
+  const text = output.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const content = Array.isArray((item as { content?: unknown }).content)
+      ? (item as { content: unknown[] }).content : [];
+    return content.flatMap((part) => part && typeof part === "object"
+      && (part as { type?: unknown }).type === "output_text"
+      && typeof (part as { text?: unknown }).text === "string"
+      ? [(part as { text: string }).text] : []);
+  }).join("");
+  return text || undefined;
 }
 
 export function judgeNominalCostUsd(
@@ -252,11 +281,46 @@ export function buildJudgeSystemPrompt(): string {
 }
 
 function extractJson(text: string): Record<string, unknown> {
-  const cleaned = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
-  const start = cleaned.indexOf("{");
-  const end = cleaned.lastIndexOf("}");
-  if (start < 0 || end <= start) throw new Error("Judge response does not contain a JSON object");
-  const parsed = JSON.parse(cleaned.slice(start, end + 1)) as unknown;
+  const raw = text.trim();
+  const candidates = [raw];
+  const fenced = raw.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i)?.[1];
+  if (fenced !== undefined) candidates.push(fenced.trim());
+  let objectText: string | undefined;
+  for (const candidate of candidates) {
+    try {
+      const direct = JSON.parse(candidate) as unknown;
+      if (direct && typeof direct === "object" && !Array.isArray(direct)) return direct as Record<string, unknown>;
+    } catch {
+      // Continue with deterministic object extraction.
+    }
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    let start = -1;
+    for (let index = 0; index < candidate.length; index += 1) {
+      const character = candidate[index];
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (character === "\\") escaped = true;
+        else if (character === '"') inString = false;
+        continue;
+      }
+      if (character === '"') inString = true;
+      else if (character === "{") {
+        if (depth === 0) start = index;
+        depth += 1;
+      } else if (character === "}" && depth > 0) {
+        depth -= 1;
+        if (depth === 0 && start >= 0) {
+          objectText = candidate.slice(start, index + 1);
+          break;
+        }
+      }
+    }
+    if (objectText) break;
+  }
+  if (!objectText) throw new SyntaxError("Judge response does not contain a complete JSON object");
+  const parsed = JSON.parse(objectText) as unknown;
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Judge response JSON must be an object");
   return parsed as Record<string, unknown>;
 }
@@ -512,30 +576,44 @@ export class AcuJudgeClient {
         id?: string;
         model?: string;
         choices?: Array<{ message?: { content?: string } }>;
+        output?: Array<{ content?: Array<{ type?: string; text?: string }> }>;
         usage?: {
           prompt_tokens?: number;
           completion_tokens?: number;
           prompt_tokens_details?: { cached_tokens?: number };
+          input_tokens?: number;
+          output_tokens?: number;
+          input_tokens_details?: { cached_tokens?: number };
         };
       } | undefined;
       let response: Response | undefined;
       let rawResponseBody = "";
+      let responseContentType = "";
+      let providerEnvelopeValid = false;
+      let assistantTextExtracted = false;
       try {
-        response = await this.fetchImplementation(`${this.config.judgeBaseUrl.replace(/\/$/, "")}/chat/completions`, {
+        const useResponses = this.config.judgeProtocol === "responses";
+        const systemPrompt = buildJudgeSystemPrompt();
+        const userPrompt = `当前API上下文：\n${truncated.text}`;
+        response = await this.fetchImplementation(`${this.config.judgeBaseUrl.replace(/\/$/, "")}/${useResponses ? "responses" : "chat/completions"}`, {
           method: "POST",
           headers: { Authorization: `Bearer ${this.config.apiKey}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
+          body: JSON.stringify(useResponses ? {
             model: this.config.judgeModel,
-            messages: [
-              { role: "system", content: buildJudgeSystemPrompt() },
-              { role: "user", content: `当前API上下文：\n${truncated.text}` },
-            ],
+            instructions: systemPrompt,
+            input: [{ role: "user", content: [{ type: "input_text", text: userPrompt }] }],
+            max_output_tokens: Math.min(300, this.config.maxOutputTokens),
+            stream: false,
+          } : {
+            model: this.config.judgeModel,
+            messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
             temperature: 0, max_tokens: Math.min(300, this.config.maxOutputTokens), response_format: { type: "json_object" },
             thinking: { type: "disabled" }, stream: false,
           }),
           signal: clientSignal ? AbortSignal.any([controller.signal, clientSignal]) : controller.signal,
         });
         if (firstByteTimeout) clearTimeout(firstByteTimeout);
+        responseContentType = response.headers.get("content-type") ?? "";
         rawResponseBody = await response.text();
         if (!response.ok) {
           const isContextError = upstreamContextError(response.status, rawResponseBody);
@@ -554,21 +632,42 @@ export class AcuJudgeClient {
                 ? "primary_server_error" : "http_status_not_backup_eligible",
             responseHeaders: responseHeaders(response.headers), rawResponseBody,
             contextSha256, contextTokenEstimate, rawRequestBytes, rawRequestTokenEstimate, judgeContextLimit,
+            failureLayer: "transport_failure", responseContentType,
+            providerEnvelopeValid: false, assistantTextExtracted: false,
           });
         }
-        payload = JSON.parse(rawResponseBody) as NonNullable<typeof payload>;
-        if (!payload) throw new Error("ACU Judge returned an invalid JSON payload");
-        if (payload?.model && payload.model !== this.config.judgeModel) {
-          throw new Error(`ACU Judge actual model mismatch: ${payload.model}`);
+        if (looksLikeHtml(rawResponseBody, responseContentType)) {
+          throw new JudgeProviderProtocolError("ACU Judge returned HTML instead of a provider envelope");
         }
-        const content = payload?.choices?.[0]?.message?.content;
-        if (!content) throw new Error("ACU Judge returned no content");
-        const result = parseJudgeResult(content);
-        const usageStatus = payload.usage?.prompt_tokens !== undefined && payload.usage?.completion_tokens !== undefined
+        try {
+          payload = JSON.parse(rawResponseBody) as NonNullable<typeof payload>;
+        } catch {
+          throw new JudgeProviderProtocolError("ACU Judge returned an invalid JSON provider envelope");
+        }
+        if (!payload || typeof payload !== "object") throw new JudgeProviderProtocolError("ACU Judge returned an invalid provider envelope");
+        if (payload?.model && payload.model !== this.config.judgeModel) {
+          throw new JudgeProviderProtocolError(`ACU Judge actual model mismatch: ${payload.model}`);
+        }
+        const content = useResponses
+          ? extractResponsesAssistantText(payload as Record<string, unknown>)
+          : payload?.choices?.[0]?.message?.content;
+        providerEnvelopeValid = useResponses ? Array.isArray(payload.output) : Array.isArray(payload.choices);
+        if (!providerEnvelopeValid || !content) throw new JudgeProviderProtocolError("ACU Judge returned no valid Assistant output");
+        assistantTextExtracted = true;
+        let result: AcuJudgeResult;
+        try {
+          result = parseJudgeResult(content);
+        } catch (error) {
+          throw new JudgeSemanticParseError(error instanceof Error ? error.message : "Judge JSON is invalid", { cause: error });
+        }
+        const reportedInputTokens = payload.usage?.prompt_tokens ?? payload.usage?.input_tokens;
+        const reportedOutputTokens = payload.usage?.completion_tokens ?? payload.usage?.output_tokens;
+        const usageStatus = reportedInputTokens !== undefined && reportedOutputTokens !== undefined
         ? "reported" as const : "usage_missing" as const;
-      const promptTokens = payload.usage?.prompt_tokens ?? truncated.tokenEstimate;
-      const cachedPromptTokens = payload.usage?.prompt_tokens_details?.cached_tokens ?? 0;
-      const completionTokens = payload.usage?.completion_tokens ?? this.config.maxOutputTokens;
+      const promptTokens = reportedInputTokens ?? truncated.tokenEstimate;
+      const cachedPromptTokens = payload.usage?.prompt_tokens_details?.cached_tokens
+        ?? payload.usage?.input_tokens_details?.cached_tokens ?? 0;
+      const completionTokens = reportedOutputTokens ?? this.config.maxOutputTokens;
       const cost = judgeNominalCostUsd(this.config.judgeModel, promptTokens, cachedPromptTokens, completionTokens);
       const upstreamRequestId = payload.id ?? response.headers.get("x-request-id");
       const createdAt = new Date().toISOString();
@@ -590,27 +689,38 @@ export class AcuJudgeClient {
       } catch (error) {
         if (error instanceof AcuJudgeAttemptError) throw error;
         if (clientSignal?.aborted) throw new AcuJudgeClientCancelledError();
-        const promptTokens = payload?.usage?.prompt_tokens ?? 0;
-        const cachedPromptTokens = payload?.usage?.prompt_tokens_details?.cached_tokens ?? 0;
-        const completionTokens = payload?.usage?.completion_tokens ?? 0;
+        const promptTokens = payload?.usage?.prompt_tokens ?? payload?.usage?.input_tokens ?? 0;
+        const cachedPromptTokens = payload?.usage?.prompt_tokens_details?.cached_tokens
+          ?? payload?.usage?.input_tokens_details?.cached_tokens ?? 0;
+        const completionTokens = payload?.usage?.completion_tokens ?? payload?.usage?.output_tokens ?? 0;
         const message = error instanceof Error ? error.message : "ACU Judge transport failure";
         const networkFailure = error instanceof TypeError || error instanceof DOMException || controller.signal.aborted;
-        const invalidSuccessfulResponse = response?.ok === true;
+        const semanticFailure = error instanceof JudgeSemanticParseError;
+        const protocolFailure = error instanceof JudgeProviderProtocolError;
+        const failureLayer = semanticFailure ? "judge_semantic_parse_failure"
+          : protocolFailure ? "provider_protocol_failure" : "transport_failure";
+        const errorCategory = semanticFailure ? "judge_semantic_parse_failure"
+          : protocolFailure ? "provider_protocol_failure"
+            : controller.signal.aborted ? "timeout" : networkFailure ? "network_error" : "provider_transport_error";
         throw new AcuJudgeAttemptError(message, {
           provider: metadata.provider, model: this.config.judgeModel, endpointHost: metadata.host,
           upstreamRequestId: payload?.id ?? response?.headers.get("x-request-id") ?? null,
           latencyMs: Date.now() - started, promptTokens, cachedPromptTokens, completionTokens,
-          usageStatus: payload?.usage?.prompt_tokens !== undefined && payload.usage?.completion_tokens !== undefined
+          usageStatus: (payload?.usage?.prompt_tokens ?? payload?.usage?.input_tokens) !== undefined
+            && (payload?.usage?.completion_tokens ?? payload?.usage?.output_tokens) !== undefined
             ? "reported" : "usage_missing",
-          errorCategory: controller.signal.aborted ? "timeout" : networkFailure ? "network_error" : "invalid_response",
-          backupEligible: networkFailure || invalidSuccessfulResponse,
+          errorCategory,
+          backupEligible: networkFailure || protocolFailure || semanticFailure,
           backupReason: controller.signal.aborted ? "primary_timeout" : networkFailure
-            ? "primary_network_error" : invalidSuccessfulResponse ? "primary_schema_or_json_invalid" : "not_backup_eligible",
+            ? "primary_network_error" : protocolFailure ? "primary_provider_protocol_invalid"
+              : semanticFailure ? "primary_judge_semantic_invalid" : "not_backup_eligible",
           responseHeaders: response ? responseHeaders(response.headers) : {},
           rawResponseBody,
-          parserExceptionType: error instanceof Error ? error.name : typeof error,
+          parserExceptionType: semanticFailure && error.cause instanceof Error
+            ? error.cause.name : error instanceof Error ? error.name : typeof error,
           parserExceptionMessage: message,
           contextSha256, contextTokenEstimate, rawRequestBytes, rawRequestTokenEstimate, judgeContextLimit,
+          failureLayer, responseContentType, providerEnvelopeValid, assistantTextExtracted,
         });
       }
     } finally {

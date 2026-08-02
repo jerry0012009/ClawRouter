@@ -1,11 +1,12 @@
 import { effectiveContextCeiling } from "./context-admission.js";
-import type { AlphaExecutionProfile } from "./routing.js";
+import { compareExecutionProfiles, type AlphaExecutionProfile } from "./routing.js";
 
 export function getEligibleLunaJudgeProfiles(input: {
   profiles: AlphaExecutionProfile[];
   requiredContextTokens: number;
   preferredProfileId?: string;
   maxProfiles?: number;
+  expectedOutputTokens?: number;
 }): AlphaExecutionProfile[] {
   const eligible = input.profiles.filter((profile) =>
     profile.modelId === "gpt-5.6-luna"
@@ -23,11 +24,11 @@ export function getEligibleLunaJudgeProfiles(input: {
     && profile.runtimeHealth?.effectiveState !== "temporarily_unavailable"
     && effectiveContextCeiling(profile) >= input.requiredContextTokens,
   );
-  const preferred = input.preferredProfileId
-    ? eligible.filter((profile) => profile.executionProfileId === input.preferredProfileId)
-    : [];
-  const rest = eligible
-    .filter((profile) => profile.executionProfileId !== input.preferredProfileId)
-    .sort((left, right) => left.executionProfileId.localeCompare(right.executionProfileId));
-  return [...preferred, ...rest].slice(0, input.maxProfiles ?? 3);
+  return eligible.sort((left, right) => {
+    const ranked = compareExecutionProfiles(
+      left, right, input.requiredContextTokens, input.expectedOutputTokens ?? 300,
+      undefined, input.preferredProfileId,
+    );
+    return ranked;
+  }).slice(0, input.maxProfiles ?? 3);
 }

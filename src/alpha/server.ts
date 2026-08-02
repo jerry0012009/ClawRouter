@@ -21,6 +21,7 @@ import { combinedMonitorState, mergeSupplyInventory, monitorRangeSpec, monitorRo
 import { AdaptiveProbeWorker } from "./adaptive-probe.js";
 import { deriveRuntimeEligibility } from "./channel-health.js";
 import { isRecoveredSupplyProfile } from "./channel-registry.js";
+import { recordSharedRuntimeHealthOutcome } from "./runtime-health-outcome.js";
 import {
   DEFAULT_BILLING_POLICY_VERSION,
   parseRetailMarkupMultiplier,
@@ -255,6 +256,7 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
   });
   const judgeConfig = readAcuRuntimeConfig();
   const runtimeRepository = new AlphaRepository(database);
+  let adaptiveProbe: AdaptiveProbeWorker;
   const judgeEconomics = serviceConfig.judgeEconomicsProviderId ? serviceConfig.providerEconomics.find((item) => item.providerId === serviceConfig.judgeEconomicsProviderId) : undefined;
   if (serviceConfig.judgeEconomicsProviderId && !judgeEconomics) {
     throw new Error(`No Provider Economics for Judge ${serviceConfig.judgeEconomicsProviderId}`);
@@ -298,6 +300,7 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
       judgeModel: "gpt-5.6-luna",
       judgeProvider: item.profile.provider,
       judgeBaseUrl: item.judgeBaseUrl,
+      judgeProtocol: item.profile.protocols.includes("responses") ? "responses" as const : "chat_completions" as const,
       apiKey: item.judgeApiKey,
       backupJudgeModel: undefined,
       backupJudgeBaseUrl: undefined,
@@ -306,9 +309,16 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
       };
       return [item.profile.executionProfileId, new AcuJudgeClient(profileConfig)] as const;
     })),
+    recordHealthOutcome: async (profile, outcome) => recordSharedRuntimeHealthOutcome({
+      repository: runtimeRepository,
+      profile,
+      protocol: "responses",
+      outcome,
+      wakeProbe: (executionProfileId) => executionProfileId ? adaptiveProbe.enqueue(executionProfileId) : adaptiveProbe.wake(),
+    }),
   });
   const adapterMap = new Map(profiles.map((item) => [item.profile.executionProfileId, item.adapter]));
-  const adaptiveProbe = new AdaptiveProbeWorker({
+  adaptiveProbe = new AdaptiveProbeWorker({
     database,
     profiles: profiles.map((item) => item.profile),
     adapters: adapterMap,

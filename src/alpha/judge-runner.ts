@@ -10,6 +10,8 @@ import { classifyWebIntentFallback, type WebIntentFallbackInput, withWebIntentSo
 import { getEligibleLunaJudgeProfiles } from "./judge-profile-selector.js";
 import type { AlphaExecutionProfile } from "./routing.js";
 import { cashCnyPerNominalUsd } from "./provider-economics.js";
+import type { AttemptOutcome } from "./channel-health.js";
+import type { RuntimeHealthOutcomeResult } from "./runtime-health-outcome.js";
 
 const MIMO_JUDGE_BLENDED_COST_FACTOR = 0.5;
 const MIMO_JUDGE_COST_SOURCE = "midpoint_openrouter_payg_and_mimo99_plan_v1";
@@ -102,6 +104,12 @@ export type AlphaJudgeAttempt = {
   judgeContextLimit?: number;
   executionProfileId?: string;
   channel?: string;
+  failureLayer?: "transport_failure" | "provider_protocol_failure" | "judge_semantic_parse_failure";
+  responseContentType?: string;
+  providerEnvelopeValid?: boolean;
+  assistantTextExtracted?: boolean;
+  healthOutcomeApplied?: boolean;
+  healthOutcomeScope?: "none" | "channel" | "profile";
 };
 
 export type AlphaJudgeInput = {
@@ -129,6 +137,10 @@ export type AcuJudgeRunnerOptions = {
   profiles?: AlphaExecutionProfile[];
   loadProfiles?: () => Promise<AlphaExecutionProfile[]>;
   profileClients?: Map<string, AcuJudgeClient>;
+  recordHealthOutcome?: (
+    profile: AlphaExecutionProfile,
+    outcome: AttemptOutcome,
+  ) => Promise<RuntimeHealthOutcomeResult>;
 };
 
 function canReuseRecent(trigger: TriggerReason): boolean {
@@ -221,6 +233,22 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
     ...(profile ? { executionProfileId: profile.executionProfileId, channel: profile.channel } : {}),
   });
 
+  const recordHealth = async (
+    attempt: AlphaJudgeAttempt,
+    profile: AlphaExecutionProfile | undefined,
+    outcome: AttemptOutcome,
+  ): Promise<void> => {
+    if (!profile || !options.recordHealthOutcome) return;
+    if (attempt.failureLayer === "judge_semantic_parse_failure") {
+      attempt.healthOutcomeApplied = false;
+      attempt.healthOutcomeScope = "none";
+      return;
+    }
+    const result = await options.recordHealthOutcome(profile, outcome);
+    attempt.healthOutcomeApplied = true;
+    attempt.healthOutcomeScope = result.scope;
+  };
+
   const aggregateCostStatus = (attempts: AlphaJudgeAttempt[]): AlphaJudgeRun["costStatus"] => {
     const statuses = new Set(attempts
       .filter((attempt) => attempt.costStatus !== "unavailable")
@@ -297,13 +325,34 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
               profilesRemaining: candidates.length - index - 1,
             });
             const result = await candidateClient.judge(input.messages, [], false, input.rawNative, input.signal, attemptDeadlineAt);
-            if (result.status === "live") attempts.push(successfulAttempt(result, index + 1, index === 0 ? "primary" : "same_model_failover", candidate.profile));
+            if (result.status === "live") {
+              const attempt = successfulAttempt(result, index + 1, index === 0 ? "primary" : "same_model_failover", candidate.profile);
+              await recordHealth(attempt, candidate.profile, {
+                success: true,
+                httpStatus: 200,
+                usageTrusted: result.usageStatus === "reported",
+                actualModelVerified: result.model === candidate.profile?.modelId,
+                totalLatencyMs: result.latencyMs,
+              });
+              attempts.push(attempt);
+            }
             return completeRun(result, attempts, result.status);
           } catch (error) {
             lastError = error;
             if (error instanceof AcuJudgeClientCancelledError) throw error;
             if (error instanceof AcuJudgeContextLengthError) continue;
-            if (error instanceof AcuJudgeAttemptError) attempts.push(failedAttempt(error, index + 1, index === 0 ? "primary" : "same_model_failover", candidate.profile));
+            if (error instanceof AcuJudgeAttemptError) {
+              const attempt = failedAttempt(error, index + 1, index === 0 ? "primary" : "same_model_failover", candidate.profile);
+              await recordHealth(attempt, candidate.profile, {
+                success: false,
+                httpStatus: error.attempt.httpStatus,
+                errorCode: error.attempt.failureLayer === "provider_protocol_failure"
+                  ? "protocol_incompatible" : error.attempt.errorCategory,
+                errorMessage: error.message,
+                totalLatencyMs: error.attempt.latencyMs,
+              });
+              attempts.push(attempt);
+            }
           }
         }
         throw lastError ?? new Error("No eligible Luna Judge Profile");

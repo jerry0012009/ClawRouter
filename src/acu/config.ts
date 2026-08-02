@@ -64,6 +64,7 @@ export type AcuRuntimeConfig = {
   maxOutputTokens: number;
   apiKey?: string;
   judgeProvider: string;
+  judgeProtocol: "responses" | "chat_completions";
   backupJudgeModel?: string;
   backupJudgeBaseUrl?: string;
   backupApiKey?: string;
@@ -104,6 +105,7 @@ export function readAcuRuntimeConfig(overrides: Partial<AcuRuntimeConfig> = {}):
     maxOutputTokens: ACU_DEFAULT_MAX_OUTPUT_TOKENS,
     apiKey: process.env.ACU_JUDGE_API_KEY?.trim(),
     judgeProvider: process.env.ACU_JUDGE_PROVIDER?.trim() || "lucen",
+    judgeProtocol: "chat_completions",
     backupJudgeModel: process.env.ACU_JUDGE_BACKUP_MODEL?.trim() || undefined,
     backupJudgeBaseUrl: process.env.ACU_JUDGE_BACKUP_BASE_URL?.trim() || undefined,
     backupApiKey: process.env.ACU_JUDGE_BACKUP_API_KEY?.trim() || undefined,

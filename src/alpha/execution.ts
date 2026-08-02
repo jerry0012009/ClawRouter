@@ -17,8 +17,8 @@ export type ProviderAttemptHandle = {
 export type ProviderRecoveryTarget = {
   profile: AlphaExecutionProfile;
   networkEndpointIndex?: number;
-  omitReasoningOverride?: boolean;
-  reason: "network_endpoint_fallback" | "same_model_channel_fallback" | "context_model_reroute" | "reasoning_profile_fallback" | "reasoning_default_fallback";
+  reasoningFallback?: "client_effort" | "default";
+  reason: "network_endpoint_fallback" | "same_model_channel_fallback" | "context_model_reroute" | "reasoning_profile_fallback" | "reasoning_client_effort_fallback" | "reasoning_default_fallback";
 };
 
 export type BufferedProviderFailure = {

@@ -1144,64 +1144,186 @@ run("Alpha PostgreSQL request processor", () => {
     expect(bodies.map((body) => (body.reasoning as { effort?: string })?.effort)).toEqual(["high", "high"]);
   });
 
-  it("falls back to model-default Effort only for acu-auto when no other Profile is allowed", async () => {
-    await database.query("DELETE FROM acu_channel_health WHERE channel_id='test-channel'");
+  it("falls back from Luna Max to the client Effort when no other Luna Profile is allowed", async () => {
+    await database.query("DELETE FROM acu_channel_health WHERE channel_id='test-alternate-model-channel'");
     await database.query(
-      "DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id='test:gpt-5.4-mini:responses'",
+      "DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id='test:gpt-5.6-luna:alternate'",
     );
-    const testCase = "reasoning-default-retry";
+    const originalDifficulty = judgeResult.difficultyIndex;
+    const originalScore = judgeResult.difficultyScore;
+    alternateModelProfile.enabled = true;
+    judgeResult.difficultyIndex = 99;
+    judgeResult.difficultyScore = 99;
+    const testCase = "reasoning-client-effort-retry";
     const body = Buffer.from(JSON.stringify({
       model: "acu-auto",
       reasoning: { effort: "high", summary: "auto" },
-      input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "Use the model default" }] }],
+      input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "Use Luna Max, then preserve my minimum" }] }],
       stream: true,
       test_case: testCase,
       test_failures_before_success: 1,
       test_failure_status: 400,
     }));
-    const response = await fetch(`http://127.0.0.1:${gatewayPort}/v1/responses`, {
-      method: "POST",
-      headers: signedHeaders(body, testCase, "user-reasoning-default", "codex", [primaryProfile.executionProfileId]),
-      body,
-    });
-    expect(response.status, await response.clone().text()).toBe(200);
-    await response.arrayBuffer();
-    const bodies = upstreamBodies.filter((item) => item.test_case === testCase);
-    expect(bodies).toHaveLength(2);
-    expect(bodies.map((item) => item.reasoning)).toEqual([
-      { effort: "high", summary: "auto" },
-      { summary: "auto" },
-    ]);
-    const attempts = await database.query<{ mapping: string }>(
-      `SELECT metadata_json->>'reasoningMappingStatus' mapping FROM acu_attempts
-       WHERE logical_request_id=(SELECT logical_request_id FROM acu_logical_requests WHERE newapi_user_id=$1)
-       ORDER BY attempt_index`,
-      ["user-reasoning-default"],
-    );
-    expect(attempts.rows.map((row) => row.mapping)).toEqual(["exact", "provider_fallback_to_default"]);
+    try {
+      const response = await fetch(`http://127.0.0.1:${gatewayPort}/v1/responses`, {
+        method: "POST",
+        headers: signedHeaders(body, testCase, "user-reasoning-client-fallback", "codex", [alternateModelProfile.executionProfileId]),
+        body,
+      });
+      expect(response.status, await response.clone().text()).toBe(200);
+      await response.arrayBuffer();
+      const bodies = upstreamBodies.filter((item) => item.test_case === testCase);
+      expect(bodies.map((item) => item.reasoning)).toEqual([
+        { effort: "max", summary: "auto" },
+        { effort: "high", summary: "auto" },
+      ]);
+      const attempts = await database.query<{ actual_model: string; metadata_json: Record<string, unknown> }>(
+        `SELECT actual_model,metadata_json FROM acu_attempts
+         WHERE logical_request_id=(SELECT logical_request_id FROM acu_logical_requests WHERE newapi_user_id=$1)
+         ORDER BY attempt_index`,
+        ["user-reasoning-client-fallback"],
+      );
+      expect(attempts.rows).toHaveLength(2);
+      expect(attempts.rows.map((row) => row.actual_model)).toEqual(["gpt-5.6-luna", "gpt-5.6-luna"]);
+      expect(attempts.rows[0]?.metadata_json).toMatchObject({ clientRequestedReasoningEffort: "high",
+        presetReasoningEffort: "max", targetCanonicalReasoningEffort: "max", resolvedReasoningEffort: "max",
+        wireReasoningEffort: "max", mappingStatus: "exact" });
+      expect(attempts.rows[1]?.metadata_json).toMatchObject({ clientRequestedReasoningEffort: "high",
+        presetReasoningEffort: "max", targetCanonicalReasoningEffort: "max", resolvedReasoningEffort: "high",
+        wireReasoningEffort: "high", mappingStatus: "provider_fallback_to_client_effort" });
+      const route = await database.query<{ formula_inputs_json: Record<string, unknown> }>(
+        "SELECT formula_inputs_json FROM acu_route_decisions WHERE newapi_user_id=$1 ORDER BY created_at DESC LIMIT 1",
+        ["user-reasoning-client-fallback"],
+      );
+      expect(route.rows[0]?.formula_inputs_json).toMatchObject({ clientRequestedReasoningEffort: "high",
+        presetReasoningEffort: "max", targetCanonicalReasoningEffort: "max", resolvedReasoningEffort: "high",
+        wireReasoningEffort: "high", mappingStatus: "provider_fallback_to_client_effort",
+        decisionSnapshot: { clientRequestedReasoningEffort: "high", presetReasoningEffort: "max",
+          targetCanonicalReasoningEffort: "max", resolvedReasoningEffort: "high", wireReasoningEffort: "high",
+          mappingStatus: "provider_fallback_to_client_effort" } });
+    } finally {
+      alternateModelProfile.enabled = false;
+      judgeResult.difficultyIndex = originalDifficulty;
+      judgeResult.difficultyScore = originalScore;
+      await database.query("DELETE FROM acu_profile_probe_queue WHERE execution_profile_id='test:gpt-5.6-luna:alternate'");
+      await database.query("DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id='test:gpt-5.6-luna:alternate'");
+    }
+  });
+
+  it("falls back from Luna Max to model default when the client supplied no Effort", async () => {
+    const originalDifficulty = judgeResult.difficultyIndex;
+    const originalScore = judgeResult.difficultyScore;
+    alternateModelProfile.enabled = true;
+    judgeResult.difficultyIndex = 99;
+    judgeResult.difficultyScore = 99;
+    const testCase = "reasoning-default-retry";
+    const body = Buffer.from(JSON.stringify({
+      model: "acu-auto",
+      input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "Use Luna Max with the model default fallback" }] }],
+      stream: true,
+      test_case: testCase,
+      test_failures_before_success: 1,
+      test_failure_status: 400,
+    }));
+    try {
+      const response = await fetch(`http://127.0.0.1:${gatewayPort}/v1/responses`, {
+        method: "POST",
+        headers: signedHeaders(body, testCase, "user-reasoning-default", "codex", [alternateModelProfile.executionProfileId]),
+        body,
+      });
+      expect(response.status, await response.clone().text()).toBe(200);
+      await response.arrayBuffer();
+      const bodies = upstreamBodies.filter((item) => item.test_case === testCase);
+      expect(bodies.map((item) => item.reasoning)).toEqual([{ effort: "max" }, undefined]);
+      const attempts = await database.query<{ metadata_json: Record<string, unknown> }>(
+        `SELECT metadata_json FROM acu_attempts
+         WHERE logical_request_id=(SELECT logical_request_id FROM acu_logical_requests WHERE newapi_user_id=$1)
+         ORDER BY attempt_index`,
+        ["user-reasoning-default"],
+      );
+      expect(attempts.rows.map((row) => row.metadata_json.mappingStatus)).toEqual(["exact", "provider_fallback_to_default"]);
+      expect(attempts.rows[1]?.metadata_json).toMatchObject({ clientRequestedReasoningEffort: null,
+        presetReasoningEffort: "max", targetCanonicalReasoningEffort: "max", resolvedReasoningEffort: null,
+        wireReasoningEffort: null });
+    } finally {
+      alternateModelProfile.enabled = false;
+      judgeResult.difficultyIndex = originalDifficulty;
+      judgeResult.difficultyScore = originalScore;
+      await database.query("DELETE FROM acu_profile_probe_queue WHERE execution_profile_id='test:gpt-5.6-luna:alternate'");
+      await database.query("DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id='test:gpt-5.6-luna:alternate'");
+    }
+  });
+
+  it("admits explicit Luna max despite a legacy Profile effort list and preserves it verbatim", async () => {
+    alternateModelProfile.enabled = true;
+    const beforeJudge = judgeCalls;
+    const testCase = "explicit-luna-max-admission";
+    const body = Buffer.from(JSON.stringify({
+      model: "gpt-5.6-luna",
+      reasoning: { effort: "max", summary: "auto" },
+      input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "Honor explicit max" }] }],
+      stream: true,
+      test_case: testCase,
+    }));
+    try {
+      const response = await fetch(`http://127.0.0.1:${gatewayPort}/v1/responses`, {
+        method: "POST",
+        headers: signedHeaders(body, testCase, "user-explicit-luna-max", "codex", [alternateModelProfile.executionProfileId]),
+        body,
+      });
+      expect(response.status, await response.clone().text()).toBe(200);
+      await response.arrayBuffer();
+      expect(judgeCalls).toBe(beforeJudge);
+      expect(upstreamBodies.filter((item) => item.test_case === testCase)).toMatchObject([
+        { model: "gpt-5.6-luna", reasoning: { effort: "max", summary: "auto" } },
+      ]);
+      const attempt = await database.query<{ metadata_json: Record<string, unknown> }>(
+        `SELECT metadata_json FROM acu_attempts
+         WHERE logical_request_id=(SELECT logical_request_id FROM acu_logical_requests WHERE newapi_user_id=$1)`,
+        ["user-explicit-luna-max"],
+      );
+      expect(attempt.rows[0]?.metadata_json).toMatchObject({ clientRequestedReasoningEffort: "max",
+        resolvedReasoningEffort: "max", wireReasoningEffort: "max", mappingStatus: "passthrough",
+        providerReasoningOverrideApplied: false });
+      const route = await database.query<{ formula_inputs_json: Record<string, unknown> }>(
+        "SELECT formula_inputs_json FROM acu_route_decisions WHERE newapi_user_id=$1",
+        ["user-explicit-luna-max"],
+      );
+      expect(route.rows[0]?.formula_inputs_json).toMatchObject({ judgeCalls: 0,
+        clientRequestedReasoningEffort: "max", resolvedReasoningEffort: "max", wireReasoningEffort: "max",
+        mappingStatus: "passthrough", decisionSnapshot: { clientRequestedReasoningEffort: "max",
+          resolvedReasoningEffort: "max", wireReasoningEffort: "max", mappingStatus: "passthrough" } });
+    } finally {
+      alternateModelProfile.enabled = false;
+    }
   });
 
   it("does not remove or retry a client Effort on an explicit model request", async () => {
     const testCase = "reasoning-explicit-rejected";
+    alternateModelProfile.enabled = true;
     const body = Buffer.from(JSON.stringify({
-      model: "gpt-5.4-mini",
-      reasoning: { effort: "high" },
+      model: "gpt-5.6-luna",
+      reasoning: { effort: "max" },
       input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "Keep my effort" }] }],
       stream: true,
       test_case: testCase,
       test_failures_before_success: 1,
       test_failure_status: 400,
     }));
-    const response = await fetch(`http://127.0.0.1:${gatewayPort}/v1/responses`, {
-      method: "POST",
-      headers: signedHeaders(body, testCase, "user-reasoning-explicit"),
-      body,
-    });
-    expect(response.status).toBe(400);
-    await response.arrayBuffer();
-    const bodies = upstreamBodies.filter((item) => item.test_case === testCase);
-    expect(bodies).toHaveLength(1);
-    expect(bodies[0]?.reasoning).toEqual({ effort: "high" });
+    try {
+      const response = await fetch(`http://127.0.0.1:${gatewayPort}/v1/responses`, {
+        method: "POST",
+        headers: signedHeaders(body, testCase, "user-reasoning-explicit", "codex", [alternateModelProfile.executionProfileId]),
+        body,
+      });
+      expect(response.status).toBe(400);
+      await response.arrayBuffer();
+      const bodies = upstreamBodies.filter((item) => item.test_case === testCase);
+      expect(bodies).toHaveLength(1);
+      expect(bodies[0]?.reasoning).toEqual({ effort: "max" });
+    } finally {
+      alternateModelProfile.enabled = false;
+    }
   });
 
   it("uses a different Provider for the third same-model Channel after two Lucen failures", async () => {

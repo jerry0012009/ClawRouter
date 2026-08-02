@@ -923,6 +923,23 @@ export class AlphaRepository {
     return result.rows[0];
   }
 
+  async updateRouteReasoningDecision(
+    routeDecisionId: string,
+    newapiUserId: string,
+    reasoningDecision: Record<string, unknown>,
+  ): Promise<void> {
+    const patch = json(reasoningDecision);
+    const result = await this.database.query(
+      `UPDATE acu_route_decisions
+       SET formula_inputs_json = formula_inputs_json || $3::jsonb || jsonb_build_object(
+         'decisionSnapshot', COALESCE(formula_inputs_json->'decisionSnapshot', '{}'::jsonb) || $3::jsonb
+       )
+       WHERE route_decision_id=$1 AND newapi_user_id=$2`,
+      [routeDecisionId, newapiUserId, patch],
+    );
+    if (result.rowCount !== 1) throw new Error("Route reasoning decision update failed");
+  }
+
   async savePayload(input: PayloadRecord): Promise<void> {
     const sanitized = sanitizePayloadForPersistence(input.body);
     const bodyJson = typeof sanitized === "string" ? null : json(sanitized);

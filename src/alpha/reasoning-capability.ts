@@ -24,7 +24,7 @@ export type ProfileReasoningOverride = {
   observedAt?: string;
 };
 
-export type ReasoningMappingStatus = "exact" | "upgraded_alias" | "capped_to_model_max" | "model_default" | "passthrough" | "unknown_client_value" | "provider_fallback_to_default";
+export type ReasoningMappingStatus = "exact" | "upgraded_alias" | "capped_to_model_max" | "model_default" | "passthrough" | "unknown_client_value" | "provider_fallback_to_client_effort" | "provider_fallback_to_default";
 
 export const REASONING_CAPABILITIES = rawCapabilities as ModelReasoningCapability[];
 

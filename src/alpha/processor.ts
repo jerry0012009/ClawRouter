@@ -1037,7 +1037,7 @@ export class AlphaRequestProcessor {
         requireTools: envelope.requiredToolTypes.length > 0,
         requiredToolTypes: envelope.requiredToolTypes,
         requireThinking: envelope.containsThinking,
-        reasoningEffort: state.effectiveReasoningEffort,
+        reasoningEffort: undefined,
         context: contextAdmission,
         expectedOutputTokens: this.expectedOutputTokens,
         allowedProfileIds: identity.allowedProfileIds.length > 0 ? identity.allowedProfileIds : undefined,
@@ -1072,6 +1072,15 @@ export class AlphaRequestProcessor {
           ? null
           : nominalCost * (profile.economics ? cashCnyPerNominalUsd(profile.economics) : 1);
         const explicitSelectionReason = "User-selected explicit model; Judge and ACU model selection skipped.";
+        const explicitReasoningDecision = decideReasoning({
+          mode: "explicit",
+          clientEffort: envelope.reasoningEffort,
+          modelId: profile.modelId,
+          protocol: envelope.protocol,
+          profileOverride: profile.reasoningOverride,
+          legacyControlMode: profile.reasoningControlMode,
+          legacySupportedEfforts: profile.supportedReasoningEfforts,
+        });
         const routeDecisionId = alphaId("route");
         await repository.saveRouteDecision({
           routeDecisionId,
@@ -1087,6 +1096,13 @@ export class AlphaRequestProcessor {
             requestedModel: envelope.requestedModel,
             judgeCalls: 0,
             reasoningEffort: state.effectiveReasoningEffort,
+            clientRequestedReasoningEffort: explicitReasoningDecision.clientRequestedReasoningEffort ?? null,
+            presetReasoningEffort: explicitReasoningDecision.presetReasoningEffort ?? null,
+            targetCanonicalReasoningEffort: explicitReasoningDecision.targetCanonicalReasoningEffort ?? null,
+            resolvedReasoningEffort: explicitReasoningDecision.resolvedReasoningEffort ?? null,
+            wireReasoningEffort: explicitReasoningDecision.wireReasoningEffort ?? null,
+            mappingStatus: explicitReasoningDecision.mappingStatus,
+            reasoningMappingStatus: explicitReasoningDecision.mappingStatus,
             requiredToolTypes: envelope.requiredToolTypes,
             ...webIntentMetadata(webIntentDecision),
             userRoutingPolicy: identity.routingPolicy,
@@ -1112,6 +1128,13 @@ export class AlphaRequestProcessor {
               }],
               excludedProfiles: [],
               selectedModel: profile.modelId,
+              clientRequestedReasoningEffort: explicitReasoningDecision.clientRequestedReasoningEffort ?? null,
+              presetReasoningEffort: explicitReasoningDecision.presetReasoningEffort ?? null,
+              targetCanonicalReasoningEffort: explicitReasoningDecision.targetCanonicalReasoningEffort ?? null,
+              resolvedReasoningEffort: explicitReasoningDecision.resolvedReasoningEffort ?? null,
+              wireReasoningEffort: explicitReasoningDecision.wireReasoningEffort ?? null,
+              mappingStatus: explicitReasoningDecision.mappingStatus,
+              reasoningMappingStatus: explicitReasoningDecision.mappingStatus,
               selectedChannel: profile.channelId ?? profile.channel,
               modelSelectionReason: explicitSelectionReason,
               channelSelectionReason: explicitSelectionReason,
@@ -1817,12 +1840,13 @@ export class AlphaRequestProcessor {
       selectedCandidateId: route.recommendation.recommended.candidateId,
       selectedExecutionPresetId: route.recommendation.recommended.executionPresetId,
       selectedDisplayName: route.recommendation.recommended.displayName,
-      clientRequestedReasoningEffort: routeReasoningDecision.clientRequestedReasoningEffort,
-      presetReasoningEffort: routeReasoningDecision.presetReasoningEffort,
-      targetCanonicalReasoningEffort: routeReasoningDecision.targetCanonicalReasoningEffort,
-      resolvedReasoningEffort: routeReasoningDecision.resolvedReasoningEffort,
-      wireReasoningEffort: routeReasoningDecision.wireReasoningEffort,
+      clientRequestedReasoningEffort: routeReasoningDecision.clientRequestedReasoningEffort ?? null,
+      presetReasoningEffort: routeReasoningDecision.presetReasoningEffort ?? null,
+      targetCanonicalReasoningEffort: routeReasoningDecision.targetCanonicalReasoningEffort ?? null,
+      resolvedReasoningEffort: routeReasoningDecision.resolvedReasoningEffort ?? null,
+      wireReasoningEffort: routeReasoningDecision.wireReasoningEffort ?? null,
       reasoningMappingStatus: routeReasoningDecision.mappingStatus,
+      mappingStatus: routeReasoningDecision.mappingStatus,
       reasoningCapabilitySource: routeReasoningDecision.reasoningCapabilitySource,
       selectedChannel: route.selectedProfile.channelId ?? route.selectedProfile.channel,
       modelSelectionReason: route.recommendation.reason,
@@ -1889,12 +1913,13 @@ export class AlphaRequestProcessor {
         providerSelectionReason: route.providerSelectionReason,
         providerCandidateEstimates: route.providerCandidateEstimates,
         reasoningEffort: state.effectiveReasoningEffort,
-        clientRequestedReasoningEffort: routeReasoningDecision.clientRequestedReasoningEffort,
-        presetReasoningEffort: routeReasoningDecision.presetReasoningEffort,
-        targetCanonicalReasoningEffort: routeReasoningDecision.targetCanonicalReasoningEffort,
-        resolvedReasoningEffort: routeReasoningDecision.resolvedReasoningEffort,
-        wireReasoningEffort: routeReasoningDecision.wireReasoningEffort,
+        clientRequestedReasoningEffort: routeReasoningDecision.clientRequestedReasoningEffort ?? null,
+        presetReasoningEffort: routeReasoningDecision.presetReasoningEffort ?? null,
+        targetCanonicalReasoningEffort: routeReasoningDecision.targetCanonicalReasoningEffort ?? null,
+        resolvedReasoningEffort: routeReasoningDecision.resolvedReasoningEffort ?? null,
+        wireReasoningEffort: routeReasoningDecision.wireReasoningEffort ?? null,
         reasoningMappingStatus: routeReasoningDecision.mappingStatus,
+        mappingStatus: routeReasoningDecision.mappingStatus,
         reasoningCapabilitySource: routeReasoningDecision.reasoningCapabilitySource,
         requiredToolTypes: envelope.requiredToolTypes,
         clientDeclaredWebTool: envelope.clientDeclaredWebTool,
@@ -2239,12 +2264,13 @@ export class AlphaRequestProcessor {
         webProfileVerified: webEligibility.transportStatus === "verified",
         webTransportStatus: webEligibility.transportStatus,
         webEligibilityConfidence: webEligibility.confidence,
-        clientRequestedReasoningEffort: input.envelope.reasoningEffort,
-        presetReasoningEffort: input.reasoningDecision?.presetReasoningEffort,
-        targetCanonicalReasoningEffort: input.reasoningDecision?.targetCanonicalReasoningEffort,
-        resolvedReasoningEffort: input.reasoningDecision?.resolvedReasoningEffort,
-        wireReasoningEffort: input.reasoningDecision?.wireReasoningEffort,
+        clientRequestedReasoningEffort: input.envelope.reasoningEffort ?? null,
+        presetReasoningEffort: input.reasoningDecision?.presetReasoningEffort ?? null,
+        targetCanonicalReasoningEffort: input.reasoningDecision?.targetCanonicalReasoningEffort ?? null,
+        resolvedReasoningEffort: input.reasoningDecision?.resolvedReasoningEffort ?? null,
+        wireReasoningEffort: input.reasoningDecision?.wireReasoningEffort ?? null,
         reasoningMappingStatus: input.reasoningDecision?.mappingStatus,
+        mappingStatus: input.reasoningDecision?.mappingStatus,
         reasoningCapabilitySource: input.reasoningDecision?.reasoningCapabilitySource,
         reasoningControlMode: input.reasoningControlMode ?? input.profile.reasoningControlMode ?? "none",
         providerReasoningOverrideApplied: input.providerReasoningOverrideApplied === true,
@@ -2280,12 +2306,13 @@ export class AlphaRequestProcessor {
         webProfileVerified: webEligibility.transportStatus === "verified",
         webTransportStatus: webEligibility.transportStatus,
         webEligibilityConfidence: webEligibility.confidence,
-        clientRequestedReasoningEffort: input.envelope.reasoningEffort,
-        presetReasoningEffort: input.reasoningDecision?.presetReasoningEffort,
-        targetCanonicalReasoningEffort: input.reasoningDecision?.targetCanonicalReasoningEffort,
-        resolvedReasoningEffort: input.reasoningDecision?.resolvedReasoningEffort,
-        wireReasoningEffort: input.reasoningDecision?.wireReasoningEffort,
+        clientRequestedReasoningEffort: input.envelope.reasoningEffort ?? null,
+        presetReasoningEffort: input.reasoningDecision?.presetReasoningEffort ?? null,
+        targetCanonicalReasoningEffort: input.reasoningDecision?.targetCanonicalReasoningEffort ?? null,
+        resolvedReasoningEffort: input.reasoningDecision?.resolvedReasoningEffort ?? null,
+        wireReasoningEffort: input.reasoningDecision?.wireReasoningEffort ?? null,
         reasoningMappingStatus: input.reasoningDecision?.mappingStatus,
+        mappingStatus: input.reasoningDecision?.mappingStatus,
         reasoningCapabilitySource: input.reasoningDecision?.reasoningCapabilitySource,
         reasoningControlMode: input.reasoningControlMode ?? input.profile.reasoningControlMode ?? "none",
         providerReasoningOverrideApplied: input.providerReasoningOverrideApplied === true,
@@ -2716,7 +2743,7 @@ export class AlphaRequestProcessor {
     const attemptedEndpoints = new Set(resolutionContext.attemptedNetworkEndpoints);
     const contextFailedModels = new Set<string>();
     const reasoningRejectedProfiles = new Set<string>();
-    let reasoningDefaultFallbackUsed = false;
+    let reasoningTerminalFallbackUsed = false;
     let pendingContextOverflow: {
       modelId: string;
       reportedContextLimit?: number;
@@ -2784,10 +2811,24 @@ export class AlphaRequestProcessor {
               attemptedProviders.add(profile.provider);
               return { profile, networkEndpointIndex: 0, reason: "reasoning_profile_fallback" };
             }
-            if (!reasoningDefaultFallbackUsed) {
-              reasoningDefaultFallbackUsed = true;
+            if (!reasoningTerminalFallbackUsed) {
+              reasoningTerminalFallbackUsed = true;
+              if (canonicalReasoningEffort(envelope.reasoningEffort)) {
+                const clientDecision = decideReasoning({
+                  mode, clientEffort: envelope.reasoningEffort,
+                  modelId: current.profile.modelId, protocol: envelope.protocol,
+                  profileOverride: current.profile.reasoningOverride,
+                  legacyControlMode: current.profile.reasoningControlMode,
+                  legacySupportedEfforts: current.profile.supportedReasoningEfforts,
+                });
+                if (clientDecision.wireReasoningEffort !== reasoningDecision.wireReasoningEffort) {
+                  return { profile: current.profile, networkEndpointIndex: current.networkEndpointIndex,
+                    reasoningFallback: "client_effort", reason: "reasoning_client_effort_fallback" };
+                }
+                return undefined;
+              }
               return { profile: current.profile, networkEndpointIndex: current.networkEndpointIndex,
-                omitReasoningOverride: true, reason: "reasoning_default_fallback" };
+                reasoningFallback: "default", reason: "reasoning_default_fallback" };
             }
             return undefined;
           }
@@ -2922,17 +2963,30 @@ export class AlphaRequestProcessor {
         resolutionContext.recoveryDecisionReason = reason;
       },
       startRetry: async (profile, nextAttemptIndex, target) => {
-        const retryDecision: ReasoningDecision = target?.omitReasoningOverride ? {
+        const selectedProfileDecision = decideReasoning({
+          mode, clientEffort: envelope.reasoningEffort, presetEffort: selectedExecutionCandidate?.reasoningEffort,
+          modelId: profile.modelId, protocol: envelope.protocol, profileOverride: profile.reasoningOverride,
+          legacyControlMode: profile.reasoningControlMode, legacySupportedEfforts: profile.supportedReasoningEfforts,
+        });
+        const clientFallbackDecision = target?.reasoningFallback === "client_effort" ? decideReasoning({
+          mode, clientEffort: envelope.reasoningEffort,
+          modelId: profile.modelId, protocol: envelope.protocol, profileOverride: profile.reasoningOverride,
+          legacyControlMode: profile.reasoningControlMode, legacySupportedEfforts: profile.supportedReasoningEfforts,
+        }) : undefined;
+        const retryDecision: ReasoningDecision = target?.reasoningFallback === "default" ? {
           ...reasoningDecision,
           resolvedReasoningEffort: undefined,
           wireReasoningEffort: undefined,
           mappingStatus: "provider_fallback_to_default",
           providerReasoningOverrideApplied: false,
-        } : decideReasoning({
-          mode, clientEffort: envelope.reasoningEffort, presetEffort: selectedExecutionCandidate?.reasoningEffort,
-          modelId: profile.modelId, protocol: envelope.protocol, profileOverride: profile.reasoningOverride,
-          legacyControlMode: profile.reasoningControlMode, legacySupportedEfforts: profile.supportedReasoningEfforts,
-        });
+        } : clientFallbackDecision ? {
+          ...reasoningDecision,
+          resolvedReasoningEffort: clientFallbackDecision.resolvedReasoningEffort,
+          wireReasoningEffort: clientFallbackDecision.wireReasoningEffort,
+          mappingStatus: "provider_fallback_to_client_effort",
+          reasoningCapabilitySource: clientFallbackDecision.reasoningCapabilitySource,
+          reasoningControlMode: clientFallbackDecision.reasoningControlMode,
+        } : selectedProfileDecision;
         const retryPrepared = prepareProviderBody(
           ingress.rawBody,
           mode === "explicit" ? envelope.requestedModel : profile.providerModelId ?? profile.modelId,
@@ -2982,6 +3036,27 @@ export class AlphaRequestProcessor {
         }
         resolutionContext.webToolPruned = retryPrepared.webToolPruned;
         resolutionContext.webToolPruneReason = retryPrepared.pruneReason;
+        resolutionContext.reasoningEffort = retryDecision.resolvedReasoningEffort;
+        resolutionContext.routeSummary.resolvedReasoningEffort = retryDecision.resolvedReasoningEffort;
+        if (routeDecisionId && target?.reasoningFallback) {
+          const persistedReasoningDecision = {
+            clientRequestedReasoningEffort: retryDecision.clientRequestedReasoningEffort ?? null,
+            presetReasoningEffort: retryDecision.presetReasoningEffort ?? null,
+            targetCanonicalReasoningEffort: retryDecision.targetCanonicalReasoningEffort ?? null,
+            resolvedReasoningEffort: retryDecision.resolvedReasoningEffort ?? null,
+            wireReasoningEffort: retryDecision.wireReasoningEffort ?? null,
+            mappingStatus: retryDecision.mappingStatus,
+            reasoningMappingStatus: retryDecision.mappingStatus,
+            reasoningCapabilitySource: retryDecision.reasoningCapabilitySource,
+          };
+          await repository.updateRouteReasoningDecision(routeDecisionId, identity.newapiUserId, persistedReasoningDecision);
+          const routeInputs = record(resolutionContext.routeDecisionSnapshot?.formula_inputs_json);
+          if (routeInputs) {
+            Object.assign(routeInputs, persistedReasoningDecision);
+            const decisionSnapshot = record(routeInputs.decisionSnapshot);
+            if (decisionSnapshot) Object.assign(decisionSnapshot, persistedReasoningDecision);
+          }
+        }
         if (envelope.webIntent !== "not_required") {
           if (resolutionContext.webFallbackChain.length === 0) {
             resolutionContext.webFallbackChain.push(

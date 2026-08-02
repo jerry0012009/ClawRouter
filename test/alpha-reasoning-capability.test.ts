@@ -55,6 +55,20 @@ describe("model-level reasoning capability", () => {
     expect(JSON.parse(prepared.body.toString()).reasoning).toEqual({ summary: "auto" });
   });
 
+  it("falls back from a preset to the mapped client effort without deleting it", () => {
+    const initial = decideReasoning({ mode: "acu-auto", clientEffort: "high", presetEffort: "max", modelId: "gpt-5.6-luna", protocol: "responses" });
+    const client = decideReasoning({ mode: "acu-auto", clientEffort: "high", modelId: "gpt-5.6-luna", protocol: "responses" });
+    const fallback = { ...initial, resolvedReasoningEffort: client.resolvedReasoningEffort,
+      wireReasoningEffort: client.wireReasoningEffort, mappingStatus: "provider_fallback_to_client_effort" as const };
+    const prepared = prepareProviderBody(
+      Buffer.from('{"model":"acu-auto","input":[],"reasoning":{"effort":"high","summary":"auto"}}'),
+      "gpt-5.6-luna", envelope("responses", "high"), profile("responses"), fallback,
+    );
+    expect(JSON.parse(prepared.body.toString()).reasoning).toEqual({ effort: "high", summary: "auto" });
+    expect(prepared).toMatchObject({ resolvedReasoningEffort: "high", wireReasoningEffort: "high",
+      mappingStatus: "provider_fallback_to_client_effort", providerReasoningOverrideApplied: true });
+  });
+
   it("classifies only explicit pre-output reasoning parameter rejection", () => {
     const failure = (body: string, status = 400, visible = 0) => ({ status, headers: {}, body: Buffer.from(body),
       observation: { rawResponseBytes: body.length, modelVisibleOutputBytes: visible } });

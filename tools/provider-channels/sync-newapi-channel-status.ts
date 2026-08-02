@@ -3,6 +3,18 @@ import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { buildModelCurve, getAcuCatalog, getAcuModel } from "../../src/acu/catalog.js";
+import {
+  buildPayablePricing,
+  buildReferencePricing,
+  parsePricingDisplayMode,
+  parseReferenceUsdCny,
+  selectPayableProfile,
+  selectPublicReferenceSource,
+} from "../../src/alpha/pricing-view.js";
+import {
+  DEFAULT_BILLING_POLICY_VERSION,
+  parseRetailMarkupMultiplier,
+} from "../../src/alpha/retail-charge.js";
 
 const catalogPath = resolve("deploy/alpha/newapi-acu-catalog.json");
 const sourceCatalogPath = resolve("src/acu/catalog/model-catalog.json");
@@ -11,6 +23,10 @@ const sourceCatalog = JSON.parse(sourceCatalogBody.toString("utf8")) as {
   schemaVersion: string;
   generatedAt: string;
   priceVersion: string;
+};
+const referenceSources = JSON.parse(await readFile(resolve("deploy/alpha/official-price-sources.json"), "utf8")) as {
+  observedAt: string;
+  sources: Array<{ vendor: string; models: string[]; nativeUnit?: "CNY per 1M tokens"; status?: string }>;
 };
 const profiles = JSON.parse(await readFile(resolve("deploy/alpha/execution-profiles.json"), "utf8")) as Array<Record<string, unknown>>;
 const economicsCatalog = JSON.parse(await readFile(resolve("deploy/alpha/provider-economics.json"), "utf8")) as {
@@ -21,6 +37,8 @@ const catalog = JSON.parse(await readFile(catalogPath, "utf8")) as {
   sourceCatalogContentSha256?: string;
   pricingVersion: string;
   generatedAt?: string;
+  displayMode?: string;
+  referenceFxCnyPerUsd?: number;
   responses: Array<Record<string, unknown>>;
   curveModelStatuses: Array<Record<string, unknown>>;
 };
@@ -28,6 +46,10 @@ catalog.sourceCatalogVersion = sourceCatalog.schemaVersion;
 catalog.sourceCatalogContentSha256 = createHash("sha256").update(sourceCatalogBody).digest("hex");
 catalog.pricingVersion = sourceCatalog.priceVersion;
 catalog.generatedAt = sourceCatalog.generatedAt;
+catalog.displayMode = parsePricingDisplayMode(process.env.ACU_PRICING_DISPLAY_MODE);
+catalog.referenceFxCnyPerUsd = parseReferenceUsdCny(process.env.ACU_PRICING_REFERENCE_USD_CNY);
+const retailMarkupMultiplier = parseRetailMarkupMultiplier(process.env.ACU_RETAIL_MARKUP_MULTIPLIER);
+const pricingPolicyVersion = process.env.ACU_BILLING_POLICY_VERSION?.trim() || DEFAULT_BILLING_POLICY_VERSION;
 const economicsByProvider = new Map(economicsCatalog.providers.map((provider) => [String(provider.providerId), provider]));
 function activeProfiles(modelId: string, responsesOnly: boolean): Array<Record<string, unknown>> {
   return profiles.filter((profile) => profile.modelId === modelId
@@ -39,13 +61,6 @@ function effectiveCostStatuses(items: Array<Record<string, unknown>>): string[] 
   return [...new Set(items.map((profile) => String(profile.effectiveCostStatus ?? "missing")))]
     .filter((status) => status === "estimated" || status === "verified")
     .sort();
-}
-
-function displayProvider(providerIds: string[]): string {
-  if (providerIds.length > 1) return "Multi-provider";
-  const provider = providerIds[0] ?? "Unknown";
-  return provider === "lucen" ? "Lucen" : provider === "blackai" ? "BlackAI"
-    : provider === "closeai" ? "CloseAI" : provider;
 }
 
 function profileCashCnyPerNominalUsd(profile: Record<string, unknown>): number {
@@ -90,9 +105,7 @@ function referenceProfile(items: Array<Record<string, unknown>>, model: {
   outputPricePerMillion: number;
   cachedInputPricePerMillion: number | null;
 }): Record<string, unknown> | undefined {
-  return items
-    .filter((profile) => profile.usageTrusted !== false && profile.effectiveCostStatus !== "missing")
-    .sort((left, right) => profileReferenceScore(left, model) - profileReferenceScore(right, model))[0];
+  return selectPayableProfile(items, (profile) => profileReferenceScore(profile, model));
 }
 
 const active = profiles.filter((profile) => profile.enabled === true
@@ -116,7 +129,6 @@ catalog.responses = activeModelIds.map((modelId) => {
   const protocols = [...new Set(modelProfiles.flatMap((profile) => profile.protocols instanceof Array
     ? profile.protocols.map(String) : []))].sort();
   const channels = new Set(modelProfiles.map((profile) => String(profile.channelId ?? profile.channel)));
-  const providers = [...new Set(modelProfiles.map((profile) => String(profile.provider)))].sort();
   const existing = existingResponses.get(modelId);
   const healthyProfiles = activeProfiles(modelId, false);
   const costProfile = referenceProfile(healthyProfiles, model);
@@ -126,6 +138,32 @@ catalog.responses = activeModelIds.map((modelId) => {
   }
   const profilePrices = profileTokenPrices(costProfile, model);
   const effectiveCostStatus = costProfile?.effectiveCostStatus === "verified" ? "verified" : "estimated";
+  const billing = costProfile.billingPrice && typeof costProfile.billingPrice === "object"
+    ? costProfile.billingPrice as Record<string, unknown> : undefined;
+  const payable = buildPayablePricing({
+    billingPrice: {
+      inputPricePerMillion: profilePrices.input,
+      outputPricePerMillion: profilePrices.output,
+      cachedInputPricePerMillion: profilePrices.cacheRead,
+      status: billing?.status === "verified" ? "verified" : "estimated",
+    },
+    cashCnyPerNominalUsd: cashMultiplier,
+    retailMarkupMultiplier,
+    effectiveCostStatus,
+    pricingPolicyVersion,
+  });
+  const referenceSource = selectPublicReferenceSource(modelId, referenceSources.sources);
+  const reference = buildReferencePricing({
+    price: {
+      inputPricePerMillion: model.inputPricePerMillion,
+      outputPricePerMillion: model.outputPricePerMillion,
+      cachedInputPricePerMillion: model.cachedInputPricePerMillion,
+      currency: referenceSource?.nativeUnit === "CNY per 1M tokens" ? "CNY" : "USD",
+    },
+    source: referenceSource,
+    observedAt: referenceSources.observedAt,
+    fxCnyPerUsd: catalog.referenceFxCnyPerUsd,
+  });
   return {
     modelId,
     displayName: model.displayName,
@@ -135,18 +173,13 @@ catalog.responses = activeModelIds.map((modelId) => {
     inputPricePerMillion: model.inputPricePerMillion,
     outputPricePerMillion: model.outputPricePerMillion,
     cachedInputPricePerMillion: model.cachedInputPricePerMillion ?? model.inputPricePerMillion,
-    effectiveInputPriceCnyPerMillion: profilePrices.input * cashMultiplier,
-    effectiveOutputPriceCnyPerMillion: profilePrices.output * cashMultiplier,
-    effectiveCachedInputPriceCnyPerMillion: profilePrices.cacheRead * cashMultiplier,
+    effectiveInputPriceCnyPerMillion: payable.inputCnyPerMillion,
+    effectiveOutputPriceCnyPerMillion: payable.outputCnyPerMillion,
+    effectiveCachedInputPriceCnyPerMillion: payable.cachedInputCnyPerMillion,
     costCurrency: "CNY",
-    costSemantics: "estimated_user_cash_cost",
-    costBasis: "current_reference_execution_profile",
-    costBasisLabel: "Reference channel price; actual route may select another eligible profile",
-    costExecutionProfileId: String(costProfile?.executionProfileId ?? ""),
-    costObservedBillingMultiplier: Number(costProfile?.observedBillingMultiplier),
-    costPriceSource: (costProfile.billingPrice as Record<string, unknown> | undefined)?.source ?? "official_catalog_fallback",
-    costProvider: displayProvider(costProfile ? [String(costProfile.provider)] : []),
-    costChannel: String(costProfile?.channel ?? ""),
+    costSemantics: "estimated_user_payable_price",
+    payable,
+    ...(reference ? { reference } : {}),
     effectiveCostStatus,
     curveProfile: model.curveProfile,
     profileConfidence: model.profileConfidence,
@@ -157,10 +190,7 @@ catalog.responses = activeModelIds.map((modelId) => {
     toolCall: modelProfiles.every((profile) => profile.toolCallSupport === true),
     reasoning: modelProfiles.every((profile) => profile.thinkingSupport === true),
     activeInAcuAuto: true,
-    provider: displayProvider(providers),
     status: "routing_active",
-    healthyChannelCount: channels.size,
-    effectiveCostStatuses: effectiveCostStatuses(modelProfiles),
   };
 });
 
@@ -181,13 +211,6 @@ for (const item of catalog.curveModelStatuses) {
   item.effectiveCostStatuses = effectiveCostStatuses(healthyProfiles);
   item.temporarilyUnavailableReason = healthyChannels.size === 0
     ? `No active verified Channel (${(item.statuses as string[]).join(", ")})` : null;
-}
-for (const item of catalog.responses) {
-  const modelId = String(item.modelId);
-  const healthyProfiles = activeProfiles(modelId, false);
-  const healthyChannels = new Set(healthyProfiles.map((profile) => String(profile.channel)));
-  item.healthyChannelCount = healthyChannels.size;
-  item.effectiveCostStatuses = effectiveCostStatuses(healthyProfiles);
 }
 await writeFile(catalogPath, `${JSON.stringify(catalog, null, 2)}\n`);
 console.log(JSON.stringify({ curveModels: catalog.curveModelStatuses.length,

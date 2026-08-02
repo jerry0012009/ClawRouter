@@ -23,8 +23,16 @@ describe("Founder Alpha New API catalog export", () => {
         cachedInputPricePerMillion: item.cachedInputPricePerMillion,
       });
       expect(item.costCurrency).toBe("CNY");
-      expect(item.costSemantics).toBe("estimated_user_cash_cost");
-      expect(item.costExecutionProfileId).not.toBe("");
+      expect(item.costSemantics).toBe("estimated_user_payable_price");
+      expect(item.payable).toMatchObject({
+        inputCnyPerMillion: item.effectiveInputPriceCnyPerMillion,
+        outputCnyPerMillion: item.effectiveOutputPriceCnyPerMillion,
+        pricingPolicyVersion: "acu-retail-v1",
+      });
+      for (const privateKey of ["costProvider", "costChannel", "costExecutionProfileId",
+        "costObservedBillingMultiplier", "healthyChannelCount", "effectiveCostStatuses"]) {
+        expect(item).not.toHaveProperty(privateKey);
+      }
       expect(item.effectiveInputPriceCnyPerMillion).toBeGreaterThan(0);
       expect(item.effectiveOutputPriceCnyPerMillion).toBeGreaterThan(0);
       expect(item.curve).toHaveLength(101);
@@ -43,19 +51,26 @@ describe("Founder Alpha New API catalog export", () => {
       costCurrency: "CNY",
       effectiveInputPriceCnyPerMillion: 0.012,
       effectiveOutputPriceCnyPerMillion: 0.072,
-      costProvider: "Lucen",
+      reference: {
+        outputCnyPerMillion: 8.64,
+        sourceType: "official",
+        sourceName: "OpenAI official pricing",
+        originalCurrency: "USD",
+        fxCnyPerUsd: 7.2,
+      },
     });
+    expect(luna.reference.inputCnyPerMillion).toBeCloseTo(1.44);
     const fable = exported.responses.find((item: { modelId: string }) => item.modelId === "claude-fable-5");
     expect(fable).toMatchObject({
       effectiveInputPriceCnyPerMillion: 0.6,
       effectiveOutputPriceCnyPerMillion: 3,
       protocol: "Messages",
-      healthyChannelCount: 1,
     });
     const kimiK3 = exported.responses.find((item: { modelId: string }) => item.modelId === "kimi-k3");
     expect(kimiK3.effectiveInputPriceCnyPerMillion).toBeCloseTo(8);
     expect(kimiK3.effectiveOutputPriceCnyPerMillion).toBeCloseTo(40);
-    expect(kimiK3).toMatchObject({ protocol: "Responses", healthyChannelCount: 1 });
+    expect(kimiK3).toMatchObject({ protocol: "Responses" });
+    expect(kimiK3.reference).toBeUndefined();
     expect(kimiK3).toMatchObject({ curveProfile: "frontier_resilient", profileConfidence: "medium" });
     const kimiK3Source = source.models.find((item: { modelId: string }) => item.modelId === "kimi-k3");
     expect(kimiK3Source.evidenceConfidence).toBe("medium");

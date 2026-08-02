@@ -6,9 +6,9 @@
   "auto": {
     "modelId": "acu-auto",
     "displayName": "ACU Auto Router",
-    "description": "根据任务难度、模型能力曲线、价格、协议兼容性和当前健康状态，从真实可用模型中动态选择。",
+    "description": "根据任务难度、模型能力、协议兼容性和当前可用状态动态选择模型。最终按实际选中模型的平台价格及路由判断费用结算。",
     "pricingLabel": "动态计费",
-    "pricingDescription": "按实际执行模型的 Provider 成本 + Judge 成本以人民币结算，不存在固定输入/输出单价。"
+    "pricingDescription": "根据任务难度、模型能力、协议兼容性和当前可用状态动态选择模型。最终按实际选中模型的平台价格及路由判断费用结算。"
   },
   "responses": [
     {
@@ -22,14 +22,24 @@
       "effectiveOutputPriceCnyPerMillion": 3,
       "effectiveCachedInputPriceCnyPerMillion": 0.06,
       "costCurrency": "CNY",
-      "costSemantics": "estimated_user_cash_cost",
-      "costBasis": "current_reference_execution_profile",
-      "costBasisLabel": "Reference channel price; actual route may select another eligible profile",
-      "costExecutionProfileId": "lucen-kiro-cache70-claude-006:claude-fable-5:messages",
-      "costObservedBillingMultiplier": 0.06,
-      "costPriceSource": "Lucen authenticated usage ledger; stable provider-model component rate",
-      "costProvider": "Lucen",
-      "costChannel": "lucen-kiro-cache70-claude-006",
+      "costSemantics": "estimated_user_payable_price",
+      "payable": {
+        "inputCnyPerMillion": 0.6,
+        "outputCnyPerMillion": 3,
+        "cachedInputCnyPerMillion": 0.06,
+        "status": "estimated",
+        "pricingPolicyVersion": "acu-retail-v1"
+      },
+      "reference": {
+        "inputCnyPerMillion": 72,
+        "outputCnyPerMillion": 360,
+        "cachedInputCnyPerMillion": 7.2,
+        "sourceType": "official",
+        "sourceName": "Anthropic official pricing",
+        "observedAt": "2026-08-02",
+        "originalCurrency": "USD",
+        "fxCnyPerUsd": 7.2
+      },
       "effectiveCostStatus": "estimated",
       "curveProfile": "frontier_resilient",
       "profileConfidence": "medium",
@@ -645,12 +655,7 @@
       "toolCall": true,
       "reasoning": true,
       "activeInAcuAuto": true,
-      "provider": "Lucen",
-      "status": "routing_active",
-      "healthyChannelCount": 1,
-      "effectiveCostStatuses": [
-        "estimated"
-      ]
+      "status": "routing_active"
     },
     {
       "modelId": "claude-opus-4-8",
@@ -663,14 +668,24 @@
       "effectiveOutputPriceCnyPerMillion": 1.5,
       "effectiveCachedInputPriceCnyPerMillion": 0.03,
       "costCurrency": "CNY",
-      "costSemantics": "estimated_user_cash_cost",
-      "costBasis": "current_reference_execution_profile",
-      "costBasisLabel": "Reference channel price; actual route may select another eligible profile",
-      "costExecutionProfileId": "lucen-kiro-cache90-claude-006:claude-opus-4-8:messages",
-      "costObservedBillingMultiplier": 0.06,
-      "costPriceSource": "Lucen authenticated usage ledger; stable provider-model component rate",
-      "costProvider": "Lucen",
-      "costChannel": "lucen-kiro-cache90-claude-006",
+      "costSemantics": "estimated_user_payable_price",
+      "payable": {
+        "inputCnyPerMillion": 0.3,
+        "outputCnyPerMillion": 1.5,
+        "cachedInputCnyPerMillion": 0.03,
+        "status": "estimated",
+        "pricingPolicyVersion": "acu-retail-v1"
+      },
+      "reference": {
+        "inputCnyPerMillion": 36,
+        "outputCnyPerMillion": 180,
+        "cachedInputCnyPerMillion": 3.6,
+        "sourceType": "official",
+        "sourceName": "Anthropic official pricing",
+        "observedAt": "2026-08-02",
+        "originalCurrency": "USD",
+        "fxCnyPerUsd": 7.2
+      },
       "effectiveCostStatus": "estimated",
       "curveProfile": "frontier_resilient",
       "profileConfidence": "medium",
@@ -1286,13 +1301,7 @@
       "toolCall": true,
       "reasoning": true,
       "activeInAcuAuto": true,
-      "provider": "Multi-provider",
-      "status": "routing_active",
-      "healthyChannelCount": 8,
-      "effectiveCostStatuses": [
-        "estimated",
-        "verified"
-      ]
+      "status": "routing_active"
     },
     {
       "modelId": "claude-sonnet-5",
@@ -1305,14 +1314,24 @@
       "effectiveOutputPriceCnyPerMillion": 0.6,
       "effectiveCachedInputPriceCnyPerMillion": 0.012,
       "costCurrency": "CNY",
-      "costSemantics": "estimated_user_cash_cost",
-      "costBasis": "current_reference_execution_profile",
-      "costBasisLabel": "Reference channel price; actual route may select another eligible profile",
-      "costExecutionProfileId": "lucen-kiro-cache90-claude-006:claude-sonnet-5:messages",
-      "costObservedBillingMultiplier": 0.06,
-      "costPriceSource": "Lucen authenticated usage ledger; stable provider-model component rate",
-      "costProvider": "Lucen",
-      "costChannel": "lucen-kiro-cache90-claude-006",
+      "costSemantics": "estimated_user_payable_price",
+      "payable": {
+        "inputCnyPerMillion": 0.12,
+        "outputCnyPerMillion": 0.6,
+        "cachedInputCnyPerMillion": 0.012,
+        "status": "estimated",
+        "pricingPolicyVersion": "acu-retail-v1"
+      },
+      "reference": {
+        "inputCnyPerMillion": 14.4,
+        "outputCnyPerMillion": 72,
+        "cachedInputCnyPerMillion": 1.4400000000000002,
+        "sourceType": "official",
+        "sourceName": "Anthropic official pricing",
+        "observedAt": "2026-08-02",
+        "originalCurrency": "USD",
+        "fxCnyPerUsd": 7.2
+      },
       "effectiveCostStatus": "estimated",
       "curveProfile": "balanced_frontier",
       "profileConfidence": "low",
@@ -1928,13 +1947,7 @@
       "toolCall": true,
       "reasoning": true,
       "activeInAcuAuto": true,
-      "provider": "Multi-provider",
-      "status": "routing_active",
-      "healthyChannelCount": 6,
-      "effectiveCostStatuses": [
-        "estimated",
-        "verified"
-      ]
+      "status": "routing_active"
     },
     {
       "modelId": "deepseek-v4-flash",
@@ -1947,14 +1960,24 @@
       "effectiveOutputPriceCnyPerMillion": 1,
       "effectiveCachedInputPriceCnyPerMillion": 0.01,
       "costCurrency": "CNY",
-      "costSemantics": "estimated_user_cash_cost",
-      "costBasis": "current_reference_execution_profile",
-      "costBasisLabel": "Reference channel price; actual route may select another eligible profile",
-      "costExecutionProfileId": "lucen-deepseek-claude-050:deepseek-v4-flash:messages",
-      "costObservedBillingMultiplier": 0.5,
-      "costPriceSource": "Lucen authenticated usage ledger; stable provider-model component rate",
-      "costProvider": "Lucen",
-      "costChannel": "lucen-deepseek-claude-050",
+      "costSemantics": "estimated_user_payable_price",
+      "payable": {
+        "inputCnyPerMillion": 0.5,
+        "outputCnyPerMillion": 1,
+        "cachedInputCnyPerMillion": 0.01,
+        "status": "estimated",
+        "pricingPolicyVersion": "acu-retail-v1"
+      },
+      "reference": {
+        "inputCnyPerMillion": 1.0080000000000002,
+        "outputCnyPerMillion": 2.0160000000000005,
+        "cachedInputCnyPerMillion": 0.02016,
+        "sourceType": "official",
+        "sourceName": "DeepSeek official pricing",
+        "observedAt": "2026-08-02",
+        "originalCurrency": "USD",
+        "fxCnyPerUsd": 7.2
+      },
       "effectiveCostStatus": "estimated",
       "curveProfile": "efficient_fast",
       "profileConfidence": "high",
@@ -2570,12 +2593,7 @@
       "toolCall": true,
       "reasoning": true,
       "activeInAcuAuto": true,
-      "provider": "Lucen",
-      "status": "routing_active",
-      "healthyChannelCount": 1,
-      "effectiveCostStatuses": [
-        "estimated"
-      ]
+      "status": "routing_active"
     },
     {
       "modelId": "gemini-2.5-flash",
@@ -2588,14 +2606,24 @@
       "effectiveOutputPriceCnyPerMillion": 0.75,
       "effectiveCachedInputPriceCnyPerMillion": 0.009,
       "costCurrency": "CNY",
-      "costSemantics": "estimated_user_cash_cost",
-      "costBasis": "current_reference_execution_profile",
-      "costBasisLabel": "Reference channel price; actual route may select another eligible profile",
-      "costExecutionProfileId": "lucen-gemini-openai-030:gemini-2.5-flash:responses",
-      "costObservedBillingMultiplier": 0.3,
-      "costPriceSource": "Lucen authenticated usage ledger; stable provider-model component rate",
-      "costProvider": "Lucen",
-      "costChannel": "lucen-gemini-openai-030",
+      "costSemantics": "estimated_user_payable_price",
+      "payable": {
+        "inputCnyPerMillion": 0.09,
+        "outputCnyPerMillion": 0.75,
+        "cachedInputCnyPerMillion": 0.009,
+        "status": "estimated",
+        "pricingPolicyVersion": "acu-retail-v1"
+      },
+      "reference": {
+        "inputCnyPerMillion": 2.16,
+        "outputCnyPerMillion": 18,
+        "cachedInputCnyPerMillion": 0.216,
+        "sourceType": "official",
+        "sourceName": "Google official pricing",
+        "observedAt": "2026-08-02",
+        "originalCurrency": "USD",
+        "fxCnyPerUsd": 7.2
+      },
       "effectiveCostStatus": "estimated",
       "curveProfile": "efficient_fast",
       "profileConfidence": "low",
@@ -3211,12 +3239,7 @@
       "toolCall": true,
       "reasoning": true,
       "activeInAcuAuto": true,
-      "provider": "Lucen",
-      "status": "routing_active",
-      "healthyChannelCount": 1,
-      "effectiveCostStatuses": [
-        "estimated"
-      ]
+      "status": "routing_active"
     },
     {
       "modelId": "glm-5.1",
@@ -3229,14 +3252,24 @@
       "effectiveOutputPriceCnyPerMillion": 1.32,
       "effectiveCachedInputPriceCnyPerMillion": 0.078,
       "costCurrency": "CNY",
-      "costSemantics": "estimated_user_cash_cost",
-      "costBasis": "current_reference_execution_profile",
-      "costBasisLabel": "Reference channel price; actual route may select another eligible profile",
-      "costExecutionProfileId": "lucen-glm-official-openai-030:glm-5.1:responses",
-      "costObservedBillingMultiplier": 0.3,
-      "costPriceSource": "official_catalog_fallback",
-      "costProvider": "Lucen",
-      "costChannel": "lucen-glm-official-openai-030",
+      "costSemantics": "estimated_user_payable_price",
+      "payable": {
+        "inputCnyPerMillion": 0.42,
+        "outputCnyPerMillion": 1.32,
+        "cachedInputCnyPerMillion": 0.078,
+        "status": "estimated",
+        "pricingPolicyVersion": "acu-retail-v1"
+      },
+      "reference": {
+        "inputCnyPerMillion": 10.08,
+        "outputCnyPerMillion": 31.680000000000003,
+        "cachedInputCnyPerMillion": 1.872,
+        "sourceType": "official",
+        "sourceName": "Z.AI official pricing",
+        "observedAt": "2026-08-02",
+        "originalCurrency": "USD",
+        "fxCnyPerUsd": 7.2
+      },
       "effectiveCostStatus": "estimated",
       "curveProfile": "balanced_frontier",
       "profileConfidence": "low",
@@ -3852,12 +3885,7 @@
       "toolCall": true,
       "reasoning": true,
       "activeInAcuAuto": true,
-      "provider": "Lucen",
-      "status": "routing_active",
-      "healthyChannelCount": 1,
-      "effectiveCostStatuses": [
-        "estimated"
-      ]
+      "status": "routing_active"
     },
     {
       "modelId": "glm-5.2",
@@ -3870,14 +3898,24 @@
       "effectiveOutputPriceCnyPerMillion": 8.4,
       "effectiveCachedInputPriceCnyPerMillion": 0.6,
       "costCurrency": "CNY",
-      "costSemantics": "estimated_user_cash_cost",
-      "costBasis": "current_reference_execution_profile",
-      "costBasisLabel": "Reference channel price; actual route may select another eligible profile",
-      "costExecutionProfileId": "lucen-mainstream-cn-claude-030:glm-5.2:messages",
-      "costObservedBillingMultiplier": 0.3,
-      "costPriceSource": "Lucen authenticated usage ledger; stable provider-model component rate",
-      "costProvider": "Lucen",
-      "costChannel": "lucen-mainstream-cn-claude-030",
+      "costSemantics": "estimated_user_payable_price",
+      "payable": {
+        "inputCnyPerMillion": 2.4,
+        "outputCnyPerMillion": 8.4,
+        "cachedInputCnyPerMillion": 0.6,
+        "status": "estimated",
+        "pricingPolicyVersion": "acu-retail-v1"
+      },
+      "reference": {
+        "inputCnyPerMillion": 10.08,
+        "outputCnyPerMillion": 31.680000000000003,
+        "cachedInputCnyPerMillion": 1.872,
+        "sourceType": "official",
+        "sourceName": "Z.AI official pricing",
+        "observedAt": "2026-08-02",
+        "originalCurrency": "USD",
+        "fxCnyPerUsd": 7.2
+      },
       "effectiveCostStatus": "estimated",
       "curveProfile": "balanced_frontier",
       "profileConfidence": "medium",
@@ -4493,12 +4531,7 @@
       "toolCall": true,
       "reasoning": true,
       "activeInAcuAuto": true,
-      "provider": "Lucen",
-      "status": "routing_active",
-      "healthyChannelCount": 3,
-      "effectiveCostStatuses": [
-        "estimated"
-      ]
+      "status": "routing_active"
     },
     {
       "modelId": "gpt-5.4-mini",
@@ -4511,14 +4544,24 @@
       "effectiveOutputPriceCnyPerMillion": 0.27,
       "effectiveCachedInputPriceCnyPerMillion": 0.0045,
       "costCurrency": "CNY",
-      "costSemantics": "estimated_user_cash_cost",
-      "costBasis": "current_reference_execution_profile",
-      "costBasisLabel": "Reference channel price; actual route may select another eligible profile",
-      "costExecutionProfileId": "lucen-cx006-plus:gpt-5.4-mini:responses",
-      "costObservedBillingMultiplier": 0.06,
-      "costPriceSource": "Lucen authenticated usage ledger; stable provider-model component rate",
-      "costProvider": "Lucen",
-      "costChannel": "lucen-cx006-plus",
+      "costSemantics": "estimated_user_payable_price",
+      "payable": {
+        "inputCnyPerMillion": 0.045,
+        "outputCnyPerMillion": 0.27,
+        "cachedInputCnyPerMillion": 0.0045,
+        "status": "estimated",
+        "pricingPolicyVersion": "acu-retail-v1"
+      },
+      "reference": {
+        "inputCnyPerMillion": 5.4,
+        "outputCnyPerMillion": 32.4,
+        "cachedInputCnyPerMillion": 0.54,
+        "sourceType": "official",
+        "sourceName": "OpenAI official pricing",
+        "observedAt": "2026-08-02",
+        "originalCurrency": "USD",
+        "fxCnyPerUsd": 7.2
+      },
       "effectiveCostStatus": "estimated",
       "curveProfile": "efficient_fast",
       "profileConfidence": "low",
@@ -5134,13 +5177,7 @@
       "toolCall": true,
       "reasoning": true,
       "activeInAcuAuto": true,
-      "provider": "Multi-provider",
-      "status": "routing_active",
-      "healthyChannelCount": 10,
-      "effectiveCostStatuses": [
-        "estimated",
-        "verified"
-      ]
+      "status": "routing_active"
     },
     {
       "modelId": "gpt-5.5",
@@ -5153,14 +5190,24 @@
       "effectiveOutputPriceCnyPerMillion": 1.7999999999999998,
       "effectiveCachedInputPriceCnyPerMillion": 0.03,
       "costCurrency": "CNY",
-      "costSemantics": "estimated_user_cash_cost",
-      "costBasis": "current_reference_execution_profile",
-      "costBasisLabel": "Reference channel price; actual route may select another eligible profile",
-      "costExecutionProfileId": "lucen-cx006-plus:gpt-5.5:responses",
-      "costObservedBillingMultiplier": 0.06,
-      "costPriceSource": "official_catalog_fallback",
-      "costProvider": "Lucen",
-      "costChannel": "lucen-cx006-plus",
+      "costSemantics": "estimated_user_payable_price",
+      "payable": {
+        "inputCnyPerMillion": 0.3,
+        "outputCnyPerMillion": 1.7999999999999998,
+        "cachedInputCnyPerMillion": 0.03,
+        "status": "estimated",
+        "pricingPolicyVersion": "acu-retail-v1"
+      },
+      "reference": {
+        "inputCnyPerMillion": 36,
+        "outputCnyPerMillion": 216,
+        "cachedInputCnyPerMillion": 3.6,
+        "sourceType": "official",
+        "sourceName": "OpenAI official pricing",
+        "observedAt": "2026-08-02",
+        "originalCurrency": "USD",
+        "fxCnyPerUsd": 7.2
+      },
       "effectiveCostStatus": "estimated",
       "curveProfile": "balanced_frontier",
       "profileConfidence": "low",
@@ -5776,13 +5823,7 @@
       "toolCall": true,
       "reasoning": true,
       "activeInAcuAuto": true,
-      "provider": "Multi-provider",
-      "status": "routing_active",
-      "healthyChannelCount": 12,
-      "effectiveCostStatuses": [
-        "estimated",
-        "verified"
-      ]
+      "status": "routing_active"
     },
     {
       "modelId": "gpt-5.6-luna",
@@ -5795,14 +5836,24 @@
       "effectiveOutputPriceCnyPerMillion": 0.072,
       "effectiveCachedInputPriceCnyPerMillion": 0.0012,
       "costCurrency": "CNY",
-      "costSemantics": "estimated_user_cash_cost",
-      "costBasis": "current_reference_execution_profile",
-      "costBasisLabel": "Reference channel price; actual route may select another eligible profile",
-      "costExecutionProfileId": "lucen-cx006-plus:gpt-5.6-luna:responses",
-      "costObservedBillingMultiplier": 0.06,
-      "costPriceSource": "official_catalog_fallback",
-      "costProvider": "Lucen",
-      "costChannel": "lucen-cx006-plus",
+      "costSemantics": "estimated_user_payable_price",
+      "payable": {
+        "inputCnyPerMillion": 0.012,
+        "outputCnyPerMillion": 0.072,
+        "cachedInputCnyPerMillion": 0.0012,
+        "status": "estimated",
+        "pricingPolicyVersion": "acu-retail-v1"
+      },
+      "reference": {
+        "inputCnyPerMillion": 1.4400000000000002,
+        "outputCnyPerMillion": 8.64,
+        "cachedInputCnyPerMillion": 0.14400000000000002,
+        "sourceType": "official",
+        "sourceName": "OpenAI official pricing",
+        "observedAt": "2026-08-02",
+        "originalCurrency": "USD",
+        "fxCnyPerUsd": 7.2
+      },
       "effectiveCostStatus": "estimated",
       "curveProfile": "efficient_fast",
       "profileConfidence": "low",
@@ -6418,13 +6469,7 @@
       "toolCall": true,
       "reasoning": true,
       "activeInAcuAuto": true,
-      "provider": "Multi-provider",
-      "status": "routing_active",
-      "healthyChannelCount": 12,
-      "effectiveCostStatuses": [
-        "estimated",
-        "verified"
-      ]
+      "status": "routing_active"
     },
     {
       "modelId": "gpt-5.6-sol",
@@ -6437,14 +6482,24 @@
       "effectiveOutputPriceCnyPerMillion": 1.7999999999999998,
       "effectiveCachedInputPriceCnyPerMillion": 0.03,
       "costCurrency": "CNY",
-      "costSemantics": "estimated_user_cash_cost",
-      "costBasis": "current_reference_execution_profile",
-      "costBasisLabel": "Reference channel price; actual route may select another eligible profile",
-      "costExecutionProfileId": "lucen-cx006-plus:gpt-5.6-sol:responses",
-      "costObservedBillingMultiplier": 0.06,
-      "costPriceSource": "Lucen authenticated usage ledger; stable provider-model component rate",
-      "costProvider": "Lucen",
-      "costChannel": "lucen-cx006-plus",
+      "costSemantics": "estimated_user_payable_price",
+      "payable": {
+        "inputCnyPerMillion": 0.3,
+        "outputCnyPerMillion": 1.7999999999999998,
+        "cachedInputCnyPerMillion": 0.03,
+        "status": "estimated",
+        "pricingPolicyVersion": "acu-retail-v1"
+      },
+      "reference": {
+        "inputCnyPerMillion": 36,
+        "outputCnyPerMillion": 216,
+        "cachedInputCnyPerMillion": 3.6,
+        "sourceType": "official",
+        "sourceName": "OpenAI official pricing",
+        "observedAt": "2026-08-02",
+        "originalCurrency": "USD",
+        "fxCnyPerUsd": 7.2
+      },
       "effectiveCostStatus": "estimated",
       "curveProfile": "frontier_resilient",
       "profileConfidence": "medium",
@@ -7060,13 +7115,7 @@
       "toolCall": true,
       "reasoning": true,
       "activeInAcuAuto": true,
-      "provider": "Multi-provider",
-      "status": "routing_active",
-      "healthyChannelCount": 10,
-      "effectiveCostStatuses": [
-        "estimated",
-        "verified"
-      ]
+      "status": "routing_active"
     },
     {
       "modelId": "gpt-5.6-terra",
@@ -7079,14 +7128,24 @@
       "effectiveOutputPriceCnyPerMillion": 1.2000000000000002,
       "effectiveCachedInputPriceCnyPerMillion": 0.020000000000000004,
       "costCurrency": "CNY",
-      "costSemantics": "estimated_user_cash_cost",
-      "costBasis": "current_reference_execution_profile",
-      "costBasisLabel": "Reference channel price; actual route may select another eligible profile",
-      "costExecutionProfileId": "lucen-cx006-value-dynamic:gpt-5.6-terra:responses",
-      "costObservedBillingMultiplier": 0.1,
-      "costPriceSource": "official_catalog_fallback",
-      "costProvider": "Lucen",
-      "costChannel": "lucen-cx006-value-dynamic",
+      "costSemantics": "estimated_user_payable_price",
+      "payable": {
+        "inputCnyPerMillion": 0.2,
+        "outputCnyPerMillion": 1.2000000000000002,
+        "cachedInputCnyPerMillion": 0.020000000000000004,
+        "status": "estimated",
+        "pricingPolicyVersion": "acu-retail-v1"
+      },
+      "reference": {
+        "inputCnyPerMillion": 14.4,
+        "outputCnyPerMillion": 86.4,
+        "cachedInputCnyPerMillion": 1.4400000000000002,
+        "sourceType": "official",
+        "sourceName": "OpenAI official pricing",
+        "observedAt": "2026-08-02",
+        "originalCurrency": "USD",
+        "fxCnyPerUsd": 7.2
+      },
       "effectiveCostStatus": "estimated",
       "curveProfile": "balanced_frontier",
       "profileConfidence": "medium",
@@ -7702,13 +7761,7 @@
       "toolCall": true,
       "reasoning": true,
       "activeInAcuAuto": true,
-      "provider": "Multi-provider",
-      "status": "routing_active",
-      "healthyChannelCount": 7,
-      "effectiveCostStatuses": [
-        "estimated",
-        "verified"
-      ]
+      "status": "routing_active"
     },
     {
       "modelId": "kimi-k2.6",
@@ -7721,14 +7774,14 @@
       "effectiveOutputPriceCnyPerMillion": 8.1,
       "effectiveCachedInputPriceCnyPerMillion": 0.1425,
       "costCurrency": "CNY",
-      "costSemantics": "estimated_user_cash_cost",
-      "costBasis": "current_reference_execution_profile",
-      "costBasisLabel": "Reference channel price; actual route may select another eligible profile",
-      "costExecutionProfileId": "lucen-mainstream-cn-claude-030:kimi-k2.6:messages",
-      "costObservedBillingMultiplier": 0.3,
-      "costPriceSource": "Lucen authenticated usage ledger; stable provider-model component rate",
-      "costProvider": "Lucen",
-      "costChannel": "lucen-mainstream-cn-claude-030",
+      "costSemantics": "estimated_user_payable_price",
+      "payable": {
+        "inputCnyPerMillion": 1.95,
+        "outputCnyPerMillion": 8.1,
+        "cachedInputCnyPerMillion": 0.1425,
+        "status": "estimated",
+        "pricingPolicyVersion": "acu-retail-v1"
+      },
       "effectiveCostStatus": "estimated",
       "curveProfile": "coding_specialist",
       "profileConfidence": "low",
@@ -8344,12 +8397,7 @@
       "toolCall": true,
       "reasoning": true,
       "activeInAcuAuto": true,
-      "provider": "Lucen",
-      "status": "routing_active",
-      "healthyChannelCount": 1,
-      "effectiveCostStatuses": [
-        "estimated"
-      ]
+      "status": "routing_active"
     },
     {
       "modelId": "kimi-k2.7-code",
@@ -8362,14 +8410,14 @@
       "effectiveOutputPriceCnyPerMillion": 8.1,
       "effectiveCachedInputPriceCnyPerMillion": 0.1425,
       "costCurrency": "CNY",
-      "costSemantics": "estimated_user_cash_cost",
-      "costBasis": "current_reference_execution_profile",
-      "costBasisLabel": "Reference channel price; actual route may select another eligible profile",
-      "costExecutionProfileId": "lucen-mainstream-cn-claude-030:kimi-k2.7-code:messages",
-      "costObservedBillingMultiplier": 0.3,
-      "costPriceSource": "Lucen authenticated usage ledger; stable provider-model component rate",
-      "costProvider": "Lucen",
-      "costChannel": "lucen-mainstream-cn-claude-030",
+      "costSemantics": "estimated_user_payable_price",
+      "payable": {
+        "inputCnyPerMillion": 1.95,
+        "outputCnyPerMillion": 8.1,
+        "cachedInputCnyPerMillion": 0.1425,
+        "status": "estimated",
+        "pricingPolicyVersion": "acu-retail-v1"
+      },
       "effectiveCostStatus": "estimated",
       "curveProfile": "coding_specialist",
       "profileConfidence": "medium",
@@ -8985,12 +9033,7 @@
       "toolCall": true,
       "reasoning": true,
       "activeInAcuAuto": true,
-      "provider": "Lucen",
-      "status": "routing_active",
-      "healthyChannelCount": 1,
-      "effectiveCostStatuses": [
-        "estimated"
-      ]
+      "status": "routing_active"
     },
     {
       "modelId": "kimi-k3",
@@ -9003,14 +9046,14 @@
       "effectiveOutputPriceCnyPerMillion": 40,
       "effectiveCachedInputPriceCnyPerMillion": 0.8,
       "costCurrency": "CNY",
-      "costSemantics": "estimated_user_cash_cost",
-      "costBasis": "current_reference_execution_profile",
-      "costBasisLabel": "Reference channel price; actual route may select another eligible profile",
-      "costExecutionProfileId": "lucen-kimi-k3-openai-040:kimi-k3:responses",
-      "costObservedBillingMultiplier": 0.4,
-      "costPriceSource": "Lucen authenticated usage ledger; stable provider-model component rate",
-      "costProvider": "Lucen",
-      "costChannel": "lucen-kimi-k3-openai-040",
+      "costSemantics": "estimated_user_payable_price",
+      "payable": {
+        "inputCnyPerMillion": 8,
+        "outputCnyPerMillion": 40,
+        "cachedInputCnyPerMillion": 0.8,
+        "status": "estimated",
+        "pricingPolicyVersion": "acu-retail-v1"
+      },
       "effectiveCostStatus": "estimated",
       "curveProfile": "frontier_resilient",
       "profileConfidence": "medium",
@@ -9626,12 +9669,7 @@
       "toolCall": true,
       "reasoning": true,
       "activeInAcuAuto": true,
-      "provider": "Lucen",
-      "status": "routing_active",
-      "healthyChannelCount": 1,
-      "effectiveCostStatuses": [
-        "estimated"
-      ]
+      "status": "routing_active"
     }
   ],
   "curveModelStatuses": [
@@ -9904,5 +9942,7 @@
     }
   ],
   "sourceCatalogContentSha256": "3b1d908f9b9aee01afcfd355bbf85867851c74256230c04adb143c9bfd61aaa9",
-  "generatedAt": "2026-08-02"
+  "generatedAt": "2026-08-02",
+  "displayMode": "comparison",
+  "referenceFxCnyPerUsd": 7.2
 }

@@ -197,6 +197,8 @@ services:
       GIN_MODE: release
       TZ: UTC
       ACU_PRICING_CATALOG_FILE: /app/acu-catalog/newapi-acu-catalog.json
+      ACU_PRICING_DISPLAY_MODE: ${ACU_PRICING_DISPLAY_MODE:-comparison}
+      ACU_PRICING_REFERENCE_USD_CNY: ${ACU_PRICING_REFERENCE_USD_CNY:-7.2}
       ACU_SCHEMA_VERSION: 0008_alpha_final_user_loop
       ACU_JUDGE_PRIMARY_MODEL: gpt-5.6-luna
       ACU_JUDGE_BACKUP_MODEL: mimo-v2.5-pro

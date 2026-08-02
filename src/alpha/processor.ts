@@ -143,6 +143,11 @@ export type AlphaResolutionContext = {
   judgeCostSource: string;
   judgeProvider?: string;
   judgeModel?: string;
+  judgeStatus?: AlphaJudgeRun["status"];
+  judgeResultSource?: AlphaJudgeRun["resultSource"];
+  judgeFirstAttemptSucceeded?: boolean;
+  judgeProfileAttemptCount?: number;
+  judgeSameModelFailoverUsed?: boolean;
   judgeLatencyMs?: number;
   requestBytes: number;
   replayed: boolean;
@@ -188,6 +193,11 @@ export type AlphaResolutionContext = {
   routeRefreshReason?: string;
   routeDecisionSnapshot?: JsonObject;
   recoveryDecisionReason?: RecoveryDecisionReason;
+  clientRequestedReasoningEffort?: string;
+  presetReasoningEffort?: string;
+  targetCanonicalReasoningEffort?: string;
+  wireReasoningEffort?: string;
+  reasoningMappingStatus?: string;
 };
 
 type PreparedState = {
@@ -2625,6 +2635,11 @@ export class AlphaRequestProcessor {
       judgeCostSource: result.judge?.costSource ?? "not_applicable",
       judgeProvider: result.judge?.provider,
       judgeModel: result.judge?.model,
+      judgeStatus: result.judge?.status,
+      judgeResultSource: result.judge?.resultSource,
+      judgeFirstAttemptSucceeded: result.judge?.attempts[0]?.status === "success",
+      judgeProfileAttemptCount: result.judge?.profileAttemptCount ?? 0,
+      judgeSameModelFailoverUsed: result.judge?.sameModelFailoverUsed ?? false,
       judgeLatencyMs: result.judge?.latencyMs ?? 0,
       requestBytes: ingress.rawBody.byteLength,
       replayed: false,
@@ -2652,6 +2667,11 @@ export class AlphaRequestProcessor {
       reusedJudgeEvaluationId: judgeReused ? judgeEvaluationId : undefined,
       routeRefreshReason,
       routeDecisionSnapshot: storedRoute,
+      clientRequestedReasoningEffort: reasoningDecision.clientRequestedReasoningEffort,
+      presetReasoningEffort: reasoningDecision.presetReasoningEffort,
+      targetCanonicalReasoningEffort: reasoningDecision.targetCanonicalReasoningEffort,
+      wireReasoningEffort: reasoningDecision.wireReasoningEffort,
+      reasoningMappingStatus: reasoningDecision.mappingStatus,
       routeSummary: routeDisplaySummary(
         envelope.requestedModel,
         result.profile.modelId,
@@ -3003,6 +3023,11 @@ export class AlphaRequestProcessor {
         resolutionContext.webToolPruned = retryPrepared.webToolPruned;
         resolutionContext.webToolPruneReason = retryPrepared.pruneReason;
         resolutionContext.reasoningEffort = retryDecision.resolvedReasoningEffort;
+        resolutionContext.clientRequestedReasoningEffort = retryDecision.clientRequestedReasoningEffort;
+        resolutionContext.presetReasoningEffort = retryDecision.presetReasoningEffort;
+        resolutionContext.targetCanonicalReasoningEffort = retryDecision.targetCanonicalReasoningEffort;
+        resolutionContext.wireReasoningEffort = retryDecision.wireReasoningEffort;
+        resolutionContext.reasoningMappingStatus = retryDecision.mappingStatus;
         resolutionContext.routeSummary.resolvedReasoningEffort = retryDecision.resolvedReasoningEffort;
         if (routeDecisionId && target?.reasoningFallback) {
           const persistedReasoningDecision = {
@@ -3152,6 +3177,18 @@ export class AlphaRequestProcessor {
       : [];
     const savedFormulaInputs = record(savedRoute?.formula_inputs_json);
     const savedDecisionSnapshot = record(savedFormulaInputs?.decisionSnapshot);
+    const topCandidates = [...savedCandidates]
+      .sort((left, right) => numberValue(right.valueUtility ?? right.valueScore)
+        - numberValue(left.valueUtility ?? left.valueScore))
+      .slice(0, 3)
+      .map((candidate) => ({
+        candidateId: stringValue(candidate.candidateId) ?? stringValue(candidate.modelId),
+        displayName: stringValue(candidate.displayName) ?? stringValue(candidate.modelId),
+        estimatedQuality: optionalNumber(candidate.estimatedQuality),
+        estimatedCallCost: optionalNumber(candidate.estimatedCallCost ?? candidate.effectiveCashCost),
+        valueUtility: optionalNumber(candidate.valueUtility ?? candidate.valueScore),
+        selected: stringValue(candidate.candidateId) === input.context.routeSummary.selectedCandidateId,
+      }));
     const routeDecisionView = savedRoute ? {
       route_decision_id: savedRoute.route_decision_id,
       phase: input.context.phase,
@@ -3301,6 +3338,32 @@ export class AlphaRequestProcessor {
         phase: input.context.phase,
         judge_explanation: input.context.judgeExplanation,
         route_decision: routeDecisionView,
+        decision_summary: {
+          work_phase: input.context.phase,
+          work_phase_quality_target_offset: optionalNumber(savedDecisionSnapshot?.workPhaseQualityTargetOffset
+            ?? savedFormulaInputs?.workPhaseQualityTargetOffset),
+          judge_trigger: input.context.judgeTrigger,
+          judge_status: input.context.judgeStatus,
+          judge_result_source: input.context.judgeResultSource,
+          judge_first_attempt_succeeded: input.context.judgeFirstAttemptSucceeded,
+          judge_profile_attempt_count: input.context.judgeProfileAttemptCount ?? 0,
+          judge_same_model_failover_used: input.context.judgeSameModelFailoverUsed ?? false,
+          selected_candidate_id: input.context.routeSummary.selectedCandidateId,
+          selected_display_name: input.context.routeSummary.selectedDisplayName,
+          selected_execution_preset_id: input.context.routeSummary.selectedExecutionPresetId,
+          client_requested_reasoning_effort: input.context.clientRequestedReasoningEffort,
+          preset_reasoning_effort: input.context.presetReasoningEffort,
+          target_canonical_reasoning_effort: input.context.targetCanonicalReasoningEffort,
+          resolved_reasoning_effort: input.context.reasoningEffort,
+          wire_reasoning_effort: input.context.wireReasoningEffort,
+          reasoning_mapping_status: input.context.reasoningMappingStatus,
+          profile_attempt_count: channelAttempts.rows.length,
+          recovery_decision_reason: input.context.recoveryDecisionReason,
+          route_refresh_reason: input.context.routeRefreshReason,
+          cache_hit_ratio: Number(input.inputTokens ?? 0n) > 0
+            ? Number(input.cachedInputTokens ?? 0n) / Number(input.inputTokens) : 0,
+          top_candidates: topCandidates,
+        },
         channel_attempts: channelAttempts.rows.map((attempt) => ({
           attempt_index: attempt.attempt_index,
           provider: attempt.provider,

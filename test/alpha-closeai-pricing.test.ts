@@ -10,7 +10,7 @@ import {
   resolveProfileBillingPrice,
   type AlphaExecutionProfile,
 } from "../src/alpha/routing.js";
-import { calculateProviderCost } from "../src/alpha/usage.js";
+import { calculateProviderCost, parseProviderUsage } from "../src/alpha/usage.js";
 
 const economics = validateProviderEconomicsCatalog(JSON.parse(readFileSync(
   new URL("../deploy/alpha/provider-economics.json", import.meta.url), "utf8",
@@ -58,9 +58,43 @@ describe("CloseAI public pricing reconciliation", () => {
     expect(resolveProfileBillingPrice(profile)).toMatchObject({
       inputPricePerMillion: 3,
       outputPricePerMillion: 15,
+      cachedInputPricePerMillion: 3,
+      cacheWritePricePerMillion: 3,
+      status: "estimated",
     });
-    expect(profile.billingPrice).not.toHaveProperty("cachedInputPricePerMillion");
-    expect(profile.billingPrice).not.toHaveProperty("cacheWritePricePerMillion");
+  });
+
+  it("conservatively prices CloseAI Messages cache reads and writes as ordinary input", () => {
+    const profile = profiles.find((item) => item.executionProfileId === "closeai-claude-sonnet-5-messages-strong")!;
+    const usage = parseProviderUsage({
+      protocol: "messages",
+      body: Buffer.from(JSON.stringify({
+        model: "claude-sonnet-5",
+        usage: {
+          input_tokens: 1_000_000,
+          cache_read_input_tokens: 2_000_000,
+          cache_creation_input_tokens: 3_000_000,
+          output_tokens: 1_000_000,
+        },
+      })),
+      contentType: "application/json",
+      requestedModel: "claude-sonnet-5",
+      requestBytes: 0,
+      billingPrice: profile.billingPrice,
+    });
+
+    expect(getAcuModel("claude-sonnet-5")).toMatchObject({
+      cachedInputPricePerMillion: 0.2,
+      cacheWritePricePerMillion: 2.5,
+    });
+    expect(usage).toMatchObject({
+      inputTokens: 1_000_000n,
+      cachedInputTokens: 5_000_000n,
+      cacheCreationInputTokens: 3_000_000n,
+      outputTokens: 1_000_000n,
+      providerCostUsd: "33.0000000000",
+    });
+    expect(usage.providerCostUsd).not.toBe("25.9000000000");
   });
 
   it("falls back to the official catalog before applying 1.5 and 7.2", () => {

@@ -5711,10 +5711,12 @@
     "billingPrice": {
       "inputPricePerMillion": 3,
       "outputPricePerMillion": 15,
+      "cachedInputPricePerMillion": 3,
+      "cacheWritePricePerMillion": 3,
       "currency": "USD_CREDIT",
-      "source": "CloseAI saved public pricing page; ordinary row displays USD base price with explicit 1.5x service multiplier",
+      "source": "CloseAI public price snapshot; conservative assumption that provider does not pass through upstream cache discounts",
       "observedAt": "2026-08-02T02:14:15Z",
-      "status": "verified"
+      "status": "estimated"
     }
   },
   {

@@ -97,7 +97,7 @@ describe("Alpha RC1 deployment profiles", () => {
     for (const decision of [simpleResponses, hardResponses, simpleMessages, hardMessages]) {
       expect(decision.candidateEstimates.map((item) => item.modelId))
         .toContain(decision.selectedProfile.modelId);
-      expect(new Set(decision.candidateEstimates.map((item) => item.modelId)).size)
+      expect(new Set(decision.candidateEstimates.map((item) => item.candidateId)).size)
         .toBe(decision.candidateEstimates.length);
     }
     expect(simpleResponses.candidateEstimates.length).toBeGreaterThanOrEqual(8);
@@ -149,7 +149,8 @@ describe("Alpha RC1 deployment profiles", () => {
       },
     });
 
-    expect(decision.candidateEstimates).toHaveLength(new Set(responseProfiles.map((profile) => profile.modelId)).size);
+    const presetCount = decision.candidateEstimates.filter((item) => item.executionPresetId).length;
+    expect(decision.candidateEstimates).toHaveLength(new Set(responseProfiles.map((profile) => profile.modelId)).size + presetCount);
     const existingProfileCount = responseProfiles.filter((profile) => profile.modelId === duplicate.modelId).length;
     expect(decision.candidateEstimates.find((item) => item.modelId === duplicate.modelId)?.executionProfileIds)
       .toHaveLength(existingProfileCount + 1);
@@ -173,8 +174,8 @@ describe("Alpha RC1 deployment profiles", () => {
       },
     });
 
-    expect(decision.candidateEstimates.map((estimate) => estimate.modelId).sort())
-      .toEqual(["gpt-5.6-luna", "gpt-5.6-sol"]);
+    expect(decision.candidateEstimates.map((estimate) => estimate.candidateId).sort())
+      .toEqual(["gpt-5.6-luna", "gpt-5.6-luna@max", "gpt-5.6-sol"]);
     expect(decision.excludedProfiles.filter((profile) => profile.reasons.includes("model_policy")).length)
       .toBeGreaterThanOrEqual(8);
   });

@@ -114,8 +114,8 @@ describe("Alpha current-formula routing", () => {
         contextTokens: 11_000,
       },
     });
-    expect(result.candidateEstimates.map((candidate) => candidate.modelId).sort()).toEqual([
-      "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra",
+    expect(result.candidateEstimates.map((candidate) => candidate.candidateId).sort()).toEqual([
+      "gpt-5.6-luna", "gpt-5.6-luna@max", "gpt-5.6-sol", "gpt-5.6-terra",
     ]);
   });
 
@@ -148,7 +148,7 @@ describe("Alpha current-formula routing", () => {
     expect(withLargeJudgeCost.estimates.map((estimate) => [estimate.modelId, estimate.paretoEfficient]))
       .toEqual(withoutJudgeCost.estimates.map((estimate) => [estimate.modelId, estimate.paretoEfficient]));
     for (const estimate of withLargeJudgeCost.estimates) {
-      const baseline = withoutJudgeCost.estimates.find((item) => item.modelId === estimate.modelId)!;
+      const baseline = withoutJudgeCost.estimates.find((item) => item.candidateId === estimate.candidateId)!;
       expect(estimate.selectionCost).toBeCloseTo(baseline.selectionCost, 12);
       expect(estimate.riskAdjustedCost).toBeCloseTo(baseline.riskAdjustedCost, 12);
       expect(estimate.expectedEndToEndCost - baseline.expectedEndToEndCost).toBeCloseTo(100, 12);
@@ -230,6 +230,20 @@ describe("Alpha current-formula routing", () => {
     expect(result.candidateEstimates.length).toBe(2);
     expect(result.candidateEstimates.every((candidate) => !candidate.meetsQualityTarget)).toBe(true);
     expect(result.selectedProfile).toBeDefined();
+  });
+
+  it("adds the Work Phase offset only to the effective preference quality target", () => {
+    const inspection = routeWithCurrentAcuFormula({
+      judge, judgeCost: 0, inputTokens: 2_000, expectedOutputTokens: 500,
+      effectiveQualityTarget: 80, profiles, requirements,
+      workPhase: { phase: "inspection", confidence: "high", signals: ["tool:Read"], qualityTargetOffset: -4, policyVersion: "acu-work-phase-policy-v1" },
+    });
+    expect(inspection.effectiveQualityTarget).toBe(73);
+    expect(inspection.workPhase.phase).toBe("inspection");
+    expect(inspection.recommendation.estimates.every((candidate) => candidate.candidateId.length > 0)).toBe(true);
+    expect(inspection.recommendation.estimates.some((candidate) => candidate.modelId === "gpt-5.6-luna"
+      && candidate.executionPresetId === "gpt-5.6-luna:max")).toBe(false);
+    expect(judge.difficultyIndex).toBe(67.2);
   });
 
   it("does not hard-filter ordinary Coding because the client declared Web Search", () => {

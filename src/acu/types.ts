@@ -96,7 +96,11 @@ export type AcuModelCatalogEntry = {
 };
 
 export type AcuModelEstimate = {
+  candidateId: string;
   modelId: string;
+  executionPresetId?: string;
+  reasoningEffort?: import("../alpha/reasoning-capability.js").CanonicalReasoningEffort;
+  expectedOutputTokenMultiplier?: number;
   displayName: string;
   provider: string;
   estimatedQuality: number;

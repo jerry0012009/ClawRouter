@@ -63,6 +63,9 @@ export function normalizeMessagesRequest(
   const toolCalls: CanonicalEnvelope["toolCalls"] = [];
   const toolResults: CanonicalEnvelope["toolResults"] = [];
   const signatures: string[] = [];
+  const outputConfig = record(raw.output_config);
+  const reasoningEffort = typeof outputConfig?.effort === "string" && outputConfig.effort.trim()
+    ? outputConfig.effort.trim() : undefined;
 
   messages.forEach((messageValue, sourceIndex) => {
     const message = record(messageValue);
@@ -164,6 +167,7 @@ export function normalizeMessagesRequest(
         ...exitPlanCalls.map((call) => `tool_use:ExitPlanMode:${call.id}`),
       ],
     },
+    reasoningEffort,
     containsThinking: signatures.length > 0 || messages.some((message) => array(record(message)?.content)
       .some((block) => record(block)?.type === "thinking")),
     thinkingSignatures: signatures,

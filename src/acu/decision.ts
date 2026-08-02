@@ -1,6 +1,7 @@
 import { ACU_DEFAULT_QUALITY_TARGET, ACU_DEFAULT_SWITCH_COST_USD } from "./config.js";
 import { getAcuCatalog, getRoutingEligibleModels, interpolateModelCurve } from "./catalog.js";
 import { clamp, normalizeProbabilities, normalizedEntropy } from "./math.js";
+import { enabledExecutionPresets, type AcuExecutionPreset } from "./execution-presets.js";
 import type {
   AcuModelCatalogEntry,
   AcuModelEstimate,
@@ -28,6 +29,7 @@ export type AcuDecisionInput = {
     inputPricePerMillion: number;
     outputPricePerMillion: number;
   }>;
+  includeExecutionPresets?: boolean;
 };
 
 export function estimateCallCost(
@@ -56,18 +58,24 @@ function estimateOne(
   switchCost: number,
   fallbackRiskScale: number,
   effectivePrice?: { inputPricePerMillion: number; outputPricePerMillion: number },
+  preset?: AcuExecutionPreset,
 ): AcuModelEstimate {
   const curvePoint = interpolateModelCurve(model, difficultyScore);
-  const quality = curvePoint.estimatedQuality;
+  const quality = clamp(curvePoint.estimatedQuality + (preset?.qualityScoreOffset ?? 0) / 100);
   const lower = clamp(quality - model.uncertaintyWidth - entropyPenalty / 100);
   const upper = clamp(quality + model.uncertaintyWidth);
-  const callCost = estimateCallCost(effectivePrice ?? model, inputTokens, outputTokens);
+  const expectedOutputTokens = Math.round(outputTokens * (preset?.expectedOutputTokenMultiplier ?? 1));
+  const callCost = estimateCallCost(effectivePrice ?? model, inputTokens, expectedOutputTokens);
   const expectedFallbackCost = fallbackRiskScale * (1 - lower) * (fallbackCallCost + switchCost);
   const selectionCost = callCost + expectedFallbackCost;
   const expectedEndToEndCost = judgeCost + selectionCost;
   return {
+    candidateId: preset?.candidateId ?? model.modelId,
     modelId: model.modelId,
-    displayName: model.displayName,
+    executionPresetId: preset?.presetId,
+    reasoningEffort: preset?.canonicalReasoningEffort,
+    expectedOutputTokenMultiplier: preset?.expectedOutputTokenMultiplier,
+    displayName: preset?.displayName ?? model.displayName,
     provider: model.provider,
     estimatedQuality: quality,
     conservativeQuality: lower,
@@ -99,10 +107,14 @@ function estimateOne(
 type ValueCandidate = Pick<
   AcuModelEstimate,
   "modelId" | "displayName" | "predictedScore" | "riskAdjustedCost"
-> & { conservativeScore?: number };
+> & { candidateId?: string; conservativeScore?: number };
+
+function candidateIdentity(candidate: ValueCandidate): string {
+  return candidate.candidateId ?? candidate.modelId;
+}
 
 export function isParetoEfficient(candidate: ValueCandidate, candidates: ValueCandidate[]): boolean {
-  return !candidates.some((other) => other.modelId !== candidate.modelId
+  return !candidates.some((other) => candidateIdentity(other) !== candidateIdentity(candidate)
     && other.predictedScore >= candidate.predictedScore
     && other.riskAdjustedCost <= candidate.riskAdjustedCost
     && (other.predictedScore > candidate.predictedScore
@@ -148,10 +160,10 @@ export function selectValueRoute<T extends ValueCandidate>(
       ? 1
       : 1 - Math.log(Math.max(1e-9, candidate.riskAdjustedCost) / minCost) / logRange;
     const valueUtility = qualityUtility * ((1 - costWeight) + costWeight * costUtility);
-    utilities.set(candidate.modelId, { riskAdjustedScore, qualityUtility, costUtility, valueUtility });
+    utilities.set(candidateIdentity(candidate), { riskAdjustedScore, qualityUtility, costUtility, valueUtility });
   }
   const selected = frontier.reduce((best, item) => (
-    utilities.get(item.modelId)!.valueUtility > utilities.get(best.modelId)!.valueUtility ? item : best
+    utilities.get(candidateIdentity(item))!.valueUtility > utilities.get(candidateIdentity(best))!.valueUtility ? item : best
   ));
   const saving = bestScore.riskAdjustedCost > 0
     ? (1 - selected.riskAdjustedCost / bestScore.riskAdjustedCost) * 100
@@ -160,7 +172,7 @@ export function selectValueRoute<T extends ValueCandidate>(
     selected,
     bestScore,
     utilities,
-    reason: selected.modelId === bestScore.modelId
+    reason: candidateIdentity(selected) === candidateIdentity(bestScore)
       ? `综合风险调整得分、您的质量偏好与对数成本效用后，${selected.displayName}的质量效用优势足以抵消成本。`
       : `综合风险调整得分、您的质量偏好与对数成本效用后，${selected.displayName}价值效用最高；相对最高得分模型预计综合成本${saving >= 0 ? "降低" : "增加"}${Math.abs(saving).toFixed(0)}%。`,
   };
@@ -189,7 +201,7 @@ export function recommendModel(input: AcuDecisionInput): AcuRecommendation {
   ));
   const fallback = flagship;
   const fallbackCallCost = estimateCallCost(input.effectivePrices?.[fallback.modelId] ?? fallback, inputTokens, outputTokens);
-  const estimates = models.map((model) => estimateOne(
+  const baseEstimates = models.map((model) => estimateOne(
     model,
     difficulty,
     entropyPenalty,
@@ -202,7 +214,15 @@ export function recommendModel(input: AcuDecisionInput): AcuRecommendation {
     fallbackRiskScale,
     input.effectivePrices?.[model.modelId],
   ));
-  const flagshipEstimate = estimates.find((estimate) => estimate.modelId === flagship.modelId);
+  const presetEstimates = input.includeExecutionPresets === false ? [] : enabledExecutionPresets().flatMap((preset) => {
+    const model = models.find((candidate) => candidate.modelId === preset.modelId);
+    return model ? [estimateOne(
+      model, difficulty, entropyPenalty, inputTokens, outputTokens, Math.max(0, input.judgeCost),
+      fallbackCallCost, qualityTarget, switchCost, fallbackRiskScale, input.effectivePrices?.[model.modelId], preset,
+    )] : [];
+  });
+  const estimates = [...baseEstimates, ...presetEstimates];
+  const flagshipEstimate = baseEstimates.find((estimate) => estimate.modelId === flagship.modelId);
   if (!flagshipEstimate) throw new Error("ACU flagship model estimate is missing");
   for (const estimate of estimates) {
     estimate.savingsVsFlagship = flagshipEstimate.selectionCost - estimate.selectionCost;
@@ -213,7 +233,7 @@ export function recommendModel(input: AcuDecisionInput): AcuRecommendation {
   const route = selectValueRoute(estimates, qualityTarget * 100, costSensitivity);
   const recommended = route.selected;
   for (const estimate of estimates) {
-    const utility = route.utilities.get(estimate.modelId);
+    const utility = route.utilities.get(estimate.candidateId);
     estimate.paretoEfficient = isParetoEfficient(estimate, estimates);
     estimate.riskAdjustedScore = utility?.riskAdjustedScore ?? estimate.conservativeScore;
     estimate.qualityUtility = utility?.qualityUtility ?? 0;
@@ -221,11 +241,11 @@ export function recommendModel(input: AcuDecisionInput): AcuRecommendation {
     estimate.valueUtility = utility?.valueUtility ?? 0;
     estimate.scoreGapVsBest = route.bestScore.predictedScore - estimate.predictedScore;
     estimate.costSavingsVsBest = route.bestScore.riskAdjustedCost - estimate.riskAdjustedCost;
-    estimate.selectionReason = estimate.modelId === recommended.modelId
+    estimate.selectionReason = estimate.candidateId === recommended.candidateId
       ? route.reason
       : estimate.paretoEfficient ? "位于当前成本—得分有效前沿。" : "存在得分更高且预计综合成本更低的候选。";
   }
-  const valuePool = estimates.filter((estimate) => estimate.modelId !== recommended.modelId && estimate.paretoEfficient);
+  const valuePool = estimates.filter((estimate) => estimate.candidateId !== recommended.candidateId && estimate.paretoEfficient);
   const valueAlternative = valuePool.length > 0
     ? valuePool.reduce((best, estimate) => (
       estimate.riskAdjustedCost < best.riskAdjustedCost ? estimate : best

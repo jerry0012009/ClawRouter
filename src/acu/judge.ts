@@ -231,7 +231,8 @@ export function buildJudgeSystemPrompt(): string {
     })}`,
   ].join("\n")).join("\n\n---\n\n");
   return [
-    "你是 ACU 任务能力需求分类器。判断当前完整、可见 API 上下文中，完成下一次模型响应所需的最低充分能力。",
+    "你是 ACU 任务能力需求分类器。Difficulty 表示：在整个 Task、完整可见历史和当前工作阶段下，完成当前这一次模型响应所需的最低充分能力。",
+    "不要只判断最新一个 Tool Call，也不要重复评估最初用户目标；应判断当前完整工作 Turn 的总体能力需求。",
     "不得回答原任务，不得推荐具体模型，不得根据模型品牌判断，不得输出代码或思维过程。",
     '只输出严格 JSON：{"difficulty_score_raw":0,"factors":{"reasoning_depth":0,"task_scope":0,"constraint_density":0,"tool_dependency":0,"verification_burden":0,"context_burden":0},"p_low":0,"p_mid":0,"p_mid_high":0,"p_high":0,"confidence":0,"signals":[],"explanation":"","webIntent":"likely","webIntentConfidence":0,"webIntentReason":"","webIntentEvidence":[]}',
     "difficulty_score_raw是0到100的原始总体判断；六个factors均为0到10、允许一位小数。后端会确定性计算最终难度指数，不要自行输出最终指数。",

@@ -6234,6 +6234,24 @@ function publicCatalogPayload() {
   };
 }
 
+// src/acu/execution-presets.ts
+var ACU_EXECUTION_PRESETS = [{
+  presetId: "gpt-5.6-luna:max",
+  candidateId: "gpt-5.6-luna@max",
+  modelId: "gpt-5.6-luna",
+  displayName: "GPT-5.6 Luna \xB7 Max",
+  canonicalReasoningEffort: "max",
+  qualityScoreOffset: 3.5,
+  expectedOutputTokenMultiplier: 1.6,
+  enabled: true,
+  calibrationStatus: "provisional",
+  source: "acu-execution-preset-v1"
+}];
+function enabledExecutionPresets() {
+  const featureEnabled = process.env.ACU_LUNA_MAX_PRESET_ENABLED?.toLowerCase() !== "false";
+  return featureEnabled ? ACU_EXECUTION_PRESETS.filter((preset) => preset.enabled) : [];
+}
+
 // src/acu/decision.ts
 function estimateCallCost(model, inputTokens, outputTokens) {
   if (model.inputPricePerMillion === null || model.outputPricePerMillion === null) {
@@ -6241,18 +6259,23 @@ function estimateCallCost(model, inputTokens, outputTokens) {
   }
   return (Math.max(0, inputTokens) * model.inputPricePerMillion + Math.max(0, outputTokens) * model.outputPricePerMillion) / 1e6;
 }
-function estimateOne(model, difficultyScore2, entropyPenalty, inputTokens, outputTokens, judgeCost, fallbackCallCost, qualityTarget, switchCost, fallbackRiskScale, effectivePrice) {
+function estimateOne(model, difficultyScore2, entropyPenalty, inputTokens, outputTokens, judgeCost, fallbackCallCost, qualityTarget, switchCost, fallbackRiskScale, effectivePrice, preset) {
   const curvePoint = interpolateModelCurve(model, difficultyScore2);
-  const quality = curvePoint.estimatedQuality;
+  const quality = clamp(curvePoint.estimatedQuality + (preset?.qualityScoreOffset ?? 0) / 100);
   const lower = clamp(quality - model.uncertaintyWidth - entropyPenalty / 100);
   const upper = clamp(quality + model.uncertaintyWidth);
-  const callCost = estimateCallCost(effectivePrice ?? model, inputTokens, outputTokens);
+  const expectedOutputTokens = Math.round(outputTokens * (preset?.expectedOutputTokenMultiplier ?? 1));
+  const callCost = estimateCallCost(effectivePrice ?? model, inputTokens, expectedOutputTokens);
   const expectedFallbackCost = fallbackRiskScale * (1 - lower) * (fallbackCallCost + switchCost);
   const selectionCost = callCost + expectedFallbackCost;
   const expectedEndToEndCost = judgeCost + selectionCost;
   return {
+    candidateId: preset?.candidateId ?? model.modelId,
     modelId: model.modelId,
-    displayName: model.displayName,
+    executionPresetId: preset?.presetId,
+    reasoningEffort: preset?.canonicalReasoningEffort,
+    expectedOutputTokenMultiplier: preset?.expectedOutputTokenMultiplier,
+    displayName: preset?.displayName ?? model.displayName,
     provider: model.provider,
     estimatedQuality: quality,
     conservativeQuality: lower,
@@ -6280,8 +6303,11 @@ function estimateOne(model, difficultyScore2, entropyPenalty, inputTokens, outpu
     meetsQualityTarget: quality >= qualityTarget
   };
 }
+function candidateIdentity(candidate) {
+  return candidate.candidateId ?? candidate.modelId;
+}
 function isParetoEfficient(candidate, candidates) {
-  return !candidates.some((other) => other.modelId !== candidate.modelId && other.predictedScore >= candidate.predictedScore && other.riskAdjustedCost <= candidate.riskAdjustedCost && (other.predictedScore > candidate.predictedScore || other.riskAdjustedCost < candidate.riskAdjustedCost));
+  return !candidates.some((other) => candidateIdentity(other) !== candidateIdentity(candidate) && other.predictedScore >= candidate.predictedScore && other.riskAdjustedCost <= candidate.riskAdjustedCost && (other.predictedScore > candidate.predictedScore || other.riskAdjustedCost < candidate.riskAdjustedCost));
 }
 function selectValueRoute(candidates, targetScore, costSensitivity = 1) {
   if (candidates.length === 0) throw new Error("Value routing requires at least one candidate");
@@ -6303,15 +6329,15 @@ function selectValueRoute(candidates, targetScore, costSensitivity = 1) {
     const qualityUtility = Math.pow(Math.max(0, riskAdjustedScore) / Math.max(1, targetScore), qualityExponent);
     const costUtility = logRange <= 1e-12 ? 1 : 1 - Math.log(Math.max(1e-9, candidate.riskAdjustedCost) / minCost) / logRange;
     const valueUtility = qualityUtility * (1 - costWeight + costWeight * costUtility);
-    utilities.set(candidate.modelId, { riskAdjustedScore, qualityUtility, costUtility, valueUtility });
+    utilities.set(candidateIdentity(candidate), { riskAdjustedScore, qualityUtility, costUtility, valueUtility });
   }
-  const selected = frontier.reduce((best, item) => utilities.get(item.modelId).valueUtility > utilities.get(best.modelId).valueUtility ? item : best);
+  const selected = frontier.reduce((best, item) => utilities.get(candidateIdentity(item)).valueUtility > utilities.get(candidateIdentity(best)).valueUtility ? item : best);
   const saving = bestScore.riskAdjustedCost > 0 ? (1 - selected.riskAdjustedCost / bestScore.riskAdjustedCost) * 100 : 0;
   return {
     selected,
     bestScore,
     utilities,
-    reason: selected.modelId === bestScore.modelId ? `\u7EFC\u5408\u98CE\u9669\u8C03\u6574\u5F97\u5206\u3001\u60A8\u7684\u8D28\u91CF\u504F\u597D\u4E0E\u5BF9\u6570\u6210\u672C\u6548\u7528\u540E\uFF0C${selected.displayName}\u7684\u8D28\u91CF\u6548\u7528\u4F18\u52BF\u8DB3\u4EE5\u62B5\u6D88\u6210\u672C\u3002` : `\u7EFC\u5408\u98CE\u9669\u8C03\u6574\u5F97\u5206\u3001\u60A8\u7684\u8D28\u91CF\u504F\u597D\u4E0E\u5BF9\u6570\u6210\u672C\u6548\u7528\u540E\uFF0C${selected.displayName}\u4EF7\u503C\u6548\u7528\u6700\u9AD8\uFF1B\u76F8\u5BF9\u6700\u9AD8\u5F97\u5206\u6A21\u578B\u9884\u8BA1\u7EFC\u5408\u6210\u672C${saving >= 0 ? "\u964D\u4F4E" : "\u589E\u52A0"}${Math.abs(saving).toFixed(0)}%\u3002`
+    reason: candidateIdentity(selected) === candidateIdentity(bestScore) ? `\u7EFC\u5408\u98CE\u9669\u8C03\u6574\u5F97\u5206\u3001\u60A8\u7684\u8D28\u91CF\u504F\u597D\u4E0E\u5BF9\u6570\u6210\u672C\u6548\u7528\u540E\uFF0C${selected.displayName}\u7684\u8D28\u91CF\u6548\u7528\u4F18\u52BF\u8DB3\u4EE5\u62B5\u6D88\u6210\u672C\u3002` : `\u7EFC\u5408\u98CE\u9669\u8C03\u6574\u5F97\u5206\u3001\u60A8\u7684\u8D28\u91CF\u504F\u597D\u4E0E\u5BF9\u6570\u6210\u672C\u6548\u7528\u540E\uFF0C${selected.displayName}\u4EF7\u503C\u6548\u7528\u6700\u9AD8\uFF1B\u76F8\u5BF9\u6700\u9AD8\u5F97\u5206\u6A21\u578B\u9884\u8BA1\u7EFC\u5408\u6210\u672C${saving >= 0 ? "\u964D\u4F4E" : "\u589E\u52A0"}${Math.abs(saving).toFixed(0)}%\u3002`
   };
 }
 function recommendModel(input) {
@@ -6334,7 +6360,7 @@ function recommendModel(input) {
   const flagship = models.reduce((best, model) => model.abilityAnchor > best.abilityAnchor ? model : best);
   const fallback = flagship;
   const fallbackCallCost = estimateCallCost(input.effectivePrices?.[fallback.modelId] ?? fallback, inputTokens, outputTokens);
-  const estimates = models.map((model) => estimateOne(
+  const baseEstimates = models.map((model) => estimateOne(
     model,
     difficulty,
     entropyPenalty,
@@ -6347,7 +6373,25 @@ function recommendModel(input) {
     fallbackRiskScale,
     input.effectivePrices?.[model.modelId]
   ));
-  const flagshipEstimate = estimates.find((estimate) => estimate.modelId === flagship.modelId);
+  const presetEstimates = input.includeExecutionPresets === false ? [] : enabledExecutionPresets().flatMap((preset) => {
+    const model = models.find((candidate) => candidate.modelId === preset.modelId);
+    return model ? [estimateOne(
+      model,
+      difficulty,
+      entropyPenalty,
+      inputTokens,
+      outputTokens,
+      Math.max(0, input.judgeCost),
+      fallbackCallCost,
+      qualityTarget,
+      switchCost,
+      fallbackRiskScale,
+      input.effectivePrices?.[model.modelId],
+      preset
+    )] : [];
+  });
+  const estimates = [...baseEstimates, ...presetEstimates];
+  const flagshipEstimate = baseEstimates.find((estimate) => estimate.modelId === flagship.modelId);
   if (!flagshipEstimate) throw new Error("ACU flagship model estimate is missing");
   for (const estimate of estimates) {
     estimate.savingsVsFlagship = flagshipEstimate.selectionCost - estimate.selectionCost;
@@ -6356,7 +6400,7 @@ function recommendModel(input) {
   const route2 = selectValueRoute(estimates, qualityTarget * 100, costSensitivity);
   const recommended = route2.selected;
   for (const estimate of estimates) {
-    const utility = route2.utilities.get(estimate.modelId);
+    const utility = route2.utilities.get(estimate.candidateId);
     estimate.paretoEfficient = isParetoEfficient(estimate, estimates);
     estimate.riskAdjustedScore = utility?.riskAdjustedScore ?? estimate.conservativeScore;
     estimate.qualityUtility = utility?.qualityUtility ?? 0;
@@ -6364,9 +6408,9 @@ function recommendModel(input) {
     estimate.valueUtility = utility?.valueUtility ?? 0;
     estimate.scoreGapVsBest = route2.bestScore.predictedScore - estimate.predictedScore;
     estimate.costSavingsVsBest = route2.bestScore.riskAdjustedCost - estimate.riskAdjustedCost;
-    estimate.selectionReason = estimate.modelId === recommended.modelId ? route2.reason : estimate.paretoEfficient ? "\u4F4D\u4E8E\u5F53\u524D\u6210\u672C\u2014\u5F97\u5206\u6709\u6548\u524D\u6CBF\u3002" : "\u5B58\u5728\u5F97\u5206\u66F4\u9AD8\u4E14\u9884\u8BA1\u7EFC\u5408\u6210\u672C\u66F4\u4F4E\u7684\u5019\u9009\u3002";
+    estimate.selectionReason = estimate.candidateId === recommended.candidateId ? route2.reason : estimate.paretoEfficient ? "\u4F4D\u4E8E\u5F53\u524D\u6210\u672C\u2014\u5F97\u5206\u6709\u6548\u524D\u6CBF\u3002" : "\u5B58\u5728\u5F97\u5206\u66F4\u9AD8\u4E14\u9884\u8BA1\u7EFC\u5408\u6210\u672C\u66F4\u4F4E\u7684\u5019\u9009\u3002";
   }
-  const valuePool = estimates.filter((estimate) => estimate.modelId !== recommended.modelId && estimate.paretoEfficient);
+  const valuePool = estimates.filter((estimate) => estimate.candidateId !== recommended.candidateId && estimate.paretoEfficient);
   const valueAlternative = valuePool.length > 0 ? valuePool.reduce((best, estimate) => estimate.riskAdjustedCost < best.riskAdjustedCost ? estimate : best) : null;
   const flagshipAlternative = flagshipEstimate;
   return {
@@ -6621,7 +6665,8 @@ function buildJudgeSystemPrompt() {
     })}`
   ].join("\n")).join("\n\n---\n\n");
   return [
-    "\u4F60\u662F ACU \u4EFB\u52A1\u80FD\u529B\u9700\u6C42\u5206\u7C7B\u5668\u3002\u5224\u65AD\u5F53\u524D\u5B8C\u6574\u3001\u53EF\u89C1 API \u4E0A\u4E0B\u6587\u4E2D\uFF0C\u5B8C\u6210\u4E0B\u4E00\u6B21\u6A21\u578B\u54CD\u5E94\u6240\u9700\u7684\u6700\u4F4E\u5145\u5206\u80FD\u529B\u3002",
+    "\u4F60\u662F ACU \u4EFB\u52A1\u80FD\u529B\u9700\u6C42\u5206\u7C7B\u5668\u3002Difficulty \u8868\u793A\uFF1A\u5728\u6574\u4E2A Task\u3001\u5B8C\u6574\u53EF\u89C1\u5386\u53F2\u548C\u5F53\u524D\u5DE5\u4F5C\u9636\u6BB5\u4E0B\uFF0C\u5B8C\u6210\u5F53\u524D\u8FD9\u4E00\u6B21\u6A21\u578B\u54CD\u5E94\u6240\u9700\u7684\u6700\u4F4E\u5145\u5206\u80FD\u529B\u3002",
+    "\u4E0D\u8981\u53EA\u5224\u65AD\u6700\u65B0\u4E00\u4E2A Tool Call\uFF0C\u4E5F\u4E0D\u8981\u91CD\u590D\u8BC4\u4F30\u6700\u521D\u7528\u6237\u76EE\u6807\uFF1B\u5E94\u5224\u65AD\u5F53\u524D\u5B8C\u6574\u5DE5\u4F5C Turn \u7684\u603B\u4F53\u80FD\u529B\u9700\u6C42\u3002",
     "\u4E0D\u5F97\u56DE\u7B54\u539F\u4EFB\u52A1\uFF0C\u4E0D\u5F97\u63A8\u8350\u5177\u4F53\u6A21\u578B\uFF0C\u4E0D\u5F97\u6839\u636E\u6A21\u578B\u54C1\u724C\u5224\u65AD\uFF0C\u4E0D\u5F97\u8F93\u51FA\u4EE3\u7801\u6216\u601D\u7EF4\u8FC7\u7A0B\u3002",
     '\u53EA\u8F93\u51FA\u4E25\u683C JSON\uFF1A{"difficulty_score_raw":0,"factors":{"reasoning_depth":0,"task_scope":0,"constraint_density":0,"tool_dependency":0,"verification_burden":0,"context_burden":0},"p_low":0,"p_mid":0,"p_mid_high":0,"p_high":0,"confidence":0,"signals":[],"explanation":"","webIntent":"likely","webIntentConfidence":0,"webIntentReason":"","webIntentEvidence":[]}',
     "difficulty_score_raw\u662F0\u5230100\u7684\u539F\u59CB\u603B\u4F53\u5224\u65AD\uFF1B\u516D\u4E2Afactors\u5747\u4E3A0\u523010\u3001\u5141\u8BB8\u4E00\u4F4D\u5C0F\u6570\u3002\u540E\u7AEF\u4F1A\u786E\u5B9A\u6027\u8BA1\u7B97\u6700\u7EC8\u96BE\u5EA6\u6307\u6570\uFF0C\u4E0D\u8981\u81EA\u884C\u8F93\u51FA\u6700\u7EC8\u6307\u6570\u3002",

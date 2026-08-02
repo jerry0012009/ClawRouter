@@ -90,7 +90,7 @@ function decision(reason: TriggerReason, overrides: Partial<TriggerDecision> = {
 export function decideTrigger(input: TriggerInput): TriggerDecision {
   if (input.mode === "explicit") return decision("explicit_model", { createSegment: input.isNewTask });
   if (input.events.some((item) => item.type === "plan_started")) {
-    return decision("plan_started", { phase: "planning", temporaryPhaseOverride: 88 });
+    return decision("plan_started", { phase: "planning" });
   }
   if (input.isNewTask) return decision("new_task");
   const hasHumanRejudgeEvidence = input.events.some((item) => (
@@ -115,7 +115,6 @@ export function decideTrigger(input: TriggerInput): TriggerDecision {
   }
   return decision("reuse_route", {
     phase: input.segment?.phase ?? "execution",
-    temporaryPhaseOverride: input.segment?.planningActive ? 88 : 0,
   });
 }
 

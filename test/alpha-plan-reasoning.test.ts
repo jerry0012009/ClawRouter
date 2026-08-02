@@ -87,13 +87,13 @@ describe("Plan reasoning escalation", () => {
     expect(body.providerReasoningOverrideApplied).toBe(false);
   });
 
-  it("does not claim standard high support when the Profile did not declare it", () => {
+  it("uses model capability before empty legacy Profile effort declarations", () => {
     const unsupported = { ...profile("responses"), supportedReasoningEfforts: [] };
     const body = prepareProviderBody(
       Buffer.from(JSON.stringify({ model: "acu-auto", input: [] })),
       "gpt-5.6-sol", envelope("responses"), unsupported, "high",
     );
-    expect(JSON.parse(body.body.toString("utf8")).reasoning).toBeUndefined();
-    expect(body.providerReasoningOverrideApplied).toBe(false);
+    expect(JSON.parse(body.body.toString("utf8")).reasoning.effort).toBe("high");
+    expect(body.providerReasoningOverrideApplied).toBe(true);
   });
 });

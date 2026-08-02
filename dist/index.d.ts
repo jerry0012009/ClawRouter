@@ -1,3 +1,5 @@
+import { C as CanonicalReasoningEffort } from './reasoning-capability-C7Gled43.js';
+
 type AcuRuntimeConfig = {
     enabled: boolean;
     judgeModel: string;
@@ -123,7 +125,11 @@ type AcuModelCatalogEntry = {
     notes: string;
 };
 type AcuModelEstimate = {
+    candidateId: string;
     modelId: string;
+    executionPresetId?: string;
+    reasoningEffort?: CanonicalReasoningEffort;
+    expectedOutputTokenMultiplier?: number;
     displayName: string;
     provider: string;
     estimatedQuality: number;
@@ -249,9 +255,11 @@ type AcuDecisionInput = {
         inputPricePerMillion: number;
         outputPricePerMillion: number;
     }>;
+    includeExecutionPresets?: boolean;
 };
 declare function estimateCallCost(model: Pick<AcuModelCatalogEntry, "inputPricePerMillion" | "outputPricePerMillion">, inputTokens: number, outputTokens: number): number;
 type ValueCandidate = Pick<AcuModelEstimate, "modelId" | "displayName" | "predictedScore" | "riskAdjustedCost"> & {
+    candidateId?: string;
     conservativeScore?: number;
 };
 declare function isParetoEfficient(candidate: ValueCandidate, candidates: ValueCandidate[]): boolean;

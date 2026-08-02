@@ -1,5 +1,6 @@
 import { canonicalHash, record } from "./protocol/common.js";
 import type { CanonicalEnvelope, CanonicalToolCall, CanonicalToolResult } from "./protocol/types.js";
+import { classifyToolCall } from "./tool-family.js";
 
 export const ALPHA_EVENT_TYPES = [
   "human_message",
@@ -43,7 +44,7 @@ export type EventExtractionState = {
 const REJECTION_PATTERN = /\b(?:redo|wrong|not satisfied|not what i asked|try again)\b|重做|还是不对|不满意|理解错|重新做/i;
 const PROVIDER_PATTERN = /\b(?:429|rate.?limit|overload|503|502|provider|upstream|gateway timeout|connection reset|econnreset)\b/i;
 const ENVIRONMENT_PATTERN = /\b(?:permission denied|eacces|command not found|not recognized|missing dependency|no space left|address already in use|environment variable|enoent)\b/i;
-const VERIFICATION_PATTERN = /\b(?:test|build|typecheck|compile|assert|expected|failed|failure|error)\b/i;
+const VERIFICATION_PATTERN = /\b(?:assert|expected|failed|failure|error)\b/i;
 const ANSI_ESCAPE_PATTERN = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
 
 function event(type: AlphaEventType, evidence: unknown, fields: Partial<AlphaDomainEvent> = {}): AlphaDomainEvent {
@@ -65,7 +66,8 @@ export function classifyToolFailure(result: CanonicalToolResult, toolName?: stri
   const text = toolResultText(result);
   if (PROVIDER_PATTERN.test(text)) return "provider_error";
   if (ENVIRONMENT_PATTERN.test(text)) return "environment_or_permission_error";
-  if (VERIFICATION_PATTERN.test(text) || /test|build|typecheck/i.test(toolName ?? "")) {
+  const family = toolName ? classifyToolCall({ id: "", name: toolName, input: {}, sourceIndex: 0 }) : "unknown";
+  if (VERIFICATION_PATTERN.test(text) || family === "verification") {
     return "execution_or_verification_failure";
   }
   return "tool_usage_error";
@@ -105,11 +107,18 @@ function planIsComplete(call: CanonicalToolCall): boolean {
   });
 }
 
+function isExplicitReplanning(call: CanonicalToolCall, planningActive: boolean): boolean {
+  if (!planningActive) return false;
+  const input = record(call.input);
+  const explanation = [input?.explanation, input?.reason]
+    .filter((value): value is string => typeof value === "string")
+    .join(" ");
+  return /\breplan(?:ning|ned)?\b|重新规划/i.test(explanation);
+}
+
 function isExecutionTool(call: CanonicalToolCall): boolean {
-  if (/(?:edit|write|patch|apply_patch|test|build|typecheck)/i.test(call.name)) return true;
-  if (call.name !== "exec_command") return false;
-  const command = typeof record(call.input)?.cmd === "string" ? String(record(call.input)?.cmd) : "";
-  return /(?:^|[;&|\n]\s*)(?:apply_patch\b|npm\s+(?:run\s+)?(?:test|build|typecheck)\b|node\s+--test\b)/i.test(command);
+  const family = classifyToolCall(call);
+  return family === "implementation" || family === "verification";
 }
 
 export function extractIncrementalEvents(
@@ -146,7 +155,11 @@ export function extractIncrementalEvents(
       events.push(event(type, { id: call.id, planHash }, {
         sourceIndex: call.sourceIndex,
         toolCallId: call.id,
-        metadata: { planHash, complete: planIsComplete(call) },
+        metadata: {
+          planHash,
+          complete: planIsComplete(call),
+          replanning: isExplicitReplanning(call, state.planningActive),
+        },
       }));
     }
     if (call.name === "ExitPlanMode") {

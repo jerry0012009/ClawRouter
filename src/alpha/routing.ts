@@ -12,6 +12,8 @@ import {
   type WebTransportStatus,
 } from "./web-capability.js";
 import type { RuntimeHealth } from "./channel-health.js";
+import type { WorkPhaseDecision } from "./work-phase.js";
+import type { ProfileReasoningOverride, ReasoningControlMode } from "./reasoning-capability.js";
 
 export type ProfileHealth = "healthy" | "degraded" | "cooldown" | "open" | "half_open" | "disabled" | "unknown";
 export type RoutingPreference = "economy" | "balanced" | "quality";
@@ -24,7 +26,7 @@ export type ToolCapability =
   | "computer_use"
   | "other_hosted_tool";
 
-export type ReasoningControlMode = "standard_effort" | "client_thinking_passthrough" | "none";
+export type { ReasoningControlMode } from "./reasoning-capability.js";
 
 export type RoutingPreferenceParameters = {
   qualityTargetOffset: number;
@@ -66,6 +68,7 @@ export type AlphaExecutionProfile = {
   thinkingSupport: boolean;
   supportedReasoningEfforts?: string[];
   reasoningControlMode?: ReasoningControlMode;
+  reasoningOverride?: ProfileReasoningOverride;
   contextWindow?: number;
   canonicalAdvertisedContextWindow?: number;
   providerDeclaredContextWindow?: number | null;
@@ -126,6 +129,8 @@ export type AlphaRouteInput = {
   requirements: AlphaRouteRequirements;
   routeDirection?: "any" | "hold_or_upgrade";
   currentProfile?: AlphaExecutionProfile;
+  workPhase?: WorkPhaseDecision;
+  includeExecutionPresets?: boolean;
 };
 
 export type ExcludedProfile = { executionProfileId: string; reasons: string[] };
@@ -189,6 +194,7 @@ export type AlphaRouteDecision = {
   effectiveQualityTarget: number;
   preference: RoutingPreference;
   preferenceParameters: RoutingPreferenceParameters;
+  workPhase: WorkPhaseDecision;
   selectedProfile: AlphaExecutionProfile;
   providerSelectionReason: string;
   effectiveSwitchCost: number;
@@ -465,9 +471,16 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
   }
   const preference = input.routingPreference ?? "balanced";
   const preferenceParameters = ROUTING_PREFERENCE_PARAMETERS[preference];
+  const workPhase = input.workPhase ?? {
+    phase: "general" as const,
+    confidence: "low" as const,
+    signals: ["fallback:not_supplied"],
+    qualityTargetOffset: 0,
+    policyVersion: "acu-work-phase-policy-v1" as const,
+  };
   const preferenceQualityTarget = Math.max(
     0,
-    Math.min(100, input.effectiveQualityTarget + preferenceParameters.qualityTargetOffset),
+    Math.min(100, input.effectiveQualityTarget + preferenceParameters.qualityTargetOffset + workPhase.qualityTargetOffset),
   );
   const bestProfileByModel = new Map<string, AlphaExecutionProfile>();
   for (const profile of eligibleProfiles) {
@@ -499,14 +512,19 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
     requireToolCallSupport: input.requirements.requireTools,
     effectivePrices,
     switchCost: effectiveSwitchCost,
+    includeExecutionPresets: input.includeExecutionPresets,
   });
   const expectedCandidateModelIds = eligibleModelIds
     .filter((modelId) => getAcuModel(modelId)?.routingEligible === true)
     .sort();
-  const actualCandidateModelIds = recommendation.estimates.map((estimate) => estimate.modelId).sort();
-  if (expectedCandidateModelIds.length !== actualCandidateModelIds.length
-    || expectedCandidateModelIds.some((modelId, index) => modelId !== actualCandidateModelIds[index])) {
-    const message = `Router model candidate conservation failed: expected=${expectedCandidateModelIds.join(",")} actual=${actualCandidateModelIds.join(",")}`;
+  const expectedCandidateIds = [
+    ...expectedCandidateModelIds,
+    ...recommendation.estimates.filter((estimate) => estimate.executionPresetId).map((estimate) => estimate.candidateId),
+  ].sort();
+  const actualCandidateIds = recommendation.estimates.map((estimate) => estimate.candidateId).sort();
+  if (expectedCandidateIds.length !== actualCandidateIds.length
+    || expectedCandidateIds.some((candidateId, index) => candidateId !== actualCandidateIds[index])) {
+    const message = `Router execution candidate conservation failed: expected=${expectedCandidateIds.join(",")} actual=${actualCandidateIds.join(",")}`;
     if (process.env.NODE_ENV === "test") throw new Error(message);
     console.error(message);
   }
@@ -556,6 +574,7 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
     effectiveQualityTarget: preferenceQualityTarget,
     preference,
     preferenceParameters,
+    workPhase,
     selectedProfile,
     providerSelectionReason,
     effectiveSwitchCost,
@@ -571,7 +590,7 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
     })),
     paretoFrontier: recommendation.estimates
       .filter((estimate) => estimate.paretoEfficient)
-      .map((estimate) => estimate.modelId),
+      .map((estimate) => estimate.candidateId),
     excludedProfiles,
     eligibleProfileIds: eligibleProfiles.map((profile) => profile.executionProfileId),
     profileEvaluations,

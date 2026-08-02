@@ -98,7 +98,8 @@ function parseMessages(payloads: unknown[]): Omit<AlphaUsage, "providerCostUsd">
     cachedInputTokens = cacheRead + cacheCreation || cachedInputTokens;
     cacheCreationInputTokens = cacheCreation || cacheCreationInputTokens;
     outputTokens = integer(usage.output_tokens) || outputTokens;
-    reasoningTokens = integer(usage.reasoning_tokens) || reasoningTokens;
+    const outputDetails = object(usage.output_tokens_details);
+    reasoningTokens = integer(outputDetails?.thinking_tokens) || integer(usage.reasoning_tokens) || reasoningTokens;
     if (typeof message?.model === "string") actualModel = message.model;
   }
   return found ? {

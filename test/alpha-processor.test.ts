@@ -112,6 +112,8 @@ run("Alpha PostgreSQL request processor", () => {
         response.end(JSON.stringify({
           error: testCase === "web-retry-once"
             ? { type: "invalid_request_error", message: "web search tool unsupported" }
+            : testCase.startsWith("reasoning-")
+              ? { type: "invalid_request_error", message: "invalid reasoning effort" }
             : { type: "overloaded_error", message: "controlled test overload" },
         }));
         return;
@@ -983,7 +985,7 @@ run("Alpha PostgreSQL request processor", () => {
     expect(state.rows[0]).toMatchObject({
       segments: "3",
       judges: "3",
-      overrides: [88, 0, 0],
+      overrides: [0, 0, 0],
       reasons: ["task_start", "accepted_response_limit", "plan_finished"],
     });
     expect(new Set(state.rows[0].judge_ids).size).toBe(3);
@@ -1109,6 +1111,97 @@ run("Alpha PostgreSQL request processor", () => {
       "SELECT 1 FROM acu_profile_probe_queue WHERE execution_profile_id='test:gpt-5.4-mini:responses'",
     )).rowCount).toBe(1);
     expect(probeWakeCount).toBeGreaterThan(wakesBeforeDemand);
+  });
+
+  it("keeps the canonical model when an auto Effort is rejected and retries another Profile", async () => {
+    await database.query("DELETE FROM acu_channel_health WHERE channel_id IN ('test-channel','test-recovery-channel','test-cross-provider-channel')");
+    await database.query(
+      "DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id IN ('test:gpt-5.4-mini:responses','test:gpt-5.4-mini:recovery','test:gpt-5.4-mini:cross-provider-recovery')",
+    );
+    const testCase = "reasoning-profile-retry";
+    await send({
+      model: "acu-auto",
+      reasoning: { effort: "high" },
+      input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "Retry the same model" }] }],
+      stream: true,
+      test_case: testCase,
+      test_failures_before_success: 1,
+      test_failure_status: 400,
+    }, testCase, "user-reasoning-profile");
+    const attempts = await database.query<{
+      execution_profile_id: string; actual_model: string; error_category: string | null;
+    }>(
+      `SELECT execution_profile_id,actual_model,error_category FROM acu_attempts
+       WHERE logical_request_id=(SELECT logical_request_id FROM acu_logical_requests WHERE newapi_user_id=$1)
+       ORDER BY attempt_index`,
+      ["user-reasoning-profile"],
+    );
+    expect(attempts.rows).toHaveLength(2);
+    expect(new Set(attempts.rows.map((row) => row.actual_model))).toEqual(new Set(["gpt-5.4-mini"]));
+    expect(attempts.rows[0]).toMatchObject({ error_category: "reasoning_transport_error" });
+    expect(attempts.rows[1]?.execution_profile_id).not.toBe(attempts.rows[0]?.execution_profile_id);
+    const bodies = upstreamBodies.filter((body) => body.test_case === testCase);
+    expect(bodies.map((body) => (body.reasoning as { effort?: string })?.effort)).toEqual(["high", "high"]);
+  });
+
+  it("falls back to model-default Effort only for acu-auto when no other Profile is allowed", async () => {
+    await database.query("DELETE FROM acu_channel_health WHERE channel_id='test-channel'");
+    await database.query(
+      "DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id='test:gpt-5.4-mini:responses'",
+    );
+    const testCase = "reasoning-default-retry";
+    const body = Buffer.from(JSON.stringify({
+      model: "acu-auto",
+      reasoning: { effort: "high", summary: "auto" },
+      input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "Use the model default" }] }],
+      stream: true,
+      test_case: testCase,
+      test_failures_before_success: 1,
+      test_failure_status: 400,
+    }));
+    const response = await fetch(`http://127.0.0.1:${gatewayPort}/v1/responses`, {
+      method: "POST",
+      headers: signedHeaders(body, testCase, "user-reasoning-default", "codex", [primaryProfile.executionProfileId]),
+      body,
+    });
+    expect(response.status, await response.clone().text()).toBe(200);
+    await response.arrayBuffer();
+    const bodies = upstreamBodies.filter((item) => item.test_case === testCase);
+    expect(bodies).toHaveLength(2);
+    expect(bodies.map((item) => item.reasoning)).toEqual([
+      { effort: "high", summary: "auto" },
+      { summary: "auto" },
+    ]);
+    const attempts = await database.query<{ mapping: string }>(
+      `SELECT metadata_json->>'reasoningMappingStatus' mapping FROM acu_attempts
+       WHERE logical_request_id=(SELECT logical_request_id FROM acu_logical_requests WHERE newapi_user_id=$1)
+       ORDER BY attempt_index`,
+      ["user-reasoning-default"],
+    );
+    expect(attempts.rows.map((row) => row.mapping)).toEqual(["exact", "provider_fallback_to_default"]);
+  });
+
+  it("does not remove or retry a client Effort on an explicit model request", async () => {
+    const testCase = "reasoning-explicit-rejected";
+    const body = Buffer.from(JSON.stringify({
+      model: "gpt-5.4-mini",
+      reasoning: { effort: "high" },
+      input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "Keep my effort" }] }],
+      stream: true,
+      test_case: testCase,
+      test_failures_before_success: 1,
+      test_failure_status: 400,
+    }));
+    const response = await fetch(`http://127.0.0.1:${gatewayPort}/v1/responses`, {
+      method: "POST",
+      headers: signedHeaders(body, testCase, "user-reasoning-explicit"),
+      body,
+    });
+    expect(response.status).toBe(400);
+    await response.arrayBuffer();
+    const bodies = upstreamBodies.filter((item) => item.test_case === testCase);
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]?.reasoning).toEqual({ effort: "high" });
   });
 
   it("uses a different Provider for the third same-model Channel after two Lucen failures", async () => {

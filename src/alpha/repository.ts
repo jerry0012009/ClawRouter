@@ -1056,6 +1056,15 @@ export class AlphaRepository {
     );
   }
 
+  async mergeProfileRuntimeMetadata(executionProfileId: string, metadata: Record<string, unknown>): Promise<void> {
+    await this.database.query(
+      `UPDATE acu_provider_model_profile_health
+       SET metadata_json=metadata_json || $2::jsonb,updated_at=now()
+       WHERE execution_profile_id=$1`,
+      [executionProfileId, json(metadata)],
+    );
+  }
+
   async deleteProfileProbeIfRecovered(executionProfileId: string): Promise<boolean> {
     const result = await this.database.query(
       `DELETE FROM acu_profile_probe_queue q USING acu_provider_model_profile_health h
@@ -1203,7 +1212,7 @@ export class AlphaRepository {
       `UPDATE acu_attempts SET status=$2,actual_model=$3,provider_request_id=$4,error_category=$5,
        http_status=$6,input_tokens=$7,cached_input_tokens=$8,output_tokens=$9,reasoning_tokens=$10,
        usage_source=$11,actual_cost_usd=$12,provider_billed=$13,latency_ms=$14,
-       visible_output_bytes=$15,completed_at=now(),metadata_json=$16 WHERE attempt_id=$1`,
+       visible_output_bytes=$15,completed_at=now(),metadata_json=metadata_json || $16::jsonb WHERE attempt_id=$1`,
       [input.attemptId, input.status, input.actualModel ?? null, input.providerRequestId ?? null,
         input.errorCategory ?? null, input.httpStatus ?? null, input.inputTokens ?? 0n,
         input.cachedInputTokens ?? 0n, input.outputTokens ?? 0n, input.reasoningTokens ?? 0n,

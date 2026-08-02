@@ -154,7 +154,7 @@ describe("Phase 2A constrained tier model", () => {
       expectedOutputTokens: 300,
       judgeCost: 0,
     });
-    for (const estimate of recommendation.estimates) {
+    for (const estimate of recommendation.estimates.filter((item) => !item.executionPresetId)) {
       const model = getAcuCatalog().models.find((item) => item.modelId === estimate.modelId)!;
       expect(estimate.predictedScore).toBeCloseTo(interpolateModelCurve(model, difficulty).estimatedQuality * 100, 12);
     }

@@ -203,7 +203,7 @@ describe("Alpha Judge triggers", () => {
     }, {}, "2.1.220");
     const events = extractIncrementalEvents(envelope, { previousHistoryLength: 0, planningActive: false });
     expect(decideTrigger({ mode: "acu-auto", isNewTask: true, events }))
-      .toMatchObject({ runJudge: true, reason: "plan_started", phase: "planning", temporaryPhaseOverride: 88 });
+      .toMatchObject({ runJudge: true, reason: "plan_started", phase: "planning", temporaryPhaseOverride: 0 });
   });
 
   it("does not Judge ambiguous Claude text mixed with tool_result", () => {
@@ -337,7 +337,7 @@ describe("Alpha Judge triggers", () => {
     for (let index = 0; index < 10; index += 1) {
       const toolStep = { type: "tool_result" as const, hash: `planning-tool-${index}`, evidenceStrength: "high" as const, metadata: { isError: false } };
       expect(decideTrigger({ mode: "acu-auto", isNewTask: false, events: [toolStep], segment: planning }))
-        .toMatchObject({ runJudge: false, reason: "reuse_route", temporaryPhaseOverride: 88 });
+        .toMatchObject({ runJudge: false, reason: "reuse_route", temporaryPhaseOverride: 0 });
     }
   });
 

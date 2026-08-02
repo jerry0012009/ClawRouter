@@ -1,0 +1,17 @@
+[
+  {"modelId":"gpt-5.6-luna","protocols":{"responses":{"controlMode":"standard_effort","supportedEfforts":["low","medium","high","max"]}},"source":"observed","status":"verified","observedAt":"2026-08-02"},
+  {"modelId":"gpt-5.6-sol","protocols":{"responses":{"controlMode":"standard_effort","supportedEfforts":["low","medium","high"]}},"source":"observed","status":"verified","observedAt":"2026-08-02"},
+  {"modelId":"gpt-5.6-terra","protocols":{"responses":{"controlMode":"standard_effort","supportedEfforts":["low","medium","high"]}},"source":"observed","status":"verified","observedAt":"2026-08-02"},
+  {"modelId":"gpt-5.5","protocols":{"responses":{"controlMode":"standard_effort","supportedEfforts":["low","medium","high"]}},"source":"observed","status":"verified","observedAt":"2026-08-02"},
+  {"modelId":"gpt-5.4-mini","protocols":{"responses":{"controlMode":"standard_effort","supportedEfforts":["low","medium","high"]}},"source":"observed","status":"verified","observedAt":"2026-08-02"},
+  {"modelId":"claude-opus-4-8","protocols":{"messages":{"controlMode":"client_thinking_passthrough","supportedEfforts":["low","medium","high"]}},"source":"observed","status":"verified","observedAt":"2026-08-02"},
+  {"modelId":"claude-sonnet-5","protocols":{"messages":{"controlMode":"client_thinking_passthrough","supportedEfforts":["low","medium","high"]}},"source":"observed","status":"verified","observedAt":"2026-08-02"},
+  {"modelId":"claude-fable-5","protocols":{"messages":{"controlMode":"client_thinking_passthrough","supportedEfforts":["low","medium","high"]}},"source":"observed","status":"verified","observedAt":"2026-08-02"},
+  {"modelId":"deepseek-v4-flash","protocols":{"messages":{"controlMode":"client_thinking_passthrough","supportedEfforts":["low","medium","high"]}},"source":"observed","status":"verified","observedAt":"2026-08-02"},
+  {"modelId":"gemini-2.5-flash","protocols":{"responses":{"controlMode":"standard_effort","supportedEfforts":["low","medium","high"]}},"source":"observed","status":"verified","observedAt":"2026-08-02"},
+  {"modelId":"glm-5.1","protocols":{"responses":{"controlMode":"standard_effort","supportedEfforts":["low","medium","high"]}},"source":"observed","status":"verified","observedAt":"2026-08-02"},
+  {"modelId":"glm-5.2","protocols":{"responses":{"controlMode":"standard_effort","supportedEfforts":["low","medium","high"]},"messages":{"controlMode":"client_thinking_passthrough","supportedEfforts":["low","medium","high"]}},"source":"observed","status":"verified","observedAt":"2026-08-02"},
+  {"modelId":"kimi-k2.6","protocols":{"messages":{"controlMode":"client_thinking_passthrough","supportedEfforts":["low","medium","high"]}},"source":"inferred","status":"provisional","observedAt":"2026-08-02"},
+  {"modelId":"kimi-k2.7-code","protocols":{"messages":{"controlMode":"client_thinking_passthrough","supportedEfforts":["low","medium","high"]}},"source":"observed","status":"verified","observedAt":"2026-08-02"},
+  {"modelId":"kimi-k3","protocols":{"responses":{"controlMode":"standard_effort","supportedEfforts":["medium"]}},"source":"observed","status":"provisional","observedAt":"2026-08-02"}
+]

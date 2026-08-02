@@ -38,7 +38,7 @@ describe("Provider Economics and v0.3 Provider selection", () => {
     });
     expect(lucenCost.providerBalanceCharge).toBeCloseTo(0.00836184, 10);
     expect(lucenCost.effectiveCashCostCny).toBeCloseTo(0.00836184, 10);
-    expect(providerCreditCashCostCny(catalog.providers.find((item) => item.providerId === "blackai")!)).toBe(0.15);
+    expect(providerCreditCashCostCny(catalog.providers.find((item) => item.providerId === "blackai")!)).toBe(0.14);
     expect(providerCreditCashCostCny(closeai)).toBe(7.2);
   });
 

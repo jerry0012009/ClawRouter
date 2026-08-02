@@ -1,6 +1,6 @@
 {
   "schemaVersion": "acu-provider-economics-v1",
-  "generatedAt": "2026-07-29T00:00:00Z",
+  "generatedAt": "2026-08-02T00:00:00Z",
   "providers": [
     {
       "providerId": "lucen",
@@ -28,17 +28,17 @@
       "baseUrlEnv": "BLACKAI_BASE_URL",
       "apiKeyEnv": "BLACKAI_API_KEY",
       "balanceCurrency": "USD-denominated credits",
-      "rechargeCashCny": 15,
-      "creditsReceivedUsd": 100,
+      "rechargeCashCny": 140,
+      "creditsReceivedUsd": 1000,
       "observedBillingMultiplier": 1,
-      "priceSource": "Founder supplied package pricing; conservative CNY 0.15 per USD credit used because the current purchase batch is unknown",
-      "priceObservedAt": "2026-07-29T00:00:00Z",
+      "priceSource": "Founder-confirmed recharge: CNY 140 purchases 1000 USD-denominated web credits; authenticated usage ledger validates per-group billing multipliers",
+      "priceObservedAt": "2026-08-02T00:00:00Z",
       "health": "healthy",
       "priority": 20,
       "enabled": true,
-      "effectiveCostStatus": "estimated",
-      "effectiveCostSource": "founder_supplied_package_pricing_conservative",
-      "effectiveCostVersion": "blackai-founder-package-conservative-20260729-v1"
+      "effectiveCostStatus": "verified",
+      "effectiveCostSource": "founder_confirmed_cny_140_per_1000_credits_and_authenticated_usage_ledger",
+      "effectiveCostVersion": "blackai-ledger-20260802-v1"
     },
     {
       "providerId": "closeai",

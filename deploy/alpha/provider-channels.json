@@ -18,7 +18,7 @@
         "ACU_CHANNEL_BLACKAI_CODEX_MIX_LOW_FALLBACK_1_BASE_URL",
         "ACU_CHANNEL_BLACKAI_CODEX_MIX_LOW_FALLBACK_2_BASE_URL"
       ],
-      "rechargeCashRatioCnyPerCreditUsd": 0.15,
+      "rechargeCashRatioCnyPerCreditUsd": 0.14,
       "effectiveCostStatus": "estimated",
       "effectiveCostSource": "founder_supplied_package_pricing_conservative",
       "observedBillingMultiplier": 1,
@@ -46,7 +46,7 @@
         "ACU_CHANNEL_BLACKAI_PRO_1_4_FALLBACK_1_BASE_URL",
         "ACU_CHANNEL_BLACKAI_PRO_1_4_FALLBACK_2_BASE_URL"
       ],
-      "rechargeCashRatioCnyPerCreditUsd": 0.15,
+      "rechargeCashRatioCnyPerCreditUsd": 0.14,
       "effectiveCostStatus": "estimated",
       "effectiveCostSource": "founder_supplied_package_pricing_conservative",
       "observedBillingMultiplier": 1.4,
@@ -74,7 +74,7 @@
         "ACU_CHANNEL_BLACKAI_CLAUDE_REVERSE_FALLBACK_1_BASE_URL",
         "ACU_CHANNEL_BLACKAI_CLAUDE_REVERSE_FALLBACK_2_BASE_URL"
       ],
-      "rechargeCashRatioCnyPerCreditUsd": 0.15,
+      "rechargeCashRatioCnyPerCreditUsd": 0.14,
       "effectiveCostStatus": "estimated",
       "effectiveCostSource": "founder_supplied_package_pricing_conservative",
       "observedBillingMultiplier": 1,
@@ -102,7 +102,7 @@
         "ACU_CHANNEL_BLACKAI_GROK_FALLBACK_1_BASE_URL",
         "ACU_CHANNEL_BLACKAI_GROK_FALLBACK_2_BASE_URL"
       ],
-      "rechargeCashRatioCnyPerCreditUsd": 0.15,
+      "rechargeCashRatioCnyPerCreditUsd": 0.14,
       "effectiveCostStatus": "estimated",
       "effectiveCostSource": "founder_supplied_package_pricing_conservative",
       "observedBillingMultiplier": 1,
@@ -130,7 +130,7 @@
         "ACU_CHANNEL_BLACKAI_IMAGE_FALLBACK_1_BASE_URL",
         "ACU_CHANNEL_BLACKAI_IMAGE_FALLBACK_2_BASE_URL"
       ],
-      "rechargeCashRatioCnyPerCreditUsd": 0.15,
+      "rechargeCashRatioCnyPerCreditUsd": 0.14,
       "effectiveCostStatus": "estimated",
       "effectiveCostSource": "founder_supplied_package_pricing_conservative",
       "observedBillingMultiplier": 1.4,
@@ -158,7 +158,7 @@
         "ACU_CHANNEL_BLACKAI_CODEX_MIX_PRO_FALLBACK_FALLBACK_1_BASE_URL",
         "ACU_CHANNEL_BLACKAI_CODEX_MIX_PRO_FALLBACK_FALLBACK_2_BASE_URL"
       ],
-      "rechargeCashRatioCnyPerCreditUsd": 0.15,
+      "rechargeCashRatioCnyPerCreditUsd": 0.14,
       "effectiveCostStatus": "estimated",
       "effectiveCostSource": "founder_supplied_package_pricing_conservative",
       "observedBillingMultiplier": 1,

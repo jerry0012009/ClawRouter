@@ -61,8 +61,12 @@ describe("Phase 2A constrained tier model", () => {
       p_mid_high: 0.2,
       p_high: 0.1,
       confidence: 0.8,
-      signals: ["one", "two", "three", "four", "five", "six"],
-      explanation: "too many signals",
+      signals: ["valid", 42],
+      explanation: "non-string signal",
+      webIntent: "not_required",
+      webIntentConfidence: 0.9,
+      webIntentReason: "No web evidence is needed.",
+      webIntentEvidence: [],
     }))).toThrow(/signals/);
     expect(() => parseJudgeResult("not-json")).toThrow(/JSON object/);
   });
@@ -223,7 +227,7 @@ describe("Phase 2A constrained tier model", () => {
 
   it("keeps every Phase 2B profile and final tier sufficiency within constraints", () => {
     const defaults = getAcuCatalog().models.filter((model) => model.defaultDisplay);
-    expect(defaults).toHaveLength(6);
+    expect(defaults).toHaveLength(8);
     for (const model of getAcuCatalog().models) {
       expect(model.curveTemperature).toBeGreaterThanOrEqual(0.09);
       expect(model.curveTemperature).toBeLessThanOrEqual(0.17);

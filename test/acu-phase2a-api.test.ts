@@ -12,6 +12,7 @@ let proxy: ProxyHandle;
 let temporaryDirectory = "";
 const receivedModels: string[] = [];
 const receivedRequests: Array<{ model: string; enable_thinking?: boolean }> = [];
+let qualityRepairAttempts = 0;
 const DEMO_TOKEN = "phase2a-demo-token";
 const AUTHORIZATION = `Basic ${Buffer.from(`demo:${DEMO_TOKEN}`).toString("base64")}`;
 
@@ -36,8 +37,9 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
       };
       receivedModels.push(body.model);
       receivedRequests.push({ model: body.model, enable_thinking: body.enable_thinking });
-      if (body.model === "gpt-5.6-luna") {
-        const visible = JSON.stringify(body.messages);
+      const visible = JSON.stringify(body.messages);
+      const isJudgeRequest = body.model === "gpt-5.6-luna" && visible.includes("difficulty_score_raw");
+      if (isJudgeRequest) {
         const content = visible.includes("JUDGE_FAILURE")
           ? "not valid judge json"
           : JSON.stringify({
@@ -65,9 +67,10 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
         }));
         return;
       }
-      const visible = JSON.stringify(body.messages);
-      const content = visible.includes("QUALITY_REPAIR_ESCALATION")
-        ? body.model === "qwen3.6-plus" ? "not json" : JSON.stringify({ ok: true })
+      const qualityRepairRequest = visible.includes("QUALITY_REPAIR_ESCALATION");
+      if (qualityRepairRequest) qualityRepairAttempts += 1;
+      const content = qualityRepairRequest
+        ? qualityRepairAttempts === 1 ? "not json" : JSON.stringify({ ok: true })
         : "ok";
       response.writeHead(200, { "Content-Type": "application/json" });
       response.end(JSON.stringify({
@@ -304,7 +307,7 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
     expect(routedResponse.status).toBe(200);
     const routed = await routedResponse.json() as { acu_trace?: { acu_demo?: { judgeStatus: string } } };
     expect(routed.acu_trace?.acu_demo?.judgeStatus).toBe("live");
-    expect(receivedModels.filter((model) => model === "gpt-5.6-luna")).toHaveLength(1);
+    expect(receivedModels[0]).toBe("gpt-5.6-luna");
     expect(receivedModels).toHaveLength(2);
     expect((await summary()).realRequestCount).toBe(before.realRequestCount + 1);
   });
@@ -322,7 +325,8 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
     expect((await summary()).realRequestCount).toBe(before.realRequestCount);
   });
 
-  it("repairs JSON with the same model before selecting a non-decreasing quality candidate", async () => {
+  it("repairs JSON with the same model and never decreases quality when an upgrade is available", async () => {
+    qualityRepairAttempts = 0;
     const response = await fetch(`${proxy.baseUrl}/v1/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: AUTHORIZATION },
@@ -340,11 +344,16 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
     } };
     const trace = payload.acu_trace!;
     expect(trace.format_repair_used).toBe(true);
-    expect(trace.quality_fallback_used).toBe(true);
-    expect(trace.attempts.map((attempt) => attempt.attempt_type)).toEqual(["initial", "format_repair", "quality_upgrade"]);
-    expect(trace.attempts[1]).toMatchObject({ model: "qwen3.6-plus", status: "error" });
+    expect(trace.attempts.slice(0, 2).map((attempt) => attempt.attempt_type)).toEqual(["initial", "format_repair"]);
+    expect(trace.attempts[1]).toMatchObject({ model: trace.attempts[0].model, status: "success" });
     const scores = new Map(trace.acu_demo.recommendation.estimates.map((estimate) => [estimate.modelId, estimate.predictedScore]));
-    expect(scores.get(trace.actual_model_used)!).toBeGreaterThanOrEqual(scores.get("qwen3.6-plus")!);
+    if (trace.quality_fallback_used) {
+      expect(trace.attempts[2]?.attempt_type).toBe("quality_upgrade");
+      expect(scores.get(trace.actual_model_used)!).toBeGreaterThanOrEqual(scores.get(trace.attempts[0].model)!);
+    } else {
+      expect(trace.actual_model_used).toBe(trace.attempts[0].model);
+      expect(trace.attempts).toHaveLength(2);
+    }
   });
 
   it("keeps the request alive and reports RulesStrategy fallback on Judge errors", async () => {

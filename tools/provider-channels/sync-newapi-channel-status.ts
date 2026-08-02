@@ -59,18 +59,40 @@ function profileCashCnyPerNominalUsd(profile: Record<string, unknown>): number {
   return multiplier * rechargeCashCny / creditsReceivedUsd;
 }
 
-function profileReferenceScore(profile: Record<string, unknown>): number {
+function profileTokenPrices(profile: Record<string, unknown>, model: {
+  inputPricePerMillion: number;
+  outputPricePerMillion: number;
+  cachedInputPricePerMillion: number | null;
+}): { input: number; output: number; cacheRead: number } {
+  const billing = profile.billingPrice && typeof profile.billingPrice === "object"
+    ? profile.billingPrice as Record<string, unknown> : undefined;
+  const input = Number(billing?.inputPricePerMillion ?? model.inputPricePerMillion);
+  const output = Number(billing?.outputPricePerMillion ?? model.outputPricePerMillion);
+  const cacheRead = Number(billing?.cachedInputPricePerMillion ?? model.cachedInputPricePerMillion ?? input);
+  return { input, output, cacheRead };
+}
+
+function profileReferenceScore(profile: Record<string, unknown>, model: {
+  inputPricePerMillion: number;
+  outputPricePerMillion: number;
+  cachedInputPricePerMillion: number | null;
+}): number {
   const cashMultiplier = profileCashCnyPerNominalUsd(profile);
+  const prices = profileTokenPrices(profile, model);
   const healthFactor = profile.health === "degraded" ? 1.2 : profile.health === "unknown" ? 1.1 : 1;
   const successRate = Math.max(0.5, Math.min(1, Number(profile.recentSuccessRate ?? 1)));
   const latencyFactor = 1 + Math.min(0.05, Math.max(0, Number(profile.observedLatencyMs ?? 0)) / 1_200_000);
-  return cashMultiplier * healthFactor * latencyFactor / successRate;
+  return (prices.input + prices.output) * cashMultiplier * healthFactor * latencyFactor / successRate;
 }
 
-function referenceProfile(items: Array<Record<string, unknown>>): Record<string, unknown> | undefined {
+function referenceProfile(items: Array<Record<string, unknown>>, model: {
+  inputPricePerMillion: number;
+  outputPricePerMillion: number;
+  cachedInputPricePerMillion: number | null;
+}): Record<string, unknown> | undefined {
   return items
     .filter((profile) => profile.usageTrusted !== false && profile.effectiveCostStatus !== "missing")
-    .sort((left, right) => profileReferenceScore(left) - profileReferenceScore(right))[0];
+    .sort((left, right) => profileReferenceScore(left, model) - profileReferenceScore(right, model))[0];
 }
 
 const active = profiles.filter((profile) => profile.enabled === true
@@ -97,11 +119,12 @@ catalog.responses = activeModelIds.map((modelId) => {
   const providers = [...new Set(modelProfiles.map((profile) => String(profile.provider)))].sort();
   const existing = existingResponses.get(modelId);
   const healthyProfiles = activeProfiles(modelId, false);
-  const costProfile = referenceProfile(healthyProfiles);
+  const costProfile = referenceProfile(healthyProfiles, model);
   const cashMultiplier = costProfile ? profileCashCnyPerNominalUsd(costProfile) : Number.NaN;
   if (!costProfile || !Number.isFinite(cashMultiplier)) {
     throw new Error(`Routing-active model ${modelId} has no healthy Profile with usable CNY economics`);
   }
+  const profilePrices = profileTokenPrices(costProfile, model);
   const effectiveCostStatus = costProfile?.effectiveCostStatus === "verified" ? "verified" : "estimated";
   return {
     modelId,
@@ -112,15 +135,16 @@ catalog.responses = activeModelIds.map((modelId) => {
     inputPricePerMillion: model.inputPricePerMillion,
     outputPricePerMillion: model.outputPricePerMillion,
     cachedInputPricePerMillion: model.cachedInputPricePerMillion ?? model.inputPricePerMillion,
-    effectiveInputPriceCnyPerMillion: model.inputPricePerMillion * cashMultiplier,
-    effectiveOutputPriceCnyPerMillion: model.outputPricePerMillion * cashMultiplier,
-    effectiveCachedInputPriceCnyPerMillion: (model.cachedInputPricePerMillion ?? model.inputPricePerMillion) * cashMultiplier,
+    effectiveInputPriceCnyPerMillion: profilePrices.input * cashMultiplier,
+    effectiveOutputPriceCnyPerMillion: profilePrices.output * cashMultiplier,
+    effectiveCachedInputPriceCnyPerMillion: profilePrices.cacheRead * cashMultiplier,
     costCurrency: "CNY",
     costSemantics: "estimated_user_cash_cost",
     costBasis: "current_reference_execution_profile",
     costBasisLabel: "Reference channel price; actual route may select another eligible profile",
     costExecutionProfileId: String(costProfile?.executionProfileId ?? ""),
     costObservedBillingMultiplier: Number(costProfile?.observedBillingMultiplier),
+    costPriceSource: (costProfile.billingPrice as Record<string, unknown> | undefined)?.source ?? "official_catalog_fallback",
     costProvider: displayProvider(costProfile ? [String(costProfile.provider)] : []),
     costChannel: String(costProfile?.channel ?? ""),
     effectiveCostStatus,

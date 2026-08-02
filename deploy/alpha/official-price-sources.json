@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "acu-official-price-sources-v1",
+  "observedAt": "2026-08-02",
+  "defaultUnit": "USD per 1M tokens",
+  "sources": [
+    {
+      "vendor": "OpenAI",
+      "url": "https://developers.openai.com/api/docs/pricing",
+      "models": ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano", "gpt-4-turbo", "gpt-5.4-mini", "gpt-5.4-nano", "gpt-5.5", "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol", "o3", "o4-mini"],
+      "notes": "Standard short-context token prices. GPT-5.5 and GPT-5.6 long-context tiers are not representable by the current flat-price catalog."
+    },
+    {
+      "vendor": "Anthropic",
+      "url": "https://docs.anthropic.com/en/docs/about-claude/pricing",
+      "models": ["claude-fable-5", "claude-opus-4-20250514", "claude-opus-4-7", "claude-opus-4-8", "claude-sonnet-4-20250514", "claude-sonnet-5"],
+      "notes": "Claude Sonnet 5 uses the published promotional price through 2026-08-31. Cache write is the 5-minute rate."
+    },
+    {
+      "vendor": "Google",
+      "url": "https://ai.google.dev/gemini-api/docs/pricing",
+      "models": ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-3-pro-image", "gemini-3.1-flash-image", "gemini-3.1-flash-lite", "gemini-3.1-flash-lite-image", "gemini-3.5-flash"],
+      "notes": "Text token prices only. Image output and cache storage per token-hour are separate dimensions not represented by the flat catalog."
+    },
+    {
+      "vendor": "DeepSeek",
+      "url": "https://api-docs.deepseek.com/quick_start/pricing",
+      "models": ["deepseek-v4-flash", "deepseek-v4-pro"],
+      "notes": "Cache-hit and cache-miss token prices from the public API pricing table."
+    },
+    {
+      "vendor": "Z.AI",
+      "url": "https://docs.z.ai/guides/overview/pricing",
+      "models": ["glm-5", "glm-5.1", "glm-5.2"]
+    },
+    {
+      "vendor": "xAI",
+      "url": "https://docs.x.ai/docs/models",
+      "models": ["x-ai/grok-4.3"],
+      "notes": "First-party short-context price; long-context requests have a higher tier."
+    },
+    {
+      "vendor": "OpenRouter",
+      "url": "https://openrouter.ai/api/v1/models",
+      "models": ["deepseek/deepseek-chat-v3-0324", "deepseek/deepseek-r1", "meta-llama/llama-3.3-70b-instruct", "meta-llama/llama-4-maverick", "qwen/qwen3-235b-a22b"],
+      "notes": "Live public model-directory prices observed on the stated date; these are channel prices, not first-party vendor list prices."
+    },
+    {
+      "vendor": "Moonshot AI",
+      "url": "https://platform.moonshot.cn/docs/pricing/chat",
+      "models": ["kimi-k2.6", "kimi-k2.7-code", "kimi-k3"],
+      "nativeUnit": "CNY per 1M tokens",
+      "status": "not_normalized_in_flat_usd_catalog",
+      "notes": "Native CNY public prices are retained as evidence; do not silently treat them as USD. Provider execution prices supply routing cost until currency-aware catalog support lands."
+    }
+  ]
+}

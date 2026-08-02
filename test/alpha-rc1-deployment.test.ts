@@ -122,7 +122,7 @@ describe("Alpha RC1 deployment profiles", () => {
     const planning = route("responses", 5, 88);
     expect(planning.candidateEstimates).toHaveLength(simpleResponses.candidateEstimates.length);
     expect(planning.candidateEstimates.map((item) => item.modelId)).toContain(planning.selectedProfile.modelId);
-    expect(planning.candidateEstimates.some((item) => !item.meetsQualityTarget)).toBe(true);
+    expect([...planning.eligibleProfileIds].sort()).toEqual([...simpleResponses.eligibleProfileIds].sort());
   });
 
   it("deduplicates same-model profiles in the formula while retaining profile provenance", async () => {

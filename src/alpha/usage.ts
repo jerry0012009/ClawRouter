@@ -1,9 +1,11 @@
 import { getAcuModel } from "../acu/catalog.js";
 import type { AlphaProtocol } from "./repository.js";
+import type { ProfileBillingPrice } from "./routing.js";
 
 export type AlphaUsage = {
   inputTokens: bigint;
   cachedInputTokens: bigint;
+  cacheCreationInputTokens?: bigint;
   outputTokens: bigint;
   reasoningTokens: bigint;
   actualModel?: string;
@@ -66,6 +68,7 @@ function parseResponses(payloads: unknown[]): Omit<AlphaUsage, "providerCostUsd"
     result = {
       inputTokens: integer(usage.input_tokens),
       cachedInputTokens: integer(inputDetails?.cached_tokens),
+      cacheCreationInputTokens: 0n,
       outputTokens: integer(usage.output_tokens),
       reasoningTokens: integer(outputDetails?.reasoning_tokens),
       actualModel: typeof response?.model === "string" ? response.model : undefined,
@@ -78,6 +81,7 @@ function parseResponses(payloads: unknown[]): Omit<AlphaUsage, "providerCostUsd"
 function parseMessages(payloads: unknown[]): Omit<AlphaUsage, "providerCostUsd"> | undefined {
   let inputTokens = 0n;
   let cachedInputTokens = 0n;
+  let cacheCreationInputTokens = 0n;
   let outputTokens = 0n;
   let reasoningTokens = 0n;
   let actualModel: string | undefined;
@@ -89,8 +93,10 @@ function parseMessages(payloads: unknown[]): Omit<AlphaUsage, "providerCostUsd">
     if (!usage) continue;
     found = true;
     inputTokens = integer(usage.input_tokens) || inputTokens;
-    cachedInputTokens = integer(usage.cache_read_input_tokens) + integer(usage.cache_creation_input_tokens)
-      || cachedInputTokens;
+    const cacheRead = integer(usage.cache_read_input_tokens);
+    const cacheCreation = integer(usage.cache_creation_input_tokens);
+    cachedInputTokens = cacheRead + cacheCreation || cachedInputTokens;
+    cacheCreationInputTokens = cacheCreation || cacheCreationInputTokens;
     outputTokens = integer(usage.output_tokens) || outputTokens;
     reasoningTokens = integer(usage.reasoning_tokens) || reasoningTokens;
     if (typeof message?.model === "string") actualModel = message.model;
@@ -98,6 +104,7 @@ function parseMessages(payloads: unknown[]): Omit<AlphaUsage, "providerCostUsd">
   return found ? {
     inputTokens,
     cachedInputTokens,
+    cacheCreationInputTokens,
     outputTokens,
     reasoningTokens,
     actualModel,
@@ -110,15 +117,34 @@ export function calculateProviderCost(
   inputTokens: bigint,
   cachedInputTokens: bigint,
   outputTokens: bigint,
+  billingPrice?: Pick<ProfileBillingPrice, "inputPricePerMillion" | "outputPricePerMillion" | "cachedInputPricePerMillion">,
+  options?: {
+    cacheCreationInputTokens?: bigint;
+    cachedInputTokensIncludesCreation?: boolean;
+    inputIncludesCachedTokens?: boolean;
+    cacheWritePricePerMillion?: number;
+  },
 ): string {
   const model = getAcuModel(modelId);
-  if (!model || model.inputPricePerMillion === null || model.outputPricePerMillion === null) return "0.0000000000";
-  const uncached = inputTokens > cachedInputTokens ? inputTokens - cachedInputTokens : 0n;
-  const cachedPrice = model.cachedInputPricePerMillion ?? model.inputPricePerMillion;
+  const inputPrice = billingPrice?.inputPricePerMillion ?? model?.inputPricePerMillion;
+  const outputPrice = billingPrice?.outputPricePerMillion ?? model?.outputPricePerMillion;
+  if (inputPrice === null || inputPrice === undefined || outputPrice === null || outputPrice === undefined) return "0.0000000000";
+  const cacheCreationTokens = options?.cacheCreationInputTokens ?? 0n;
+  const cacheReadTokens = options?.cachedInputTokensIncludesCreation
+    ? cachedInputTokens > cacheCreationTokens ? cachedInputTokens - cacheCreationTokens : 0n
+    : cachedInputTokens;
+  const allCachedTokens = options?.cachedInputTokensIncludesCreation
+    ? cachedInputTokens : cachedInputTokens + cacheCreationTokens;
+  const uncached = options?.inputIncludesCachedTokens === false
+    ? inputTokens
+    : inputTokens > allCachedTokens ? inputTokens - allCachedTokens : 0n;
+  const cachedPrice = billingPrice?.cachedInputPricePerMillion ?? model?.cachedInputPricePerMillion ?? inputPrice;
+  const cacheWritePrice = options?.cacheWritePricePerMillion ?? model?.cacheWritePricePerMillion ?? inputPrice;
   const cost = (
-    Number(uncached) * model.inputPricePerMillion
-    + Number(cachedInputTokens) * cachedPrice
-    + Number(outputTokens) * model.outputPricePerMillion
+    Number(uncached) * inputPrice
+    + Number(cacheReadTokens) * cachedPrice
+    + Number(cacheCreationTokens) * cacheWritePrice
+    + Number(outputTokens) * outputPrice
   ) / 1_000_000;
   return cost.toFixed(10);
 }
@@ -129,12 +155,14 @@ export function parseProviderUsage(input: {
   contentType: string;
   requestedModel: string;
   requestBytes: number;
+  billingPrice?: ProfileBillingPrice;
 }): AlphaUsage {
   const payloads = jsonPayloads(input.body, input.contentType);
   const parsed = input.protocol === "responses" ? parseResponses(payloads) : parseMessages(payloads);
   const usage = parsed ?? {
     inputTokens: BigInt(Math.ceil(input.requestBytes / 4)),
     cachedInputTokens: 0n,
+    cacheCreationInputTokens: 0n,
     outputTokens: BigInt(Math.ceil(input.body.length / 4)),
     reasoningTokens: 0n,
     usageSource: "response_text_estimate" as const,
@@ -146,6 +174,13 @@ export function parseProviderUsage(input: {
       usage.inputTokens,
       usage.cachedInputTokens,
       usage.outputTokens,
+      input.billingPrice,
+      {
+        cacheCreationInputTokens: usage.cacheCreationInputTokens ?? 0n,
+        cachedInputTokensIncludesCreation: input.protocol === "messages",
+        inputIncludesCachedTokens: input.protocol !== "messages",
+        cacheWritePricePerMillion: input.billingPrice?.cacheWritePricePerMillion,
+      },
     ),
   };
 }

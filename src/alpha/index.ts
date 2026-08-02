@@ -57,8 +57,10 @@ export {
 export { buildAlphaJudgeContext, type AlphaJudgeContextEnvelope } from "./judge-context.js";
 export {
   resolveExplicitProfile,
+  resolveProfileBillingPrice,
   routeWithCurrentAcuFormula,
   type AlphaExecutionProfile,
+  type ProfileBillingPrice,
   type AlphaRouteDecision,
   type AlphaRouteRequirements,
 } from "./routing.js";

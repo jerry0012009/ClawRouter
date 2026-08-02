@@ -11,6 +11,7 @@ import { AlphaRepository, alphaId, sha256, type AlphaProtocol } from "./reposito
 import {
   AlphaAdmissionError,
   exclusionCategory,
+  resolveProfileBillingPrice,
   resolveExplicitProfile,
   routeWithCurrentAcuFormula,
   type AlphaExecutionProfile,
@@ -1898,6 +1899,7 @@ export class AlphaRequestProcessor {
       contentType: contentType ?? "application/octet-stream",
       requestedModel: input.attempt.profile.modelId,
       requestBytes: input.requestBytes,
+      billingPrice: input.attempt.profile.billingPrice,
     }) : undefined;
     const responseText = input.response?.body.toString("utf8") ?? "";
     const retryAfterSeconds = input.response?.headers["retry-after"] ? Number(input.response.headers["retry-after"]) : undefined;
@@ -2038,6 +2040,7 @@ export class AlphaRequestProcessor {
     const attemptId = alphaId("att");
     const startedAt = new Date();
     const catalogModel = getAcuModel(input.profile.modelId);
+    const billingPrice = resolveProfileBillingPrice(input.profile);
     const webEligibility = resolveWebEligibility(input.profile, input.envelope);
     await repository.createAttempt({
       attemptId,
@@ -2055,8 +2058,10 @@ export class AlphaRequestProcessor {
       requestedModel: input.requestedModel,
       actualModel: input.profile.modelId,
       status: "started",
-      inputPricePerMillion: catalogModel?.inputPricePerMillion?.toString(),
-      outputPricePerMillion: catalogModel?.outputPricePerMillion?.toString(),
+      inputPricePerMillion: Number.isFinite(billingPrice.inputPricePerMillion)
+        ? billingPrice.inputPricePerMillion.toString() : catalogModel?.inputPricePerMillion?.toString(),
+      outputPricePerMillion: Number.isFinite(billingPrice.outputPricePerMillion)
+        ? billingPrice.outputPricePerMillion.toString() : catalogModel?.outputPricePerMillion?.toString(),
       startedAt,
       metadata: {
         clientDeclaredWebTool: input.envelope.clientDeclaredWebTool,
@@ -2072,6 +2077,8 @@ export class AlphaRequestProcessor {
           && input.envelope.reasoningEffort !== "high" ? "plan_active" : undefined,
         reasoningControlMode: input.reasoningControlMode ?? input.profile.reasoningControlMode ?? "none",
         providerReasoningOverrideApplied: input.providerReasoningOverrideApplied === true,
+        billingPriceSource: input.profile.billingPrice?.source ?? "official_catalog_fallback",
+        billingPriceObservedAt: input.profile.billingPrice?.observedAt,
       },
     });
     await repository.savePayload({
@@ -3170,6 +3177,7 @@ export class AlphaRequestProcessor {
       contentType,
       requestedModel: context.selectedProfile.modelId,
       requestBytes: context.requestBytes,
+      billingPrice: context.selectedProfile.billingPrice,
     });
     context.webActuallyInvoked = relay.webSearch.actuallyInvoked;
     trace.envelope.webActuallyInvoked = relay.webSearch.actuallyInvoked;

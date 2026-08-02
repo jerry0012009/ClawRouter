@@ -12,8 +12,8 @@ import re
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "src/models.ts"
 CATALOG = ROOT / "src/acu/catalog/model-catalog.json"
-PRICE_VERSION = "acu-price-2026-08-01-lucen-v1"
-GENERATED_AT = "2026-08-01"
+PRICE_VERSION = "acu-official-public-price-2026-08-02-v1"
+GENERATED_AT = "2026-08-02"
 
 
 def source_prices() -> dict[str, tuple[float, float, float, float]]:
@@ -51,7 +51,7 @@ def main() -> None:
         })
     catalog["generatedAt"] = GENERATED_AT
     catalog["priceVersion"] = PRICE_VERSION
-    catalog["provenance"]["priceAndAvailabilitySource"] = "src/models.ts at build-time"
+    catalog["provenance"]["priceAndAvailabilitySource"] = "src/models.ts from official vendor pages; see deploy/alpha/official-price-sources.json"
     catalog["provenance"]["priceAndAvailabilitySourceSha256"] = hashlib.sha256(SOURCE.read_bytes()).hexdigest()
     CATALOG.write_text(json.dumps(catalog, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 

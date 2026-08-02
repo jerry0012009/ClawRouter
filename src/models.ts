@@ -1,5 +1,5 @@
 /**
- * Model Definitions — Dual Upstream (2026-08-01 Lucen reconciliation)
+ * Model Definitions - public list prices with provider execution overrides.
  *
  * "proxy": api.openai-proxy.org (OpenAI, Anthropic, Google, DeepSeek, Kimi, Qwen, GLM)
  * "openrouter": openrouter.ai (DeepSeek, Meta, Qwen, Grok, free models)
@@ -44,25 +44,22 @@ export const BLOCKRUN_MODELS: ExtendedModelDefinition[] = [
     cost: { input: 10, output: 30, cacheRead: 5, cacheWrite: 10 }, contextWindow: 128_000, maxTokens: 4_096 },
 
   // ── OpenAI (GPT-5 series, need max_completion_tokens) ──
-  // Nominal prices are provider-credit prices used by ACU economics. For the
-  // Lucen account, one RMB recharge buys one USD-denominated credit, so these
-  // numeric values map one-for-one to RMB before the execution multiplier.
   { id: "gpt-5.6-sol", name: "GPT-5.6 Sol", upstream: "proxy", useMaxCompletionTokens: true, reasoning: true, input: ["text", "image"],
-    cost: { input: 5, output: 30, cacheRead: 0.5, cacheWrite: 5 }, contextWindow: 1_050_000, maxTokens: 128_000 },
+    cost: { input: 5, output: 30, cacheRead: 0.5, cacheWrite: 6.25 }, contextWindow: 1_050_000, maxTokens: 128_000 },
   { id: "gpt-5.6-terra", name: "GPT-5.6 Terra", upstream: "proxy", useMaxCompletionTokens: true, reasoning: true, input: ["text", "image"],
     cost: { input: 2, output: 12, cacheRead: 0.2, cacheWrite: 2.5 }, contextWindow: 1_050_000, maxTokens: 128_000 },
   { id: "gpt-5.6-luna", name: "GPT-5.6 Luna", upstream: "proxy", useMaxCompletionTokens: true, reasoning: true, input: ["text", "image"],
-    cost: { input: 0.2, output: 1.2, cacheRead: 0.02, cacheWrite: 1 }, contextWindow: 1_050_000, maxTokens: 128_000 },
+    cost: { input: 0.2, output: 1.2, cacheRead: 0.02, cacheWrite: 0.25 }, contextWindow: 1_050_000, maxTokens: 128_000 },
   { id: "gpt-5.5", name: "GPT-5.5", upstream: "proxy", useMaxCompletionTokens: true, reasoning: true, input: ["text", "image"],
-    cost: { input: 5, output: 30, cacheRead: 2.5, cacheWrite: 5 }, contextWindow: 1_048_576, maxTokens: 65_536 },
+    cost: { input: 5, output: 30, cacheRead: 0.5, cacheWrite: 5 }, contextWindow: 1_050_000, maxTokens: 65_536 },
   { id: "gpt-5.4-nano", name: "GPT-5.4 Nano", upstream: "proxy", useMaxCompletionTokens: true, reasoning: false, input: ["text", "image"],
-    cost: { input: 0.2, output: 1.25, cacheRead: 0.1, cacheWrite: 0.2 }, contextWindow: 1_048_576, maxTokens: 32_768 },
+    cost: { input: 0.2, output: 1.25, cacheRead: 0.02, cacheWrite: 0.2 }, contextWindow: 1_048_576, maxTokens: 32_768 },
   { id: "gpt-5.4-mini", name: "GPT-5.4 Mini", upstream: "proxy", useMaxCompletionTokens: true, reasoning: false, input: ["text", "image"],
     cost: { input: 0.75, output: 4.5, cacheRead: 0.075, cacheWrite: 0.75 }, contextWindow: 1_048_576, maxTokens: 32_768 },
 
   // ── OpenAI Reasoning (need max_completion_tokens) ──
   { id: "o3", name: "o3", upstream: "proxy", useMaxCompletionTokens: true, reasoning: true, input: ["text", "image"],
-    cost: { input: 10, output: 40, cacheRead: 2.5, cacheWrite: 10 }, contextWindow: 200_000, maxTokens: 100_000 },
+    cost: { input: 2, output: 8, cacheRead: 0.5, cacheWrite: 2 }, contextWindow: 200_000, maxTokens: 100_000 },
   { id: "o4-mini", name: "o4-mini", upstream: "proxy", useMaxCompletionTokens: true, reasoning: true, input: ["text", "image"],
     cost: { input: 1.1, output: 4.4, cacheRead: 0.275, cacheWrite: 1.1 }, contextWindow: 200_000, maxTokens: 100_000 },
 
@@ -82,25 +79,25 @@ export const BLOCKRUN_MODELS: ExtendedModelDefinition[] = [
 
   // ── Google Gemini ──
   { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", upstream: "proxy", reasoning: true, input: ["text", "image"],
-    cost: { input: 0.3, output: 2.5, cacheRead: 0.0375, cacheWrite: 0.15 }, contextWindow: 1_048_576, maxTokens: 65_536 },
+    cost: { input: 0.3, output: 2.5, cacheRead: 0.03, cacheWrite: 0.15 }, contextWindow: 1_048_576, maxTokens: 65_536 },
   { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", upstream: "proxy", reasoning: true, input: ["text", "image"],
-    cost: { input: 1.25, output: 10, cacheRead: 0.3125, cacheWrite: 1.25 }, contextWindow: 1_048_576, maxTokens: 65_536 },
+    cost: { input: 1.25, output: 10, cacheRead: 0.125, cacheWrite: 1.25 }, contextWindow: 1_048_576, maxTokens: 65_536 },
   { id: "gemini-3-pro-image", name: "Gemini 3 Pro Image", upstream: "proxy", reasoning: false, input: ["text", "image"],
     cost: { input: 2, output: 12, cacheRead: 1, cacheWrite: 2 }, contextWindow: 1_048_576, maxTokens: 65_536 },
   { id: "gemini-3.1-flash-lite", name: "Gemini 3.1 Flash Lite", upstream: "proxy", reasoning: false, input: ["text", "image"],
-    cost: { input: 0.25, output: 1.5, cacheRead: 0.125, cacheWrite: 0.25 }, contextWindow: 1_048_576, maxTokens: 65_536 },
+    cost: { input: 0.25, output: 1.5, cacheRead: 0.025, cacheWrite: 0.25 }, contextWindow: 1_048_576, maxTokens: 65_536 },
   { id: "gemini-3.1-flash-lite-image", name: "Gemini 3.1 Flash Lite Image", upstream: "proxy", reasoning: false, input: ["text", "image"],
     cost: { input: 0.25, output: 1.5, cacheRead: 0.125, cacheWrite: 0.25 }, contextWindow: 1_048_576, maxTokens: 65_536 },
   { id: "gemini-3.1-flash-image", name: "Gemini 3.1 Flash Image", upstream: "proxy", reasoning: false, input: ["text", "image"],
     cost: { input: 0.5, output: 3, cacheRead: 0.25, cacheWrite: 0.5 }, contextWindow: 1_048_576, maxTokens: 65_536 },
   { id: "gemini-3.5-flash", name: "Gemini 3.5 Flash", upstream: "proxy", reasoning: false, input: ["text", "image"],
-    cost: { input: 1.5, output: 9, cacheRead: 0.75, cacheWrite: 1.5 }, contextWindow: 1_048_576, maxTokens: 65_536 },
+    cost: { input: 1.5, output: 9, cacheRead: 0.15, cacheWrite: 1.5 }, contextWindow: 1_048_576, maxTokens: 65_536 },
 
   // ── DeepSeek (via proxy) ──
   { id: "deepseek-v4-flash", name: "DeepSeek V4 Flash", upstream: "proxy", reasoning: false, input: ["text"],
-    cost: { input: 1, output: 2, cacheRead: 0.07, cacheWrite: 0.15 }, contextWindow: 1_000_000, maxTokens: 384_000 },
+    cost: { input: 0.14, output: 0.28, cacheRead: 0.0028, cacheWrite: 0.14 }, contextWindow: 1_000_000, maxTokens: 384_000 },
   { id: "deepseek-v4-pro", name: "DeepSeek V4 Pro", upstream: "proxy", reasoning: true, input: ["text"],
-    cost: { input: 1.8, output: 3.6, cacheRead: 0.9, cacheWrite: 1.8 }, contextWindow: 163_840, maxTokens: 163_840 },
+    cost: { input: 0.435, output: 0.87, cacheRead: 0.003625, cacheWrite: 0.435 }, contextWindow: 163_840, maxTokens: 163_840 },
   { id: "deepseek-v3.2", name: "DeepSeek V3.2", upstream: "proxy", reasoning: false, input: ["text"],
     cost: { input: 0.3, output: 0.45, cacheRead: 0.15, cacheWrite: 0.3 }, contextWindow: 163_840, maxTokens: 163_840 },
 
@@ -130,11 +127,11 @@ export const BLOCKRUN_MODELS: ExtendedModelDefinition[] = [
 
   // ── GLM ──
   { id: "glm-5.2", name: "GLM 5.2", upstream: "proxy", reasoning: false, input: ["text"],
-    cost: { input: 8, output: 28, cacheRead: 2, cacheWrite: 1.2 }, contextWindow: 128_000, maxTokens: 16_384 },
+    cost: { input: 1.4, output: 4.4, cacheRead: 0.26, cacheWrite: 1.4 }, contextWindow: 128_000, maxTokens: 16_384 },
   { id: "glm-5.1", name: "GLM 5.1", upstream: "proxy", reasoning: false, input: ["text"],
-    cost: { input: 0.9, output: 3.5, cacheRead: 0.45, cacheWrite: 0.9 }, contextWindow: 128_000, maxTokens: 16_384 },
+    cost: { input: 1.4, output: 4.4, cacheRead: 0.26, cacheWrite: 1.4 }, contextWindow: 128_000, maxTokens: 16_384 },
   { id: "glm-5", name: "GLM 5", upstream: "proxy", reasoning: false, input: ["text"],
-    cost: { input: 0.6, output: 2.7, cacheRead: 0.3, cacheWrite: 0.6 }, contextWindow: 128_000, maxTokens: 16_384 },
+    cost: { input: 1, output: 3.2, cacheRead: 0.2, cacheWrite: 1 }, contextWindow: 128_000, maxTokens: 16_384 },
 
   // ═══════════════════════════════════════════
   //  OpenRouter
@@ -142,23 +139,23 @@ export const BLOCKRUN_MODELS: ExtendedModelDefinition[] = [
 
   // ── DeepSeek (via OpenRouter) ──
   { id: "deepseek/deepseek-chat-v3-0324", name: "DeepSeek V3 (OR)", upstream: "openrouter", reasoning: false, input: ["text"],
-    cost: { input: 0.5, output: 1.54, cacheRead: 0.07, cacheWrite: 0.5 }, contextWindow: 163_840, maxTokens: 163_840 },
+    cost: { input: 0.27, output: 1.12, cacheRead: 0.135, cacheWrite: 0.27 }, contextWindow: 163_840, maxTokens: 163_840 },
   { id: "deepseek/deepseek-r1", name: "DeepSeek R1 (OR)", upstream: "openrouter", reasoning: true, input: ["text"],
-    cost: { input: 0.55, output: 2.19, cacheRead: 0.14, cacheWrite: 0.55 }, contextWindow: 163_840, maxTokens: 163_840 },
+    cost: { input: 0.7, output: 2.5, cacheRead: 0.14, cacheWrite: 0.7 }, contextWindow: 163_840, maxTokens: 163_840 },
 
   // ── Meta ──
   { id: "meta-llama/llama-4-maverick", name: "Llama 4 Maverick", upstream: "openrouter", reasoning: false, input: ["text", "image"],
-    cost: { input: 0.2, output: 0.6, cacheRead: 0.05, cacheWrite: 0.2 }, contextWindow: 1_048_576, maxTokens: 32_768 },
+    cost: { input: 0.2, output: 0.8, cacheRead: 0.05, cacheWrite: 0.2 }, contextWindow: 1_048_576, maxTokens: 32_768 },
   { id: "meta-llama/llama-3.3-70b-instruct", name: "Llama 3.3 70B", upstream: "openrouter", reasoning: false, input: ["text"],
-    cost: { input: 0.1, output: 0.1, cacheRead: 0.025, cacheWrite: 0.1 }, contextWindow: 131_072, maxTokens: 16_384 },
+    cost: { input: 0.13, output: 0.4, cacheRead: 0.025, cacheWrite: 0.13 }, contextWindow: 131_072, maxTokens: 16_384 },
 
   // ── Qwen (via OpenRouter) ──
   { id: "qwen/qwen3-235b-a22b", name: "Qwen3 235B (OR)", upstream: "openrouter", reasoning: true, input: ["text"],
-    cost: { input: 0.2, output: 0.6, cacheRead: 0.1, cacheWrite: 0.2 }, contextWindow: 131_072, maxTokens: 32_768 },
+    cost: { input: 0.455, output: 1.82, cacheRead: 0.1, cacheWrite: 0.455 }, contextWindow: 131_072, maxTokens: 32_768 },
 
   // ── xAI ──
   { id: "x-ai/grok-4.3", name: "Grok 4.3 (OR)", upstream: "openrouter", reasoning: false, input: ["text", "image"],
-    cost: { input: 3, output: 15, cacheRead: 1.5, cacheWrite: 3 }, contextWindow: 131_072, maxTokens: 16_384 },
+    cost: { input: 1.25, output: 2.5, cacheRead: 0.2, cacheWrite: 1.25 }, contextWindow: 131_072, maxTokens: 16_384 },
 
   // ── Free models (OpenRouter) ──
   { id: "openai/gpt-oss-20b:free", name: "GPT-OSS 20B (Free)", upstream: "openrouter", reasoning: false, input: ["text"],

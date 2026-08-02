@@ -1,0 +1,965 @@
+{
+  "schemaVersion": "acu-provider-billing-evidence-v1",
+  "generatedAt": "2026-08-02T01:17:27.893Z",
+  "pricePrecedence": [
+    "verified execution-profile ledger price",
+    "official shared catalog fallback"
+  ],
+  "formula": "cashCny = nominal token cost * observed group multiplier * cashCnyPerCredit",
+  "providers": [
+    {
+      "provider": "lucen",
+      "source": "lucen.cc authenticated usage API",
+      "exportedAt": "2026-08-02T01:16:33.273Z",
+      "recordCount": 5916,
+      "cashCnyPerCredit": 1,
+      "dashboardWindow": {
+        "startDate": "2026-07-26",
+        "endDate": "2026-08-01",
+        "nominalCredits": 395.238378385,
+        "chargedCredits": 52.7343259546,
+        "chargedCashCny": 52.7343259546
+      },
+      "actualEqualsNominalTimesMultiplier": {
+        "checkedRecords": 5916,
+        "failures": 0
+      },
+      "models": [
+        {
+          "model": "gpt-5.6-sol",
+          "records": 5137,
+          "observedBillingMultipliers": [
+            0.04,
+            0.06,
+            0.07,
+            0.08,
+            0.1,
+            0.12,
+            0.14,
+            0.17,
+            0.25
+          ],
+          "componentRates": {
+            "inputPricePerMillion": {
+              "modalRate": 5,
+              "samples": 5136,
+              "alternatives": []
+            },
+            "outputPricePerMillion": {
+              "modalRate": 30,
+              "samples": 5136,
+              "alternatives": []
+            },
+            "cachedInputPricePerMillion": {
+              "modalRate": 0.5,
+              "samples": 5048,
+              "alternatives": []
+            }
+          }
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "records": 215,
+          "observedBillingMultipliers": [
+            0.06,
+            0.08,
+            0.1,
+            0.12,
+            0.14,
+            0.17,
+            0.25
+          ],
+          "componentRates": {
+            "inputPricePerMillion": {
+              "modalRate": 0.2,
+              "samples": 124,
+              "alternatives": [
+                {
+                  "rate": 1,
+                  "samples": 89
+                }
+              ]
+            },
+            "outputPricePerMillion": {
+              "modalRate": 1.2,
+              "samples": 124,
+              "alternatives": [
+                {
+                  "rate": 6,
+                  "samples": 89
+                }
+              ]
+            },
+            "cachedInputPricePerMillion": {
+              "modalRate": 0.1,
+              "samples": 69,
+              "alternatives": [
+                {
+                  "rate": 0.02,
+                  "samples": 57
+                }
+              ]
+            }
+          }
+        },
+        {
+          "model": "gpt-5.4-mini",
+          "records": 116,
+          "observedBillingMultipliers": [
+            0.06,
+            0.08,
+            0.1,
+            0.12,
+            0.14,
+            0.17,
+            0.25
+          ],
+          "componentRates": {
+            "inputPricePerMillion": {
+              "modalRate": 0.75,
+              "samples": 115,
+              "alternatives": []
+            },
+            "outputPricePerMillion": {
+              "modalRate": 4.5,
+              "samples": 115,
+              "alternatives": []
+            },
+            "cachedInputPricePerMillion": {
+              "modalRate": 0.075,
+              "samples": 96,
+              "alternatives": []
+            }
+          }
+        },
+        {
+          "model": "glm-5.2",
+          "records": 95,
+          "observedBillingMultipliers": [
+            0.15,
+            0.3
+          ],
+          "componentRates": {
+            "inputPricePerMillion": {
+              "modalRate": 8,
+              "samples": 95,
+              "alternatives": []
+            },
+            "outputPricePerMillion": {
+              "modalRate": 28,
+              "samples": 95,
+              "alternatives": []
+            },
+            "cachedInputPricePerMillion": {
+              "modalRate": 2,
+              "samples": 66,
+              "alternatives": []
+            }
+          }
+        },
+        {
+          "model": "gpt-5.5",
+          "records": 94,
+          "observedBillingMultipliers": [
+            0.06,
+            0.08,
+            0.1,
+            0.12,
+            0.14,
+            0.17,
+            0.25,
+            0.3
+          ],
+          "componentRates": {
+            "inputPricePerMillion": {
+              "modalRate": 5,
+              "samples": 83,
+              "alternatives": [
+                {
+                  "rate": 8,
+                  "samples": 10
+                }
+              ]
+            },
+            "outputPricePerMillion": {
+              "modalRate": 30,
+              "samples": 83,
+              "alternatives": [
+                {
+                  "rate": 28,
+                  "samples": 10
+                }
+              ]
+            },
+            "cachedInputPricePerMillion": {
+              "modalRate": 0.5,
+              "samples": 75,
+              "alternatives": [
+                {
+                  "rate": 2,
+                  "samples": 9
+                }
+              ]
+            }
+          }
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "records": 69,
+          "observedBillingMultipliers": [
+            0.06,
+            0.08,
+            0.1,
+            0.12,
+            0.14,
+            0.17,
+            0.25
+          ],
+          "componentRates": {
+            "inputPricePerMillion": {
+              "modalRate": 2,
+              "samples": 61,
+              "alternatives": [
+                {
+                  "rate": 2.5,
+                  "samples": 8
+                }
+              ]
+            },
+            "outputPricePerMillion": {
+              "modalRate": 12,
+              "samples": 61,
+              "alternatives": [
+                {
+                  "rate": 15,
+                  "samples": 8
+                }
+              ]
+            },
+            "cachedInputPricePerMillion": {
+              "modalRate": 0.2,
+              "samples": 50,
+              "alternatives": [
+                {
+                  "rate": 0.25,
+                  "samples": 4
+                }
+              ]
+            }
+          }
+        },
+        {
+          "model": "kimi-k3",
+          "records": 30,
+          "observedBillingMultipliers": [
+            0.4
+          ],
+          "componentRates": {
+            "inputPricePerMillion": {
+              "modalRate": 20,
+              "samples": 30,
+              "alternatives": []
+            },
+            "outputPricePerMillion": {
+              "modalRate": 100,
+              "samples": 30,
+              "alternatives": []
+            },
+            "cachedInputPricePerMillion": {
+              "modalRate": 2,
+              "samples": 19,
+              "alternatives": []
+            }
+          }
+        },
+        {
+          "model": "claude-opus-4-8",
+          "records": 29,
+          "observedBillingMultipliers": [
+            0.06,
+            0.15,
+            0.3,
+            0.9,
+            1
+          ],
+          "componentRates": {
+            "inputPricePerMillion": {
+              "modalRate": 5,
+              "samples": 29,
+              "alternatives": []
+            },
+            "outputPricePerMillion": {
+              "modalRate": 25,
+              "samples": 29,
+              "alternatives": []
+            },
+            "cachedInputPricePerMillion": {
+              "modalRate": 0.5,
+              "samples": 10,
+              "alternatives": []
+            },
+            "cacheWritePricePerMillion": {
+              "modalRate": 6.25,
+              "samples": 12,
+              "alternatives": []
+            }
+          }
+        },
+        {
+          "model": "glm-5.1",
+          "records": 29,
+          "observedBillingMultipliers": [
+            0.3
+          ],
+          "componentRates": {
+            "inputPricePerMillion": {
+              "modalRate": 8,
+              "samples": 25,
+              "alternatives": [
+                {
+                  "rate": 6,
+                  "samples": 4
+                }
+              ]
+            },
+            "outputPricePerMillion": {
+              "modalRate": 28,
+              "samples": 25,
+              "alternatives": [
+                {
+                  "rate": 24,
+                  "samples": 4
+                }
+              ]
+            },
+            "cachedInputPricePerMillion": {
+              "modalRate": 2,
+              "samples": 17,
+              "alternatives": []
+            }
+          }
+        },
+        {
+          "model": "gemini-3.5-flash",
+          "records": 20,
+          "observedBillingMultipliers": [
+            0.3
+          ],
+          "componentRates": {
+            "inputPricePerMillion": {
+              "modalRate": 1.5,
+              "samples": 20,
+              "alternatives": []
+            },
+            "outputPricePerMillion": {
+              "modalRate": 9,
+              "samples": 19,
+              "alternatives": []
+            }
+          }
+        },
+        {
+          "model": "claude-sonnet-5",
+          "records": 18,
+          "observedBillingMultipliers": [
+            0.06,
+            0.15,
+            1
+          ],
+          "componentRates": {
+            "inputPricePerMillion": {
+              "modalRate": 2,
+              "samples": 18,
+              "alternatives": []
+            },
+            "outputPricePerMillion": {
+              "modalRate": 10,
+              "samples": 18,
+              "alternatives": []
+            },
+            "cachedInputPricePerMillion": {
+              "modalRate": 0.2,
+              "samples": 11,
+              "alternatives": []
+            },
+            "cacheWritePricePerMillion": {
+              "modalRate": 2.5,
+              "samples": 8,
+              "alternatives": []
+            }
+          }
+        },
+        {
+          "model": "gemini-2.5-flash",
+          "records": 18,
+          "observedBillingMultipliers": [
+            0.3
+          ],
+          "componentRates": {
+            "inputPricePerMillion": {
+              "modalRate": 0.3,
+              "samples": 17,
+              "alternatives": []
+            },
+            "outputPricePerMillion": {
+              "modalRate": 2.5,
+              "samples": 17,
+              "alternatives": []
+            }
+          }
+        },
+        {
+          "model": "deepseek-v4-flash",
+          "records": 15,
+          "observedBillingMultipliers": [
+            0.5
+          ],
+          "componentRates": {
+            "inputPricePerMillion": {
+              "modalRate": 1,
+              "samples": 15,
+              "alternatives": []
+            },
+            "outputPricePerMillion": {
+              "modalRate": 2,
+              "samples": 15,
+              "alternatives": []
+            },
+            "cachedInputPricePerMillion": {
+              "modalRate": 0.02,
+              "samples": 5,
+              "alternatives": []
+            }
+          }
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "records": 9,
+          "observedBillingMultipliers": [
+            0.5
+          ],
+          "componentRates": {
+            "inputPricePerMillion": {
+              "modalRate": 3,
+              "samples": 9,
+              "alternatives": []
+            },
+            "outputPricePerMillion": {
+              "modalRate": 6,
+              "samples": 9,
+              "alternatives": []
+            },
+            "cachedInputPricePerMillion": {
+              "modalRate": 0.025,
+              "samples": 1,
+              "alternatives": []
+            }
+          }
+        },
+        {
+          "model": "qwen3.7-max",
+          "records": 8,
+          "observedBillingMultipliers": [
+            0.4
+          ],
+          "componentRates": {
+            "inputPricePerMillion": {
+              "modalRate": 12,
+              "samples": 8,
+              "alternatives": []
+            },
+            "outputPricePerMillion": {
+              "modalRate": 36,
+              "samples": 8,
+              "alternatives": []
+            }
+          }
+        },
+        {
+          "model": "kimi-k2.6",
+          "records": 5,
+          "observedBillingMultipliers": [
+            0.3
+          ],
+          "componentRates": {
+            "inputPricePerMillion": {
+              "modalRate": 6.5,
+              "samples": 5,
+              "alternatives": []
+            },
+            "outputPricePerMillion": {
+              "modalRate": 27,
+              "samples": 5,
+              "alternatives": []
+            }
+          }
+        },
+        {
+          "model": "kimi-k2.7-code",
+          "records": 5,
+          "observedBillingMultipliers": [
+            0.3
+          ],
+          "componentRates": {
+            "inputPricePerMillion": {
+              "modalRate": 6.5,
+              "samples": 5,
+              "alternatives": []
+            },
+            "outputPricePerMillion": {
+              "modalRate": 27,
+              "samples": 5,
+              "alternatives": []
+            }
+          }
+        },
+        {
+          "model": "claude-fable-5",
+          "records": 4,
+          "observedBillingMultipliers": [
+            0.06
+          ],
+          "componentRates": {
+            "inputPricePerMillion": {
+              "modalRate": 10,
+              "samples": 4,
+              "alternatives": []
+            },
+            "outputPricePerMillion": {
+              "modalRate": 50,
+              "samples": 4,
+              "alternatives": []
+            },
+            "cachedInputPricePerMillion": {
+              "modalRate": 1,
+              "samples": 1,
+              "alternatives": []
+            },
+            "cacheWritePricePerMillion": {
+              "modalRate": 12.5,
+              "samples": 2,
+              "alternatives": []
+            }
+          }
+        }
+      ],
+      "dashboardModels": [
+        {
+          "model": "gpt-5.6-sol",
+          "requests": 2804,
+          "input_tokens": 30650044,
+          "output_tokens": 1021637,
+          "cache_creation_tokens": 0,
+          "cache_read_tokens": 361790840,
+          "total_tokens": 393462521,
+          "cost": 364.79475,
+          "actual_cost": 43.37636172
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "requests": 215,
+          "input_tokens": 4439213,
+          "output_tokens": 42977,
+          "cache_creation_tokens": 0,
+          "cache_read_tokens": 2986946,
+          "total_tokens": 7469136,
+          "cost": 1.5605872,
+          "actual_cost": 0.1438827426
+        },
+        {
+          "model": "glm-5.2",
+          "requests": 95,
+          "input_tokens": 394045,
+          "output_tokens": 47350,
+          "cache_creation_tokens": 0,
+          "cache_read_tokens": 3057088,
+          "total_tokens": 3498483,
+          "cost": 10.592336,
+          "actual_cost": 3.119313
+        },
+        {
+          "model": "gpt-5.5",
+          "requests": 94,
+          "input_tokens": 557349,
+          "output_tokens": 9730,
+          "cache_creation_tokens": 0,
+          "cache_read_tokens": 882399,
+          "total_tokens": 1449478,
+          "cost": 4.6092625,
+          "actual_cost": 1.03553189
+        },
+        {
+          "model": "gpt-5.4-mini",
+          "requests": 116,
+          "input_tokens": 660204,
+          "output_tokens": 10971,
+          "cache_creation_tokens": 0,
+          "cache_read_tokens": 690675,
+          "total_tokens": 1361850,
+          "cost": 0.596323125,
+          "actual_cost": 0.042624918
+        },
+        {
+          "model": "kimi-k3",
+          "requests": 30,
+          "input_tokens": 328637,
+          "output_tokens": 23290,
+          "cache_creation_tokens": 0,
+          "cache_read_tokens": 605864,
+          "total_tokens": 957791,
+          "cost": 10.113468,
+          "actual_cost": 4.0453872
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "requests": 69,
+          "input_tokens": 134180,
+          "output_tokens": 1146,
+          "cache_creation_tokens": 0,
+          "cache_read_tokens": 340480,
+          "total_tokens": 475806,
+          "cost": 0.3857859,
+          "actual_cost": 0.04205123
+        },
+        {
+          "model": "glm-5.1",
+          "requests": 29,
+          "input_tokens": 78370,
+          "output_tokens": 9131,
+          "cache_creation_tokens": 0,
+          "cache_read_tokens": 289856,
+          "total_tokens": 377357,
+          "cost": 1.460292,
+          "actual_cost": 0.4380876
+        },
+        {
+          "model": "claude-opus-4-8",
+          "requests": 29,
+          "input_tokens": 50505,
+          "output_tokens": 384,
+          "cache_creation_tokens": 18984,
+          "cache_read_tokens": 27637,
+          "total_tokens": 97510,
+          "cost": 0.3945935,
+          "actual_cost": 0.223885245
+        },
+        {
+          "model": "gemini-3.5-flash",
+          "requests": 20,
+          "input_tokens": 93757,
+          "output_tokens": 3503,
+          "cache_creation_tokens": 0,
+          "cache_read_tokens": 0,
+          "total_tokens": 97260,
+          "cost": 0.1721625,
+          "actual_cost": 0.05164875
+        },
+        {
+          "model": "gemini-2.5-flash",
+          "requests": 18,
+          "input_tokens": 93924,
+          "output_tokens": 629,
+          "cache_creation_tokens": 0,
+          "cache_read_tokens": 0,
+          "total_tokens": 94553,
+          "cost": 0.0297497,
+          "actual_cost": 0.00892491
+        },
+        {
+          "model": "claude-sonnet-5",
+          "requests": 18,
+          "input_tokens": 4818,
+          "output_tokens": 182,
+          "cache_creation_tokens": 3886,
+          "cache_read_tokens": 36788,
+          "total_tokens": 45674,
+          "cost": 0.0285286,
+          "actual_cost": 0.005519349
+        },
+        {
+          "model": "deepseek-v4-flash",
+          "requests": 15,
+          "input_tokens": 12921,
+          "output_tokens": 862,
+          "cache_creation_tokens": 0,
+          "cache_read_tokens": 22528,
+          "total_tokens": 36311,
+          "cost": 0.01509556,
+          "actual_cost": 0.00754778
+        },
+        {
+          "model": "qwen3.7-max",
+          "requests": 8,
+          "input_tokens": 36160,
+          "output_tokens": 48,
+          "cache_creation_tokens": 0,
+          "cache_read_tokens": 0,
+          "total_tokens": 36208,
+          "cost": 0.435648,
+          "actual_cost": 0.1742592
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "requests": 9,
+          "input_tokens": 9898,
+          "output_tokens": 367,
+          "cache_creation_tokens": 0,
+          "cache_read_tokens": 4352,
+          "total_tokens": 14617,
+          "cost": 0.0320048,
+          "actual_cost": 0.0160024
+        },
+        {
+          "model": "claude-fable-5",
+          "requests": 4,
+          "input_tokens": 146,
+          "output_tokens": 100,
+          "cache_creation_tokens": 162,
+          "cache_read_tokens": 12,
+          "total_tokens": 420,
+          "cost": 0.008497,
+          "actual_cost": 0.00050982
+        },
+        {
+          "model": "kimi-k2.6",
+          "requests": 5,
+          "input_tokens": 204,
+          "output_tokens": 130,
+          "cache_creation_tokens": 0,
+          "cache_read_tokens": 0,
+          "total_tokens": 334,
+          "cost": 0.004836,
+          "actual_cost": 0.0014508
+        },
+        {
+          "model": "kimi-k2.7-code",
+          "requests": 5,
+          "input_tokens": 204,
+          "output_tokens": 116,
+          "cache_creation_tokens": 0,
+          "cache_read_tokens": 0,
+          "total_tokens": 320,
+          "cost": 0.004458,
+          "actual_cost": 0.0013374
+        }
+      ]
+    },
+    {
+      "provider": "blackai",
+      "source": "blackaicoding.com authenticated usage API",
+      "exportedAt": "2026-08-02T01:17:27.893Z",
+      "recordCount": 13251,
+      "cashCnyPerCredit": 0.14,
+      "dashboardWindow": {
+        "startDate": "2026-07-26",
+        "endDate": "2026-08-01",
+        "nominalCredits": 610.05886415,
+        "chargedCredits": 610.159416182,
+        "chargedCashCny": 85.42231826548
+      },
+      "actualEqualsNominalTimesMultiplier": {
+        "checkedRecords": 13251,
+        "failures": 0
+      },
+      "groups": [
+        {
+          "id": 2,
+          "name": "codex混合渠道--低价",
+          "platform": "openai",
+          "rate_multiplier": 1
+        },
+        {
+          "id": 7,
+          "name": "纯pro渠道",
+          "platform": "openai",
+          "rate_multiplier": 1.4
+        },
+        {
+          "id": 9,
+          "name": "claudecode逆向",
+          "platform": "anthropic",
+          "rate_multiplier": 1
+        },
+        {
+          "id": 11,
+          "name": "grok",
+          "platform": "openai",
+          "rate_multiplier": 1
+        },
+        {
+          "id": 12,
+          "name": "生图",
+          "platform": "openai",
+          "rate_multiplier": 1.4
+        },
+        {
+          "id": 1,
+          "name": "codex混合渠道_现在暂时pro兜底，其他渠道挂了",
+          "platform": "openai",
+          "rate_multiplier": 1
+        }
+      ],
+      "models": [
+        {
+          "model": "gpt-5.6-sol",
+          "records": 10808,
+          "observedBillingMultipliers": [
+            1,
+            1.4
+          ],
+          "componentRates": {}
+        },
+        {
+          "model": "gpt-5.5",
+          "records": 2232,
+          "observedBillingMultipliers": [
+            1,
+            1.4
+          ],
+          "componentRates": {}
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "records": 103,
+          "observedBillingMultipliers": [
+            1,
+            1.4
+          ],
+          "componentRates": {}
+        },
+        {
+          "model": "gpt-5.4-mini",
+          "records": 50,
+          "observedBillingMultipliers": [
+            1,
+            1.4
+          ],
+          "componentRates": {}
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "records": 47,
+          "observedBillingMultipliers": [
+            1,
+            1.4
+          ],
+          "componentRates": {}
+        },
+        {
+          "model": "claude-opus-4-8",
+          "records": 5,
+          "observedBillingMultipliers": [
+            1
+          ],
+          "componentRates": {}
+        },
+        {
+          "model": "claude-sonnet-5",
+          "records": 5,
+          "observedBillingMultipliers": [
+            1
+          ],
+          "componentRates": {}
+        },
+        {
+          "model": "claude-fable-5",
+          "records": 1,
+          "observedBillingMultipliers": [
+            1
+          ],
+          "componentRates": {}
+        }
+      ],
+      "dashboardModels": [
+        {
+          "model": "gpt-5.6-sol",
+          "requests": 4462,
+          "input_tokens": 54510713,
+          "output_tokens": 1418727,
+          "cache_creation_tokens": 0,
+          "cache_read_tokens": 582889216,
+          "total_tokens": 638818656,
+          "cost": 607.449956,
+          "actual_cost": 607.485404
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "requests": 103,
+          "input_tokens": 2365738,
+          "output_tokens": 20148,
+          "cache_creation_tokens": 0,
+          "cache_read_tokens": 10335232,
+          "total_tokens": 12721118,
+          "cost": 0.9728228,
+          "actual_cost": 0.987566832
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "requests": 47,
+          "input_tokens": 339367,
+          "output_tokens": 4783,
+          "cache_creation_tokens": 0,
+          "cache_read_tokens": 1460480,
+          "total_tokens": 1804630,
+          "cost": 1.2637045,
+          "actual_cost": 1.2740213
+        },
+        {
+          "model": "gpt-5.4-mini",
+          "requests": 50,
+          "input_tokens": 90347,
+          "output_tokens": 602,
+          "cache_creation_tokens": 0,
+          "cache_read_tokens": 141184,
+          "total_tokens": 232133,
+          "cost": 0.08105805,
+          "actual_cost": 0.09116925
+        },
+        {
+          "model": "gpt-5.5",
+          "requests": 24,
+          "input_tokens": 38034,
+          "output_tokens": 221,
+          "cache_creation_tokens": 0,
+          "cache_read_tokens": 77312,
+          "total_tokens": 115567,
+          "cost": 0.235456,
+          "actual_cost": 0.265388
+        },
+        {
+          "model": "claude-opus-4-8",
+          "requests": 5,
+          "input_tokens": 2573,
+          "output_tokens": 29,
+          "cache_creation_tokens": 1792,
+          "cache_read_tokens": 30089,
+          "total_tokens": 34483,
+          "cost": 0.0398345,
+          "actual_cost": 0.0398345
+        },
+        {
+          "model": "claude-sonnet-5",
+          "requests": 5,
+          "input_tokens": 2568,
+          "output_tokens": 22,
+          "cache_creation_tokens": 0,
+          "cache_read_tokens": 29994,
+          "total_tokens": 32584,
+          "cost": 0.0113548,
+          "actual_cost": 0.0113548
+        },
+        {
+          "model": "claude-fable-5",
+          "requests": 1,
+          "input_tokens": 34,
+          "output_tokens": 24,
+          "cache_creation_tokens": 251,
+          "cache_read_tokens": 0,
+          "total_tokens": 309,
+          "cost": 0.0046775,
+          "actual_cost": 0.0046775
+        }
+      ]
+    }
+  ]
+}

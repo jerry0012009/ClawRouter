@@ -900,7 +900,16 @@
     "observedBillingMultiplier": 0.15,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
-    "requiresFreshProbe": true
+    "requiresFreshProbe": true,
+    "billingPrice": {
+      "inputPricePerMillion": 8,
+      "outputPricePerMillion": 28,
+      "cachedInputPricePerMillion": 2,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-claude-clone-020:claude-opus-4-8:messages",
@@ -939,7 +948,17 @@
     "observedBillingMultiplier": 0.2,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
-    "requiresFreshProbe": true
+    "requiresFreshProbe": true,
+    "billingPrice": {
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 25,
+      "cachedInputPricePerMillion": 0.5,
+      "cacheWritePricePerMillion": 6.25,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-claude-clone-020:claude-sonnet-5:messages",
@@ -978,7 +997,17 @@
     "observedBillingMultiplier": 0.2,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
-    "requiresFreshProbe": true
+    "requiresFreshProbe": true,
+    "billingPrice": {
+      "inputPricePerMillion": 2,
+      "outputPricePerMillion": 10,
+      "cachedInputPricePerMillion": 0.2,
+      "cacheWritePricePerMillion": 2.5,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-claude-cursor-reverse-030:claude-opus-4-8:messages",
@@ -1017,7 +1046,17 @@
     "observedBillingMultiplier": 0.3,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
-    "requiresFreshProbe": true
+    "requiresFreshProbe": true,
+    "billingPrice": {
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 25,
+      "cachedInputPricePerMillion": 0.5,
+      "cacheWritePricePerMillion": 6.25,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-claude-cursor-reverse-030:claude-sonnet-5:messages",
@@ -1056,7 +1095,17 @@
     "observedBillingMultiplier": 0.3,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
-    "requiresFreshProbe": true
+    "requiresFreshProbe": true,
+    "billingPrice": {
+      "inputPricePerMillion": 2,
+      "outputPricePerMillion": 10,
+      "cachedInputPricePerMillion": 0.2,
+      "cacheWritePricePerMillion": 2.5,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-cx003-low:gpt-5.5:responses",
@@ -1173,7 +1222,16 @@
     "observedBillingMultiplier": 0.03,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
-    "requiresFreshProbe": true
+    "requiresFreshProbe": true,
+    "billingPrice": {
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 30,
+      "cachedInputPricePerMillion": 0.5,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-cx003-low:gpt-5.6-terra:responses",
@@ -1251,7 +1309,16 @@
     "observedBillingMultiplier": 0.04,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
-    "requiresFreshProbe": true
+    "requiresFreshProbe": true,
+    "billingPrice": {
+      "inputPricePerMillion": 0.75,
+      "outputPricePerMillion": 4.5,
+      "cachedInputPricePerMillion": 0.075,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-cx004-low-dedicated:gpt-5.5:responses",
@@ -1368,7 +1435,16 @@
     "observedBillingMultiplier": 0.04,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
-    "requiresFreshProbe": true
+    "requiresFreshProbe": true,
+    "billingPrice": {
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 30,
+      "cachedInputPricePerMillion": 0.5,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-cx004-low-dedicated:gpt-5.6-terra:responses",
@@ -1465,7 +1541,16 @@
     "webSearchLastVerifiedAt": "2026-07-29T17:31:45.066Z",
     "webSearchFailureReason": null,
     "autoRouteEnabled": true,
-    "requiresFreshProbe": false
+    "requiresFreshProbe": false,
+    "billingPrice": {
+      "inputPricePerMillion": 0.75,
+      "outputPricePerMillion": 4.5,
+      "cachedInputPricePerMillion": 0.075,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.5:responses",
@@ -1607,7 +1692,16 @@
     "observedBillingMultiplier": 0.1,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
-    "requiresFreshProbe": true
+    "requiresFreshProbe": true,
+    "billingPrice": {
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 30,
+      "cachedInputPricePerMillion": 0.5,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-cx006-value-dynamic:gpt-5.6-terra:responses",
@@ -1712,7 +1806,16 @@
     "observedBillingMultiplier": 0.06,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": true,
-    "requiresFreshProbe": false
+    "requiresFreshProbe": false,
+    "billingPrice": {
+      "inputPricePerMillion": 0.75,
+      "outputPricePerMillion": 4.5,
+      "cachedInputPricePerMillion": 0.075,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-cx006-plus:gpt-5.5:responses",
@@ -1856,7 +1959,16 @@
     "observedBillingMultiplier": 0.06,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": true,
-    "requiresFreshProbe": false
+    "requiresFreshProbe": false,
+    "billingPrice": {
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 30,
+      "cachedInputPricePerMillion": 0.5,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-cx006-plus:gpt-5.6-terra:responses",
@@ -1934,7 +2046,16 @@
     "observedBillingMultiplier": 0.08,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
-    "requiresFreshProbe": true
+    "requiresFreshProbe": true,
+    "billingPrice": {
+      "inputPricePerMillion": 0.75,
+      "outputPricePerMillion": 4.5,
+      "cachedInputPricePerMillion": 0.075,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-cx008-plus-dedicated:gpt-5.5:responses",
@@ -2068,7 +2189,16 @@
     "observedBillingMultiplier": 0.08,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": true,
-    "requiresFreshProbe": false
+    "requiresFreshProbe": false,
+    "billingPrice": {
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 30,
+      "cachedInputPricePerMillion": 0.5,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-cx008-plus-dedicated:gpt-5.6-terra:responses",
@@ -2157,7 +2287,16 @@
     "observedBillingMultiplier": 0.1,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": true,
-    "requiresFreshProbe": false
+    "requiresFreshProbe": false,
+    "billingPrice": {
+      "inputPricePerMillion": 0.75,
+      "outputPricePerMillion": 4.5,
+      "cachedInputPricePerMillion": 0.075,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-cx010-plus-fast:gpt-5.5:responses",
@@ -2301,7 +2440,16 @@
     "observedBillingMultiplier": 0.1,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": true,
-    "requiresFreshProbe": false
+    "requiresFreshProbe": false,
+    "billingPrice": {
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 30,
+      "cachedInputPricePerMillion": 0.5,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-cx010-plus-fast:gpt-5.6-terra:responses",
@@ -2379,7 +2527,16 @@
     "observedBillingMultiplier": 0.12,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
-    "requiresFreshProbe": true
+    "requiresFreshProbe": true,
+    "billingPrice": {
+      "inputPricePerMillion": 0.75,
+      "outputPricePerMillion": 4.5,
+      "cachedInputPricePerMillion": 0.075,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-cx012-pro:gpt-5.5:responses",
@@ -2496,7 +2653,16 @@
     "observedBillingMultiplier": 0.12,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
-    "requiresFreshProbe": true
+    "requiresFreshProbe": true,
+    "billingPrice": {
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 30,
+      "cachedInputPricePerMillion": 0.5,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-cx012-pro:gpt-5.6-terra:responses",
@@ -2585,7 +2751,16 @@
     "observedBillingMultiplier": 0.14,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": true,
-    "requiresFreshProbe": false
+    "requiresFreshProbe": false,
+    "billingPrice": {
+      "inputPricePerMillion": 0.75,
+      "outputPricePerMillion": 4.5,
+      "cachedInputPricePerMillion": 0.075,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-cx014-pro-stable:gpt-5.5:responses",
@@ -2729,7 +2904,16 @@
     "observedBillingMultiplier": 0.14,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": true,
-    "requiresFreshProbe": false
+    "requiresFreshProbe": false,
+    "billingPrice": {
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 30,
+      "cachedInputPricePerMillion": 0.5,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-cx014-pro-stable:gpt-5.6-terra:responses",
@@ -2818,7 +3002,16 @@
     "observedBillingMultiplier": 0.17,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": true,
-    "requiresFreshProbe": false
+    "requiresFreshProbe": false,
+    "billingPrice": {
+      "inputPricePerMillion": 0.75,
+      "outputPricePerMillion": 4.5,
+      "cachedInputPricePerMillion": 0.075,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-cx017-pro-first-token:gpt-5.5:responses",
@@ -2962,7 +3155,16 @@
     "observedBillingMultiplier": 0.17,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": true,
-    "requiresFreshProbe": false
+    "requiresFreshProbe": false,
+    "billingPrice": {
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 30,
+      "cachedInputPricePerMillion": 0.5,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-cx017-pro-first-token:gpt-5.6-terra:responses",
@@ -3060,7 +3262,16 @@
     "observedBillingMultiplier": 0.25,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": true,
-    "requiresFreshProbe": false
+    "requiresFreshProbe": false,
+    "billingPrice": {
+      "inputPricePerMillion": 0.75,
+      "outputPricePerMillion": 4.5,
+      "cachedInputPricePerMillion": 0.075,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-cx025-pro-premium:gpt-5.5:responses",
@@ -3204,7 +3415,16 @@
     "observedBillingMultiplier": 0.25,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": true,
-    "requiresFreshProbe": false
+    "requiresFreshProbe": false,
+    "billingPrice": {
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 30,
+      "cachedInputPricePerMillion": 0.5,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-cx025-pro-premium:gpt-5.6-terra:responses",
@@ -3291,7 +3511,17 @@
     "observedBillingMultiplier": 0.4,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
-    "requiresFreshProbe": true
+    "requiresFreshProbe": true,
+    "billingPrice": {
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 25,
+      "cachedInputPricePerMillion": 0.5,
+      "cacheWritePricePerMillion": 6.25,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-claude-max-090:claude-opus-4-8:messages",
@@ -3330,7 +3560,17 @@
     "observedBillingMultiplier": 0.9,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
-    "requiresFreshProbe": true
+    "requiresFreshProbe": true,
+    "billingPrice": {
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 25,
+      "cachedInputPricePerMillion": 0.5,
+      "cacheWritePricePerMillion": 6.25,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-claude-max-090:claude-sonnet-5:messages",
@@ -3369,7 +3609,17 @@
     "observedBillingMultiplier": 0.9,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
-    "requiresFreshProbe": true
+    "requiresFreshProbe": true,
+    "billingPrice": {
+      "inputPricePerMillion": 2,
+      "outputPricePerMillion": 10,
+      "cachedInputPricePerMillion": 0.2,
+      "cacheWritePricePerMillion": 2.5,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-claude-antigravity-reverse-040:claude-opus-4-8:messages",
@@ -3408,7 +3658,17 @@
     "observedBillingMultiplier": 0.4,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
-    "requiresFreshProbe": true
+    "requiresFreshProbe": true,
+    "billingPrice": {
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 25,
+      "cachedInputPricePerMillion": 0.5,
+      "cacheWritePricePerMillion": 6.25,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-gemini-openai-030:gemini-2.5-flash:responses",
@@ -3456,7 +3716,15 @@
     "observedBillingMultiplier": 0.3,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": true,
-    "requiresFreshProbe": false
+    "requiresFreshProbe": false,
+    "billingPrice": {
+      "inputPricePerMillion": 0.3,
+      "outputPricePerMillion": 2.5,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-gemini-openai-030:gemini-3.5-flash:responses",
@@ -3495,7 +3763,15 @@
     "observedBillingMultiplier": 0.3,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
-    "requiresFreshProbe": true
+    "requiresFreshProbe": true,
+    "billingPrice": {
+      "inputPricePerMillion": 1.5,
+      "outputPricePerMillion": 9,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-mainstream-cn-claude-030:claude-opus-4-8:messages",
@@ -3541,7 +3817,17 @@
     "observedBillingMultiplier": 0.3,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": true,
-    "requiresFreshProbe": false
+    "requiresFreshProbe": false,
+    "billingPrice": {
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 25,
+      "cachedInputPricePerMillion": 0.5,
+      "cacheWritePricePerMillion": 6.25,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-mainstream-cn-claude-030:deepseek-v4-flash:messages",
@@ -3580,7 +3866,16 @@
     "observedBillingMultiplier": 0.3,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
-    "requiresFreshProbe": true
+    "requiresFreshProbe": true,
+    "billingPrice": {
+      "inputPricePerMillion": 1,
+      "outputPricePerMillion": 2,
+      "cachedInputPricePerMillion": 0.02,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-mainstream-cn-claude-030:deepseek-v4-pro:messages",
@@ -3619,7 +3914,16 @@
     "observedBillingMultiplier": 0.3,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
-    "requiresFreshProbe": true
+    "requiresFreshProbe": true,
+    "billingPrice": {
+      "inputPricePerMillion": 3,
+      "outputPricePerMillion": 6,
+      "cachedInputPricePerMillion": 0.025,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-mainstream-cn-claude-030:glm-5.1:messages",
@@ -3704,7 +4008,16 @@
     "observedBillingMultiplier": 0.3,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": true,
-    "requiresFreshProbe": false
+    "requiresFreshProbe": false,
+    "billingPrice": {
+      "inputPricePerMillion": 8,
+      "outputPricePerMillion": 28,
+      "cachedInputPricePerMillion": 2,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-mainstream-cn-claude-030:kimi-k2.6:messages",
@@ -3750,7 +4063,15 @@
     "observedBillingMultiplier": 0.3,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": true,
-    "requiresFreshProbe": false
+    "requiresFreshProbe": false,
+    "billingPrice": {
+      "inputPricePerMillion": 6.5,
+      "outputPricePerMillion": 27,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-mainstream-cn-claude-030:kimi-k2.7-code:messages",
@@ -3796,7 +4117,15 @@
     "observedBillingMultiplier": 0.3,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": true,
-    "requiresFreshProbe": false
+    "requiresFreshProbe": false,
+    "billingPrice": {
+      "inputPricePerMillion": 6.5,
+      "outputPricePerMillion": 27,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-kiro-cache-claude-015:claude-opus-4-8:messages",
@@ -3842,7 +4171,17 @@
     "observedBillingMultiplier": 0.15,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": true,
-    "requiresFreshProbe": false
+    "requiresFreshProbe": false,
+    "billingPrice": {
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 25,
+      "cachedInputPricePerMillion": 0.5,
+      "cacheWritePricePerMillion": 6.25,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-kiro-cache-claude-015:claude-sonnet-5:messages",
@@ -3888,7 +4227,17 @@
     "observedBillingMultiplier": 0.15,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": true,
-    "requiresFreshProbe": false
+    "requiresFreshProbe": false,
+    "billingPrice": {
+      "inputPricePerMillion": 2,
+      "outputPricePerMillion": 10,
+      "cachedInputPricePerMillion": 0.2,
+      "cacheWritePricePerMillion": 2.5,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-glm-official-claude-030:claude-opus-4-8:messages",
@@ -3934,7 +4283,17 @@
     "observedBillingMultiplier": 0.3,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": true,
-    "requiresFreshProbe": false
+    "requiresFreshProbe": false,
+    "billingPrice": {
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 25,
+      "cachedInputPricePerMillion": 0.5,
+      "cacheWritePricePerMillion": 6.25,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-glm-official-claude-030:glm-5.1:messages",
@@ -4019,7 +4378,16 @@
     "observedBillingMultiplier": 0.3,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": true,
-    "requiresFreshProbe": false
+    "requiresFreshProbe": false,
+    "billingPrice": {
+      "inputPricePerMillion": 8,
+      "outputPricePerMillion": 28,
+      "cachedInputPricePerMillion": 2,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-glm-official-openai-030:glm-5.1:responses",
@@ -4115,7 +4483,16 @@
     "observedBillingMultiplier": 0.3,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": true,
-    "requiresFreshProbe": false
+    "requiresFreshProbe": false,
+    "billingPrice": {
+      "inputPricePerMillion": 8,
+      "outputPricePerMillion": 28,
+      "cachedInputPricePerMillion": 2,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-glm-official-openai-030:gpt-5.5:responses",
@@ -4202,7 +4579,15 @@
     "observedBillingMultiplier": 0.4,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
-    "requiresFreshProbe": true
+    "requiresFreshProbe": true,
+    "billingPrice": {
+      "inputPricePerMillion": 12,
+      "outputPricePerMillion": 36,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-qwen-official-openai-010:qwen3.7-max:responses",
@@ -4241,7 +4626,15 @@
     "observedBillingMultiplier": 0.4,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
-    "requiresFreshProbe": true
+    "requiresFreshProbe": true,
+    "billingPrice": {
+      "inputPricePerMillion": 12,
+      "outputPricePerMillion": 36,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-grok-006:claude-opus-4-8:responses",
@@ -4280,7 +4673,17 @@
     "observedBillingMultiplier": 0.06,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
-    "requiresFreshProbe": true
+    "requiresFreshProbe": true,
+    "billingPrice": {
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 25,
+      "cachedInputPricePerMillion": 0.5,
+      "cacheWritePricePerMillion": 6.25,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-grok-006:claude-sonnet-5:responses",
@@ -4319,7 +4722,17 @@
     "observedBillingMultiplier": 0.06,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
-    "requiresFreshProbe": true
+    "requiresFreshProbe": true,
+    "billingPrice": {
+      "inputPricePerMillion": 2,
+      "outputPricePerMillion": 10,
+      "cachedInputPricePerMillion": 0.2,
+      "cacheWritePricePerMillion": 2.5,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-deepseek-openai-050:deepseek-v4-flash:responses",
@@ -4358,7 +4771,16 @@
     "observedBillingMultiplier": 0.5,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
-    "requiresFreshProbe": true
+    "requiresFreshProbe": true,
+    "billingPrice": {
+      "inputPricePerMillion": 1,
+      "outputPricePerMillion": 2,
+      "cachedInputPricePerMillion": 0.02,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-deepseek-openai-050:deepseek-v4-pro:responses",
@@ -4397,7 +4819,16 @@
     "observedBillingMultiplier": 0.5,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
-    "requiresFreshProbe": true
+    "requiresFreshProbe": true,
+    "billingPrice": {
+      "inputPricePerMillion": 3,
+      "outputPricePerMillion": 6,
+      "cachedInputPricePerMillion": 0.025,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-deepseek-openai-050:glm-5.1:responses",
@@ -4475,7 +4906,16 @@
     "observedBillingMultiplier": 0.5,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
-    "requiresFreshProbe": true
+    "requiresFreshProbe": true,
+    "billingPrice": {
+      "inputPricePerMillion": 8,
+      "outputPricePerMillion": 28,
+      "cachedInputPricePerMillion": 2,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-deepseek-openai-050:kimi-k2.6:responses",
@@ -4514,7 +4954,15 @@
     "observedBillingMultiplier": 0.5,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
-    "requiresFreshProbe": true
+    "requiresFreshProbe": true,
+    "billingPrice": {
+      "inputPricePerMillion": 6.5,
+      "outputPricePerMillion": 27,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-deepseek-openai-050:kimi-k2.7-code:responses",
@@ -4553,7 +5001,15 @@
     "observedBillingMultiplier": 0.5,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
-    "requiresFreshProbe": true
+    "requiresFreshProbe": true,
+    "billingPrice": {
+      "inputPricePerMillion": 6.5,
+      "outputPricePerMillion": 27,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-deepseek-openai-050:qwen3.6-plus:responses",
@@ -4631,7 +5087,15 @@
     "observedBillingMultiplier": 0.5,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
-    "requiresFreshProbe": true
+    "requiresFreshProbe": true,
+    "billingPrice": {
+      "inputPricePerMillion": 12,
+      "outputPricePerMillion": 36,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-deepseek-claude-050:deepseek-v4-flash:messages",
@@ -4677,7 +5141,16 @@
     "observedBillingMultiplier": 0.5,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": true,
-    "requiresFreshProbe": false
+    "requiresFreshProbe": false,
+    "billingPrice": {
+      "inputPricePerMillion": 1,
+      "outputPricePerMillion": 2,
+      "cachedInputPricePerMillion": 0.02,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-deepseek-claude-050:deepseek-v4-pro:messages",
@@ -4716,7 +5189,16 @@
     "observedBillingMultiplier": 0.5,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": false,
-    "requiresFreshProbe": true
+    "requiresFreshProbe": true,
+    "billingPrice": {
+      "inputPricePerMillion": 3,
+      "outputPricePerMillion": 6,
+      "cachedInputPricePerMillion": 0.025,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-kiro-cache90-claude-006:claude-opus-4-8:messages",
@@ -4762,7 +5244,17 @@
     "observedBillingMultiplier": 0.06,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": true,
-    "requiresFreshProbe": false
+    "requiresFreshProbe": false,
+    "billingPrice": {
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 25,
+      "cachedInputPricePerMillion": 0.5,
+      "cacheWritePricePerMillion": 6.25,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-kiro-cache90-claude-006:claude-sonnet-5:messages",
@@ -4808,7 +5300,17 @@
     "observedBillingMultiplier": 0.06,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": true,
-    "requiresFreshProbe": false
+    "requiresFreshProbe": false,
+    "billingPrice": {
+      "inputPricePerMillion": 2,
+      "outputPricePerMillion": 10,
+      "cachedInputPricePerMillion": 0.2,
+      "cacheWritePricePerMillion": 2.5,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-kiro-cache70-claude-006:claude-opus-4-8:messages",
@@ -4854,7 +5356,17 @@
     "observedBillingMultiplier": 0.06,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": true,
-    "requiresFreshProbe": false
+    "requiresFreshProbe": false,
+    "billingPrice": {
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 25,
+      "cachedInputPricePerMillion": 0.5,
+      "cacheWritePricePerMillion": 6.25,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-kiro-cache70-claude-006:claude-sonnet-5:messages",
@@ -4900,7 +5412,17 @@
     "observedBillingMultiplier": 0.06,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": true,
-    "requiresFreshProbe": false
+    "requiresFreshProbe": false,
+    "billingPrice": {
+      "inputPricePerMillion": 2,
+      "outputPricePerMillion": 10,
+      "cachedInputPricePerMillion": 0.2,
+      "cacheWritePricePerMillion": 2.5,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-claude-max-unlimited-100:claude-opus-4-8:messages",
@@ -4946,7 +5468,17 @@
     "observedBillingMultiplier": 1,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": true,
-    "requiresFreshProbe": false
+    "requiresFreshProbe": false,
+    "billingPrice": {
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 25,
+      "cachedInputPricePerMillion": 0.5,
+      "cacheWritePricePerMillion": 6.25,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-claude-max-unlimited-100:claude-sonnet-5:messages",
@@ -4992,7 +5524,17 @@
     "observedBillingMultiplier": 1,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": true,
-    "requiresFreshProbe": false
+    "requiresFreshProbe": false,
+    "billingPrice": {
+      "inputPricePerMillion": 2,
+      "outputPricePerMillion": 10,
+      "cachedInputPricePerMillion": 0.2,
+      "cacheWritePricePerMillion": 2.5,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-kiro-cache70-claude-006:claude-fable-5:messages",
@@ -5038,7 +5580,17 @@
     "observedBillingMultiplier": 0.06,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": true,
-    "requiresFreshProbe": false
+    "requiresFreshProbe": false,
+    "billingPrice": {
+      "inputPricePerMillion": 10,
+      "outputPricePerMillion": 50,
+      "cachedInputPricePerMillion": 1,
+      "cacheWritePricePerMillion": 12.5,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "lucen-kimi-k3-openai-040:kimi-k3:responses",
@@ -5086,7 +5638,16 @@
     "observedBillingMultiplier": 0.4,
     "effectiveCostStatus": "estimated",
     "autoRouteEnabled": true,
-    "requiresFreshProbe": false
+    "requiresFreshProbe": false,
+    "billingPrice": {
+      "inputPricePerMillion": 20,
+      "outputPricePerMillion": 100,
+      "cachedInputPricePerMillion": 2,
+      "currency": "USD_CREDIT",
+      "source": "Lucen authenticated usage ledger; stable provider-model component rate",
+      "observedAt": "2026-08-02T01:16:33.273Z",
+      "status": "verified"
+    }
   },
   {
     "executionProfileId": "closeai-claude-opus-4-8-messages-frontier",

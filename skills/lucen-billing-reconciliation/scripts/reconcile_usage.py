@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare sanitized Lucen usage billing with the ACU model catalog."""
+"""Compare sanitized Lucen usage billing with the official ACU catalog."""
 
 from __future__ import annotations
 
@@ -28,7 +28,9 @@ def main() -> None:
         item["modelId"]: item
         for item in json.loads(args.catalog.read_text())["models"]
     }
-    rows = billing["records"]
+    rows = billing.get("records", billing.get("items"))
+    if not isinstance(rows, list):
+        raise ValueError("Billing input must contain a records or items array")
     prices: dict[tuple[str, str], Counter[float]] = defaultdict(Counter)
     groups: dict[str, set[str]] = defaultdict(set)
     mismatches = 0
@@ -42,7 +44,7 @@ def main() -> None:
         for label, token_key, cost_key in COMPONENTS:
             tokens = float(row.get(token_key, 0) or 0)
             cost = float(row.get(cost_key, 0) or 0)
-            if tokens > 0:
+            if tokens > 0 and cost > 0:
                 price = round(cost * 1_000_000 / tokens, 8)
                 prices[(model, label)][price] += 1
 
@@ -52,7 +54,7 @@ def main() -> None:
         f"- Records: {len(rows)}",
         f"- Cost equation mismatches: {mismatches}",
         "",
-        "| Model | Groups | ACU input/output/cache | Lucen dominant input/output/cache |",
+        "| Model | Groups | Official input/output/cache | Lucen dominant input/output/cache |",
         "| --- | ---: | --- | --- |",
     ]
     for model in sorted(groups):

@@ -32,6 +32,17 @@ export type RoutingPreferenceParameters = {
   fallbackRiskScale: number;
 };
 
+export type ProfileBillingPrice = {
+  inputPricePerMillion: number;
+  outputPricePerMillion: number;
+  cachedInputPricePerMillion?: number;
+  cacheWritePricePerMillion?: number;
+  currency: "USD_CREDIT";
+  source: string;
+  observedAt: string;
+  status: "verified" | "estimated";
+};
+
 export const ROUTING_PREFERENCE_PARAMETERS: Record<RoutingPreference, RoutingPreferenceParameters> = {
   economy: { qualityTargetOffset: -6, costSensitivity: 1.8, fallbackRiskScale: 0.35 },
   balanced: { qualityTargetOffset: -3, costSensitivity: 1.4, fallbackRiskScale: 0.25 },
@@ -48,6 +59,7 @@ export type AlphaExecutionProfile = {
   channelId?: string;
   routingGroupName?: string;
   effectiveCostStatus?: "verified" | "estimated" | "missing";
+  billingPrice?: ProfileBillingPrice;
   protocols: AlphaProtocol[];
   toolCallSupport: boolean;
   supportedToolTypes?: ToolCapability[];
@@ -216,11 +228,20 @@ function nominalPrice(modelId: string): { inputPricePerMillion: number; outputPr
   return { inputPricePerMillion: model.inputPricePerMillion, outputPricePerMillion: model.outputPricePerMillion };
 }
 
+export function resolveProfileBillingPrice(profile: AlphaExecutionProfile): {
+  inputPricePerMillion: number;
+  outputPricePerMillion: number;
+  cachedInputPricePerMillion?: number;
+  cacheWritePricePerMillion?: number;
+} {
+  return profile.billingPrice ?? nominalPrice(profile.modelId);
+}
+
 function profileEffectivePrices(profile: AlphaExecutionProfile): {
   inputPricePerMillion: number;
   outputPricePerMillion: number;
 } {
-  const nominal = nominalPrice(profile.modelId);
+  const nominal = resolveProfileBillingPrice(profile);
   const multiplier = profile.economics ? cashCnyPerNominalUsd(profile.economics) : 1;
   return {
     inputPricePerMillion: nominal.inputPricePerMillion * multiplier,

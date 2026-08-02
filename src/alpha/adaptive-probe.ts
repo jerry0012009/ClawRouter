@@ -357,6 +357,7 @@ export class AdaptiveProbeWorker {
     let usageTrusted = false;
     let inputTokens = 0n;
     let cachedInputTokens = 0n;
+    let cacheCreationInputTokens = 0n;
     let outputTokens = 0n;
     let reasoningTokens = 0n;
     let actualModel: string | undefined;
@@ -378,9 +379,11 @@ export class AdaptiveProbeWorker {
         contentType: response.headers.get("content-type") ?? "application/octet-stream",
         requestedModel: profile.modelId,
         requestBytes: body.byteLength,
+        billingPrice: profile.billingPrice,
       });
       inputTokens = usage.inputTokens;
       cachedInputTokens = usage.cachedInputTokens;
+      cacheCreationInputTokens = usage.cacheCreationInputTokens ?? 0n;
       outputTokens = usage.outputTokens;
       reasoningTokens = usage.reasoningTokens;
       actualModel = usage.actualModel;
@@ -493,6 +496,7 @@ export class AdaptiveProbeWorker {
             rawResponseBytes: responseBody.byteLength,
             inputTokens: inputTokens.toString(),
             cachedInputTokens: cachedInputTokens.toString(),
+            cacheCreationInputTokens: cacheCreationInputTokens.toString(),
             outputTokens: outputTokens.toString(),
             reasoningTokens: reasoningTokens.toString(),
             actualModel: actualModel ?? null,

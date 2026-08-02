@@ -112,6 +112,16 @@ function validateProfile(value: unknown, index: number): ConfiguredExecutionProf
   if (!profile.baseUrl && !profile.baseUrlEnv) {
     throw new Error(`Execution profile ${index} must declare baseUrl or baseUrlEnv`);
   }
+  if (profile.billingPrice) {
+    for (const [field, amount] of Object.entries(profile.billingPrice)) {
+      if (field.endsWith("PricePerMillion") && (typeof amount !== "number" || !Number.isFinite(amount) || amount < 0)) {
+        throw new Error(`Execution profile ${index} has invalid billingPrice.${field}`);
+      }
+    }
+    if (profile.billingPrice.currency !== "USD_CREDIT" || !profile.billingPrice.source || !profile.billingPrice.observedAt) {
+      throw new Error(`Execution profile ${index} has incomplete billingPrice evidence`);
+    }
+  }
   return profile as ConfiguredExecutionProfile;
 }
 
@@ -178,6 +188,7 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
       channelId: profile.channelId ?? profile.channel,
       routingGroupName: profile.routingGroupName,
       effectiveCostStatus: profile.effectiveCostStatus,
+      billingPrice: profile.billingPrice,
       protocols: profile.protocols,
       toolCallSupport: profile.toolCallSupport,
       supportedToolTypes: profile.supportedToolTypes,

@@ -1,77 +1,109 @@
 ---
 name: lucen-billing-reconciliation
-description: Reconcile Lucen usage bills with ACU model costs, execution-profile multipliers, cache pricing, and provider cash conversion. Use when importing Lucen usage exports, auditing model or channel prices, investigating billing discrepancies, onboarding Lucen channels, or updating ACU economics.
+description: Reconcile Lucen, BlackAI, and CloseAI usage ledgers with official public model prices, execution-profile billing overrides, routing-group multipliers, cache pricing, and RMB cash conversion. Use when importing provider usage exports, validating public or channel prices, investigating billing discrepancies, comparing provider costs, onboarding channels, or updating ACU pricing and economics.
 ---
 
-# Lucen Billing Reconciliation
+# Provider Billing Reconciliation
 
-Use Lucen per-request component costs as the billing source of truth for
-Lucen execution profiles. Keep Lucen's USD-denominated credits separate from
-ACU's RMB accounting: when recharge is 1 RMB for 1 USD credit, the numeric
-nominal credit price converts one-for-one to RMB cash before the channel
-multiplier.
+Keep official public prices, provider ledger prices, routing-group multipliers,
+and cash conversion as separate evidence layers. Never make one provider's
+ledger price the shared price for another provider.
 
 ## Source Of Truth
 
-Treat these values as different:
+Apply this precedence:
 
-- **Lucen nominal price**: `input_cost`, `output_cost`,
+- **Official catalog price**: public vendor reference price. Update only from
+  a dated primary source manifest.
+- **Provider ledger price**: `input_cost`, `output_cost`,
   `cache_read_cost`, and `cache_creation_cost` divided by their token counts.
-- **Lucen charged price**: `actual_cost`, normally
+- **Provider charged price**: `actual_cost`, normally
   `total_cost * rate_multiplier`.
-- **ACU cost**: Lucen nominal price in provider-credit units multiplied by
-  provider conversion and execution-profile multiplier, yielding RMB.
-- **Official vendor price**: context only; never substitute it for observed
-  Lucen billing during reconciliation.
+- **ACU cash cost**: provider ledger price when verified, otherwise official
+  catalog fallback, multiplied by the group multiplier and CNY/credit ratio.
 
 Use `provider + channel/execution profile + provider model` as the effective
-pricing key. Do not assume one global model price is valid for every Lucen
-group.
+pricing key. Do not absorb a model-specific ledger price difference into a
+provider-wide multiplier.
 
 ## Workflow
 
-1. Obtain a Lucen usage export or sanitized API response. Never store
-   passwords, bearer tokens, API key values, IP addresses, or request IDs.
-2. Normalize each row into model, provider model, route group, token counts,
+1. Read [references/billing-method.md](references/billing-method.md) completely.
+2. Obtain each provider's usage export through its normal authenticated flow.
+   Respect CAPTCHA and region policy; never bypass them. Never store passwords,
+   bearer tokens, API key values, cookies, account identifiers, IP addresses,
+   user agents, request bodies, or request IDs.
+3. Capture the official public-price source manifest separately. Distinguish
+   first-party vendor pages from provider/channel directories.
+4. Normalize each row into model, provider model, route group, token counts,
    component costs, `total_cost`, `actual_cost`, and `rate_multiplier`.
-3. Calculate a component price only when its token count is positive:
+5. Calculate a component price only when its token count and cost are positive:
 
    `unit_price = component_cost / component_tokens * 1,000,000`
 
-4. Group by model and route group. Report the modal unit price and all
+6. Group by model and route group. Report the modal unit price and all
    materially different price clusters; do not average across groups.
-5. Verify:
+7. Verify every retained row:
 
    `actual_cost ≈ total_cost * rate_multiplier`
 
-6. Compare observed Lucen nominal prices with ACU profile prices before
-   applying the multiplier. Update channel multipliers from Lucen's live
-   group table, not from API-key labels.
-7. Keep profiles with different nominal prices separate. If runtime only
-   supports global model prices, mark the discrepancy and do not silently
-   rewrite a shared model used by BlackAI or CloseAI.
-8. Save a dated sanitized artifact and a short reconciliation report.
+8. Update routing-group multipliers from authenticated group data or exact
+   request equations, not API-key labels. Apply provider cash conversion only
+   after the group multiplier.
+9. Add an execution-profile price only when the component rate is stable for
+   that exact provider/model/profile evidence. Preserve alternatives as
+   unresolved; do not flatten them.
+10. Regenerate the shared catalog, execution-profile catalog, and New API
+    catalog. Verify the New API effective CNY price uses the profile override.
+11. Save a dated aggregate artifact and report. Delete authentication and raw
+    temporary files after aggregation.
 
 ## Runtime Rules
 
 - A verified execution-profile price override takes precedence over the global
   catalog price.
+- The global catalog contains official public reference prices, not provider
+  account prices.
 - A live route-group multiplier takes precedence over a stale channel label.
 - Missing cache prices remain explicitly unknown; do not infer them from input
   price without recording the assumption.
+- Treat cache read and cache creation as distinct. Anthropic Messages reports
+  them outside ordinary input; OpenAI Responses reports cached input inside
+  input tokens.
+- Keep native currencies explicit. Do not silently treat CNY vendor prices as
+  USD.
 - Separate requested model from `upstream_model` and actual model identity.
 - A billable model is not automatically protocol-, tool-, identity-, or
   routing-eligible.
+- Mark a blocked login as unverified with the exact precheck reason. Do not
+  preserve an old rate as newly verified.
 
 ## Resources
 
-Read [references/billing-method.md](references/billing-method.md) for field
-mapping, currency rules, and the operational checklist.
+Build the cross-provider aggregate with sanitized temporary inputs:
 
-Run the deterministic comparator with:
+```bash
+node scripts/build-provider-billing-evidence.mjs \
+  lucen=/tmp/lucen-ledger-sanitized.json \
+  blackai=/tmp/black-ledger-sanitized.json \
+  --output reports/provider-billing-evidence-YYYYMMDD.json
+```
+
+Then regenerate and verify:
+
+```bash
+python3 scripts/sync-acu-catalog-prices.py
+npx tsx tools/provider-channels/sync-newapi-channel-status.ts
+npm run typecheck
+npm test
+npm run build
+```
+
+Use the legacy single-provider comparator only for an already-sanitized Lucen
+sample:
 
 ```bash
 python3 skills/lucen-billing-reconciliation/scripts/reconcile_usage.py \
-  --billing reports/lucen-billing-sample-20260801.json \
+  --billing reports/lucen-billing-sample-YYYYMMDD.json \
   --catalog src/acu/catalog/model-catalog.json
 ```

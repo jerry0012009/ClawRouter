@@ -1,0 +1,18 @@
+{
+  "endpoint": "/api/pricing/acu-selection-corridor?input_tokens=100000&output_tokens=4000",
+  "capturedAnonymously": true,
+  "formulaVersion": "acu-routing-model-v0.4",
+  "lunaMax": {
+    "candidateId": "gpt-5.6-luna@max",
+    "modelId": "gpt-5.6-luna",
+    "executionPresetId": "gpt-5.6-luna:max",
+    "reasoningEffort": "max",
+    "estimatedCallCostCny": 0.002768,
+    "qualityExamples": {"difficulty0": 100, "difficulty38": 90.1943931488}
+  },
+  "selectedRanges": {
+    "economy": {"minDifficulty": 0, "maxDifficulty": 36, "pointCount": 19},
+    "balanced": {"minDifficulty": 0, "maxDifficulty": 36, "pointCount": 19},
+    "quality": {"minDifficulty": 0, "maxDifficulty": 32, "pointCount": 17}
+  }
+}

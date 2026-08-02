@@ -1,0 +1,14 @@
+{
+  "endpoint": "/api/pricing",
+  "capturedAnonymously": true,
+  "publicEntryCount": 16,
+  "canonicalModelCardCountExcludingAcuAuto": 15,
+  "luna": {
+    "modelId": "gpt-5.6-luna",
+    "displayName": "GPT-5.6 Luna",
+    "activeInAcuAuto": true,
+    "protocol": "Messages + Responses",
+    "reasoning": true
+  },
+  "lunaMaxPublicCardPresent": false
+}

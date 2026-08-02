@@ -1,0 +1,10 @@
+execution_profile_id,channel,provider,first_attempts,successes,failures,failover_attempts,final_selected,last_success_at,average_latency_ms,latency_p50_ms,latency_p95_ms,runtime_health,consecutive_failures,recent_success_rate,runtime_last_success_at,probe_state
+lucen-cx006-value-dynamic:gpt-5.6-luna:responses,lucen-cx006-value-dynamic,lucen,40,23,17,0,23,2026-08-02 20:00:27.993+00,12738.6,13299.5,18312,healthy,0,0.8787147860667324,2026-08-02 20:45:28.512+00,not_queued
+not_persisted,not_persisted,xiaomi_mimo,29,21,8,0,0,2026-07-31 21:29:35.984+00,10078.5,6816,38995.19999999998,,,,,not_queued
+not_persisted,not_persisted,lucen,6,4,2,0,0,2026-08-01 16:44:17.89+00,17364.0,16080,24949,,,,,not_queued
+blackai-codex-mix-low:gpt-5.6-luna:responses,blackai-codex-mix-low,blackai,1,0,17,16,0,,579.6,573,849.4,healthy,0,0.8610048837222404,2026-08-02 19:43:22.152+00,not_queued
+lucen-cx012-pro:gpt-5.6-luna:responses,lucen-cx012-pro,lucen,1,0,1,0,0,,24966.0,24966,24966,healthy,0,0.8720000000000001,2026-08-02 19:44:59.595+00,not_queued
+lucen-cx014-pro-stable:gpt-5.6-luna:responses,lucen-cx014-pro-stable,lucen,1,0,1,0,0,,24921.0,24921,24921,open,6,0.2202009600000001,2026-08-02 13:43:18.913+00,queued
+blackai-codex-mix-pro-fallback:gpt-5.6-luna:responses,blackai-codex-mix-pro-fallback,blackai,0,0,17,17,0,,464.2,452,775,healthy,0,0.8720000000000001,2026-08-02 19:43:23.363+00,not_queued
+not_persisted,not_persisted,closeai,0,6,2,0,0,2026-07-31 16:35:28.118+00,5600.1,4910,7910.549999999999,,,,,not_queued
+lucen-cx010-plus-fast:gpt-5.6-luna:responses,lucen-cx010-plus-fast,lucen,0,0,1,1,0,,24459.0,24459,24459,healthy,0,0.8385242604741034,2026-08-02 20:45:28.601+00,not_queued

@@ -1,0 +1,9 @@
+{
+  "source": "/internal/admin/traces/<masked-logical-request-id>",
+  "rawResponsePersisted": false,
+  "topLevelKeys": ["admission_traces","attempts","events","judge_attempts","judge_evaluations","judge_ledger","logical_requests","route_decisions","segments","session","task","usage_reports"],
+  "observedRouteCandidateKeys": ["candidateId","modelId","displayName","executionPresetId","reasoningEffort","estimatedQuality","estimatedCallCost","valueUtility","paretoEfficient","bestExecutionProfileId"],
+  "observedSegmentMetadataKeys": ["workPhase","workPhaseConfidence","workPhaseSignals","workPhaseQualityTargetOffset","workPhasePolicyVersion","judgeRun"],
+  "observedAttemptMetadataKeys": ["candidateId","executionPresetId","clientRequestedReasoningEffort","presetReasoningEffort","targetCanonicalReasoningEffort","resolvedReasoningEffort","wireReasoningEffort","reasoningMappingStatus","cachedInputTokens","cacheHitRatio","first_model_event_latency_ms","recoveryDecisionReason"],
+  "observedUsageKeys": ["cached_input_tokens","reasoning_tokens","actual_total_cash_cost_cny","judge_cash_cost_cny","failed_attempt_cash_cost_cny"]
+}

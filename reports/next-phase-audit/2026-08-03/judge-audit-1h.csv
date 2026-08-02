@@ -1,0 +1,2 @@
+audit_window,logical_requests,judge_new,judge_reused,judge_new_rate_pct,judge_reuse_rate_pct,first_attempt_success,first_attempt_success_pct,same_model_failover,same_model_failover_pct,backup,final_live,recent_evaluation,rules_fallback,rules_fallback_pct,latency_p50_ms,latency_p95_ms,latency_p99_ms,total_cost_cny,average_new_judge_cost_cny,failed_attempt_cost_cny
+1h,7,2,4,28.571,57.143,0,0.000,2,100.000,0,0,2,0,0.000,18495,18551.7,18556.74,0.0000000000,0.0000000000,0.0000000000

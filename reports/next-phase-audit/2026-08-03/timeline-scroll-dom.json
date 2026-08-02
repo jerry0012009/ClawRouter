@@ -1,0 +1,35 @@
+{
+  "auditStatus": "dynamic_dom_skipped_no_safe_dashboard_session",
+  "viewports": [
+    {"width": 1366, "height": 768, "executed": false},
+    {"width": 1440, "height": 900, "executed": false},
+    {"width": 1920, "height": 1080, "executed": false}
+  ],
+  "reason": "The dedicated-looking user has no dashboard access token or existing browser session. Creating credentials or using an unlabelled model token would mutate or risk user state.",
+  "runtimeMeasurements": {
+    "windowScrollY": null,
+    "timelineRootScrollTop": null,
+    "dialogScrollTop": null,
+    "ancestorComputedStyles": null
+  },
+  "staticAncestorChain": [
+    {"component":"SidebarInset","classes":"h-[calc(100svh-var(--app-header-height,0px))] min-h-0 overflow-hidden"},
+    {"component":"Main","classes":"flex min-h-0 flex-1 flex-col overflow-hidden"},
+    {"component":"SectionPageLayout.Content fixed","classes":"min-h-0 flex-1 overflow-hidden"},
+    {"component":"UsageLogs content wrapper","classes":"flex h-full min-h-0 flex-col"},
+    {"component":"section slot","classes":"min-h-0 flex-1"},
+    {"component":"ACUWorkTimeline root","classes":"flex h-full min-h-0 flex-col overflow-x-hidden overflow-y-auto"},
+    {"component":"chart section","classes":"min-w-0 overflow-hidden"},
+    {"component":"chart height","classes":"h-[34rem] sm:h-[38rem] touch-pan-y"}
+  ],
+  "echartsInsideDataZoom": {
+    "zoomOnMouseWheel": true,
+    "moveOnMouseMove": true,
+    "moveOnMouseWheel": false,
+    "preventDefaultMouseMove": true
+  },
+  "dialog": {
+    "modal": false,
+    "contentClasses":"top-4 right-4 bottom-4 max-h-none overflow-y-auto"
+  }
+}

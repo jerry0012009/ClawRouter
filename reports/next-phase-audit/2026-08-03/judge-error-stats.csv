@@ -1,0 +1,16 @@
+audit_window,provider,model,endpoint_host,error_category,http_status,attempts,average_latency_ms,cost_cny
+1h,blackai,gpt-5.6-luna,blackaicoding.com,invalid_response,0,4,788.8,0.0000000000
+1h,lucen,gpt-5.6-luna,lucen.cc,timeout,0,2,16917.5,0.0000000000
+24h,blackai,gpt-5.6-luna,blackaicoding.com,invalid_response,0,14,543.6,0.0000000000
+24h,lucen,gpt-5.6-luna,lucen.cc,timeout,0,6,16954.7,0.0000000000
+24h,lucen,gpt-5.6-luna,lucen.cc,none,0,6,11979.0,0.0042376400
+24h,lucen,gpt-5.6-luna,lucen.cc,http_502,502,1,5623.0,0.0000000000
+7d,blackai,gpt-5.6-luna,blackaicoding.com,invalid_response,0,32,541.8,0.0000000000
+7d,lucen,gpt-5.6-luna,lucen.cc,none,0,24,11801.8,0.0480097280
+7d,xiaomi_mimo,mimo-v2.5-pro,token-plan-cn.xiaomimimo.com,none,0,24,9687.0,1.1602447000
+7d,lucen,gpt-5.6-luna,lucen.cc,timeout,0,16,19417.6,0.0000000000
+7d,xiaomi_mimo,mimo-v2.5-pro,token-plan-cn.xiaomimimo.com,invalid_response,0,9,10253.8,0.4255862000
+7d,closeai,deepseek-v4-flash,api.openai-proxy.org,none,0,8,5161.6,0.2343669840
+7d,lucen,gpt-5.6-luna,lucen.cc,http_502,502,5,5285.8,0.0000000000
+7d,closeai,deepseek-v4-flash,api.openai-proxy.org,invalid_response,0,2,7127.5,0.0879724800
+7d,xiaomi_mimo,mimo-v2.5-pro,token-plan-cn.xiaomimimo.com,network_error,0,1,10510.0,0.0000000000

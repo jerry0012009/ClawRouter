@@ -309,7 +309,7 @@
       ['executionProfileId', trace.execution_profile_id], ['完整Attempts', attempts], ['validator_result', trace.validator_result], ['validator', trace.validator],
       ['validator_reason', trace.validator_reason], ['quality_fallback_used', String(trace.quality_fallback_used === true)], ['任务评估耗时', `${latency.judge_latency_ms ?? evaluation.judgeLatencyMs} ms`],
       ['Router总耗时', `${latency.total_router_latency_ms ?? 0} ms`], ['Completion / Reasoning Token', `${usage.completionTokens ?? '—'} / ${usage.reasoningTokens ?? '—'}`],
-      ['Usage来源', usage.usageSource], ['Judge成本', money(costs.judge_cost)], ['模型成本', money(costs.model_call_cost)], ['ACU账单估算', money(costs.total_acu_cost)],
+      ['Usage来源', usage.usageSource], ['Judge成本', money(costs.judge_cost)], ['模型成本', money(costs.model_call_cost)], ['ACU Router价格', money(costs.total_acu_cost)],
     ];
     $('acu-technical-details').innerHTML = fields.map(([key, value]) => `<div><dt>${key}</dt><dd>${value ?? '—'}</dd></div>`).join('');
   }

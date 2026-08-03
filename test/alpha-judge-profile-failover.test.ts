@@ -80,6 +80,46 @@ describe("Luna Judge Profile selector", () => {
     expect(selected.map((item) => item.executionProfileId)).toEqual(["b", "a"]);
   });
 
+  it("slightly increases Judge reliability and latency weight without making it health-first", () => {
+    const selected = getEligibleLunaJudgeProfiles({
+      profiles: [
+        profile("cheap-slower", {
+          recentSuccessRate: 0.7, observedLatencyMs: 30_000,
+          billingPrice: { inputPricePerMillion: 0.8, outputPricePerMillion: 0.8 },
+        }),
+        profile("reliable-faster", {
+          recentSuccessRate: 0.9, observedLatencyMs: 2_000,
+          billingPrice: { inputPricePerMillion: 0.8, outputPricePerMillion: 0.8 },
+        }),
+        profile("meaningfully-cheaper", {
+          recentSuccessRate: 0.55, observedLatencyMs: 40_000,
+          billingPrice: { inputPricePerMillion: 0.3, outputPricePerMillion: 0.3 },
+        }),
+      ],
+      requiredContextTokens: 100,
+      maxProfiles: 3,
+    });
+    expect(selected.map((item) => item.executionProfileId)).toEqual([
+      "meaningfully-cheaper", "reliable-faster", "cheap-slower",
+    ]);
+  });
+
+  it("keeps one healthy cross-provider Judge fallback", () => {
+    const selected = getEligibleLunaJudgeProfiles({
+      profiles: [
+        profile("lucen-a", { billingPrice: { inputPricePerMillion: 1, outputPricePerMillion: 1 } }),
+        profile("lucen-b", { billingPrice: { inputPricePerMillion: 1.1, outputPricePerMillion: 1.1 } }),
+        profile("lucen-c", { billingPrice: { inputPricePerMillion: 1.2, outputPricePerMillion: 1.2 } }),
+        profile("degraded-blackai", { provider: "blackai", health: "degraded",
+          billingPrice: { inputPricePerMillion: 10, outputPricePerMillion: 10 } }),
+        profile("closeai", { provider: "closeai", billingPrice: { inputPricePerMillion: 12, outputPricePerMillion: 12 } }),
+      ],
+      requiredContextTokens: 100,
+      maxProfiles: 3,
+    });
+    expect(selected.map((item) => item.executionProfileId)).toEqual(["lucen-a", "lucen-b", "closeai"]);
+  });
+
   it("hydrates shared runtime health before filtering and ranking Judge Profiles", () => {
     const now = new Date("2026-08-03T12:00:00.000Z");
     const open = hydrateExecutionProfileRuntime(profile("open"), {

@@ -2,7 +2,7 @@ export type CircuitState = "healthy" | "degraded" | "open" | "half_open" | "disa
 export type HealthScope = "none" | "channel" | "profile";
 export type ProviderErrorClass =
   | "none" | "client_cancelled" | "authentication" | "quota_exhausted" | "rate_limited"
-  | "network" | "timeout" | "slow_first_model_event" | "provider_5xx" | "provider_edge_timeout" | "model_not_found" | "protocol_incompatible"
+  | "network" | "timeout" | "slow_first_model_event" | "provider_empty_stream" | "provider_5xx" | "provider_edge_timeout" | "model_not_found" | "protocol_incompatible"
   | "tool_incompatible" | "actual_model_missing" | "actual_model_mismatch" | "usage_untrusted" | "other_provider_error";
 
 export type HealthSnapshot = {
@@ -130,9 +130,8 @@ export function classifyAttemptOutcome(outcome: AttemptOutcome, consecutiveFailu
   if (/model[_ -]?not[_ -]?found|unknown model|does not exist/.test(code)) return classified({ errorClass: "model_not_found", scope: "profile", permanent: false, cooldownSeconds: 1_800, recoverableBeforeModelOutput: true, respectRetryAfter: false, countsAsChannelFailure: false });
   if (/tool.*(?:unsupported|not supported)|unsupported.*tool/.test(code)) return classified({ errorClass: "tool_incompatible", scope: "profile", permanent: false, cooldownSeconds: 1_800, recoverableBeforeModelOutput: true, respectRetryAfter: false, countsAsChannelFailure: false });
   if (/protocol|unsupported.*(?:responses|messages)|invalid.*schema/.test(code)) return classified({ errorClass: "protocol_incompatible", scope: "profile", permanent: false, cooldownSeconds: 1_800, recoverableBeforeModelOutput: true, respectRetryAfter: false, countsAsChannelFailure: false });
-  if (outcome.httpStatus === 200 && /upstream_failed_before_output|stream_ended_before_model_event/.test(code)) {
-    return classified({ errorClass: "protocol_incompatible", scope: "profile", permanent: false, cooldownSeconds: 1_800, recoverableBeforeModelOutput: true, respectRetryAfter: false, countsAsChannelFailure: false });
-  }
+  if ((!outcome.httpStatus || outcome.httpStatus === 200)
+    && /stream_ended_before_model_event|provider_empty_stream/.test(code)) return classified({ errorClass: "provider_empty_stream", scope: "profile", permanent: false, cooldownSeconds: networkBackoff(consecutiveFailures + 1), recoverableBeforeModelOutput: true, respectRetryAfter: false, countsAsChannelFailure: false });
   if (outcome.httpStatus === 400) return classified({ errorClass: "other_provider_error", scope: "profile", permanent: false, cooldownSeconds: 1_800, recoverableBeforeModelOutput: true, respectRetryAfter: false, countsAsChannelFailure: false });
   if (outcome.httpStatus === 524) return classified({ errorClass: "provider_edge_timeout", scope: "profile", permanent: false, cooldownSeconds: Math.max(1, outcome.retryAfterSeconds ?? networkBackoff(consecutiveFailures + 1)), recoverableBeforeModelOutput: true, respectRetryAfter: true, countsAsChannelFailure: false });
   if (outcome.httpStatus && outcome.httpStatus >= 500 && outcome.httpStatus <= 599) return classified({ errorClass: "provider_5xx", scope: "profile", permanent: false, cooldownSeconds: Math.max(1, outcome.retryAfterSeconds ?? networkBackoff(consecutiveFailures + 1)), recoverableBeforeModelOutput: true, respectRetryAfter: true, countsAsChannelFailure: false });

@@ -14,6 +14,8 @@ export type RelayResult = {
   firstModelEventAt?: string;
   firstModelEventLatencyMs?: number;
   protocolCompleted: boolean;
+  terminalKind?: "completed" | "incomplete" | "failed";
+  incompleteReason?: string;
   responseStarted: boolean;
   webSearch: WebSearchEvidence;
 };
@@ -73,6 +75,8 @@ export async function relayProviderResponse(upstream: Response, response: Server
   const body = Buffer.concat(chunks);
   const observed = modelObserver.result();
   const protocolCompleted = preObserved?.protocolCompleted === true || observed.protocolCompleted === true;
+  const terminalKind = observed.terminalKind ?? preObserved?.terminalKind;
+  const incompleteReason = observed.incompleteReason ?? preObserved?.incompleteReason;
   return {
     body,
     httpStatus: upstream.status,
@@ -84,6 +88,8 @@ export async function relayProviderResponse(upstream: Response, response: Server
     firstModelEventAt: preObserved?.firstModelEventAt?.toISOString() ?? observed.firstModelEventAt?.toISOString(),
     firstModelEventLatencyMs: preObserved?.firstModelEventLatencyMs ?? observed.firstModelEventLatencyMs,
     protocolCompleted,
+    terminalKind,
+    incompleteReason,
     responseStarted: response.headersSent,
     webSearch: webObserver?.evidence() ?? inspectWebSearchEvidence(body, contentType),
   };

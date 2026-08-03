@@ -365,6 +365,40 @@ describe("Alpha native protocol gateway", () => {
     expect(traces.at(-1)).toMatchObject({ status: "completed", response: { complete: true, clientCancelled: false, protocolCompleted: true } });
   });
 
+  it("relays max_output_tokens incomplete responses without replaying them", async () => {
+    const expected = [
+      'data: {"type":"response.output_text.delta","delta":"partial"}\n\n',
+      'data: {"type":"response.incomplete","response":{"incomplete_details":{"reason":"max_output_tokens"}}}\n\n',
+    ].join("");
+    let attempts = 0;
+    const traces: AlphaGatewayTrace[] = [];
+    const gatewayPort = await listen(createAlphaGatewayServer({
+      trustedIdentitySecret: sharedSecret,
+      async resolveExecution(envelope) {
+        return {
+          requestedModel: envelope.requestedModel,
+          actualModel: envelope.requestedModel,
+          provider: "test",
+          channel: "test",
+          adapter: { async execute() {
+            attempts += 1;
+            return new Response(expected, { status: 200, headers: { "content-type": "text/event-stream" } });
+          } },
+        };
+      },
+      onTrace(trace) { traces.push({ ...trace }); },
+    }));
+    const body = Buffer.from('{"model":"gpt-test","input":"long answer","stream":true}');
+    const response = await fetch(`http://127.0.0.1:${gatewayPort}/v1/responses`, {
+      method: "POST", headers: signedHeaders(body), body,
+    });
+    expect(await response.text()).toBe(expected);
+    expect(attempts).toBe(1);
+    expect(traces.at(-1)).toMatchObject({
+      response: { terminalKind: "incomplete", incompleteReason: "max_output_tokens" },
+    });
+  });
+
   it("keeps relaying a stream while valid chunks continue", async () => {
     const upstreamPort = await listen(createServer(async (_request, response) => {
       response.setHeader("content-type", "text/event-stream");

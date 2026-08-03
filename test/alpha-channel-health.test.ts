@@ -39,6 +39,18 @@ describe("Provider Channel circuit breaker", () => {
     expect(next).toMatchObject({ state: "healthy", consecutiveFailures: 0, recentSuccessRate: 1 });
   });
 
+  it("classifies an empty pre-output stream as transient Profile health", () => {
+    expect(classifyAttemptOutcome({
+      success: false, httpStatus: 200, errorCode: "stream_ended_before_model_event",
+    }, 0)).toMatchObject({
+      errorClass: "provider_empty_stream", scope: "profile", cooldownSeconds: 30,
+      recoverableBeforeModelOutput: true,
+    });
+    expect(classifyAttemptOutcome({
+      success: false, httpStatus: 503, errorCode: "stream_ended_before_model_event",
+    }, 0)).toMatchObject({ errorClass: "provider_5xx", scope: "profile", cooldownSeconds: 30 });
+  });
+
   it("quarantines actual-model mismatch and distrusts missing Usage at Profile scope", () => {
     expect(classifyAttemptOutcome({ success: false, actualModelMismatch: true }, 0)).toMatchObject({
       errorClass: "actual_model_mismatch", scope: "profile", permanent: false, cooldownSeconds: 1_800,

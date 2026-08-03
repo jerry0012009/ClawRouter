@@ -32,6 +32,7 @@ export type RecoveryDecisionReason =
   | "no_same_model_profile"
   | "no_compatible_profile"
   | "deadline_exhausted"
+  | "recovery_budget_exhausted"
   | "executed";
 
 export function classifyExecutionOutcome(input: {

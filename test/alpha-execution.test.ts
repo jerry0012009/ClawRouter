@@ -5,6 +5,8 @@ import {
   contextOverflowRecoveryEligible,
   createRecoveringProviderAdapter,
   isRecoverableProviderStatus,
+  ProviderPreOutputError,
+  providerAttemptIdentity,
   type ProviderAttemptHandle,
 } from "../src/alpha/execution.js";
 import type { NativeProviderRequest } from "../src/alpha/provider.js";
@@ -126,7 +128,7 @@ describe("Alpha Provider attempt recovery", () => {
     const response = await adapter.execute(request());
     expect(response.status).toBe(400);
     expect(calls).toBe(3);
-    expect(recorded).toBe(2);
+    expect(recorded).toBe(3);
   });
 
   it("tries a Channel network fallback before a same-model Channel", async () => {
@@ -274,6 +276,15 @@ describe("Alpha Provider attempt recovery", () => {
     expect([200, 400, 401, 403, 404, 422].some(isRecoverableProviderStatus)).toBe(false);
   });
 
+  it("keys attempts by Profile, endpoint, and reasoning variant", () => {
+    expect(providerAttemptIdentity({ executionProfileId: "profile-a", networkEndpoint: "primary" }))
+      .not.toBe(providerAttemptIdentity({ executionProfileId: "profile-b", networkEndpoint: "primary" }));
+    expect(providerAttemptIdentity({ executionProfileId: "profile-a", networkEndpoint: "secondary" }))
+      .not.toBe(providerAttemptIdentity({ executionProfileId: "profile-a", networkEndpoint: "primary" }));
+    expect(providerAttemptIdentity({ executionProfileId: "profile-a", networkEndpoint: "primary", reasoningFallback: "default" }))
+      .not.toBe(providerAttemptIdentity({ executionProfileId: "profile-a", networkEndpoint: "primary" }));
+  });
+
   it("recovers from a 524 HTML response without treating error bytes as model output", async () => {
     let calls = 0;
     let failure: Parameters<NonNullable<Parameters<typeof createRecoveringProviderAdapter>[0]["recordFailedAttempt"]>>[0] | undefined;
@@ -296,7 +307,7 @@ describe("Alpha Provider attempt recovery", () => {
     expect(failure?.response?.observation).toMatchObject({ rawResponseBytes: 31, modelVisibleOutputBytes: 0 });
   });
 
-  it("uses the first-model-event watchdog only when a recovery target exists", async () => {
+  it("uses the header watchdog before a recovery target is selected", async () => {
     let calls = 0;
     const slow = (attemptIndex: number): ProviderAttemptHandle => ({
       attemptId: `attempt-${attemptIndex}`, attemptIndex, profile,
@@ -310,15 +321,16 @@ describe("Alpha Provider attempt recovery", () => {
       initial: slow(1), maxAttempts: 2, hasRecoveryTarget: () => true, firstModelEventDeadlineMs: () => 10,
       selectRecoveryProfile: () => profile,
       async startRetry(_profile, index) { return slow(index); },
-      async recordFailedAttempt(input) { expect((input.error as Error).message).toBe("slow_first_model_event"); },
+      async recordFailedAttempt(input) { expect((input.error as ProviderPreOutputError).code).toBe("header_timeout"); },
     });
     const response = await adapter.execute(request());
     expect(await response.text()).toContain("output_text.delta");
     expect(calls).toBe(2);
   });
 
-  it("does not arm the first-model-event watchdog without a healthy recovery target", async () => {
+  it("arms the watchdog and finalizes the only attempt without a recovery target", async () => {
     let aborted = false;
+    let recorded = 0;
     const adapter = createRecoveringProviderAdapter({
       initial: {
         attemptId: "attempt-1", attemptIndex: 1, profile,
@@ -331,10 +343,123 @@ describe("Alpha Provider attempt recovery", () => {
       hasRecoveryTarget: () => false,
       firstModelEventDeadlineMs: () => 5,
       async startRetry() { throw new Error("must not retry"); },
-      async recordFailedAttempt() { throw new Error("must not record a failure"); },
+      async recordFailedAttempt(input) {
+        recorded += 1;
+        expect((input.error as ProviderPreOutputError).code).toBe("header_timeout");
+      },
+    });
+    await expect(adapter.execute(request())).rejects.toMatchObject({ code: "header_timeout" });
+    expect(aborted).toBe(true);
+    expect(recorded).toBe(1);
+  });
+
+  it("uses the current Profile deadline after fallback", async () => {
+    const second = { ...profile, executionProfileId: "test:model:second", channel: "second" };
+    const deadlines: string[] = [];
+    const handle = (attemptIndex: number, selected: AlphaExecutionProfile): ProviderAttemptHandle => ({
+      attemptId: `attempt-${attemptIndex}`, attemptIndex, profile: selected,
+      adapter: { async execute(input) {
+        if (selected === second) return new Response("ok", { status: 200 });
+        return new Promise<Response>((_resolve, reject) => input.signal.addEventListener("abort", () => reject(input.signal.reason), { once: true }));
+      } },
+    });
+    const adapter = createRecoveringProviderAdapter({
+      initial: handle(1, profile), maxAttempts: 2,
+      firstModelEventDeadlineMs(attempt) {
+        deadlines.push(attempt.profile.executionProfileId);
+        return attempt.profile === profile ? 5 : 50;
+      },
+      selectRecoveryTarget: () => ({ profile: second, reason: "same_model_channel_fallback" }),
+      startRetry: async (selected, index) => handle(index, selected),
+      recordFailedAttempt: async () => {},
     });
     expect(await (await adapter.execute(request())).text()).toBe("ok");
-    expect(aborted).toBe(false);
+    expect(deadlines).toEqual([profile.executionProfileId, second.executionProfileId]);
+  });
+
+  it("allows a fourth attempt to succeed", async () => {
+    let calls = 0;
+    const profiles = Array.from({ length: 4 }, (_, index) => ({
+      ...profile, executionProfileId: `profile-${index + 1}`, channel: `channel-${index + 1}`,
+    }));
+    const handle = (index: number, selected: AlphaExecutionProfile): ProviderAttemptHandle => ({
+      attemptId: `attempt-${index}`, attemptIndex: index, profile: selected,
+      adapter: { async execute() {
+        calls += 1;
+        return calls < 4 ? new Response("failed", { status: 503 }) : new Response("ok", { status: 200 });
+      } },
+    });
+    const adapter = createRecoveringProviderAdapter({
+      initial: handle(1, profiles[0]!), maxAttempts: 5,
+      selectRecoveryTarget(current) {
+        const next = profiles[current.attemptIndex];
+        return next ? { profile: next, reason: "same_model_channel_fallback" } : undefined;
+      },
+      startRetry: async (selected, index) => handle(index, selected),
+      recordFailedAttempt: async () => {},
+    });
+    expect(await (await adapter.execute(request())).text()).toBe("ok");
+    expect(calls).toBe(4);
+  });
+
+  it("stops on the recovery time budget and records the final attempt", async () => {
+    const decisions: string[] = [];
+    let retries = 0;
+    const adapter = createRecoveringProviderAdapter({
+      initial: {
+        attemptId: "attempt-1", attemptIndex: 1, profile,
+        adapter: { async execute() { return new Response("failed", { status: 503 }); } },
+      },
+      maxAttempts: 5, recoveryBudgetMs: 10, minimumAttemptBudgetMs: 20,
+      selectRecoveryProfile: () => profile,
+      startRetry: async () => { retries += 1; throw new Error("must not retry"); },
+      recordFailedAttempt: async (input) => { expect(input.timeBudgetExhausted).toBe(true); },
+      recordRecoveryDecision: async (input) => { decisions.push(input.recoveryDecision); },
+    });
+    expect((await adapter.execute(request())).status).toBe(503);
+    expect(retries).toBe(0);
+    expect(decisions).toEqual(["recovery_budget_exhausted"]);
+  });
+
+  it("preserves HTTP 200 headers and observations for an empty SSE stream", async () => {
+    let failure: ProviderPreOutputError | undefined;
+    const adapter = createRecoveringProviderAdapter({
+      initial: {
+        attemptId: "attempt-1", attemptIndex: 1, profile, networkEndpoint: "primary.test",
+        adapter: { async execute() {
+          return new Response("", { status: 200, headers: { "content-type": "text/event-stream", "x-request-id": "empty-1" } });
+        } },
+      },
+      firstModelEventDeadlineMs: () => 50,
+      startRetry: async () => { throw new Error("must not retry"); },
+      recordFailedAttempt: async (input) => { failure = input.error as ProviderPreOutputError; },
+    });
+    await expect(adapter.execute(request())).rejects.toMatchObject({ code: "stream_ended_before_model_event" });
+    expect(failure).toMatchObject({
+      code: "stream_ended_before_model_event",
+      details: { upstreamStatus: 200, providerRequestId: "empty-1", endpoint: "primary.test" },
+      observation: { rawResponseBytes: 0, modelVisibleOutputBytes: 0 },
+    });
+  });
+
+  it("applies the first-model-event deadline to an SSE 5xx response body", async () => {
+    let failure: ProviderPreOutputError | undefined;
+    const adapter = createRecoveringProviderAdapter({
+      initial: {
+        attemptId: "attempt-1", attemptIndex: 1, profile,
+        adapter: { async execute(input) {
+          const body = new ReadableStream({ start(controller) {
+            input.signal.addEventListener("abort", () => controller.error(input.signal.reason), { once: true });
+          } });
+          return new Response(body, { status: 503, headers: { "content-type": "text/event-stream" } });
+        } },
+      },
+      firstModelEventDeadlineMs: () => 5,
+      startRetry: async () => { throw new Error("must not retry"); },
+      recordFailedAttempt: async (input) => { failure = input.error as ProviderPreOutputError; },
+    });
+    await expect(adapter.execute(request())).rejects.toMatchObject({ code: "slow_first_model_event" });
+    expect(failure).toMatchObject({ details: { upstreamStatus: 503 } });
   });
 
   it("disarms the watchdog after the first valid model event", async () => {

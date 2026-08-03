@@ -50,6 +50,7 @@ function signedHeaders(
   userId = "user-auto",
   client: "codex" | "claude-code" = "codex",
   allowedProfileIds: string[] = [],
+  routingPreference: "economy" | "balanced" | "quality" = "balanced",
 ): Record<string, string> {
   const identity = {
     newapiUserId: userId,
@@ -60,7 +61,7 @@ function signedHeaders(
     allowedModelIds: [],
     allowedProfileIds,
     routingPolicyVersion: `acu-user-policy-v2-${createHash("sha256").update(JSON.stringify(allowedProfileIds)).digest("hex").slice(0, 16)}`,
-    routingPreference: "balanced" as const,
+    routingPreference,
     timestamp: new Date().toISOString(),
     bodySha256: bodySha256(body),
   };
@@ -104,6 +105,13 @@ run("Alpha PostgreSQL request processor", () => {
       const testCase = typeof requestBody.test_case === "string" ? requestBody.test_case : "";
       const testCaseCall = (upstreamCaseCalls.get(testCase) ?? 0) + 1;
       upstreamCaseCalls.set(testCase, testCaseCall);
+      if (requestBody.test_empty_stream_once === true && testCaseCall === 1) {
+        response.statusCode = 200;
+        response.setHeader("content-type", "text/event-stream");
+        response.setHeader("x-request-id", `provider-${testCase}-empty-1`);
+        response.end();
+        return;
+      }
       const failuresBeforeSuccess = Number(requestBody.test_failures_before_success ?? 0);
       if (testCase && testCaseCall <= failuresBeforeSuccess) {
         response.statusCode = Number(requestBody.test_failure_status ?? 503);
@@ -180,19 +188,20 @@ run("Alpha PostgreSQL request processor", () => {
         "event: response.output_text.delta",
         `data: ${JSON.stringify({ type: "response.output_text.delta", delta: "ok" })}`,
         "",
-        "event: response.completed",
-        `data: ${JSON.stringify({
+        requestBody.test_incomplete_reason ? "event: response.incomplete" : "event: response.completed",
+        `data: ${JSON.stringify(requestBody.test_incomplete_reason ? {
+          type: "response.incomplete",
+          response: { id: responseId, model: requestBody.model,
+            incomplete_details: { reason: requestBody.test_incomplete_reason } },
+        } : {
           type: "response.completed",
           response: {
-            id: responseId,
-            model: requestBody.model,
+            id: responseId, model: requestBody.model,
             output: requestBody.test_web_success === true
               ? [{ type: "web_search_call", status: "completed" }, { type: "message", content: [] }]
               : [{ type: "message", content: [] }],
             usage: {
-              input_tokens: 100,
-              input_tokens_details: { cached_tokens: 20 },
-              output_tokens: 10,
+              input_tokens: 100, input_tokens_details: { cached_tokens: 20 }, output_tokens: 10,
               output_tokens_details: { reasoning_tokens: 2 },
             },
           },
@@ -1152,6 +1161,78 @@ run("Alpha PostgreSQL request processor", () => {
     expect(probeWakeCount).toBeGreaterThan(wakesBeforeDemand);
   });
 
+  it("records an HTTP 200 empty stream in Profile health and immediately advances to the next Profile", async () => {
+    await database.query("DELETE FROM acu_channel_health WHERE channel_id IN ('test-channel','test-recovery-channel','test-cross-provider-channel')");
+    await database.query(
+      "DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id IN ('test:gpt-5.4-mini:responses','test:gpt-5.4-mini:recovery','test:gpt-5.4-mini:cross-provider-recovery')",
+    );
+    await send({
+      model: "acu-auto",
+      input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "Recover from an empty stream" }] }],
+      stream: true,
+      test_case: "empty-stream-retry",
+      test_empty_stream_once: true,
+    }, "empty-stream-retry", "user-empty-stream");
+    const attempts = await database.query<{
+      attempt_index: number; execution_profile_id: string; http_status: number; status: string;
+      provider_request_id: string; metadata_json: Record<string, unknown>;
+    }>(
+      `SELECT attempt_index,execution_profile_id,http_status,status,provider_request_id,metadata_json
+       FROM acu_attempts WHERE logical_request_id=(SELECT logical_request_id FROM acu_logical_requests WHERE newapi_user_id=$1)
+       ORDER BY attempt_index`,
+      ["user-empty-stream"],
+    );
+    expect(attempts.rows).toHaveLength(2);
+    expect(attempts.rows[0]).toMatchObject({
+      attempt_index: 1, execution_profile_id: primaryProfile.executionProfileId, http_status: 200, status: "error",
+      provider_request_id: "provider-empty-stream-retry-empty-1",
+      metadata_json: {
+        errorCode: "stream_ended_before_model_event", errorClass: "provider_empty_stream",
+        raw_response_bytes: 0, model_visible_output_bytes: 0, healthScope: "profile",
+        recoveryDecisionReason: "executed", nextExecutionProfileId: recoveryProfile.executionProfileId,
+      },
+    });
+    expect(attempts.rows[1]).toMatchObject({
+      attempt_index: 2, execution_profile_id: recoveryProfile.executionProfileId, http_status: 200, status: "success",
+    });
+    const health = await database.query<{ consecutive_failures: number; cooldown_active: boolean }>(
+      `SELECT consecutive_failures,coalesce(cooldown_until>now(),false) cooldown_active
+       FROM acu_provider_model_profile_health WHERE execution_profile_id=$1`,
+      [primaryProfile.executionProfileId],
+    );
+    expect(health.rows).toEqual([{ consecutive_failures: 1, cooldown_active: true }]);
+    expect((await database.query(
+      "SELECT 1 FROM acu_profile_probe_queue WHERE execution_profile_id=$1",
+      [primaryProfile.executionProfileId],
+    )).rowCount).toBe(1);
+  });
+
+  it("relays max_output_tokens without retrying or changing Profile health", async () => {
+    await database.query("DELETE FROM acu_channel_health WHERE channel_id='test-channel'");
+    await database.query("DELETE FROM acu_profile_probe_queue WHERE execution_profile_id=$1", [primaryProfile.executionProfileId]);
+    await database.query("DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id=$1", [primaryProfile.executionProfileId]);
+    await send({
+      model: "acu-auto",
+      input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "Generate until the token limit" }] }],
+      stream: true,
+      test_case: "generation-truncated",
+      test_incomplete_reason: "max_output_tokens",
+    }, "generation-truncated", "user-generation-truncated");
+    const attempts = await database.query<{ status: string; metadata_json: Record<string, unknown> }>(
+      `SELECT status,metadata_json FROM acu_attempts
+       WHERE logical_request_id=(SELECT logical_request_id FROM acu_logical_requests WHERE newapi_user_id=$1)`,
+      ["user-generation-truncated"],
+    );
+    expect(attempts.rows).toHaveLength(1);
+    expect(attempts.rows[0]).toMatchObject({ status: "success", metadata_json: {
+      terminalKind: "incomplete", incompleteReason: "max_output_tokens", generationTruncated: true,
+    } });
+    expect((await database.query(
+      "SELECT 1 FROM acu_provider_model_profile_health WHERE execution_profile_id=$1",
+      [primaryProfile.executionProfileId],
+    )).rowCount).toBe(0);
+  });
+
   it("keeps the canonical model when an auto Effort is rejected and retries another Profile", async () => {
     await database.query("DELETE FROM acu_channel_health WHERE channel_id IN ('test-channel','test-recovery-channel','test-cross-provider-channel')");
     await database.query(
@@ -1206,7 +1287,8 @@ run("Alpha PostgreSQL request processor", () => {
     try {
       const response = await fetch(`http://127.0.0.1:${gatewayPort}/v1/responses`, {
         method: "POST",
-        headers: signedHeaders(body, testCase, "user-reasoning-client-fallback", "codex", [alternateModelProfile.executionProfileId]),
+        headers: signedHeaders(body, testCase, "user-reasoning-client-fallback", "codex",
+          [alternateModelProfile.executionProfileId], "quality"),
         body,
       });
       expect(response.status, await response.clone().text()).toBe(200);
@@ -1267,7 +1349,8 @@ run("Alpha PostgreSQL request processor", () => {
     try {
       const response = await fetch(`http://127.0.0.1:${gatewayPort}/v1/responses`, {
         method: "POST",
-        headers: signedHeaders(body, testCase, "user-reasoning-default", "codex", [alternateModelProfile.executionProfileId]),
+        headers: signedHeaders(body, testCase, "user-reasoning-default", "codex",
+          [alternateModelProfile.executionProfileId], "quality"),
         body,
       });
       expect(response.status, await response.clone().text()).toBe(200);
@@ -1419,11 +1502,38 @@ run("Alpha PostgreSQL request processor", () => {
       body,
     });
     expect(response.status).toBe(502);
-    const attempts = await database.query<{ execution_profile_id: string }>(
-      `SELECT execution_profile_id FROM acu_attempts
+    const attempts = await database.query<{
+      execution_profile_id: string;
+      status: string;
+      http_status: number;
+      latency_ms: number;
+      network_endpoint: string;
+      provider_request_id: string;
+      metadata_json: Record<string, unknown>;
+    }>(
+      `SELECT execution_profile_id,status,http_status,latency_ms,network_endpoint,provider_request_id,metadata_json FROM acu_attempts
        WHERE logical_request_id=(SELECT logical_request_id FROM acu_logical_requests WHERE newapi_user_id='user-profile-policy')`,
     );
-    expect(attempts.rows).toEqual([{ execution_profile_id: "test:gpt-5.4-mini:responses" }]);
+    expect(attempts.rows).toHaveLength(1);
+    expect(attempts.rows[0]).toMatchObject({
+      execution_profile_id: "test:gpt-5.4-mini:responses",
+      status: "error",
+      http_status: 502,
+      network_endpoint: "primary",
+      provider_request_id: "provider-profile-policy-no-recovery-failed-1",
+      metadata_json: {
+        endpoint: "primary",
+        healthScope: "profile",
+        recoveryDecisionReason: "no_compatible_profile",
+        stopReason: "no_compatible_profile",
+        attemptsBudgetExhausted: false,
+        timeBudgetExhausted: false,
+      },
+    });
+    expect(attempts.rows[0]!.latency_ms).toBeGreaterThanOrEqual(0);
+    expect(attempts.rows[0]!.metadata_json.responseHeaders).toMatchObject({
+      "x-request-id": "provider-profile-policy-no-recovery-failed-1",
+    });
   });
 
   it("reuses Judge and only reroutes when the Token Profile policy changes", async () => {

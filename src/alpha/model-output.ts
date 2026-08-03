@@ -4,6 +4,8 @@ export type ModelOutputObservation = {
   firstModelEventAt?: Date;
   firstModelEventLatencyMs?: number;
   protocolCompleted?: boolean;
+  terminalKind?: "completed" | "incomplete" | "failed";
+  incompleteReason?: string;
 };
 
 function hasChatDelta(value: unknown): boolean {
@@ -25,18 +27,30 @@ function isModelEvent(value: unknown): boolean {
   if (!value || typeof value !== "object") return false;
   const record = value as Record<string, unknown>;
   const type = typeof record.type === "string" ? record.type : "";
-  if (/^response\.(?:output_item|content_part)\.added$/.test(type)) return true;
-  if (/^response\.(?:output_text|reasoning|function_call_arguments|custom_tool_call_input)\.delta$/.test(type)) return true;
+  if (/^response\.(?:output_item|content_part)\.(?:added|done)$/.test(type)) return true;
+  if (/^response\.(?:output_text|reasoning|reasoning_text|reasoning_summary_text|function_call_arguments|custom_tool_call_input)\.delta$/.test(type)) return true;
   if (type === "content_block_start" || type === "content_block_delta") return true;
   return hasChatDelta(value);
 }
 
-function isProtocolCompleted(value: unknown): boolean {
-  if (!value || typeof value !== "object") return false;
+function terminalObservation(value: unknown): Pick<ModelOutputObservation, "terminalKind" | "incompleteReason"> | undefined {
+  if (!value || typeof value !== "object") return undefined;
   const record = value as Record<string, unknown>;
-  if (record.type === "response.completed") return true;
-  if (record.type !== "message_stop") return false;
-  return true;
+  if (record.type === "response.completed" || record.type === "message_stop") return { terminalKind: "completed" };
+  if (record.type === "response.failed") return { terminalKind: "failed" };
+  if (record.type !== "response.incomplete") return undefined;
+  const response = record.response && typeof record.response === "object"
+    ? record.response as Record<string, unknown>
+    : undefined;
+  const details = response?.incomplete_details && typeof response.incomplete_details === "object"
+    ? response.incomplete_details as Record<string, unknown>
+    : record.incomplete_details && typeof record.incomplete_details === "object"
+      ? record.incomplete_details as Record<string, unknown>
+      : undefined;
+  return {
+    terminalKind: "incomplete",
+    incompleteReason: typeof details?.reason === "string" ? details.reason : undefined,
+  };
 }
 
 export class ModelOutputObserver {
@@ -59,7 +73,12 @@ export class ModelOutputObserver {
     if (!data || data === "[DONE]") return;
     try {
       const parsed = JSON.parse(data);
-      if (isProtocolCompleted(parsed)) this.observation.protocolCompleted = true;
+      const terminal = terminalObservation(parsed);
+      if (terminal) {
+        this.observation.terminalKind = terminal.terminalKind;
+        this.observation.incompleteReason = terminal.incompleteReason;
+        this.observation.protocolCompleted = terminal.terminalKind === "completed";
+      }
       if (!isModelEvent(parsed)) return;
       const bytes = Buffer.byteLength(`${line}\n`);
       this.observation.modelVisibleOutputBytes += bytes;

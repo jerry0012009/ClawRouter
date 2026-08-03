@@ -1239,6 +1239,14 @@ export class AlphaRepository {
     if (result.rowCount !== 1) throw new Error("Attempt completion failed");
   }
 
+  async mergeAttemptMetadata(attemptId: string, metadata: Record<string, unknown>): Promise<void> {
+    const result = await this.database.query(
+      "UPDATE acu_attempts SET metadata_json=metadata_json || $2::jsonb WHERE attempt_id=$1",
+      [attemptId, json(metadata)],
+    );
+    if (result.rowCount !== 1) throw new Error("Attempt metadata update failed");
+  }
+
   async createUsageReport(input: UsageReportRecord): Promise<{ usageReportId: string; inserted: boolean }> {
     const result = await this.database.query<{ usage_report_id: string }>(
       `INSERT INTO acu_usage_reports

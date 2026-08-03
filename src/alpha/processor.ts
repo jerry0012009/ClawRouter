@@ -32,6 +32,8 @@ import {
   computeFirstModelEventDeadlineMs,
   contextOverflowRecoveryEligible,
   createRecoveringProviderAdapter,
+  ProviderPreOutputError,
+  providerAttemptIdentity,
   type BufferedProviderFailure,
   type ProviderAttemptHandle,
   type ProviderRecoveryTarget,
@@ -196,6 +198,7 @@ export type AlphaResolutionContext = {
   routeRefreshReason?: string;
   routeDecisionSnapshot?: JsonObject;
   recoveryDecisionReason?: RecoveryDecisionReason;
+  recoveryFinalizedAttemptId?: string;
   clientRequestedReasoningEffort?: string;
   presetReasoningEffort?: string;
   targetCanonicalReasoningEffort?: string;
@@ -2102,8 +2105,14 @@ export class AlphaRequestProcessor {
       learnedContextFailureThreshold?: number;
     };
     reasoningTransportError?: boolean;
+    attemptsBudgetExhausted?: boolean;
+    timeBudgetExhausted?: boolean;
   }): Promise<void> {
     const repository = new AlphaRepository(this.options.database);
+    const preOutputError = input.error instanceof ProviderPreOutputError ? input.error : undefined;
+    const upstreamStatus = input.response?.status ?? preOutputError?.details.upstreamStatus;
+    const responseHeaders = input.response?.headers ?? preOutputError?.details.responseHeaders;
+    const observation = input.response?.observation ?? preOutputError?.observation;
     const contentType = input.response ? responseContentType(input.response.headers) : undefined;
     const usage = input.response ? parseProviderUsage({
       protocol: input.protocol,
@@ -2115,16 +2124,6 @@ export class AlphaRequestProcessor {
     }) : undefined;
     const responseText = input.response?.body.toString("utf8") ?? "";
     const retryAfterSeconds = input.response?.headers["retry-after"] ? Number(input.response.headers["retry-after"]) : undefined;
-    const health = input.webFailure || input.contextOverflow ? undefined : await this.recordRuntimeHealth(input.attempt.profile, input.protocol, {
-      success: false,
-      attemptedAt: input.attempt.startedAt,
-      httpStatus: input.response?.status,
-      errorCode: input.error instanceof Error ? input.error.name : undefined,
-      errorMessage: input.error instanceof Error ? input.error.message : responseText.slice(0, 512),
-      retryAfterSeconds: Number.isFinite(retryAfterSeconds) ? retryAfterSeconds : undefined,
-      firstTokenLatencyMs: input.response?.observation?.firstModelEventLatencyMs,
-      totalLatencyMs: input.latencyMs,
-    });
     if (input.response) {
       await repository.savePayload({
         payloadId: alphaId("payload"),
@@ -2146,11 +2145,11 @@ export class AlphaRequestProcessor {
       status: "error",
       actualModel: usage?.actualModel ?? input.attempt.profile.modelId,
       providerRequestId: input.response?.headers["x-request-id"]
-        ?? input.response?.headers["request-id"],
+        ?? input.response?.headers["request-id"] ?? preOutputError?.details.providerRequestId,
       errorCategory: input.webFailure
         ? "web_search_failed"
         : input.reasoningTransportError ? "reasoning_transport_error" : "provider_error",
-      httpStatus: input.response?.status,
+      httpStatus: upstreamStatus,
       inputTokens: usage?.inputTokens,
       cachedInputTokens: usage?.cachedInputTokens,
       outputTokens: usage?.outputTokens,
@@ -2159,31 +2158,54 @@ export class AlphaRequestProcessor {
       actualCostUsd: billing?.actualCostUsd ?? "0.0000000000",
       providerBilled: billing?.providerBilled,
       latencyMs: input.latencyMs,
-      visibleOutputBytes: input.response?.observation?.modelVisibleOutputBytes ?? 0,
+      visibleOutputBytes: observation?.modelVisibleOutputBytes ?? 0,
       metadata: {
         error: input.error instanceof Error ? input.error.message : undefined,
         webFailure: input.webFailure === true,
-        normalized_error_signature: sha256(`${input.contextOverflow ? "provider_context_overflow" : health?.errorClass ?? "web_search_failed"}\n${input.response?.status ?? 0}\n${input.attempt.profile.provider}\n${input.attempt.profile.channel}`),
+        errorCode: preOutputError?.code,
+        normalized_error_signature: sha256(`${input.contextOverflow ? "provider_context_overflow"
+          : input.reasoningTransportError ? "reasoning_transport_error"
+            : preOutputError?.code ?? "provider_error"}\n${upstreamStatus ?? 0}\n${input.attempt.profile.provider}\n${input.attempt.profile.channel}`),
         errorClass: input.contextOverflow
           ? "provider_context_overflow"
-          : input.reasoningTransportError ? "reasoning_transport_error" : health?.errorClass,
+          : input.reasoningTransportError ? "reasoning_transport_error" : undefined,
         canonicalModelId: input.contextOverflow ? input.attempt.profile.modelId : undefined,
         reportedContextLimit: input.contextOverflow?.reportedContextLimit,
         requiredTotalContextTokens: input.contextOverflow?.requiredTotalContextTokens,
         learnedContextFailureThreshold: input.contextOverflow?.learnedContextFailureThreshold,
         endpoint: input.attempt.networkEndpoint,
-        cfRay: input.response?.headers["cf-ray"],
+        cfRay: responseHeaders?.["cf-ray"],
         contentType,
         retryAfterSeconds: Number.isFinite(retryAfterSeconds) ? retryAfterSeconds : undefined,
-        raw_response_bytes: input.response?.observation?.rawResponseBytes ?? input.response?.body.byteLength ?? 0,
-        model_visible_output_bytes: input.response?.observation?.modelVisibleOutputBytes ?? 0,
-        first_model_event_at: input.response?.observation?.firstModelEventAt?.toISOString(),
-        first_model_event_latency_ms: input.response?.observation?.firstModelEventLatencyMs,
-        cooldown_until: health?.cooldownUntil?.toISOString(),
+        raw_response_bytes: observation?.rawResponseBytes ?? input.response?.body.byteLength ?? 0,
+        model_visible_output_bytes: observation?.modelVisibleOutputBytes ?? 0,
+        first_model_event_at: observation?.firstModelEventAt?.toISOString(),
+        first_model_event_latency_ms: observation?.firstModelEventLatencyMs,
         billingStatus: billing?.billingStatus ?? "unknown",
         recoveryDecisionReason: input.recoveryDecisionReason,
+        attemptsBudgetExhausted: input.attemptsBudgetExhausted === true,
+        timeBudgetExhausted: input.timeBudgetExhausted === true,
+        responseHeaders,
       },
     });
+    const health = input.webFailure || input.contextOverflow ? undefined : await this.recordRuntimeHealth(input.attempt.profile, input.protocol, {
+      success: false,
+      attemptedAt: input.attempt.startedAt,
+      httpStatus: upstreamStatus,
+      errorCode: preOutputError?.code ?? (input.error instanceof Error ? input.error.name : undefined),
+      errorMessage: input.error instanceof Error ? input.error.message : responseText.slice(0, 512),
+      retryAfterSeconds: Number.isFinite(retryAfterSeconds) ? retryAfterSeconds : undefined,
+      firstTokenLatencyMs: observation?.firstModelEventLatencyMs,
+      totalLatencyMs: input.latencyMs,
+    });
+    if (health) {
+      await repository.mergeAttemptMetadata(input.attempt.attemptId, {
+        normalized_error_signature: sha256(`${health.errorClass}\n${upstreamStatus ?? 0}\n${input.attempt.profile.provider}\n${input.attempt.profile.channel}`),
+        errorClass: health.errorClass,
+        cooldown_until: health.cooldownUntil?.toISOString(),
+        healthScope: health.scope,
+      });
+    }
     if (input.webFailure) {
       const runtime = await repository.profileHealth(input.attempt.profile.executionProfileId);
       const previousRate = optionalNumber(runtime?.metadata?.webSearchRecentSuccessRate)
@@ -2219,7 +2241,7 @@ export class AlphaRequestProcessor {
         attemptIndex: input.attempt.attemptIndex,
         provider: input.attempt.profile.provider,
         channel: input.attempt.profile.channel,
-        httpStatus: input.response?.status,
+        httpStatus: upstreamStatus,
         errorClass: input.contextOverflow
           ? "provider_context_overflow"
           : input.reasoningTransportError ? "reasoning_transport_error" : health?.errorClass,
@@ -2228,9 +2250,11 @@ export class AlphaRequestProcessor {
         requiredTotalContextTokens: input.contextOverflow?.requiredTotalContextTokens,
         learnedContextFailureThreshold: input.contextOverflow?.learnedContextFailureThreshold,
         cooldownUntil: health?.cooldownUntil?.toISOString(),
-        recoveryEligible: (input.response?.observation?.modelVisibleOutputBytes ?? 0) === 0,
+        recoveryEligible: (observation?.modelVisibleOutputBytes ?? 0) === 0,
         recoveryAction: input.contextOverflow ? "context_model_reroute" : undefined,
         recoveryDecisionReason: input.recoveryDecisionReason,
+        attemptsBudgetExhausted: input.attemptsBudgetExhausted === true,
+        timeBudgetExhausted: input.timeBudgetExhausted === true,
       },
     });
   }
@@ -2594,7 +2618,7 @@ export class AlphaRequestProcessor {
     const judgeReused = Boolean(storedRouteInputs?.judgeReused)
       || (!result.judge && Boolean(judgeEvaluationId) && mode !== "explicit");
     const attemptIndex = await repository.nextProviderAttemptIndex(logical.logicalRequestId);
-    const maxProviderAttempts = 3;
+    const maxProviderAttempts = 5;
     if (attemptIndex > maxProviderAttempts) throw new Error("Provider Attempt budget exhausted for logical request");
     let requestPayloadId: string | undefined;
     if (logical.inserted) {
@@ -2612,25 +2636,6 @@ export class AlphaRequestProcessor {
       });
       await repository.attachRequestPayload(logical.logicalRequestId, identity.newapiUserId, requestPayloadId);
     }
-    const prepared = prepareProviderBody(
-      ingress.rawBody,
-      mode === "explicit" ? envelope.requestedModel : result.profile.providerModelId ?? result.profile.modelId,
-      envelope,
-      result.profile,
-      (() => {
-        const selected = result.route?.recommendation.recommended;
-        return decideReasoning({
-          mode,
-          clientEffort: envelope.reasoningEffort,
-          presetEffort: selected?.reasoningEffort,
-          modelId: result.profile.modelId,
-          protocol: envelope.protocol,
-          profileOverride: result.profile.reasoningOverride,
-          legacyControlMode: result.profile.reasoningControlMode,
-          legacySupportedEfforts: result.profile.supportedReasoningEfforts,
-        });
-      })(),
-    );
     const selectedExecutionCandidate = result.route?.recommendation.recommended;
     const reasoningDecision = decideReasoning({
       mode,
@@ -2642,7 +2647,17 @@ export class AlphaRequestProcessor {
       legacyControlMode: result.profile.reasoningControlMode,
       legacySupportedEfforts: result.profile.supportedReasoningEfforts,
     });
+    const prepared = prepareProviderBody(
+      ingress.rawBody,
+      mode === "explicit" ? envelope.requestedModel : result.profile.providerModelId ?? result.profile.modelId,
+      envelope,
+      result.profile,
+      reasoningDecision,
+    );
     const providerBody = prepared.body;
+    const initialProviderBody = JSON.parse(providerBody.toString("utf8")) as JsonObject;
+    const initialWireReasoningEffort = stringValue(record(initialProviderBody.reasoning)?.effort)
+      ?? stringValue(record(initialProviderBody.output_config)?.effort);
     const initialAttempt = await this.startProviderAttempt({
       identity,
       state,
@@ -2712,7 +2727,8 @@ export class AlphaRequestProcessor {
       attemptedExecutionProfileIds: [result.profile.executionProfileId],
       attemptedChannelIds: [result.profile.channelId ?? result.profile.channel],
       attemptedProviders: [result.profile.provider],
-      attemptedNetworkEndpoints: initialAttempt.networkEndpoint ? [initialAttempt.networkEndpoint] : [],
+      attemptedNetworkEndpoints: initialAttempt.networkEndpoint
+        ? [`${initialAttempt.profile.executionProfileId}:${initialAttempt.networkEndpoint}`] : [],
       phase: state.decision.phase,
       workPhase: state.workPhase.phase,
       workPhaseQualityTargetOffset: state.workPhase.qualityTargetOffset,
@@ -2755,34 +2771,57 @@ export class AlphaRequestProcessor {
       hostedWebRequired: envelope.hostedWebRequired,
       webIntent: envelope.webIntent,
     } satisfies AlphaRouteRequirements;
-    const latencySamples = await this.options.database.query<{ latency_ms: number }>(
-      `SELECT (metadata_json->>'first_model_event_latency_ms')::double precision AS latency_ms
-       FROM acu_attempts
-       WHERE attempt_kind='provider' AND status='success' AND execution_profile_id=$1
-         AND metadata_json ? 'first_model_event_latency_ms'
-         AND CASE WHEN $2::boolean THEN input_tokens>=100000 ELSE input_tokens<100000 END
-         AND completed_at >= now()-interval '24 hours'
-       ORDER BY completed_at DESC LIMIT 50`,
-      [result.profile.executionProfileId, recoveryContextAdmission.estimatedInputTokens >= 100_000],
-    );
-    const recentOutcomes = await this.options.database.query<{ error_class: string }>(
-      `SELECT COALESCE(metadata_json->>'errorClass',error_category,'') AS error_class
-       FROM acu_attempts WHERE attempt_kind='provider' AND execution_profile_id=$1
-         AND completed_at >= now()-interval '24 hours'
-       ORDER BY completed_at DESC LIMIT 5`,
-      [result.profile.executionProfileId],
-    );
-    const runtimeProfileHealth = await new AlphaRepository(this.options.database).profileHealth(result.profile.executionProfileId);
-    const firstModelEventDeadlineMs = computeFirstModelEventDeadlineMs({
-      estimatedInputTokens: recoveryContextAdmission.estimatedInputTokens,
-      successfulLatenciesMs: latencySamples.rows.map((row) => Number(row.latency_ms)),
-      recentErrorClasses: recentOutcomes.rows.map((row) => row.error_class),
-      profileState: runtimeProfileHealth?.state ?? result.profile.health,
-    });
+    const longContext = recoveryContextAdmission.estimatedInputTokens >= 100_000;
+    const attemptDeadlineCache = new Map<string, Promise<number>>();
+    const deadlineForProfile = (profile: AlphaExecutionProfile): Promise<number> => {
+      const key = `${profile.executionProfileId}:${longContext ? "long" : "standard"}`;
+      const cached = attemptDeadlineCache.get(key);
+      if (cached) return cached;
+      const value = Promise.all([
+        this.options.database.query<{ latency_ms: number }>(
+          `SELECT (metadata_json->>'first_model_event_latency_ms')::double precision AS latency_ms
+           FROM acu_attempts
+           WHERE attempt_kind='provider' AND status='success' AND execution_profile_id=$1
+             AND metadata_json ? 'first_model_event_latency_ms'
+             AND CASE WHEN $2::boolean THEN input_tokens>=100000 ELSE input_tokens<100000 END
+             AND completed_at >= now()-interval '24 hours'
+           ORDER BY completed_at DESC LIMIT 50`,
+          [profile.executionProfileId, longContext],
+        ),
+        this.options.database.query<{ error_class: string }>(
+          `SELECT COALESCE(metadata_json->>'errorClass',error_category,'') AS error_class
+           FROM acu_attempts WHERE attempt_kind='provider' AND execution_profile_id=$1
+             AND completed_at >= now()-interval '24 hours'
+           ORDER BY completed_at DESC LIMIT 5`,
+          [profile.executionProfileId],
+        ),
+        repository.profileHealth(profile.executionProfileId),
+      ]).then(([latencies, outcomes, runtime]) => computeFirstModelEventDeadlineMs({
+        estimatedInputTokens: recoveryContextAdmission.estimatedInputTokens,
+        successfulLatenciesMs: latencies.rows.map((row) => Number(row.latency_ms)),
+        recentErrorClasses: outcomes.rows.map((row) => row.error_class),
+        profileState: runtime?.state ?? profile.health,
+      }));
+      attemptDeadlineCache.set(key, value);
+      return value;
+    };
     const attemptedProfiles = new Set(resolutionContext.attemptedExecutionProfileIds);
     const attemptedChannels = new Set(resolutionContext.attemptedChannelIds);
     const attemptedProviders = new Set(resolutionContext.attemptedProviders);
     const attemptedEndpoints = new Set(resolutionContext.attemptedNetworkEndpoints);
+    const endpointAttemptKey = (profile: AlphaExecutionProfile, endpoint?: string): string => (
+      `${profile.executionProfileId}:${endpoint ?? "primary"}`
+    );
+    const attemptIdentity = (profile: AlphaExecutionProfile, endpoint: string | undefined, target?: ProviderRecoveryTarget): string => (
+      providerAttemptIdentity({
+        executionProfileId: profile.executionProfileId,
+        networkEndpoint: endpoint,
+        reasoningFallback: target?.reasoningFallback,
+      })
+    );
+    const attemptedIdentities = new Set([
+      attemptIdentity(initialAttempt.profile, initialAttempt.networkEndpoint),
+    ]);
     const contextFailedModels = new Set<string>();
     const reasoningRejectedProfiles = new Set<string>();
     let reasoningTerminalFallbackUsed = false;
@@ -2807,16 +2846,23 @@ export class AlphaRequestProcessor {
       && (!envelope.containsThinking || profile.thinkingSupport)
       && effectiveContextCeiling(profile) >= recoveryContextAdmission.requiredTotalContextTokens
       && this.options.adapters.has(profile.executionProfileId)
-    )).sort((left, right) => compareWebPreference(left, right, envelope));
-    const hasUnattemptedRecovery = (current: ProviderAttemptHandle): boolean => recoveryPool.some((profile) => (
-      !attemptedProfiles.has(profile.executionProfileId)
-    )) || this.endpoints(current.profile).some((item) => !attemptedEndpoints.has(item.endpoint));
+    ));
+    const profileCurrentlyRoutable = async (profile: AlphaExecutionProfile): Promise<boolean> => {
+      const [profileHealth, channelHealth] = await Promise.all([
+        repository.profileHealth(profile.executionProfileId),
+        repository.channelHealth(profile.channelId ?? profile.channel),
+      ]);
+      return ![profileHealth?.state, channelHealth?.state].some((state) => ["open", "half_open", "disabled"].includes(state ?? ""))
+        && ![profileHealth?.cooldownUntil, channelHealth?.cooldownUntil].some((until) => until && until.getTime() > Date.now());
+    };
     const adapter = createRecoveringProviderAdapter({
       initial: initialAttempt,
       maxAttempts: maxProviderAttempts,
+      recoveryBudgetMs: longContext ? 270_000 : 180_000,
+      minimumAttemptBudgetMs: 15_000,
       isRecoverableResponse: (response) => isWebSearchProviderError(response, envelope),
       isRecoverableFailure: (failure, current) => {
-        if (mode !== "explicit" && prepared.providerReasoningOverrideApplied && isReasoningTransportError(failure)) {
+        if (mode !== "explicit" && isReasoningTransportError(failure)) {
           reasoningRejectedProfiles.add(current.profile.executionProfileId);
           return true;
         }
@@ -2841,20 +2887,16 @@ export class AlphaRequestProcessor {
         };
         return true;
       },
-      hasRecoveryTarget: hasUnattemptedRecovery,
-      firstModelEventDeadlineMs: () => firstModelEventDeadlineMs,
+      firstModelEventDeadlineMs: (attempt) => deadlineForProfile(attempt.profile),
       selectRecoveryTarget: (() => {
-        return (current, failure, error): ProviderRecoveryTarget | undefined => {
+        return async (current, failure): Promise<ProviderRecoveryTarget | undefined> => {
           if (failure && reasoningRejectedProfiles.has(current.profile.executionProfileId)) {
-            const profile = recoveryPool.find((candidate) => !attemptedProfiles.has(candidate.executionProfileId));
+            const profile = recoveryPool.find((candidate) => !attemptedProfiles.has(candidate.executionProfileId)
+              && !attemptedIdentities.has(attemptIdentity(candidate, this.endpoints(candidate)[0]?.endpoint)));
             if (profile) {
-              attemptedProfiles.add(profile.executionProfileId);
-              attemptedChannels.add(profile.channelId ?? profile.channel);
-              attemptedProviders.add(profile.provider);
               return { profile, networkEndpointIndex: 0, reason: "reasoning_profile_fallback" };
             }
             if (!reasoningTerminalFallbackUsed) {
-              reasoningTerminalFallbackUsed = true;
               if (canonicalReasoningEffort(envelope.reasoningEffort)) {
                 const clientDecision = decideReasoning({
                   mode, clientEffort: envelope.reasoningEffort,
@@ -2863,14 +2905,15 @@ export class AlphaRequestProcessor {
                   legacyControlMode: current.profile.reasoningControlMode,
                   legacySupportedEfforts: current.profile.supportedReasoningEfforts,
                 });
-                if (clientDecision.wireReasoningEffort !== reasoningDecision.wireReasoningEffort) {
-                  return { profile: current.profile, networkEndpointIndex: current.networkEndpointIndex,
-                    reasoningFallback: "client_effort", reason: "reasoning_client_effort_fallback" };
-                }
-                return undefined;
+                return clientDecision.wireReasoningEffort !== initialWireReasoningEffort
+                  ? { profile: current.profile, networkEndpointIndex: current.networkEndpointIndex,
+                    reasoningFallback: "client_effort", reason: "reasoning_client_effort_fallback" }
+                  : undefined;
               }
-              return { profile: current.profile, networkEndpointIndex: current.networkEndpointIndex,
-                reasoningFallback: "default", reason: "reasoning_default_fallback" };
+              return initialWireReasoningEffort !== undefined
+                ? { profile: current.profile, networkEndpointIndex: current.networkEndpointIndex,
+                  reasoningFallback: "default", reason: "reasoning_default_fallback" }
+                : undefined;
             }
             return undefined;
           }
@@ -2899,15 +2942,6 @@ export class AlphaRequestProcessor {
                 includeExecutionPresets: envelope.reasoningEffort === undefined || canonicalReasoningEffort(envelope.reasoningEffort) !== undefined,
               });
               const profile = reroute.selectedProfile;
-              attemptedProfiles.add(profile.executionProfileId);
-              attemptedChannels.add(profile.channelId ?? profile.channel);
-              attemptedProviders.add(profile.provider);
-              const primaryEndpoint = this.endpoints(profile)[0]?.endpoint;
-              if (primaryEndpoint) attemptedEndpoints.add(primaryEndpoint);
-              resolutionContext.attemptedExecutionProfileIds = [...attemptedProfiles];
-              resolutionContext.attemptedChannelIds = [...attemptedChannels];
-              resolutionContext.attemptedProviders = [...attemptedProviders];
-              resolutionContext.attemptedNetworkEndpoints = [...attemptedEndpoints];
               return { profile, networkEndpointIndex: 0, reason: "context_model_reroute" };
             } catch {
               return undefined;
@@ -2920,53 +2954,36 @@ export class AlphaRequestProcessor {
               errorMessage: failure.body.toString("utf8").slice(0, 512),
             }, 0).scope
             : "profile";
-          const eligible = recoveryPool.filter((profile) => (
-            !attemptedProfiles.has(profile.executionProfileId)
-            && (failureScope !== "channel"
-              || (profile.channelId ?? profile.channel) !== (current.profile.channelId ?? current.profile.channel))
-          ));
-          const errorClass = failure?.status === 524
-            ? "provider_edge_timeout"
-            : error instanceof Error ? error.message : undefined;
-          const preferCrossProvider = errorClass === "provider_edge_timeout"
-            || (runtimeProfileHealth?.consecutiveFailures ?? 0) > 0;
-          const profile = (current.attemptIndex === 1 && !preferCrossProvider
-            ? eligible.find((candidate) => candidate.provider === current.profile.provider)
-            : undefined)
-            ?? (current.attemptIndex === 1 && preferCrossProvider
-              ? eligible.find((candidate) => candidate.provider !== current.profile.provider)
-            : undefined)
-            ?? (current.attemptIndex >= 2
-            ? eligible.find((candidate) => candidate.provider !== result.profile.provider)
-            : undefined)
-            ?? eligible[0];
+          const eligible: AlphaExecutionProfile[] = [];
+          for (const profile of recoveryPool) {
+            const endpoint = this.endpoints(profile)[0]?.endpoint;
+            if (!attemptedProfiles.has(profile.executionProfileId)
+              && !attemptedIdentities.has(attemptIdentity(profile, endpoint))
+              && (failureScope !== "channel"
+                || (profile.channelId ?? profile.channel) !== (current.profile.channelId ?? current.profile.channel))
+              && await profileCurrentlyRoutable(profile)) eligible.push(profile);
+          }
+          const profile = eligible[0];
           if (profile) {
-            attemptedProfiles.add(profile.executionProfileId);
-            attemptedChannels.add(profile.channelId ?? profile.channel);
-            attemptedProviders.add(profile.provider);
-            const primaryEndpoint = this.endpoints(profile)[0]?.endpoint;
-            if (primaryEndpoint) attemptedEndpoints.add(primaryEndpoint);
-            resolutionContext.attemptedExecutionProfileIds = [...attemptedProfiles];
-            resolutionContext.attemptedChannelIds = [...attemptedChannels];
-            resolutionContext.attemptedProviders = [...attemptedProviders];
-            resolutionContext.attemptedNetworkEndpoints = [...attemptedEndpoints];
             return { profile, networkEndpointIndex: 0, reason: "same_model_channel_fallback" };
           }
-          const endpointProfiles = [current.profile, ...recoveryPool.filter((candidate) => attemptedProfiles.has(candidate.executionProfileId))];
+          const endpointProfiles = recoveryPool.filter((candidate) => attemptedProfiles.has(candidate.executionProfileId));
           for (const endpointProfile of endpointProfiles) {
+            if (endpointProfile.executionProfileId !== current.profile.executionProfileId
+              && !await profileCurrentlyRoutable(endpointProfile)) continue;
             const endpoints = this.endpoints(endpointProfile);
             for (let index = 0; index < endpoints.length; index += 1) {
               const endpoint = endpoints[index]?.endpoint;
-              if (!endpoint || attemptedEndpoints.has(endpoint)) continue;
-              attemptedEndpoints.add(endpoint);
-              resolutionContext.attemptedNetworkEndpoints = [...attemptedEndpoints];
+              if (!endpoint || attemptedEndpoints.has(endpointAttemptKey(endpointProfile, endpoint))
+                || attemptedIdentities.has(attemptIdentity(endpointProfile, endpoint))) continue;
               return { profile: endpointProfile, networkEndpointIndex: index, reason: "network_endpoint_fallback" };
             }
           }
           return undefined;
         };
       })(),
-      recordFailedAttempt: async ({ attempt, response, error, latencyMs }) => {
+      recordFailedAttempt: async ({ attempt, response, error, latencyMs,
+        attemptsBudgetExhausted, timeBudgetExhausted }) => {
         const contextOverflow = response ? classifyProviderContextOverflow(response) : { isContextOverflow: false };
         const threshold = contextOverflow.isContextOverflow
           ? this.contextFailureThresholdByModel.get(attempt.profile.modelId)
@@ -2982,7 +2999,8 @@ export class AlphaRequestProcessor {
           error,
           latencyMs,
           webFailure: Boolean(response && isExplicitWebCompatibilityFailure(response, envelope)),
-          recoveryDecisionReason: resolutionContext.recoveryDecisionReason,
+          attemptsBudgetExhausted,
+          timeBudgetExhausted,
           contextOverflow: contextOverflow.isContextOverflow ? {
             reportedContextLimit: contextOverflow.reportedContextLimit,
             requiredTotalContextTokens: recoveryContextAdmission.requiredTotalContextTokens,
@@ -2990,6 +3008,7 @@ export class AlphaRequestProcessor {
           } : undefined,
           reasoningTransportError: reasoningRejectedProfiles.has(attempt.profile.executionProfileId),
         });
+        resolutionContext.recoveryFinalizedAttemptId = attempt.attemptId;
         if (response && reasoningRejectedProfiles.has(attempt.profile.executionProfileId)) {
           const effort = reasoningDecision.wireReasoningEffort ?? reasoningDecision.resolvedReasoningEffort;
           await repository.mergeProfileRuntimeMetadata(attempt.profile.executionProfileId, {
@@ -3001,8 +3020,33 @@ export class AlphaRequestProcessor {
           this.options.wakeProbe?.(attempt.profile.executionProfileId);
         }
       },
+      recordRecoveryDecision: async ({ attempt, recoveryDecision, nextTarget,
+        attemptsBudgetExhausted, timeBudgetExhausted }) => {
+        await repository.mergeAttemptMetadata(attempt.attemptId, {
+          recoveryDecisionReason: recoveryDecision,
+          nextExecutionProfileId: nextTarget?.profile.executionProfileId,
+          nextNetworkEndpointIndex: nextTarget?.networkEndpointIndex,
+          nextRecoveryAction: nextTarget?.reason,
+          stopReason: nextTarget ? null : recoveryDecision,
+          attemptsBudgetExhausted,
+          timeBudgetExhausted,
+        });
+      },
       onRecoveryDecision(reason) {
         resolutionContext.recoveryDecisionReason = reason;
+      },
+      commitRecoveryTarget: (_current, target) => {
+        const endpoint = this.endpoints(target.profile)[target.networkEndpointIndex ?? 0]?.endpoint;
+        attemptedProfiles.add(target.profile.executionProfileId);
+        attemptedChannels.add(target.profile.channelId ?? target.profile.channel);
+        attemptedProviders.add(target.profile.provider);
+        attemptedEndpoints.add(endpointAttemptKey(target.profile, endpoint));
+        attemptedIdentities.add(attemptIdentity(target.profile, endpoint, target));
+        resolutionContext.attemptedExecutionProfileIds = [...attemptedProfiles];
+        resolutionContext.attemptedChannelIds = [...attemptedChannels];
+        resolutionContext.attemptedProviders = [...attemptedProviders];
+        resolutionContext.attemptedNetworkEndpoints = [...attemptedEndpoints];
+        if (target.reasoningFallback) reasoningTerminalFallbackUsed = true;
       },
       startRetry: async (profile, nextAttemptIndex, target) => {
         const selectedProfileDecision = decideReasoning({
@@ -3067,15 +3111,6 @@ export class AlphaRequestProcessor {
         resolutionContext.attemptStartedAt = next.startedAt.toISOString();
         resolutionContext.selectedProfile = next.profile;
         resolutionContext.networkEndpoint = next.networkEndpoint;
-        if (!resolutionContext.attemptedExecutionProfileIds.includes(next.profile.executionProfileId)) {
-          resolutionContext.attemptedExecutionProfileIds.push(next.profile.executionProfileId);
-        }
-        const nextChannelId = next.profile.channelId ?? next.profile.channel;
-        if (!resolutionContext.attemptedChannelIds.includes(nextChannelId)) resolutionContext.attemptedChannelIds.push(nextChannelId);
-        if (!resolutionContext.attemptedProviders.includes(next.profile.provider)) resolutionContext.attemptedProviders.push(next.profile.provider);
-        if (next.networkEndpoint && !resolutionContext.attemptedNetworkEndpoints.includes(next.networkEndpoint)) {
-          resolutionContext.attemptedNetworkEndpoints.push(next.networkEndpoint);
-        }
         resolutionContext.webToolPruned = retryPrepared.webToolPruned;
         resolutionContext.webToolPruneReason = retryPrepared.pruneReason;
         resolutionContext.reasoningEffort = retryDecision.resolvedReasoningEffort;
@@ -3562,23 +3597,28 @@ export class AlphaRequestProcessor {
     const repository = new AlphaRepository(this.options.database);
     const relay = trace.response;
     if (!relay) {
-      await repository.completeAttempt({
-        attemptId: context.attemptId,
-        status: trace.status,
-        errorCategory: trace.status === "cancelled" ? "client_cancelled" : "provider_error",
-      });
+      const recoveryAlreadyFinalized = context.recoveryFinalizedAttemptId === context.attemptId;
+      if (!recoveryAlreadyFinalized) {
+        await repository.completeAttempt({
+          attemptId: context.attemptId,
+          status: trace.status,
+          errorCategory: trace.status === "cancelled" ? "client_cancelled" : "provider_error",
+        });
+      }
       await repository.completeLogicalRequest({
         logicalRequestId: context.logicalRequestId,
         newapiUserId: context.newapiUserId,
         status: trace.status,
         errorCategory: trace.status === "cancelled" ? "client_cancelled" : "provider_error",
       });
-      await this.recordRuntimeHealth(context.selectedProfile, context.protocol, {
-        success: false,
-        attemptedAt: context.attemptStartedAt ? new Date(context.attemptStartedAt) : undefined,
-        clientCancelled: trace.status === "cancelled",
-        errorMessage: trace.error instanceof Error ? trace.error.message : "provider execution failed",
-      });
+      if (!recoveryAlreadyFinalized) {
+        await this.recordRuntimeHealth(context.selectedProfile, context.protocol, {
+          success: false,
+          attemptedAt: context.attemptStartedAt ? new Date(context.attemptStartedAt) : undefined,
+          clientCancelled: trace.status === "cancelled",
+          errorMessage: trace.error instanceof Error ? trace.error.message : "provider execution failed",
+        });
+      }
       await this.createFinalUsageReport({
         context,
         actualModel: context.selectedProfile.modelId,
@@ -3587,6 +3627,7 @@ export class AlphaRequestProcessor {
       return;
     }
     const contentType = relay.responseHeaders["content-type"] ?? "application/octet-stream";
+    const recoveryAlreadyFinalized = context.recoveryFinalizedAttemptId === context.attemptId;
     const usage = parseProviderUsage({
       protocol: context.protocol,
       body: relay.body,
@@ -3615,6 +3656,7 @@ export class AlphaRequestProcessor {
       }
     }
     const transportSuccess = relay.httpStatus >= 200 && relay.httpStatus < 300 && relay.complete;
+    const generationTruncated = relay.terminalKind === "incomplete" && relay.incompleteReason === "max_output_tokens";
     const billing = resolveProviderBilling(usage);
     const canonicalModel = canonicalActualModel(context.selectedProfile, usage.actualModel);
     const actualModelMismatch = Boolean(usage.actualModel && canonicalModel !== context.selectedProfile.modelId);
@@ -3637,20 +3679,21 @@ export class AlphaRequestProcessor {
         : webRequiredFailure
           ? context.webActuallyInvoked ? "web_search_failed" : "web_search_not_invoked"
           : "provider_error";
-    const providerPayloadId = alphaId("payload");
-    await repository.savePayload({
-      payloadId: providerPayloadId,
-      newapiUserId: context.newapiUserId,
-      logicalRequestId: context.logicalRequestId,
-      attemptId: context.attemptId,
-      payloadKind: contentType.includes("text/event-stream") ? "provider_stream" : "provider_response",
-      protocol: context.protocol,
-      contentType,
-      headers: relay.responseHeaders,
-      body: relay.body.toString("utf8"),
-      isComplete: relay.complete,
-      metadata: { httpStatus: relay.httpStatus, responseHeaders: relay.responseHeaders },
-    });
+    if (!recoveryAlreadyFinalized) {
+      await repository.savePayload({
+        payloadId: alphaId("payload"),
+        newapiUserId: context.newapiUserId,
+        logicalRequestId: context.logicalRequestId,
+        attemptId: context.attemptId,
+        payloadKind: contentType.includes("text/event-stream") ? "provider_stream" : "provider_response",
+        protocol: context.protocol,
+        contentType,
+        headers: relay.responseHeaders,
+        body: relay.body.toString("utf8"),
+        isComplete: relay.complete,
+        metadata: { httpStatus: relay.httpStatus, responseHeaders: relay.responseHeaders },
+      });
+    }
     const responsePayloadId = alphaId("payload");
     await repository.savePayload({
       payloadId: responsePayloadId,
@@ -3668,7 +3711,7 @@ export class AlphaRequestProcessor {
     const providerRequestId = relay.responseHeaders["x-request-id"]
       ?? relay.responseHeaders["request-id"]
       ?? relay.responseHeaders["x-oneapi-request-id"];
-    await repository.completeAttempt({
+    if (!recoveryAlreadyFinalized) await repository.completeAttempt({
       attemptId: context.attemptId,
       status,
       actualModel: canonicalActualModel(context.selectedProfile, usage.actualModel),
@@ -3685,6 +3728,9 @@ export class AlphaRequestProcessor {
       visibleOutputBytes: relay.modelVisibleOutputBytes,
       metadata: {
         complete: relay.complete,
+        terminalKind: relay.terminalKind,
+        incompleteReason: relay.incompleteReason,
+        generationTruncated,
         clientCancelled: relay.clientCancelled,
         clientDeclaredWebTool: context.clientDeclaredWebTool,
         hostedWebRequired: context.hostedWebRequired,
@@ -3714,7 +3760,8 @@ export class AlphaRequestProcessor {
         recoveryDecisionReason: context.recoveryDecisionReason,
       },
     });
-    if (outcome.healthImpact !== "none" && (!webRequiredFailure || transportSuccess)) {
+    if (!recoveryAlreadyFinalized && !generationTruncated
+      && outcome.healthImpact !== "none" && (!webRequiredFailure || transportSuccess)) {
       const strictErrorCode = transportSuccess && !usage.actualModel
         ? "actual_model_missing"
         : actualModelMismatch
@@ -3735,7 +3782,8 @@ export class AlphaRequestProcessor {
         firstTokenLatencyMs: relay.firstModelEventLatencyMs,
       });
     }
-    if (transportSuccess || relay.webSearch.actuallyInvoked || webRequiredFailure) {
+    if (!recoveryAlreadyFinalized && !generationTruncated
+      && (transportSuccess || relay.webSearch.actuallyInvoked || webRequiredFailure)) {
       await repository.saveProfileWebHealth({
         executionProfileId: context.selectedProfile.executionProfileId,
         channelId: context.selectedProfile.channelId ?? context.selectedProfile.channel,
@@ -3780,6 +3828,9 @@ export class AlphaRequestProcessor {
       billingStatus: outcome.billingStatus,
       healthImpact: outcome.healthImpact,
       recoveryDecisionReason: context.recoveryDecisionReason,
+      terminalKind: relay.terminalKind,
+      incompleteReason: relay.incompleteReason,
+      generationTruncated,
     });
     await repository.completeLogicalRequest({
       logicalRequestId: context.logicalRequestId,

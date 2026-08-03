@@ -1,6 +1,6 @@
 import type { NativeProviderAdapter, NativeProviderRequest } from "./provider.js";
 import type { AlphaExecutionProfile } from "./routing.js";
-import { ModelOutputObserver, setResponseObservation, type ModelOutputObservation } from "./model-output.js";
+import { getResponseObservation, ModelOutputObserver, setResponseObservation, type ModelOutputObservation } from "./model-output.js";
 import type { RecoveryDecisionReason } from "./execution-outcome.js";
 
 export type ProviderAttemptHandle = {
@@ -72,6 +72,7 @@ export type ProviderRecoveryOptions = {
     latencyMs: number;
     response?: BufferedProviderFailure;
     error?: unknown;
+    clientCancelled: boolean;
     attemptsBudgetExhausted: boolean;
     timeBudgetExhausted: boolean;
   }): Promise<void>;
@@ -194,13 +195,13 @@ async function waitForFirstModelEvent(
     })), deadlineMs);
   });
   try {
-    while (!observer.hasModelEvent()) {
+    while (!observer.hasModelEvent() && !observer.hasTerminalEvent()) {
       const item = await Promise.race([reader.read(), timeout]);
       if (item.done) break;
       buffered.push(item.value);
       observer.observe(item.value);
     }
-    if (!observer.hasModelEvent()) throw new ProviderPreOutputError("stream_ended_before_model_event", observer.result(), {
+    if (!observer.hasModelEvent() && !observer.hasTerminalEvent()) throw new ProviderPreOutputError("stream_ended_before_model_event", observer.result(), {
       upstreamStatus: response.status,
       responseHeaders: Object.fromEntries(response.headers.entries()),
       providerRequestId: response.headers.get("x-request-id") ?? response.headers.get("request-id") ?? undefined,
@@ -285,7 +286,15 @@ export function createRecoveringProviderAdapter(options: ProviderRecoveryOptions
             const remaining = Math.max(1, deadline - (Date.now() - startedAt));
             response = await waitForFirstModelEvent(response, attemptSignal, remaining, startedAt, current);
           }
+          const earlyObservation = getResponseObservation(response);
+          if ((earlyObservation?.modelVisibleOutputBytes ?? 0) > 0) {
+            options.onRecoveryDecision?.("output_already_visible");
+            options.onSelected?.(current);
+            return response;
+          }
+          const terminalFailure = earlyObservation?.terminalKind === "failed";
           const responseRecoverable = isRecoverableProviderStatus(response.status)
+            || (terminalFailure && (earlyObservation.modelVisibleOutputBytes ?? 0) === 0)
             || options.isRecoverableResponse?.(response, current) === true;
           const inspectFailure = !response.ok && options.isRecoverableFailure !== undefined;
           if (!responseRecoverable && !inspectFailure) {
@@ -294,8 +303,9 @@ export function createRecoveringProviderAdapter(options: ProviderRecoveryOptions
             return response;
           }
           responseFailure = await bufferFailure(response);
+          const modelOutputStarted = (responseFailure.observation?.modelVisibleOutputBytes ?? 0) > 0;
           const failureRecoverable = options.isRecoverableFailure?.(responseFailure, current) === true;
-          recoverable = responseRecoverable || failureRecoverable;
+          recoverable = !modelOutputStarted && (responseRecoverable || failureRecoverable);
           if (!recoverable) {
             options.onRecoveryDecision?.("not_recoverable");
             options.onSelected?.(current);
@@ -310,6 +320,7 @@ export function createRecoveringProviderAdapter(options: ProviderRecoveryOptions
         const remainingBudget = Math.max(0, recoveryBudgetMs - elapsed);
         const attemptsBudgetExhausted = current.attemptIndex >= maxAttempts;
         const timeBudgetExhausted = remainingBudget < minimumAttemptBudgetMs;
+        const clientCancelled = request.signal.aborted;
         const preliminaryStop: ProviderRecoveryStopReason | undefined = request.signal.aborted
           ? "client_disconnected"
           : attemptsBudgetExhausted ? "max_attempts_reached"
@@ -320,21 +331,26 @@ export function createRecoveringProviderAdapter(options: ProviderRecoveryOptions
           latencyMs: Date.now() - startedAt,
           response: responseFailure,
           error: attemptError,
+          clientCancelled,
           attemptsBudgetExhausted,
           timeBudgetExhausted,
         });
         const selectedTarget = preliminaryStop ? undefined
           : await options.selectRecoveryTarget?.(current, responseFailure, attemptError);
-        const recoveryTarget = selectedTarget ?? (preliminaryStop ? undefined : legacyTarget(current.profile));
+        const proposedTarget = selectedTarget ?? (preliminaryStop ? undefined : legacyTarget(current.profile));
+        const budgetExpiredBeforeRetry = proposedTarget !== undefined
+          && recoveryBudgetMs - (Date.now() - recoveryStartedAt) < minimumAttemptBudgetMs;
+        const recoveryTarget = budgetExpiredBeforeRetry ? undefined : proposedTarget;
         const recoveryDecision: ProviderRecoveryStopReason | "executed" = preliminaryStop
-          ?? (recoveryTarget ? "executed" : "no_compatible_profile");
+          ?? (budgetExpiredBeforeRetry ? "recovery_budget_exhausted"
+            : recoveryTarget ? "executed" : "no_compatible_profile");
         options.onRecoveryDecision?.(recoveryDecision);
         await options.recordRecoveryDecision?.({
           attempt: current,
           recoveryDecision,
           nextTarget: recoveryTarget,
           attemptsBudgetExhausted,
-          timeBudgetExhausted,
+          timeBudgetExhausted: timeBudgetExhausted || budgetExpiredBeforeRetry,
         });
         if (!recoveryTarget) {
           options.onSelected?.(current);

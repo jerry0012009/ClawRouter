@@ -83,6 +83,7 @@ run("Alpha PostgreSQL request processor", () => {
   let probeWakeCount = 0;
   let cancelledJudgeStarted: (() => void) | undefined;
   let releaseCancelledJudge: (() => void) | undefined;
+  let providerHeadersWaitStarted: (() => void) | undefined;
   let primaryProfile: AlphaExecutionProfile;
   let processor: AlphaRequestProcessor;
   let recoveryProfile: AlphaExecutionProfile;
@@ -105,6 +106,13 @@ run("Alpha PostgreSQL request processor", () => {
       const testCase = typeof requestBody.test_case === "string" ? requestBody.test_case : "";
       const testCaseCall = (upstreamCaseCalls.get(testCase) ?? 0) + 1;
       upstreamCaseCalls.set(testCase, testCaseCall);
+      const responseFailed = requestBody.test_response_failed === true
+        && (requestBody.test_response_failed_once !== true || testCaseCall === 1);
+      if (requestBody.test_wait_headers === true) {
+        providerHeadersWaitStarted?.();
+        await new Promise<void>((resolve) => request.once("close", () => resolve()));
+        return;
+      }
       if (requestBody.test_empty_stream_once === true && testCaseCall === 1) {
         response.statusCode = 200;
         response.setHeader("content-type", "text/event-stream");
@@ -185,11 +193,19 @@ run("Alpha PostgreSQL request processor", () => {
           })}`,
           "",
         ] : []),
-        "event: response.output_text.delta",
-        `data: ${JSON.stringify({ type: "response.output_text.delta", delta: "ok" })}`,
-        "",
-        requestBody.test_incomplete_reason ? "event: response.incomplete" : "event: response.completed",
-        `data: ${JSON.stringify(requestBody.test_incomplete_reason ? {
+        ...(requestBody.test_terminal_only === true ? [] : [
+          "event: response.output_text.delta",
+          `data: ${JSON.stringify({ type: "response.output_text.delta", delta: "ok" })}`,
+          "",
+        ]),
+        responseFailed
+          ? "event: response.failed"
+          : requestBody.test_incomplete_reason ? "event: response.incomplete" : "event: response.completed",
+        `data: ${JSON.stringify(responseFailed ? {
+          type: "response.failed",
+          response: { id: responseId, model: requestBody.model,
+            error: { type: "overloaded_error", code: "server_error", message: "controlled generation failure" } },
+        } : requestBody.test_incomplete_reason ? {
           type: "response.incomplete",
           response: { id: responseId, model: requestBody.model,
             incomplete_details: { reason: requestBody.test_incomplete_reason } },
@@ -626,6 +642,67 @@ run("Alpha PostgreSQL request processor", () => {
       usage_reports: "0",
       user_charge_cny: null,
       next_status: "completed",
+    });
+    judgeCalls = 0;
+    upstreamBodies.length = 0;
+    upstreamCaseCalls.clear();
+  });
+
+  it("finalizes a headers-waiting Provider attempt as client cancellation without health or probe changes", async () => {
+    await database.query("DELETE FROM acu_channel_health WHERE channel_id IN ('test-channel','test-recovery-channel')");
+    await database.query(
+      "DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id IN ('test:gpt-5.4-mini:responses','test:gpt-5.4-mini:recovery')",
+    );
+    await database.query(
+      "DELETE FROM acu_profile_probe_queue WHERE execution_profile_id IN ('test:gpt-5.4-mini:responses','test:gpt-5.4-mini:recovery')",
+    );
+    const body = Buffer.from(JSON.stringify({
+      model: "acu-auto",
+      input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "Wait for Provider headers" }] }],
+      stream: true,
+      test_case: "provider-header-client-cancel",
+      test_wait_headers: true,
+    }));
+    const controller = new AbortController();
+    const providerStarted = new Promise<void>((resolve) => { providerHeadersWaitStarted = resolve; });
+    const pending = fetch(`http://127.0.0.1:${gatewayPort}/v1/responses`, {
+      method: "POST",
+      headers: signedHeaders(body, "provider-header-client-cancel", "user-provider-client-cancel"),
+      body,
+      signal: controller.signal,
+    });
+    await providerStarted;
+    controller.abort(new Error("fixture Provider attempt cancellation"));
+    await expect(pending).rejects.toThrow();
+    providerHeadersWaitStarted = undefined;
+    for (let index = 0; index < 50; index += 1) {
+      const completed = await database.query<{ status: string }>(
+        "SELECT status FROM acu_logical_requests WHERE newapi_user_id=$1",
+        ["user-provider-client-cancel"],
+      );
+      if (completed.rows[0]?.status === "cancelled") break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    const state = await database.query<{
+      attempt_count: string; attempt_status: string; attempt_error: string; recovery: string;
+      logical_status: string; health_count: string; probe_count: string;
+    }>(
+      `SELECT
+       (SELECT count(*) FROM acu_attempts a WHERE a.logical_request_id=l.logical_request_id) attempt_count,
+       (SELECT status FROM acu_attempts a WHERE a.logical_request_id=l.logical_request_id) attempt_status,
+       (SELECT error_category FROM acu_attempts a WHERE a.logical_request_id=l.logical_request_id) attempt_error,
+       (SELECT metadata_json->>'recoveryDecisionReason' FROM acu_attempts a WHERE a.logical_request_id=l.logical_request_id) recovery,
+       l.status logical_status,
+       (SELECT count(*) FROM acu_provider_model_profile_health h WHERE h.execution_profile_id IN
+         ('test:gpt-5.4-mini:responses','test:gpt-5.4-mini:recovery')) health_count,
+       (SELECT count(*) FROM acu_profile_probe_queue q WHERE q.execution_profile_id IN
+         ('test:gpt-5.4-mini:responses','test:gpt-5.4-mini:recovery')) probe_count
+       FROM acu_logical_requests l WHERE l.newapi_user_id=$1`,
+      ["user-provider-client-cancel"],
+    );
+    expect(state.rows[0]).toEqual({
+      attempt_count: "1", attempt_status: "cancelled", attempt_error: "client_cancelled",
+      recovery: "client_disconnected", logical_status: "cancelled", health_count: "0", probe_count: "0",
     });
     judgeCalls = 0;
     upstreamBodies.length = 0;
@@ -1231,6 +1308,70 @@ run("Alpha PostgreSQL request processor", () => {
       "SELECT 1 FROM acu_provider_model_profile_health WHERE execution_profile_id=$1",
       [primaryProfile.executionProfileId],
     )).rowCount).toBe(0);
+  });
+
+  it("records response.failed after visible output as a failed logical request without recovery", async () => {
+    await database.query("DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id=$1", [primaryProfile.executionProfileId]);
+    const acceptedBefore = await database.query<{ count: number }>(
+      "SELECT accepted_responses_since_judge count FROM acu_segments WHERE newapi_user_id=$1 AND status='active'",
+      ["user-generation-failed-visible"],
+    );
+    await send({
+      model: "acu-auto",
+      input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "Fail after output" }] }],
+      stream: true,
+      test_case: "generation-failed-visible",
+      test_response_failed: true,
+    }, "generation-failed-visible", "user-generation-failed-visible");
+    const state = await database.query<{
+      attempts: string; attempt_status: string; terminal: string; logical_status: string;
+      accepted_attempt_id: string | null; accepted_responses: number;
+    }>(
+      `SELECT
+       (SELECT count(*) FROM acu_attempts a WHERE a.logical_request_id=l.logical_request_id) attempts,
+       (SELECT status FROM acu_attempts a WHERE a.logical_request_id=l.logical_request_id) attempt_status,
+       (SELECT metadata_json->>'terminalKind' FROM acu_attempts a WHERE a.logical_request_id=l.logical_request_id) terminal,
+       l.status logical_status,l.accepted_attempt_id,
+       (SELECT accepted_responses_since_judge FROM acu_segments s WHERE s.segment_id=l.segment_id) accepted_responses
+       FROM acu_logical_requests l WHERE l.newapi_user_id=$1`,
+      ["user-generation-failed-visible"],
+    );
+    expect(acceptedBefore.rows).toHaveLength(0);
+    expect(state.rows[0]).toEqual({
+      attempts: "1", attempt_status: "error", terminal: "failed", logical_status: "failed",
+      accepted_attempt_id: null, accepted_responses: 0,
+    });
+    const health = await database.query<{ error_class: string }>(
+      "SELECT error_class FROM acu_provider_model_profile_health WHERE execution_profile_id=$1",
+      [primaryProfile.executionProfileId],
+    );
+    expect(health.rows).toEqual([]);
+  });
+
+  it("immediately recovers from terminal-only response.failed without empty-stream classification", async () => {
+    await database.query("DELETE FROM acu_channel_health WHERE channel_id IN ('test-channel','test-recovery-channel')");
+    await database.query(
+      "DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id IN ('test:gpt-5.4-mini:responses','test:gpt-5.4-mini:recovery')",
+    );
+    await send({
+      model: "acu-auto",
+      input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "Recover terminal failure" }] }],
+      stream: true,
+      test_case: "generation-failed-terminal-only",
+      test_response_failed: true,
+      test_response_failed_once: true,
+      test_terminal_only: true,
+    }, "generation-failed-terminal-only", "user-generation-failed-terminal-only");
+    const attempts = await database.query<{ attempt_index: number; status: string; error_class: string | null }>(
+      `SELECT attempt_index,status,metadata_json->>'errorClass' error_class FROM acu_attempts
+       WHERE logical_request_id=(SELECT logical_request_id FROM acu_logical_requests WHERE newapi_user_id=$1)
+       ORDER BY attempt_index`,
+      ["user-generation-failed-terminal-only"],
+    );
+    expect(attempts.rows).toEqual([
+      { attempt_index: 1, status: "error", error_class: "other_provider_error" },
+      { attempt_index: 2, status: "success", error_class: null },
+    ]);
   });
 
   it("keeps the canonical model when an auto Effort is rejected and retries another Profile", async () => {

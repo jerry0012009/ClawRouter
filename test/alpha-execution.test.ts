@@ -421,6 +421,107 @@ describe("Alpha Provider attempt recovery", () => {
     expect(decisions).toEqual(["recovery_budget_exhausted"]);
   });
 
+  it("rechecks the recovery budget after selecting a target", async () => {
+    let retries = 0;
+    const decisions: string[] = [];
+    const adapter = createRecoveringProviderAdapter({
+      initial: {
+        attemptId: "attempt-1", attemptIndex: 1, profile,
+        adapter: { async execute() { return new Response("failed", { status: 503 }); } },
+      },
+      recoveryBudgetMs: 25, minimumAttemptBudgetMs: 15,
+      async selectRecoveryTarget() {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        return { profile, reason: "same_model_channel_fallback" };
+      },
+      startRetry: async () => { retries += 1; throw new Error("must not retry"); },
+      recordFailedAttempt: async () => {},
+      recordRecoveryDecision: async ({ recoveryDecision }) => { decisions.push(recoveryDecision); },
+    });
+    expect((await adapter.execute(request())).status).toBe(503);
+    expect(retries).toBe(0);
+    expect(decisions).toEqual(["recovery_budget_exhausted"]);
+  });
+
+  it.each([
+    [503, "response.output_text.delta"],
+    [503, "response.reasoning_text.delta"],
+    [503, "response.function_call_arguments.delta"],
+    [429, "response.custom_tool_call_input.delta"],
+  ])("does not replay HTTP %i SSE after %s", async (status, type) => {
+    let retries = 0;
+    let failedRecords = 0;
+    const body = `data: ${JSON.stringify({ type, delta: "visible" })}\n\n`;
+    const adapter = createRecoveringProviderAdapter({
+      initial: {
+        attemptId: "attempt-1", attemptIndex: 1, profile,
+        adapter: { async execute() {
+          return new Response(body, { status, headers: { "content-type": "text/event-stream" } });
+        } },
+      },
+      selectRecoveryProfile: () => profile,
+      startRetry: async () => { retries += 1; throw new Error("must not retry"); },
+      recordFailedAttempt: async () => { failedRecords += 1; },
+    });
+    const response = await adapter.execute(request());
+    expect(response.status).toBe(status);
+    expect(await response.text()).toBe(body);
+    expect(retries).toBe(0);
+    expect(failedRecords).toBe(0);
+  });
+
+  it.each([
+    ["response.incomplete", { response: { incomplete_details: { reason: "max_output_tokens" } } }],
+    ["response.completed", {}],
+  ])("returns terminal-only %s without waiting or recovery", async (type, extra) => {
+    let retries = 0;
+    const body = `data: ${JSON.stringify({ type, ...extra })}\n\n`;
+    const adapter = createRecoveringProviderAdapter({
+      initial: {
+        attemptId: "attempt-1", attemptIndex: 1, profile,
+        adapter: { async execute() {
+          return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
+        } },
+      },
+      firstModelEventDeadlineMs: () => 5_000,
+      selectRecoveryProfile: () => profile,
+      startRetry: async () => { retries += 1; throw new Error("must not retry"); },
+      recordFailedAttempt: async () => { throw new Error("must not record failure"); },
+    });
+    const started = Date.now();
+    expect(await (await adapter.execute(request())).text()).toBe(body);
+    expect(Date.now() - started).toBeLessThan(500);
+    expect(retries).toBe(0);
+  });
+
+  it("immediately recovers from a terminal-only response.failed", async () => {
+    let calls = 0;
+    let recorded: Parameters<NonNullable<Parameters<typeof createRecoveringProviderAdapter>[0]["recordFailedAttempt"]>>[0] | undefined;
+    const failed = `data: ${JSON.stringify({ type: "response.failed", response: {
+      error: { type: "overloaded_error", code: "server_error", message: "overloaded" },
+    } })}\n\n`;
+    const handle = (attemptIndex: number): ProviderAttemptHandle => ({
+      attemptId: `attempt-${attemptIndex}`, attemptIndex, profile,
+      adapter: { async execute() {
+        calls += 1;
+        return calls === 1
+          ? new Response(failed, { status: 200, headers: { "content-type": "text/event-stream" } })
+          : new Response("ok", { status: 200 });
+      } },
+    });
+    const adapter = createRecoveringProviderAdapter({
+      initial: handle(1), firstModelEventDeadlineMs: () => 5_000,
+      selectRecoveryProfile: () => profile,
+      startRetry: async (_profile, index) => handle(index),
+      recordFailedAttempt: async (input) => { recorded = input; },
+    });
+    expect(await (await adapter.execute(request())).text()).toBe("ok");
+    expect(calls).toBe(2);
+    expect(recorded?.response).toMatchObject({ status: 200, observation: {
+      terminalKind: "failed", modelVisibleOutputBytes: 0,
+    } });
+  });
+
   it("preserves HTTP 200 headers and observations for an empty SSE stream", async () => {
     let failure: ProviderPreOutputError | undefined;
     const adapter = createRecoveringProviderAdapter({

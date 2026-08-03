@@ -10,6 +10,7 @@ import type { AlphaJudgeRun, AlphaJudgeRunner } from "./judge-runner.js";
 import { AlphaRepository, alphaId, sha256, type AlphaProtocol } from "./repository.js";
 import {
   AlphaAdmissionError,
+  compareExecutionProfiles,
   exclusionCategory,
   resolveProfileBillingPrice,
   resolveExplicitProfile,
@@ -2105,6 +2106,7 @@ export class AlphaRequestProcessor {
       learnedContextFailureThreshold?: number;
     };
     reasoningTransportError?: boolean;
+    clientCancelled?: boolean;
     attemptsBudgetExhausted?: boolean;
     timeBudgetExhausted?: boolean;
   }): Promise<void> {
@@ -2142,11 +2144,13 @@ export class AlphaRequestProcessor {
     const billing = usage ? resolveProviderBilling(usage) : undefined;
     await repository.completeAttempt({
       attemptId: input.attempt.attemptId,
-      status: "error",
+      status: input.clientCancelled ? "cancelled" : "error",
       actualModel: usage?.actualModel ?? input.attempt.profile.modelId,
       providerRequestId: input.response?.headers["x-request-id"]
         ?? input.response?.headers["request-id"] ?? preOutputError?.details.providerRequestId,
-      errorCategory: input.webFailure
+      errorCategory: input.clientCancelled
+        ? "client_cancelled"
+        : input.webFailure
         ? "web_search_failed"
         : input.reasoningTransportError ? "reasoning_transport_error" : "provider_error",
       httpStatus: upstreamStatus,
@@ -2161,6 +2165,8 @@ export class AlphaRequestProcessor {
       visibleOutputBytes: observation?.modelVisibleOutputBytes ?? 0,
       metadata: {
         error: input.error instanceof Error ? input.error.message : undefined,
+        clientCancelled: input.clientCancelled === true,
+        modelOutputStarted: (observation?.modelVisibleOutputBytes ?? 0) > 0,
         webFailure: input.webFailure === true,
         errorCode: preOutputError?.code,
         normalized_error_signature: sha256(`${input.contextOverflow ? "provider_context_overflow"
@@ -2191,6 +2197,7 @@ export class AlphaRequestProcessor {
     const health = input.webFailure || input.contextOverflow ? undefined : await this.recordRuntimeHealth(input.attempt.profile, input.protocol, {
       success: false,
       attemptedAt: input.attempt.startedAt,
+      clientCancelled: input.clientCancelled,
       httpStatus: upstreamStatus,
       errorCode: preOutputError?.code ?? (input.error instanceof Error ? input.error.name : undefined),
       errorMessage: input.error instanceof Error ? input.error.message : responseText.slice(0, 512),
@@ -2206,7 +2213,7 @@ export class AlphaRequestProcessor {
         healthScope: health.scope,
       });
     }
-    if (input.webFailure) {
+    if (input.webFailure && !input.clientCancelled) {
       const runtime = await repository.profileHealth(input.attempt.profile.executionProfileId);
       const previousRate = optionalNumber(runtime?.metadata?.webSearchRecentSuccessRate)
         ?? input.attempt.profile.webSearchRecentSuccessRate
@@ -2232,8 +2239,8 @@ export class AlphaRequestProcessor {
       taskId: input.state.taskId,
       segmentId: input.state.segmentId,
       logicalRequestId: input.logicalRequestId,
-      eventType: "provider_error",
-      eventHash: sha256(`provider-error\n${input.logicalRequestId}\n${input.attempt.attemptIndex}`),
+      eventType: input.clientCancelled ? "client_cancelled" : "provider_error",
+      eventHash: sha256(`${input.clientCancelled ? "client-cancelled" : "provider-error"}\n${input.logicalRequestId}\n${input.attempt.attemptIndex}`),
       evidenceStrength: "high",
       sourceProtocol: input.protocol,
       sourceClient: "acu",
@@ -2847,6 +2854,11 @@ export class AlphaRequestProcessor {
       && effectiveContextCeiling(profile) >= recoveryContextAdmission.requiredTotalContextTokens
       && this.options.adapters.has(profile.executionProfileId)
     ));
+    if (!result.route) {
+      recoveryPool.sort((left, right) => compareExecutionProfiles(
+        left, right, recoveryContextAdmission.estimatedInputTokens, this.expectedOutputTokens, originalRequirements,
+      ));
+    }
     const profileCurrentlyRoutable = async (profile: AlphaExecutionProfile): Promise<boolean> => {
       const [profileHealth, channelHealth] = await Promise.all([
         repository.profileHealth(profile.executionProfileId),
@@ -2982,7 +2994,7 @@ export class AlphaRequestProcessor {
           return undefined;
         };
       })(),
-      recordFailedAttempt: async ({ attempt, response, error, latencyMs,
+      recordFailedAttempt: async ({ attempt, response, error, latencyMs, clientCancelled,
         attemptsBudgetExhausted, timeBudgetExhausted }) => {
         const contextOverflow = response ? classifyProviderContextOverflow(response) : { isContextOverflow: false };
         const threshold = contextOverflow.isContextOverflow
@@ -2997,6 +3009,7 @@ export class AlphaRequestProcessor {
           requestBytes: ingress.rawBody.byteLength,
           response,
           error,
+          clientCancelled,
           latencyMs,
           webFailure: Boolean(response && isExplicitWebCompatibilityFailure(response, envelope)),
           attemptsBudgetExhausted,
@@ -3009,7 +3022,7 @@ export class AlphaRequestProcessor {
           reasoningTransportError: reasoningRejectedProfiles.has(attempt.profile.executionProfileId),
         });
         resolutionContext.recoveryFinalizedAttemptId = attempt.attemptId;
-        if (response && reasoningRejectedProfiles.has(attempt.profile.executionProfileId)) {
+        if (!clientCancelled && response && reasoningRejectedProfiles.has(attempt.profile.executionProfileId)) {
           const effort = reasoningDecision.wireReasoningEffort ?? reasoningDecision.resolvedReasoningEffort;
           await repository.mergeProfileRuntimeMetadata(attempt.profile.executionProfileId, {
             rejectedReasoningEfforts: effort ? [effort] : [],
@@ -3656,13 +3669,14 @@ export class AlphaRequestProcessor {
       }
     }
     const transportSuccess = relay.httpStatus >= 200 && relay.httpStatus < 300 && relay.complete;
+    const generationFailed = relay.terminalKind === "failed";
     const generationTruncated = relay.terminalKind === "incomplete" && relay.incompleteReason === "max_output_tokens";
     const billing = resolveProviderBilling(usage);
     const canonicalModel = canonicalActualModel(context.selectedProfile, usage.actualModel);
     const actualModelMismatch = Boolean(usage.actualModel && canonicalModel !== context.selectedProfile.modelId);
     const outcome = classifyExecutionOutcome({
       httpStatus: relay.httpStatus,
-      complete: relay.complete,
+      complete: relay.complete && !generationFailed,
       clientCancelled: relay.clientCancelled,
       modelVisibleOutputBytes: relay.modelVisibleOutputBytes,
       providerUsageReported: usage.usageSource === "provider_usage",
@@ -3670,7 +3684,7 @@ export class AlphaRequestProcessor {
       hostedWebIncompatible: webRequiredFailure,
       recoveryExecuted: context.recoveryDecisionReason === "executed",
     });
-    const success = transportSuccess && !webRequiredFailure;
+    const success = transportSuccess && !generationFailed && !webRequiredFailure;
     const status = relay.clientCancelled ? "cancelled" : success ? "success" : "error";
     const errorCategory = success
       ? undefined
@@ -3762,7 +3776,9 @@ export class AlphaRequestProcessor {
     });
     if (!recoveryAlreadyFinalized && !generationTruncated
       && outcome.healthImpact !== "none" && (!webRequiredFailure || transportSuccess)) {
-      const strictErrorCode = transportSuccess && !usage.actualModel
+      const strictErrorCode = generationFailed
+        ? undefined
+        : transportSuccess && !usage.actualModel
         ? "actual_model_missing"
         : actualModelMismatch
           ? "actual_model_mismatch"
@@ -3770,7 +3786,7 @@ export class AlphaRequestProcessor {
             ? "usage_untrusted"
             : undefined;
       await this.recordRuntimeHealth(context.selectedProfile, context.protocol, {
-        success: transportSuccess,
+        success,
         attemptedAt: context.attemptStartedAt ? new Date(context.attemptStartedAt) : undefined,
         clientCancelled: relay.clientCancelled,
         httpStatus: relay.httpStatus,
@@ -3778,11 +3794,11 @@ export class AlphaRequestProcessor {
         actualModelMismatch,
         actualModelVerified: Boolean(usage.actualModel && canonicalModel === context.selectedProfile.modelId),
         usageTrusted: usage.usageSource === "provider_usage",
-        errorMessage: outcome.deliveryStatus,
+        errorMessage: generationFailed ? relay.body.toString("utf8").slice(0, 512) : outcome.deliveryStatus,
         firstTokenLatencyMs: relay.firstModelEventLatencyMs,
       });
     }
-    if (!recoveryAlreadyFinalized && !generationTruncated
+    if (!recoveryAlreadyFinalized && !generationTruncated && !generationFailed
       && (transportSuccess || relay.webSearch.actuallyInvoked || webRequiredFailure)) {
       await repository.saveProfileWebHealth({
         executionProfileId: context.selectedProfile.executionProfileId,
@@ -3794,15 +3810,15 @@ export class AlphaRequestProcessor {
         actualModelVerified: Boolean(usage.actualModel && canonicalModel === context.selectedProfile.modelId),
         canonicalAdvertisedContextWindow: context.selectedProfile.canonicalAdvertisedContextWindow,
         providerDeclaredContextWindow: context.selectedProfile.providerDeclaredContextWindow,
-        observedSuccessfulInputTokens: transportSuccess ? usage.inputTokens : undefined,
+        observedSuccessfulInputTokens: success ? usage.inputTokens : undefined,
         providerHardContextCap: context.selectedProfile.providerHardContextCap,
         contextCapabilityStatus: context.selectedProfile.providerHardContextCap
           ? "provider_capped"
-          : transportSuccess ? "observed_floor" : context.selectedProfile.contextCapabilityStatus,
-        contextCapabilitySource: transportSuccess
+          : success ? "observed_floor" : context.selectedProfile.contextCapabilityStatus,
+        contextCapabilitySource: success
           ? "provider_usage_observed_success"
           : context.selectedProfile.contextCapabilitySource,
-        contextLastVerifiedAt: transportSuccess ? new Date() : undefined,
+        contextLastVerifiedAt: success ? new Date() : undefined,
         metadata: {
           webSearchRecentSuccessRate: context.selectedProfile.webSearchRecentSuccessRate,
           webSearchObservedLatencyMs: context.selectedProfile.webSearchObservedLatencyMs,
@@ -3835,7 +3851,7 @@ export class AlphaRequestProcessor {
     await repository.completeLogicalRequest({
       logicalRequestId: context.logicalRequestId,
       newapiUserId: context.newapiUserId,
-      status: success ? "completed" : status,
+      status: success ? "completed" : generationFailed ? "failed" : status,
       acceptedAttemptId: success ? context.attemptId : undefined,
       responsePayloadId,
       errorCategory,

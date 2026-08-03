@@ -32,4 +32,13 @@ describe("Alpha model output observation", () => {
       protocolCompleted: false,
     });
   });
+
+  it.each(["response.completed", "response.incomplete", "response.failed", "message_stop"])(
+    "reports %s as a terminal event",
+    (type) => {
+      const observer = new ModelOutputObserver(Date.now());
+      observer.observe(Buffer.from(`data: ${JSON.stringify({ type })}\n\n`));
+      expect(observer.hasTerminalEvent()).toBe(true);
+    },
+  );
 });

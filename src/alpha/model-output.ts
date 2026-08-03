@@ -96,6 +96,10 @@ export class ModelOutputObserver {
     return this.observation.firstModelEventAt !== undefined;
   }
 
+  hasTerminalEvent(): boolean {
+    return this.observation.terminalKind !== undefined;
+  }
+
   result(): ModelOutputObservation {
     return { ...this.observation };
   }

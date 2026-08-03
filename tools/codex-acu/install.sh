@@ -36,7 +36,8 @@ model = "acu-auto"
 model_provider = "acu-founder-alpha"
 model_reasoning_effort = "medium"
 model_context_window = 1050000
-model_auto_compact_token_limit = 900000
+model_auto_compact_token_limit = 800000
+model_auto_compact_token_limit_scope = "total"
 model_catalog_json = "$acu_home/model-catalog.json"
 
 [model_providers.acu-founder-alpha]

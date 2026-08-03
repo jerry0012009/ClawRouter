@@ -24,7 +24,7 @@
       "auto_review_model_override": null,
       "context_window": 1050000,
       "max_context_window": 1050000,
-      "auto_compact_token_limit": 900000,
+      "auto_compact_token_limit": 800000,
       "comp_hash": "2911",
       "reasoning_summary_format": "experimental",
       "default_reasoning_summary": "none",

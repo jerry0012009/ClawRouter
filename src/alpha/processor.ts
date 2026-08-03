@@ -787,6 +787,8 @@ export class AlphaRequestProcessor {
         executionPresetId: preset.presetId,
         reasoningEffort: preset.canonicalReasoningEffort,
         calibrationStatus: preset.calibrationStatus,
+        expectedOutputTokenMultiplier: preset.expectedOutputTokenMultiplier,
+        estimatedOutputTokens: Math.round(expectedOutputTokens * preset.expectedOutputTokenMultiplier),
         points: executionPresetPoints.get(preset.candidateId) ?? [],
       })),
       series,

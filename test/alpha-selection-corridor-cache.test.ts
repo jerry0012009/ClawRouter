@@ -89,6 +89,8 @@ describe("selection corridor cache", () => {
         executionPresetId: string;
         reasoningEffort: string;
         calibrationStatus: string;
+        expectedOutputTokenMultiplier: number;
+        estimatedOutputTokens: number;
         points: Array<{ difficulty: number; estimatedQuality: number; estimatedCallCost: number }>;
       }>;
     };
@@ -101,6 +103,8 @@ describe("selection corridor cache", () => {
       executionPresetId: "gpt-5.6-luna:max",
       reasoningEffort: "max",
       calibrationStatus: "provisional",
+      expectedOutputTokenMultiplier: 1.6,
+      estimatedOutputTokens: 6_400,
     });
     expect(result.executionPresetSeries[0]?.points).toHaveLength(51);
     expect(result.executionPresetSeries[0]?.points.map((point) => point.difficulty)).toEqual(

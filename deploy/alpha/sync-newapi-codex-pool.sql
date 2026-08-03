@@ -29,6 +29,16 @@ SET model_limits_enabled = true,
 WHERE name = 'ACU Founder Codex'
   AND user_id = (SELECT id FROM users WHERE username = 'acu_founder');
 
+-- This host also runs development workloads. Host-wide CPU sampling would
+-- reject all relay traffic when an unrelated build or test saturates CPU.
+-- Persist both controls so CPU protection stays off across fresh deployments
+-- and remains disabled even if the aggregate monitor is later re-enabled.
+INSERT INTO options (key, value)
+VALUES
+  ('performance_setting.monitor_enabled', 'false'),
+  ('performance_setting.monitor_cpu_threshold', '0')
+ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+
 -- Founder opts into the new cost-first preference explicitly. Existing users
 -- retain balanced behavior through the application default.
 UPDATE users

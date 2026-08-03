@@ -42,6 +42,18 @@ function successfulProbeAdapter(modelId: string): NativeProviderAdapter {
   };
 }
 
+function successfulInspectingProbeAdapter(
+  modelId: string,
+  inspect: (body: Record<string, unknown>) => void,
+): NativeProviderAdapter {
+  return {
+    async execute(request) {
+      inspect(JSON.parse(Buffer.from(request.body).toString("utf8")) as Record<string, unknown>);
+      return successfulProbeAdapter(modelId).execute(request);
+    },
+  };
+}
+
 const failedProbeAdapter = (status = 500): NativeProviderAdapter => ({
   async execute() {
     return new Response('{"error":{"message":"probe fixture failure"}}', {
@@ -109,13 +121,14 @@ run("Alpha PostgreSQL foundation", () => {
     expect(versions.rows.map((row) => row.migration_version)).toContain("0007_rc22_judge_cutover");
     expect(versions.rows.map((row) => row.migration_version)).toContain("0008_alpha_final_user_loop");
     expect(versions.rows.map((row) => row.migration_version)).toContain("0015_judge_profile_attempt_limit");
+    expect(versions.rows.map((row) => row.migration_version)).toContain("0016_judge_profile_attempt_limit_5");
     const judgeAttemptConstraint = await database.query<{ definition: string }>(
       `SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint
        WHERE conrelid='acu_judge_attempts'::regclass
        AND conname='acu_judge_attempts_attempt_index_check'`,
     );
     expect(judgeAttemptConstraint.rows[0]?.definition).toContain("attempt_index >= 1");
-    expect(judgeAttemptConstraint.rows[0]?.definition).toContain("attempt_index <= 3");
+    expect(judgeAttemptConstraint.rows[0]?.definition).toContain("attempt_index <= 5");
     const columns = await database.query<{ column_name: string }>(
       `SELECT column_name FROM information_schema.columns
        WHERE table_schema='public' AND table_name='acu_usage_reports'`,
@@ -608,6 +621,33 @@ run("Alpha PostgreSQL foundation", () => {
     expect((await database.query<{ count: number }>("SELECT count(*)::int count FROM acu_full_pool_probe_runs")).rows[0]?.count)
       .toBe(fullPoolCount.rows[0]?.count);
     await repository.deleteProfileProbe("__full_pool__");
+  });
+
+  it("uses the Provider minimum output allowance for Responses recovery probes", async () => {
+    const profile = recoveryProfile("responses-min-output-profile", "responses-min-output-model", "responses-min-output-channel");
+    await database.query(
+      "UPDATE acu_probe_worker_lease SET holder_id=null,lease_until=now()-interval '1 second' WHERE singleton=true",
+    );
+    await database.query("DELETE FROM acu_profile_probe_queue WHERE execution_profile_id=$1", [profile.executionProfileId]);
+    await database.query("DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id=$1", [profile.executionProfileId]);
+    await repository.enqueueProfileProbe(profile.executionProfileId);
+    let requestBody: Record<string, unknown> | undefined;
+    const worker = new AdaptiveProbeWorker({
+      database,
+      profiles: [profile],
+      adapters: new Map([[profile.executionProfileId, successfulInspectingProbeAdapter(
+        profile.modelId,
+        (body) => { requestBody = body; },
+      )]]),
+      dailyBudgetCny: 1,
+    });
+
+    await worker.runOnce();
+
+    expect(requestBody).toMatchObject({ model: profile.modelId, max_output_tokens: 16, stream: true });
+    expect(await repository.profileHealth(profile.executionProfileId)).toMatchObject({
+      state: "healthy", consecutiveFailures: 0, usageTrusted: true, actualModelVerified: true,
+    });
   });
 
   it("does not use an old exact success to clear a newer Channel failure", async () => {

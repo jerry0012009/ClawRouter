@@ -73,6 +73,8 @@ export type AlphaExecutionProfile = {
   canonicalAdvertisedContextWindow?: number;
   providerDeclaredContextWindow?: number | null;
   observedSuccessfulInputTokens?: number;
+  observedContextFailureThresholdTokens?: number;
+  observedJudgeContextFailureThresholdTokens?: number;
   providerHardContextCap?: number | null;
   contextCapabilityStatus?: "verified" | "observed_floor" | "unverified_long_context" | "provider_capped";
   contextCapabilitySource?: string;
@@ -340,6 +342,9 @@ function exclusionReasons(
   }
   const requiredContextTokens = requirements.context?.requiredTotalContextTokens ?? requirements.contextTokens ?? 0;
   if (effectiveContextCeiling(profile) < requiredContextTokens) reasons.push("context_window");
+  if ((profile.observedContextFailureThresholdTokens ?? Number.POSITIVE_INFINITY) <= requiredContextTokens) {
+    reasons.push("context_window");
+  }
   if (["cooldown", "open", "disabled"].includes(profile.health)) reasons.push(`health_${profile.health}`);
   if (profile.health === "half_open") reasons.push("health_half_open_probe_required");
   if (profile.economics && (!profile.economics.enabled || profile.economics.health === "blocked")) reasons.push("provider_economics");

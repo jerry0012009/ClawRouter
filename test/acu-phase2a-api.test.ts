@@ -293,6 +293,7 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
       benchmarkPricing: { modelId: string; inputPricePerMillion: number; outputPricePerMillion: number; label: string };
       qualityLeaderModel: { modelId: string; predictedScore: number };
       qualityCeilingModel: { modelId: string; predictedScore: number };
+      recommendation: { recommended: { modelId: string }; estimates: Array<{ modelId: string }> };
       displayCandidates: Array<{ modelId: string; predictedScore: number; routingEligible: boolean }>;
     };
     expect(plan.planningOnly).toBe(true);
@@ -305,8 +306,14 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
       modelId: "claude-opus-4-8",
       inputPricePerMillion: 10,
       outputPricePerMillion: 50,
-      label: "Anthropic Opus 4.8 Fast mode 官方价（Demo基准）",
+      label: "旗舰模型价格",
     });
+    expect(plan.displayCandidates.every((item) => (
+      item.modelId !== "kimi-k3"
+    ))).toBe(true);
+    expect(plan.displayCandidates.some((item) => item.modelId === "claude-fable-5")).toBe(true);
+    expect(plan.recommendation.estimates.every((item) => item.modelId !== "kimi-k3")).toBe(true);
+    expect(plan.recommendation.recommended.modelId).not.toBe("kimi-k3");
     expect(Number(plan.qualityLeaderModel.predictedScore.toFixed(1))).toBe(Math.max(...compatibleScores));
     expect(plan.qualityCeilingModel.modelId).toBe(plan.qualityLeaderModel.modelId);
 

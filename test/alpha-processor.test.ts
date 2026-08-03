@@ -1765,6 +1765,19 @@ run("Alpha PostgreSQL request processor", () => {
       actual_model: "gpt-5.4-mini",
       status: "success",
     });
+    const contextEvidence = await database.query<{ metadata_json: Record<string, unknown> }>(
+      "SELECT metadata_json FROM acu_provider_model_profile_health WHERE execution_profile_id=$1",
+      [attempts.rows[0]!.execution_profile_id],
+    );
+    expect(contextEvidence.rows[0]?.metadata_json).toMatchObject({
+      observedContextFailureThresholdTokens: expect.any(Number),
+      contextFailureLastObservedAt: expect.any(String),
+    });
+    const successEvidence = await database.query<{ observed_successful_input_tokens: string }>(
+      "SELECT observed_successful_input_tokens::text FROM acu_provider_model_profile_health WHERE execution_profile_id=$1",
+      [attempts.rows[1]!.execution_profile_id],
+    );
+    expect(Number(successEvidence.rows[0]?.observed_successful_input_tokens)).toBeGreaterThan(0);
   });
 
   it("never recovers through a Profile outside the Token allowlist", async () => {

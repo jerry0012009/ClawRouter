@@ -347,7 +347,7 @@ export class AdaptiveProbeWorker {
     const providerModel = profile.providerModelId ?? profile.modelId;
     const payload = protocol === "messages"
       ? { model: providerModel, max_tokens: 4, stream: true, messages: [{ role: "user", content: "只输出 OK" }] }
-      : { model: providerModel, input: "只输出 OK", max_output_tokens: 4, stream: true };
+      : { model: providerModel, input: "只输出 OK", max_output_tokens: 16, stream: true };
     const body = Buffer.from(JSON.stringify(payload));
     const startedAt = new Date();
     const probeAttemptId = `probe_${alphaId("att").slice(4)}`;

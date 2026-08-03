@@ -227,7 +227,22 @@ export function hydrateExecutionProfileRuntime(
       runtime?.observedSuccessfulInputTokens ?? 0,
       profile.observedSuccessfulInputTokens ?? 0,
     ),
+    observedContextFailureThresholdTokens: optionalNumber(runtime?.metadata?.observedContextFailureThresholdTokens)
+      ?? profile.observedContextFailureThresholdTokens,
+    observedJudgeContextFailureThresholdTokens: optionalNumber(runtime?.metadata?.observedJudgeContextFailureThresholdTokens)
+      ?? profile.observedJudgeContextFailureThresholdTokens,
   };
+}
+
+export function compareContextRecoveryProfiles(
+  left: AlphaExecutionProfile,
+  right: AlphaExecutionProfile,
+  estimatedInputTokens: number,
+): number {
+  const leftCoversInput = (left.observedSuccessfulInputTokens ?? 0) >= estimatedInputTokens;
+  const rightCoversInput = (right.observedSuccessfulInputTokens ?? 0) >= estimatedInputTokens;
+  if (leftCoversInput !== rightCoversInput) return leftCoversInput ? -1 : 1;
+  return (right.observedSuccessfulInputTokens ?? 0) - (left.observedSuccessfulInputTokens ?? 0);
 }
 
 type PreparedState = {
@@ -2197,11 +2212,32 @@ export class AlphaRequestProcessor {
         canonicalModelId: input.attempt.profile.modelId,
         protocol: input.protocol,
         usageTrusted: input.attempt.profile.usageTrusted !== false,
-        actualModelVerified: true,
+        actualModelVerified: runtime?.actualModelVerified ?? false,
         metadata: {
           webSearchRecentSuccessRate: (previousRate * 4) / 5,
           webSearchFailureReason: "web_search_protocol_incompatible",
           webTransportStatus: "incompatible",
+        },
+      });
+    }
+    if (input.contextOverflow && !input.clientCancelled) {
+      const runtime = await repository.profileHealth(input.attempt.profile.executionProfileId);
+      const previousThreshold = optionalNumber(runtime?.metadata?.observedContextFailureThresholdTokens);
+      const observedThreshold = Math.min(
+        previousThreshold ?? Number.POSITIVE_INFINITY,
+        input.contextOverflow.requiredTotalContextTokens,
+      );
+      await repository.saveProfileWebHealth({
+        executionProfileId: input.attempt.profile.executionProfileId,
+        channelId: input.attempt.profile.channelId ?? input.attempt.profile.channel,
+        providerId: input.attempt.profile.provider,
+        canonicalModelId: input.attempt.profile.modelId,
+        protocol: input.protocol,
+        usageTrusted: input.attempt.profile.usageTrusted !== false,
+        actualModelVerified: true,
+        metadata: {
+          observedContextFailureThresholdTokens: observedThreshold,
+          contextFailureLastObservedAt: new Date().toISOString(),
         },
       });
     }
@@ -2821,6 +2857,8 @@ export class AlphaRequestProcessor {
       && resolveWebEligibility(profile, envelope).eligible
       && (!envelope.containsThinking || profile.thinkingSupport)
       && effectiveContextCeiling(profile) >= recoveryContextAdmission.requiredTotalContextTokens
+      && (profile.observedContextFailureThresholdTokens ?? Number.POSITIVE_INFINITY)
+        > recoveryContextAdmission.requiredTotalContextTokens
       && this.options.adapters.has(profile.executionProfileId)
     ));
     if (!result.route) {
@@ -2892,7 +2930,21 @@ export class AlphaRequestProcessor {
           }
           if (pendingContextOverflow && !result.routingJudge) return undefined;
           if (pendingContextOverflow) {
-            for (const profile of recoveryPool) {
+            const contextRecoveryPool = [...recoveryPool].sort((left, right) => {
+              const evidence = compareContextRecoveryProfiles(
+                left,
+                right,
+                recoveryContextAdmission.estimatedInputTokens,
+              );
+              return evidence !== 0 ? evidence : compareExecutionProfiles(
+                left,
+                right,
+                recoveryContextAdmission.estimatedInputTokens,
+                this.expectedOutputTokens,
+                originalRequirements,
+              );
+            });
+            for (const profile of contextRecoveryPool) {
               if (profile.modelId === current.profile.modelId
                 && !attemptedProfiles.has(profile.executionProfileId)
                 && !attemptedIdentities.has(attemptIdentity(profile, this.endpoints(profile)[0]?.endpoint))

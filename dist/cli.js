@@ -4189,8 +4189,8 @@ var ACU_DEFAULT_JUDGE_MODEL = "gpt-5.6-luna";
 var ACU_DEFAULT_JUDGE_BASE_URL = "https://lucen.cc/v1";
 var ACU_DEFAULT_JUDGE_MODE = "non-thinking";
 var ACU_DEFAULT_JUDGE_FIRST_BYTE_TIMEOUT_MS = 0;
-var ACU_DEFAULT_JUDGE_TOTAL_TIMEOUT_MS = 25e3;
-var ACU_DEFAULT_JUDGE_MAX_PROFILE_ATTEMPTS = 3;
+var ACU_DEFAULT_JUDGE_TOTAL_TIMEOUT_MS = 27e4;
+var ACU_DEFAULT_JUDGE_MAX_PROFILE_ATTEMPTS = 5;
 var ACU_DEFAULT_MAX_CONTEXT_TOKENS = 1e6;
 var ACU_DEFAULT_BACKUP_MAX_CONTEXT_TOKENS = 1e6;
 var ACU_DEFAULT_MAX_OUTPUT_TOKENS = 300;
@@ -4251,7 +4251,7 @@ function readAcuRuntimeConfig(overrides = {}) {
     ),
     syncBackupEnabled: booleanValue(process.env.ACU_JUDGE_SYNC_BACKUP_ENABLED, false),
     sameModelFailoverEnabled: booleanValue(process.env.ACU_JUDGE_SAME_MODEL_FAILOVER_ENABLED, true),
-    maxProfileAttempts: Math.max(1, Math.min(3, positiveInteger(process.env.ACU_JUDGE_MAX_PROFILE_ATTEMPTS, ACU_DEFAULT_JUDGE_MAX_PROFILE_ATTEMPTS))),
+    maxProfileAttempts: Math.max(1, Math.min(5, positiveInteger(process.env.ACU_JUDGE_MAX_PROFILE_ATTEMPTS, ACU_DEFAULT_JUDGE_MAX_PROFILE_ATTEMPTS))),
     primaryProfileId: process.env.ACU_JUDGE_PRIMARY_PROFILE_ID?.trim() || void 0,
     cachePath: process.env.ACU_JUDGE_CACHE_PATH?.trim(),
     allowMock: booleanValue(process.env.ACU_ALLOW_MOCK),
@@ -6722,6 +6722,14 @@ function estimateVisibleTokens(text) {
   }
   return Math.ceil(ascii / 4) + nonAscii;
 }
+function estimateJudgeContextTokens(rawNative) {
+  return estimateVisibleTokens(
+    `[ACU_STATE_METADATA]
+${stableJson(rawNative.stateMetadata)}
+[RAW_NATIVE_API_REQUEST]
+${rawNative.rawRequest}`
+  );
+}
 function buildJudgeSystemPrompt() {
   const examples = twin_few_shots_default.examples.map((example) => [
     `\u793A\u4F8B ${example.exampleId}`,
@@ -6915,8 +6923,16 @@ function responseHeaders(headers) {
   ].includes(name.toLowerCase())));
 }
 function upstreamContextError(status, body) {
-  if (status !== 400 && status !== 413 && status !== 422) return false;
-  return /context[_ -]?(?:length|window)|maximum context|too many tokens|token limit/i.test(body);
+  const pattern = /context[_ -]?(?:length|window)|maximum context|too many tokens|token limit/i;
+  if (status === 400 || status === 413 || status === 422) return pattern.test(body);
+  if (status !== 200) return false;
+  try {
+    const payload = JSON.parse(body);
+    const error = payload.error ?? payload.response?.error;
+    return error !== void 0 && pattern.test(typeof error === "string" ? error : JSON.stringify(error));
+  } catch {
+    return false;
+  }
 }
 function errorResponseMetadata(body) {
   try {
@@ -6955,7 +6971,7 @@ ${stableJson(rawNative.stateMetadata)}
 ${rawNative.rawRequest}` : serializeVisibleContext(messages, tools);
     const contextSha256 = createHash4("sha256").update(visible).digest("hex");
     const judgeContextLimit = this.config.maxContextTokens;
-    const contextTokenEstimate = estimateVisibleTokens(visible);
+    const contextTokenEstimate = rawNative ? estimateJudgeContextTokens(rawNative) : estimateVisibleTokens(visible);
     const truncated = { text: visible, tokenEstimate: contextTokenEstimate, truncated: false };
     const key = createHash4("sha256").update(`${this.config.promptVersion}
 ${this.config.judgeModel}
@@ -7030,8 +7046,8 @@ ${truncated.text}`;
         if (firstByteTimeout) clearTimeout(firstByteTimeout);
         responseContentType = response.headers.get("content-type") ?? "";
         rawResponseBody = await response.text();
-        if (!response.ok) {
-          const isContextError = upstreamContextError(response.status, rawResponseBody);
+        const isContextError = upstreamContextError(response.status, rawResponseBody);
+        if (!response.ok || isContextError) {
           const errorMetadata = errorResponseMetadata(rawResponseBody);
           throw new AcuJudgeAttemptError(`ACU Judge HTTP ${response.status}`, {
             provider: metadata.provider,
@@ -7937,7 +7953,7 @@ var ACU_DEMO_BENCHMARK_PRICING = {
   modelId: ACU_DEMO_BENCHMARK_MODEL_ID,
   inputPricePerMillion: 10,
   outputPricePerMillion: 50,
-  label: "Anthropic Opus 4.8 Fast mode \u5B98\u65B9\u4EF7\uFF08Demo\u57FA\u51C6\uFF09"
+  label: "\u65D7\u8230\u6A21\u578B\u4EF7\u683C"
 };
 var ROUTING_PROFILES = /* @__PURE__ */ new Set(["auto", "eco", "premium"]);
 var rateLimitedModels = /* @__PURE__ */ new Map();
@@ -8318,6 +8334,13 @@ function benchmarkBaselineCandidate(candidates) {
   }
   return benchmark;
 }
+function demoCandidateWithinBenchmark(modelId) {
+  const model = getAcuModel(modelId);
+  return Boolean(model && model.inputPricePerMillion !== null && model.outputPricePerMillion !== null && model.inputPricePerMillion !== void 0 && model.outputPricePerMillion !== void 0 && model.inputPricePerMillion <= ACU_DEMO_BENCHMARK_PRICING.inputPricePerMillion && model.outputPricePerMillion <= ACU_DEMO_BENCHMARK_PRICING.outputPricePerMillion);
+}
+function demoEligibleModelIds(modelIds) {
+  return modelIds.filter(demoCandidateWithinBenchmark);
+}
 function buildPlanRecord(args) {
   const displayRecommendation = recommendModel({
     probabilities: args.evaluation.judge,
@@ -8326,7 +8349,7 @@ function buildPlanRecord(args) {
     expectedOutputTokens: args.expectedOutputTokens,
     judgeCost: args.evaluation.judgeCost,
     qualityTarget: args.evaluation.qualityTarget,
-    eligibleModelIds: args.allCompatibleModelIds
+    eligibleModelIds: demoEligibleModelIds(args.allCompatibleModelIds)
   });
   const routedDisplayCandidates = displayRecommendation.estimates.map((estimate) => decoratePlanCandidate(estimate, args.evaluation.difficultyScore, args.store));
   const benchmarkCandidate = benchmarkBaselineCandidate(routedDisplayCandidates);
@@ -8340,11 +8363,15 @@ function buildPlanRecord(args) {
     expectedTotalCost: args.evaluation.judgeCost + benchmarkSelectionCost,
     riskAdjustedCost: benchmarkSelectionCost
   };
-  const displayCandidates = routedDisplayCandidates.map((candidate) => candidate.modelId === benchmarkBaselineModel.modelId ? benchmarkBaselineModel : candidate);
+  const displayCandidates = routedDisplayCandidates.map((candidate) => candidate.modelId === benchmarkBaselineModel.modelId ? benchmarkBaselineModel : candidate).filter((candidate) => demoCandidateWithinBenchmark(candidate.modelId));
+  const demoEvaluation = {
+    ...args.evaluation,
+    recommendation: displayRecommendation
+  };
   const qualityLeaderModel = qualityCeilingCandidate(displayCandidates);
   const now = Date.now();
   return {
-    evaluation: args.evaluation,
+    evaluation: demoEvaluation,
     createdAt: now,
     expiresAt: now + ACU_PLAN_TTL_MS,
     contextSha256: args.evaluation.contextSha256,
@@ -8898,13 +8925,18 @@ async function handleRequest(req, res, ctx) {
         requestId: randomUUID2(),
         requestedModel: "planning_only"
       }, rulesDecision);
-      const plan = buildPlanRecord({ evaluation, allCompatibleModelIds, expectedOutputTokens, store: ctx.acuStore });
+      const plan = buildPlanRecord({
+        evaluation,
+        allCompatibleModelIds,
+        expectedOutputTokens,
+        store: ctx.acuStore
+      });
       pruneAcuPlans(ctx.acuPlans);
       const planId = randomUUID2();
       ctx.acuPlans.set(planId, plan);
       res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
       res.end(JSON.stringify({
-        ...evaluation,
+        ...plan.evaluation,
         planId,
         planExpiresAt: new Date(plan.expiresAt).toISOString(),
         benchmarkBaselineModel: plan.benchmarkBaselineModel,

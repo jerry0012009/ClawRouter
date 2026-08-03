@@ -245,6 +245,12 @@ export function estimateVisibleTokens(text: string): number {
   return Math.ceil(ascii / 4) + nonAscii;
 }
 
+export function estimateJudgeContextTokens(rawNative: RawNativeJudgeContext): number {
+  return estimateVisibleTokens(
+    `[ACU_STATE_METADATA]\n${stableJson(rawNative.stateMetadata)}\n[RAW_NATIVE_API_REQUEST]\n${rawNative.rawRequest}`,
+  );
+}
+
 export function buildJudgeSystemPrompt(): string {
   const examples = (fewShotData.examples as FewShot[]).map((example) => [
     `示例 ${example.exampleId}`,
@@ -481,8 +487,16 @@ function responseHeaders(headers: Headers): Record<string, string> {
 }
 
 function upstreamContextError(status: number, body: string): boolean {
-  if (status !== 400 && status !== 413 && status !== 422) return false;
-  return /context[_ -]?(?:length|window)|maximum context|too many tokens|token limit/i.test(body);
+  const pattern = /context[_ -]?(?:length|window)|maximum context|too many tokens|token limit/i;
+  if (status === 400 || status === 413 || status === 422) return pattern.test(body);
+  if (status !== 200) return false;
+  try {
+    const payload = JSON.parse(body) as { error?: unknown; response?: { error?: unknown } };
+    const error = payload.error ?? payload.response?.error;
+    return error !== undefined && pattern.test(typeof error === "string" ? error : JSON.stringify(error));
+  } catch {
+    return false;
+  }
 }
 
 function errorResponseMetadata(body: string): {
@@ -541,7 +555,7 @@ export class AcuJudgeClient {
       : serializeVisibleContext(messages, tools);
     const contextSha256 = createHash("sha256").update(visible).digest("hex");
     const judgeContextLimit = this.config.maxContextTokens;
-    const contextTokenEstimate = estimateVisibleTokens(visible);
+    const contextTokenEstimate = rawNative ? estimateJudgeContextTokens(rawNative) : estimateVisibleTokens(visible);
     const truncated = { text: visible, tokenEstimate: contextTokenEstimate, truncated: false };
     const key = createHash("sha256").update(`${this.config.promptVersion}\n${this.config.judgeModel}\n${contextSha256}`).digest("hex");
     const path = cachePath(this.config);
@@ -615,8 +629,8 @@ export class AcuJudgeClient {
         if (firstByteTimeout) clearTimeout(firstByteTimeout);
         responseContentType = response.headers.get("content-type") ?? "";
         rawResponseBody = await response.text();
-        if (!response.ok) {
-          const isContextError = upstreamContextError(response.status, rawResponseBody);
+        const isContextError = upstreamContextError(response.status, rawResponseBody);
+        if (!response.ok || isContextError) {
           const errorMetadata = errorResponseMetadata(rawResponseBody);
           throw new AcuJudgeAttemptError(`ACU Judge HTTP ${response.status}`, {
             provider: metadata.provider, model: this.config.judgeModel, endpointHost: metadata.host,

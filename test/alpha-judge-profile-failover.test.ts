@@ -28,6 +28,14 @@ function profile(id: string, overrides: Partial<AlphaExecutionProfile> = {}): Al
 }
 
 describe("Luna Judge Profile selector", () => {
+  it("selects at most five Profiles by default", () => {
+    const selected = getEligibleLunaJudgeProfiles({
+      profiles: Array.from({ length: 6 }, (_, index) => profile(`profile-${index}`)),
+      requiredContextTokens: 100,
+    });
+    expect(selected).toHaveLength(5);
+  });
+
   it("reserves one viable failover window without extending the shared deadline", () => {
     expect(judgeProfileAttemptDeadline({ now: 1_000, globalDeadlineAt: 26_000, profilesRemaining: 2 })).toBe(18_000);
     expect(judgeProfileAttemptDeadline({ now: 18_000, globalDeadlineAt: 26_000, profilesRemaining: 1 })).toBe(26_000);
@@ -62,6 +70,25 @@ describe("Luna Judge Profile selector", () => {
       requiredContextTokens: 100,
     });
     expect(selected.map((item) => item.executionProfileId)).toEqual(["b", "a"]);
+  });
+
+  it("prefers proven long-context capacity only when cheaper evidence no longer covers the Judge input", () => {
+    const cheap = profile("cheap", { observedSuccessfulInputTokens: 200_000 });
+    const provenLong = profile("proven-long", { observedSuccessfulInputTokens: 800_007 });
+    expect(getEligibleLunaJudgeProfiles({
+      profiles: [cheap, provenLong], requiredContextTokens: 300_000,
+    }).map((item) => item.executionProfileId)).toEqual(["proven-long", "cheap"]);
+  });
+
+  it("excludes a Profile at its observed Judge context failure threshold", () => {
+    const selected = getEligibleLunaJudgeProfiles({
+      profiles: [
+        profile("failed", { observedJudgeContextFailureThresholdTokens: 380_000 }),
+        profile("eligible"),
+      ],
+      requiredContextTokens: 380_000,
+    });
+    expect(selected.map((item) => item.executionProfileId)).toEqual(["eligible"]);
   });
 
   it("hydrates shared runtime health before filtering and ranking Judge Profiles", () => {
@@ -136,6 +163,47 @@ describe("Luna Judge Profile selector", () => {
     expect(result.sameModelFailoverUsed).toBe(true);
     expect(result.sameModelFailoverChain).toEqual([preferred.executionProfileId, alternate.executionProfileId]);
     expect(result.attempts.map((attempt) => attempt.model)).toEqual(["gpt-5.6-luna", "gpt-5.6-luna"]);
+  });
+
+  it("records Judge context evidence and retries another Luna Profile", async () => {
+    const first = profile("first", { observedSuccessfulInputTokens: 100 });
+    const second = profile("second", { observedSuccessfulInputTokens: 100 });
+    const config = readAcuRuntimeConfig({
+      allowMock: true, apiKey: "fixture", judgeProtocol: "responses", maxProfileAttempts: 5,
+      cachePath: `/tmp/judge-context-failover-${randomUUID()}.json`, syncBackupEnabled: false,
+    });
+    const valid = {
+      difficulty_score_raw: 42,
+      factors: { reasoning_depth: 4, task_scope: 4, constraint_density: 4, tool_dependency: 4, verification_burden: 4, context_burden: 4 },
+      p_low: 0.1, p_mid: 0.7, p_mid_high: 0.15, p_high: 0.05, confidence: 0.9,
+      signals: [], explanation: "fixture", webIntent: "not_required", webIntentConfidence: 1,
+      webIntentReason: "local", webIntentEvidence: [],
+    };
+    const clients = new Map([
+      [first.executionProfileId, new AcuJudgeClient(config, async () => new Response(JSON.stringify({
+        error: { code: "context_length_exceeded", message: "Input exceeds the context window" },
+      }), { status: 200, headers: { "content-type": "application/json" } }))],
+      [second.executionProfileId, new AcuJudgeClient(config, async () => new Response(JSON.stringify({
+        model: "gpt-5.6-luna", output: [{ content: [{ type: "output_text", text: JSON.stringify(valid) }] }],
+        usage: { input_tokens: 120, output_tokens: 20 },
+      }), { status: 200, headers: { "content-type": "application/json" } }))],
+    ]);
+    const evidence: Array<{ id: string; successInputTokens?: number; judgeFailureThresholdTokens?: number }> = [];
+    const result = await createAcuJudgeRunner({
+      config, profiles: [first, second], profileClients: clients,
+      recordContextEvidence: async (selected, item) => { evidence.push({ id: selected.executionProfileId, ...item }); },
+      rulesDecision: { model: "rules", tier: "MEDIUM", confidence: 1, method: "rules", reasoning: "fixture", costEstimate: 0, baselineCost: 0, savings: 0 },
+    }).run({
+      messages: [], tools: [], trigger: "new_task", contextHash: "fixture",
+      webIntentFallbackInput: { recentUserInputs: ["fixture"] },
+      rawNative: { stateMetadata: {}, rawRequest: JSON.stringify({ model: "acu-auto", input: "fixture" }) },
+    });
+    expect(result.selectedProfileId).toBe(second.executionProfileId);
+    expect(result.attempts).toHaveLength(2);
+    expect(evidence).toEqual([
+      { id: first.executionProfileId, judgeFailureThresholdTokens: expect.any(Number) },
+      { id: second.executionProfileId, successInputTokens: 120 },
+    ]);
   });
 
   it.each([

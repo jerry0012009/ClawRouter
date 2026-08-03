@@ -5,8 +5,8 @@ export const ACU_DEFAULT_JUDGE_MODEL = "gpt-5.6-luna";
 export const ACU_DEFAULT_JUDGE_BASE_URL = "https://lucen.cc/v1";
 export const ACU_DEFAULT_JUDGE_MODE = "non-thinking" as const;
 export const ACU_DEFAULT_JUDGE_FIRST_BYTE_TIMEOUT_MS = 0;
-export const ACU_DEFAULT_JUDGE_TOTAL_TIMEOUT_MS = 25_000;
-export const ACU_DEFAULT_JUDGE_MAX_PROFILE_ATTEMPTS = 3;
+export const ACU_DEFAULT_JUDGE_TOTAL_TIMEOUT_MS = 270_000;
+export const ACU_DEFAULT_JUDGE_MAX_PROFILE_ATTEMPTS = 5;
 export const ACU_DEFAULT_MAX_CONTEXT_TOKENS = 1_000_000;
 export const ACU_DEFAULT_BACKUP_MAX_CONTEXT_TOKENS = 1_000_000;
 export const ACU_DEFAULT_MAX_OUTPUT_TOKENS = 300;
@@ -116,7 +116,7 @@ export function readAcuRuntimeConfig(overrides: Partial<AcuRuntimeConfig> = {}):
     ),
     syncBackupEnabled: booleanValue(process.env.ACU_JUDGE_SYNC_BACKUP_ENABLED, false),
     sameModelFailoverEnabled: booleanValue(process.env.ACU_JUDGE_SAME_MODEL_FAILOVER_ENABLED, true),
-    maxProfileAttempts: Math.max(1, Math.min(3, positiveInteger(process.env.ACU_JUDGE_MAX_PROFILE_ATTEMPTS, ACU_DEFAULT_JUDGE_MAX_PROFILE_ATTEMPTS))),
+    maxProfileAttempts: Math.max(1, Math.min(5, positiveInteger(process.env.ACU_JUDGE_MAX_PROFILE_ATTEMPTS, ACU_DEFAULT_JUDGE_MAX_PROFILE_ATTEMPTS))),
     primaryProfileId: process.env.ACU_JUDGE_PRIMARY_PROFILE_ID?.trim() || undefined,
     cachePath: process.env.ACU_JUDGE_CACHE_PATH?.trim(),
     allowMock: booleanValue(process.env.ACU_ALLOW_MOCK),

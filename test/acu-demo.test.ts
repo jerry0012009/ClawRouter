@@ -271,7 +271,8 @@ describe("ACU Router demo reliability", () => {
     const integrated = await readFile(join(process.cwd(), "public", "acu-integrated.js"), "utf8");
     expect(html).toContain("acu-decision-module");
     expect(html).toContain("固定旗舰基准 / Claude Opus 4.8");
-    expect(html).toContain("Opus同Token基准");
+    expect(html).toContain("旗舰模型价格");
+    expect(html).toContain("ACU Router价格");
     expect(html).toContain("全部备选");
     expect(html).toContain("<span class=\"num\">04</span>");
     expect(html).toContain("<span class=\"num\">05</span>");

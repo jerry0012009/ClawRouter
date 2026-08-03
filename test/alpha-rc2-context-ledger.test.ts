@@ -57,6 +57,14 @@ describe("Alpha RC2 context admission and ledger contract", () => {
     expect(effectiveContextCeiling(profile({ providerHardContextCap: 200_000 }))).toBe(200_000);
   });
 
+  it("excludes only requests at or above a Profile's observed context failure threshold", () => {
+    const cappedByEvidence = profile({ observedContextFailureThresholdTokens: 380_000 });
+    expect(route([cappedByEvidence], 379_999).selectedProfile.executionProfileId).toBe("lucen-luna");
+    expect(() => route([cappedByEvidence], 380_000)).toThrowError(
+      expect.objectContaining<Partial<AlphaAdmissionError>>({ errorType: "context_length_exceeded" }),
+    );
+  });
+
   it("counts cached history because admission estimates the full structured request", () => {
     const small = normalizeResponsesRequest({ model: "acu-auto", input: "next" });
     const cached = normalizeResponsesRequest({

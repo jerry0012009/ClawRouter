@@ -1,6 +1,7 @@
 (() => {
   const API = window.AcuApiPrefix.resolve(location.pathname, location.origin);
   const ROUTER_MODEL = 'auto';
+  const DEMO_BENCHMARK_PRICES = { input: 10, output: 50 };
   const modelCatalogMap = {};
   let currentRun = null;
   let running = false;
@@ -218,11 +219,11 @@
     const normalizedBenchmarkCost = benchmarkCounterfactualCost(state.plan, state.router.response, state.router.trace);
     const actualSavings = normalizedBenchmarkCost > 0 ? (1 - state.router.cost / normalizedBenchmarkCost) * 100 : null;
     state.router.normalizedBenchmarkCost = normalizedBenchmarkCost;
-    const benchmarkLabel = state.plan.benchmarkPricing?.label || 'Opus 4.8 Demo基准价';
+    const benchmarkLabel = state.plan.benchmarkPricing?.label || '旗舰模型价格';
     const banner = $('savings-banner');
     banner.className = `banner ${state.router.quality.score >= state.spec.threshold ? 'ok' : 'warn'}`;
     if (state.router.model === benchmark.modelId) {
-      banner.textContent = `ACU判断当前任务需要保留${benchmark.displayName}。按 Router 同等 Token 重算（${benchmarkLabel}），旗舰基准 US$${(normalizedBenchmarkCost ?? 0).toFixed(5)}；ACU 总成本 US$${state.router.cost.toFixed(5)}。`;
+      banner.textContent = `ACU判断当前任务需要保留${benchmark.displayName}。按 Router 同等 Token 重算，${benchmarkLabel} US$${(normalizedBenchmarkCost ?? 0).toFixed(5)}；ACU Router价格 US$${state.router.cost.toFixed(5)}。`;
     } else {
       const gap = benchmark.predictedScore - recommended.predictedScore;
       const costPhrase = actualSavings === null
@@ -231,7 +232,7 @@
       const leaderNote = qualityLeader?.modelId === recommended.modelId
         ? `；推荐接近预计质量最高模型 ${qualityLeader.displayName}`
         : '';
-      banner.textContent = `相对固定旗舰基准 ${benchmark.displayName}，ACU以预计得分差 ${gap.toFixed(1)}分换取${costPhrase}${leaderNote}。${benchmarkLabel}：US$${(normalizedBenchmarkCost ?? 0).toFixed(5)}；ACU 总成本 US$${state.router.cost.toFixed(5)}。`;
+      banner.textContent = `相对固定旗舰基准 ${benchmark.displayName}，ACU以预计得分差 ${gap.toFixed(1)}分换取${costPhrase}${leaderNote}。${benchmarkLabel} US$${(normalizedBenchmarkCost ?? 0).toFixed(5)}；ACU Router价格 US$${state.router.cost.toFixed(5)}。`;
     }
     if (!state.ledgerAdded) {
       state.ledgerAdded = true;
@@ -274,7 +275,7 @@
     tr.innerHTML = `<td>${row.time}</td><td>${row.task}</td><td>${row.preference}</td><td>${row.model}</td><td class="green-text">$${row.cost.toFixed(5)}</td><td>$${row.benchmark.toFixed(5)}</td><td class="${row.savings >= 0 ? 'green-text' : 'yellow-text'}">${row.savings.toFixed(1)}%</td><td>${row.quality}</td><td>${row.validator}</td><td>${row.switched}</td><td>${row.latency}</td>`;
     body.prepend(tr);
     [...body.children].slice(8).forEach((node) => node.remove());
-    $('ledger-summary').innerHTML = `<span>累计ACU账单估算 $${totalRouterCost.toFixed(5)}</span><span>累计Opus同Token基准 $${totalBenchmarkCost.toFixed(5)}</span><span>累计净节省 $${(totalBenchmarkCost - totalRouterCost).toFixed(5)}</span>`;
+    $('ledger-summary').innerHTML = `<span>累计ACU Router价格 $${totalRouterCost.toFixed(5)}</span><span>累计旗舰模型价格 $${totalBenchmarkCost.toFixed(5)}</span><span>累计净节省 $${(totalBenchmarkCost - totalRouterCost).toFixed(5)}</span>`;
   }
 
   async function runComparison() {
@@ -321,7 +322,7 @@
         const quality = evaluateQuality(content, prompt, spec, null);
         renderAnswer($('baseline-answer'), response, content);
         renderQualityResult('baseline-quality', 'Claude Opus 4.8 固定旗舰基准', quality, spec);
-        $('baseline-meta').innerHTML = `<span class="pill warn">${benchmark.displayName}</span><span class="pill">预计 ${benchmark.predictedScore.toFixed(1)}分</span><span class="pill">${modeLabel(benchmark)}</span><span class="pill">模型调用 ${latency}ms</span><span class="pill warn">独立调用账单估算 US$${observedCost.toFixed(5)}</span><span class="pill">${usageSourceLabel(response)}</span><span class="pill">基准估算 ${plan.benchmarkPricing?.inputPricePerMillion ?? 10}/${plan.benchmarkPricing?.outputPricePerMillion ?? 50} $/M</span><span class="pill">仅作质量对照，不计入节省率</span>${emptyOutputRetry ? '<span class="pill warn">已自动重试，估算含两次调用</span>' : ''}`;
+        $('baseline-meta').innerHTML = `<span class="pill warn">${benchmark.displayName}</span><span class="pill">预计 ${benchmark.predictedScore.toFixed(1)}分</span><span class="pill">${modeLabel(benchmark)}</span><span class="pill">模型调用 ${latency}ms</span><span class="pill warn">独立调用估算 US$${observedCost.toFixed(5)}</span><span class="pill">${usageSourceLabel(response)}</span><span class="pill">旗舰模型价格 ${plan.benchmarkPricing?.inputPricePerMillion ?? DEMO_BENCHMARK_PRICES.input}/${plan.benchmarkPricing?.outputPricePerMillion ?? DEMO_BENCHMARK_PRICES.output} $/M</span><span class="pill">仅作质量对照，不计入节省率</span>${emptyOutputRetry ? '<span class="pill warn">已自动重试，估算含两次调用</span>' : ''}`;
         state.benchmark = { response, model: benchmark.modelId, observedCost, quality, latency, predictedScore: benchmark.predictedScore };
       }).catch((error) => {
         $('baseline-answer').textContent = `固定旗舰基准调用失败：${error.message}`;
@@ -342,7 +343,7 @@
         const latency = trace?.latency_breakdown || {};
         renderAnswer($('router-answer'), response, content);
         renderQualityResult('router-quality', 'ACU Router', quality, spec);
-        $('router-meta').innerHTML = `<span class="pill ok">实际 ${model}</span><span class="pill">任务评估 ${latency.judge_latency_ms ?? 0}ms</span><span class="pill">模型调用 ${trace?.attempts?.[0]?.latency_ms ?? 0}ms</span><span class="pill">总耗时 ${latency.total_router_latency_ms ?? wallLatency}ms</span><span class="pill ok">ACU总账单估算 US$${cost.toFixed(5)}</span><span class="pill">${usageSourceLabel(response, trace)}</span>`;
+        $('router-meta').innerHTML = `<span class="pill ok">实际 ${model}</span><span class="pill">任务评估 ${latency.judge_latency_ms ?? 0}ms</span><span class="pill">模型调用 ${trace?.attempts?.[0]?.latency_ms ?? 0}ms</span><span class="pill">总耗时 ${latency.total_router_latency_ms ?? wallLatency}ms</span><span class="pill ok">ACU Router价格 US$${cost.toFixed(5)}</span><span class="pill">${usageSourceLabel(response, trace)}</span>`;
         state.router = { response, trace, model, cost, quality, latency: wallLatency };
         renderTrace(trace, plan);
         currentRun = { routerQuality: quality, spec, model, benchmarkModel: benchmark.modelId };
@@ -385,6 +386,7 @@
       for (const model of payload.data || []) {
         const input = Number(model.pricing?.prompt ?? model.pricing?.input ?? 0);
         const output = Number(model.pricing?.completion ?? model.pricing?.output ?? 0);
+        if (input > DEMO_BENCHMARK_PRICES.input || output > DEMO_BENCHMARK_PRICES.output) continue;
         modelCatalogMap[model.id] = {
           input,
           output,

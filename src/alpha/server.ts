@@ -199,6 +199,8 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
       canonicalAdvertisedContextWindow: profile.canonicalAdvertisedContextWindow ?? canonicalAdvertisedContextWindow(profile.modelId),
       providerDeclaredContextWindow: profile.providerDeclaredContextWindow ?? null,
       observedSuccessfulInputTokens: profile.observedSuccessfulInputTokens ?? 0,
+      observedContextFailureThresholdTokens: profile.observedContextFailureThresholdTokens,
+      observedJudgeContextFailureThresholdTokens: profile.observedJudgeContextFailureThresholdTokens,
       providerHardContextCap: profile.providerHardContextCap ?? null,
       contextCapabilityStatus: profile.contextCapabilityStatus ?? "unverified_long_context",
       contextCapabilitySource: profile.contextCapabilitySource ?? "canonical_advertised_default",
@@ -305,6 +307,36 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
       outcome,
       wakeProbe: (executionProfileId) => executionProfileId ? adaptiveProbe.enqueue(executionProfileId) : adaptiveProbe.wake(),
     }),
+    recordContextEvidence: async (profile, evidence) => {
+      const runtime = await runtimeRepository.profileHealth(profile.executionProfileId);
+      const previousJudgeFailure = Number(runtime?.metadata?.observedJudgeContextFailureThresholdTokens);
+      const judgeFailureThreshold = evidence.judgeFailureThresholdTokens === undefined
+        ? undefined
+        : Math.min(
+            Number.isFinite(previousJudgeFailure) ? previousJudgeFailure : Number.POSITIVE_INFINITY,
+            evidence.judgeFailureThresholdTokens,
+          );
+      await runtimeRepository.saveProfileWebHealth({
+        executionProfileId: profile.executionProfileId,
+        channelId: profile.channelId ?? profile.channel,
+        providerId: profile.provider,
+        canonicalModelId: profile.modelId,
+        protocol: "responses",
+        usageTrusted: profile.usageTrusted !== false,
+        actualModelVerified: evidence.successInputTokens !== undefined
+          ? true : runtime?.actualModelVerified ?? false,
+        observedSuccessfulInputTokens: evidence.successInputTokens === undefined
+          ? undefined : BigInt(evidence.successInputTokens),
+        contextCapabilityStatus: evidence.successInputTokens === undefined ? undefined : "observed_floor",
+        contextCapabilitySource: evidence.successInputTokens === undefined
+          ? undefined : "judge_provider_usage_observed_success",
+        contextLastVerifiedAt: evidence.successInputTokens === undefined ? undefined : new Date(),
+        metadata: judgeFailureThreshold === undefined ? {} : {
+          observedJudgeContextFailureThresholdTokens: judgeFailureThreshold,
+          judgeContextFailureLastObservedAt: new Date().toISOString(),
+        },
+      });
+    },
   });
   const processor = new AlphaRequestProcessor({
     database,

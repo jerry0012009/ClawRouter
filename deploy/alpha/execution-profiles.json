@@ -5900,11 +5900,11 @@
     "effectiveCostStatus": "verified",
     "canonicalAdvertisedContextWindow": 1050000,
     "providerDeclaredContextWindow": null,
-    "observedSuccessfulInputTokens": 0,
+    "observedSuccessfulInputTokens": 800007,
     "providerHardContextCap": null,
-    "contextCapabilityStatus": "unverified_long_context",
-    "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
-    "contextLastVerifiedAt": null,
+    "contextCapabilityStatus": "observed_floor",
+    "contextCapabilitySource": "controlled_live_probe",
+    "contextLastVerifiedAt": "2026-08-03T15:37:00.000Z",
     "reasoningControlMode": "none"
   },
   {
@@ -6000,11 +6000,11 @@
     "webSearchFailureReason": null,
     "canonicalAdvertisedContextWindow": 1050000,
     "providerDeclaredContextWindow": null,
-    "observedSuccessfulInputTokens": 0,
+    "observedSuccessfulInputTokens": 800007,
     "providerHardContextCap": null,
-    "contextCapabilityStatus": "unverified_long_context",
-    "contextCapabilitySource": "canonical_official_context_window_unverified_provider",
-    "contextLastVerifiedAt": null,
+    "contextCapabilityStatus": "observed_floor",
+    "contextCapabilitySource": "controlled_live_probe",
+    "contextLastVerifiedAt": "2026-08-03T17:12:50.000Z",
     "reasoningControlMode": "none"
   }
 ]

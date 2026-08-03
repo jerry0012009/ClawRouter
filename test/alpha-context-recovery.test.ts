@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { classifyProviderContextOverflow, contextOverflowRecoveryEligible, createRecoveringProviderAdapter, type ProviderAttemptHandle } from "../src/alpha/execution.js";
 import { effectiveContextCeiling } from "../src/alpha/context-admission.js";
-import { contextModelRerouteReason } from "../src/alpha/processor.js";
+import { compareContextRecoveryProfiles, contextModelRerouteReason } from "../src/alpha/processor.js";
 import type { NativeProviderRequest } from "../src/alpha/provider.js";
 import { routeWithCurrentAcuFormula, type AlphaExecutionProfile } from "../src/alpha/routing.js";
 import type { AcuJudgeResult } from "../src/acu/types.js";
@@ -92,6 +92,20 @@ describe("context overflow recovery", () => {
   it("records the context reroute from the previous model to the next model", () => {
     expect(contextModelRerouteReason("glm-5.2", "gpt-5.6-sol"))
       .toBe("context_model_reroute:glm-5.2->gpt-5.6-sol");
+  });
+
+  it("prefers same-model recovery Profiles with evidence covering the current input", () => {
+    const unverifiedCheap = { ...profile("cheap", "gpt-5.6-luna"), observedSuccessfulInputTokens: 9_000 };
+    const verifiedLong = { ...profile("long", "gpt-5.6-luna"), observedSuccessfulInputTokens: 800_007 };
+    expect([unverifiedCheap, verifiedLong].sort((left, right) => (
+      compareContextRecoveryProfiles(left, right, 600_000)
+    )).map((item) => item.executionProfileId)).toEqual(["long", "cheap"]);
+  });
+
+  it("uses the strongest successful input evidence when no recovery Profile covers the input", () => {
+    const small = { ...profile("small", "gpt-5.6-luna"), observedSuccessfulInputTokens: 100_000 };
+    const larger = { ...profile("larger", "gpt-5.6-luna"), observedSuccessfulInputTokens: 300_000 };
+    expect(compareContextRecoveryProfiles(larger, small, 600_000)).toBeLessThan(0);
   });
 
   it("does not impose an admission ceiling without a verified Provider hard cap", () => {

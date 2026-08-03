@@ -1,4 +1,4 @@
-import { AcuJudgeAttemptError, AcuJudgeClient, AcuJudgeClientCancelledError, AcuJudgeContextLengthError, estimateVisibleTokens, judgeNominalCostUsd, type JudgeRequestResult, type RawNativeJudgeContext } from "../acu/judge.js";
+import { AcuJudgeAttemptError, AcuJudgeClient, AcuJudgeClientCancelledError, AcuJudgeContextLengthError, estimateJudgeContextTokens, judgeNominalCostUsd, type JudgeRequestResult, type RawNativeJudgeContext } from "../acu/judge.js";
 import { normalizedEntropy } from "../acu/math.js";
 import { rulesFallbackJudge } from "../acu/strategy.js";
 import type { AcuRuntimeConfig } from "../acu/config.js";
@@ -141,6 +141,10 @@ export type AcuJudgeRunnerOptions = {
     profile: AlphaExecutionProfile,
     outcome: AttemptOutcome,
   ) => Promise<RuntimeHealthOutcomeResult>;
+  recordContextEvidence?: (
+    profile: AlphaExecutionProfile,
+    evidence: { successInputTokens?: number; judgeFailureThresholdTokens?: number },
+  ) => Promise<void>;
 };
 
 function canReuseRecent(trigger: TriggerReason): boolean {
@@ -303,11 +307,14 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
   return {
     async run(input) {
       const attempts: AlphaJudgeAttempt[] = [];
+      const requiredContextTokens = input.rawNative
+        ? estimateJudgeContextTokens(input.rawNative)
+        : 0;
       const deadlineAt = options.config.timeoutMs > 0 ? Date.now() + options.config.timeoutMs : undefined;
       try {
         const availableProfiles = options.loadProfiles ? await options.loadProfiles() : options.profiles;
         const profiles = availableProfiles?.length
-          ? getEligibleLunaJudgeProfiles({ profiles: availableProfiles, requiredContextTokens: estimateVisibleTokens(input.rawNative.rawRequest), preferredProfileId: options.config.primaryProfileId, maxProfiles: options.config.sameModelFailoverEnabled ? options.config.maxProfileAttempts : 1 })
+          ? getEligibleLunaJudgeProfiles({ profiles: availableProfiles, requiredContextTokens, preferredProfileId: options.config.primaryProfileId, maxProfiles: options.config.sameModelFailoverEnabled ? options.config.maxProfileAttempts : 1 })
           : [];
         const candidates: Array<{ profile?: AlphaExecutionProfile; client: AcuJudgeClient }> = profiles.length
           ? profiles.map((profile) => ({ profile, client: profileClients.get(profile.executionProfileId)! })).filter((candidate) => candidate.client)
@@ -334,6 +341,9 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
                 actualModelVerified: result.model === candidate.profile?.modelId,
                 totalLatencyMs: result.latencyMs,
               });
+              if (candidate.profile && result.usageStatus === "reported") {
+                await options.recordContextEvidence?.(candidate.profile, { successInputTokens: result.promptTokens });
+              }
               attempts.push(attempt);
             }
             return completeRun(result, attempts, result.status);
@@ -343,14 +353,21 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
             if (error instanceof AcuJudgeContextLengthError) continue;
             if (error instanceof AcuJudgeAttemptError) {
               const attempt = failedAttempt(error, index + 1, index === 0 ? "primary" : "same_model_failover", candidate.profile);
-              await recordHealth(attempt, candidate.profile, {
-                success: false,
-                httpStatus: error.attempt.httpStatus,
-                errorCode: error.attempt.failureLayer === "provider_protocol_failure"
-                  ? "protocol_incompatible" : error.attempt.errorCategory,
-                errorMessage: error.message,
-                totalLatencyMs: error.attempt.latencyMs,
-              });
+              if (error.attempt.errorCategory === "context_length_exceeded") {
+                if (candidate.profile) await options.recordContextEvidence?.(candidate.profile, {
+                  judgeFailureThresholdTokens: error.attempt.contextTokenEstimate
+                    ?? requiredContextTokens,
+                });
+              } else {
+                await recordHealth(attempt, candidate.profile, {
+                  success: false,
+                  httpStatus: error.attempt.httpStatus,
+                  errorCode: error.attempt.failureLayer === "provider_protocol_failure"
+                    ? "protocol_incompatible" : error.attempt.errorCategory,
+                  errorMessage: error.message,
+                  totalLatencyMs: error.attempt.latencyMs,
+                });
+              }
               attempts.push(attempt);
             }
           }
@@ -363,13 +380,16 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
         const primaryContextError = error instanceof AcuJudgeAttemptError
           && error.attempt.errorCategory === "context_length_exceeded";
         if (error instanceof AcuJudgeAttemptError && error.attempt.backupEligible
+          && attempts.length < options.config.maxProfileAttempts
           && options.config.syncBackupEnabled && backupClient) {
           try {
             const backup = await backupClient.judge(input.messages, [], false, input.rawNative, input.signal);
-            if (backup.status === "live") attempts.push(successfulAttempt(backup, 2, "backup"));
+            if (backup.status === "live") attempts.push(successfulAttempt(backup, attempts.length + 1, "backup"));
             return completeRun(backup, attempts, backup.status === "cache_hit" ? "cache_hit" : "backup_live");
           } catch (backupError) {
-            if (backupError instanceof AcuJudgeAttemptError) attempts.push(failedAttempt(backupError, 2, "backup"));
+            if (backupError instanceof AcuJudgeAttemptError) {
+              attempts.push(failedAttempt(backupError, attempts.length + 1, "backup"));
+            }
             if (backupError instanceof AcuJudgeAttemptError
               && backupError.attempt.errorCategory === "context_length_exceeded") {
               return terminalContextFailure(backupError.attempt.model, attempts, input);

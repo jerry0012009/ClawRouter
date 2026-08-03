@@ -57,6 +57,7 @@ services:
       - ../../migrations/acu/0013_full_pool_probe_runs.sql:/migration/0013_full_pool_probe_runs.sql:ro
       - ../../migrations/acu/0014_judge_same_model_failover.sql:/migration/0014_judge_same_model_failover.sql:ro
       - ../../migrations/acu/0015_judge_profile_attempt_limit.sql:/migration/0015_judge_profile_attempt_limit.sql:ro
+      - ../../migrations/acu/0016_judge_profile_attempt_limit_5.sql:/migration/0016_judge_profile_attempt_limit_5.sql:ro
     networks: [alpha-backend]
     command:
       - /bin/sh
@@ -79,6 +80,7 @@ services:
         psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0013_full_pool_probe_runs.sql
         psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0014_judge_same_model_failover.sql
         psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0015_judge_profile_attempt_limit.sql
+        psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0016_judge_profile_attempt_limit_5.sql
 
   newapi-codex-pool-sync:
     image: postgres:16-alpine
@@ -107,7 +109,7 @@ services:
         BUILD_COMMIT_SHA: ${CLAWROUTER_BUILD_COMMIT_SHA:-unknown}
         BUILD_TIME: ${BUILD_TIME:-unknown}
         BUILD_BRANCH: ${CLAWROUTER_BUILD_BRANCH:-unknown}
-        SCHEMA_VERSION: 0015_judge_profile_attempt_limit
+        SCHEMA_VERSION: 0016_judge_profile_attempt_limit_5
     restart: unless-stopped
     depends_on:
       acu-migrate:
@@ -146,11 +148,11 @@ services:
       ACU_JUDGE_ROLLBACK_TO_BACKUP: ${ACU_JUDGE_ROLLBACK_TO_BACKUP:-false}
       ACU_JUDGE_ECONOMICS_PROVIDER_ID: lucen
       ACU_JUDGE_FIRST_BYTE_TIMEOUT_MS: ${ACU_JUDGE_FIRST_BYTE_TIMEOUT_MS:-0}
-      ACU_JUDGE_TOTAL_TIMEOUT_MS: ${ACU_JUDGE_TOTAL_TIMEOUT_MS:-25000}
+      ACU_JUDGE_TOTAL_TIMEOUT_MS: ${ACU_JUDGE_TOTAL_TIMEOUT_MS:-270000}
       ACU_JUDGE_SYNC_BACKUP_ENABLED: ${ACU_JUDGE_SYNC_BACKUP_ENABLED:-false}
       ACU_JUDGE_CONTEXT_POLICY: ${ACU_JUDGE_CONTEXT_POLICY:-full_native}
       ACU_JUDGE_SAME_MODEL_FAILOVER_ENABLED: ${ACU_JUDGE_SAME_MODEL_FAILOVER_ENABLED:-true}
-      ACU_JUDGE_MAX_PROFILE_ATTEMPTS: ${ACU_JUDGE_MAX_PROFILE_ATTEMPTS:-3}
+      ACU_JUDGE_MAX_PROFILE_ATTEMPTS: ${ACU_JUDGE_MAX_PROFILE_ATTEMPTS:-5}
       ACU_JUDGE_PRIMARY_PROFILE_ID: ${ACU_JUDGE_PRIMARY_PROFILE_ID:-lucen-cx006-value-dynamic:gpt-5.6-luna:responses}
       ACU_JUDGE_MAX_CONTEXT_TOKENS: ${ACU_JUDGE_MAX_CONTEXT_TOKENS:-1000000}
       ACU_JUDGE_BACKUP_MAX_CONTEXT_TOKENS: ${ACU_JUDGE_BACKUP_MAX_CONTEXT_TOKENS:-1000000}

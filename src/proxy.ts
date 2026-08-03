@@ -101,7 +101,7 @@ const ACU_DEMO_BENCHMARK_PRICING = {
   modelId: ACU_DEMO_BENCHMARK_MODEL_ID,
   inputPricePerMillion: 10,
   outputPricePerMillion: 50,
-  label: "Anthropic Opus 4.8 Fast mode 官方价（Demo基准）",
+  label: "旗舰模型价格",
 };
 
 // ── Routing profile virtual models ──
@@ -806,6 +806,21 @@ function benchmarkBaselineCandidate(candidates: AcuPlanCandidate[]): AcuPlanCand
   return benchmark;
 }
 
+function demoCandidateWithinBenchmark(modelId: string): boolean {
+  const model = getAcuModel(modelId);
+  return Boolean(model
+    && model.inputPricePerMillion !== null
+    && model.outputPricePerMillion !== null
+    && model.inputPricePerMillion !== undefined
+    && model.outputPricePerMillion !== undefined
+    && model.inputPricePerMillion <= ACU_DEMO_BENCHMARK_PRICING.inputPricePerMillion
+    && model.outputPricePerMillion <= ACU_DEMO_BENCHMARK_PRICING.outputPricePerMillion);
+}
+
+function demoEligibleModelIds(modelIds: string[]): string[] {
+  return modelIds.filter(demoCandidateWithinBenchmark);
+}
+
 function buildPlanRecord(args: {
   evaluation: AcuEvaluation;
   allCompatibleModelIds: string[];
@@ -819,7 +834,7 @@ function buildPlanRecord(args: {
     expectedOutputTokens: args.expectedOutputTokens,
     judgeCost: args.evaluation.judgeCost,
     qualityTarget: args.evaluation.qualityTarget,
-    eligibleModelIds: args.allCompatibleModelIds,
+    eligibleModelIds: demoEligibleModelIds(args.allCompatibleModelIds),
   });
   const routedDisplayCandidates = displayRecommendation.estimates.map((estimate) => (
     decoratePlanCandidate(estimate, args.evaluation.difficultyScore, args.store)
@@ -838,13 +853,17 @@ function buildPlanRecord(args: {
     expectedTotalCost: args.evaluation.judgeCost + benchmarkSelectionCost,
     riskAdjustedCost: benchmarkSelectionCost,
   };
-  const displayCandidates = routedDisplayCandidates.map((candidate) => (
-    candidate.modelId === benchmarkBaselineModel.modelId ? benchmarkBaselineModel : candidate
-  ));
+  const displayCandidates = routedDisplayCandidates
+    .map((candidate) => candidate.modelId === benchmarkBaselineModel.modelId ? benchmarkBaselineModel : candidate)
+    .filter((candidate) => demoCandidateWithinBenchmark(candidate.modelId));
+  const demoEvaluation: AcuEvaluation = {
+    ...args.evaluation,
+    recommendation: displayRecommendation,
+  };
   const qualityLeaderModel = qualityCeilingCandidate(displayCandidates);
   const now = Date.now();
   return {
-    evaluation: args.evaluation,
+    evaluation: demoEvaluation,
     createdAt: now,
     expiresAt: now + ACU_PLAN_TTL_MS,
     contextSha256: args.evaluation.contextSha256,
@@ -1516,13 +1535,18 @@ async function handleRequest(
         requireToolCallSupport: requireTools, requireVisionSupport: requireVision,
         requestId: randomUUID(), requestedModel: "planning_only",
       }, rulesDecision);
-      const plan = buildPlanRecord({ evaluation, allCompatibleModelIds, expectedOutputTokens, store: ctx.acuStore });
+      const plan = buildPlanRecord({
+        evaluation,
+        allCompatibleModelIds,
+        expectedOutputTokens,
+        store: ctx.acuStore,
+      });
       pruneAcuPlans(ctx.acuPlans);
       const planId = randomUUID();
       ctx.acuPlans.set(planId, plan);
       res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
       res.end(JSON.stringify({
-        ...evaluation,
+        ...plan.evaluation,
         planId,
         planExpiresAt: new Date(plan.expiresAt).toISOString(),
         benchmarkBaselineModel: plan.benchmarkBaselineModel,

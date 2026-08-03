@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { getEligibleLunaJudgeProfiles } from "../src/alpha/judge-profile-selector.js";
 import type { AlphaExecutionProfile } from "../src/alpha/routing.js";
-import { AcuJudgeClient } from "../src/acu/judge.js";
+import { AcuJudgeClient, AcuJudgeClientCancelledError } from "../src/acu/judge.js";
 import { readAcuRuntimeConfig } from "../src/acu/config.js";
 import { createAcuJudgeRunner, judgeProfileAttemptDeadline } from "../src/alpha/judge-runner.js";
 import { randomUUID } from "node:crypto";
 import { hydrateExecutionProfileRuntime } from "../src/alpha/processor.js";
+import { computeFirstModelEventDeadlineMs, hasRecoveryAttemptBudget, MINIMUM_RECOVERY_ATTEMPT_BUDGET_MS, recoveryBudgetMs } from "../src/alpha/execution-timing.js";
 
 function profile(id: string, overrides: Partial<AlphaExecutionProfile> = {}): AlphaExecutionProfile {
   return {
@@ -28,10 +29,25 @@ function profile(id: string, overrides: Partial<AlphaExecutionProfile> = {}): Al
 }
 
 describe("Luna Judge Profile selector", () => {
-  it("reserves one viable failover window without extending the shared deadline", () => {
-    expect(judgeProfileAttemptDeadline({ now: 1_000, globalDeadlineAt: 26_000, profilesRemaining: 2 })).toBe(18_000);
-    expect(judgeProfileAttemptDeadline({ now: 18_000, globalDeadlineAt: 26_000, profilesRemaining: 1 })).toBe(26_000);
-    expect(judgeProfileAttemptDeadline({ now: 20_000, globalDeadlineAt: 26_000, profilesRemaining: 0 })).toBe(26_000);
+  it("uses Router context defaults, recovery budgets and minimum attempt budget", () => {
+    expect(computeFirstModelEventDeadlineMs({ estimatedInputTokens: 80_000, successfulLatenciesMs: [], recentErrorClasses: [] })).toBe(45_000);
+    expect(computeFirstModelEventDeadlineMs({ estimatedInputTokens: 100_000, successfulLatenciesMs: [], recentErrorClasses: [] })).toBe(75_000);
+    expect(recoveryBudgetMs(80_000)).toBe(180_000);
+    expect(recoveryBudgetMs(100_000)).toBe(270_000);
+    expect(MINIMUM_RECOVERY_ATTEMPT_BUDGET_MS).toBe(15_000);
+    expect(hasRecoveryAttemptBudget(181_000, 166_000)).toBe(true);
+    expect(hasRecoveryAttemptBudget(181_000, 166_001)).toBe(false);
+  });
+
+  it("uses the shared dynamic deadline and gives failover Profiles a normal window", () => {
+    const dynamic = computeFirstModelEventDeadlineMs({
+      estimatedInputTokens: 80_000,
+      successfulLatenciesMs: Array.from({ length: 10 }, (_, index) => 20_000 + index * 100),
+      recentErrorClasses: [], profileState: "healthy",
+    });
+    expect(dynamic).toBe(31_350);
+    expect(judgeProfileAttemptDeadline({ now: 1_000, poolDeadlineAt: 181_000, profileDeadlineMs: dynamic })).toBe(32_350);
+    expect(judgeProfileAttemptDeadline({ now: 46_000, poolDeadlineAt: 181_000, profileDeadlineMs: 45_000 })).toBe(91_000);
   });
 
   it("uses the shared score and only uses preferred Profile as a tie-breaker", () => {
@@ -136,6 +152,115 @@ describe("Luna Judge Profile selector", () => {
     expect(result.sameModelFailoverUsed).toBe(true);
     expect(result.sameModelFailoverChain).toEqual([preferred.executionProfileId, alternate.executionProfileId]);
     expect(result.attempts.map((attempt) => attempt.model)).toEqual(["gpt-5.6-luna", "gpt-5.6-luna"]);
+  });
+
+  it.each([
+    ["HTML", "<!doctype html><html></html>", "text/html", "provider_protocol_failure"],
+    ["invalid provider envelope", "not-json", "application/json", "provider_protocol_failure"],
+    ["invalid Judge JSON", JSON.stringify({ model: "gpt-5.6-luna", output: [{ content: [{ type: "output_text", text: "ordinary prose" }] }] }), "application/json", "judge_semantic_parse_failure"],
+  ])("fails over immediately after %s", async (_name, body, contentType, expectedCategory) => {
+    const first = profile("first");
+    const second = profile("second");
+    const config = readAcuRuntimeConfig({
+      allowMock: true, apiKey: "fixture", judgeModel: "gpt-5.6-luna", judgeProtocol: "responses",
+      primaryProfileId: first.executionProfileId, cachePath: `/tmp/judge-protocol-${randomUUID()}.json`, syncBackupEnabled: false,
+    });
+    const valid = {
+      difficulty_score_raw: 42,
+      factors: { reasoning_depth: 4, task_scope: 4, constraint_density: 4, tool_dependency: 4, verification_burden: 4, context_burden: 4 },
+      p_low: 0.1, p_mid: 0.7, p_mid_high: 0.15, p_high: 0.05, confidence: 0.9,
+      signals: [], explanation: "fixture", webIntent: "not_required", webIntentConfidence: 1,
+      webIntentReason: "local", webIntentEvidence: [],
+    };
+    const clients = new Map([
+      [first.executionProfileId, new AcuJudgeClient(config, async () => new Response(body, { status: 200, headers: { "content-type": contentType } }))],
+      [second.executionProfileId, new AcuJudgeClient(config, async () => new Response(JSON.stringify({
+        model: "gpt-5.6-luna", output: [{ content: [{ type: "output_text", text: JSON.stringify(valid) }] }],
+        usage: { input_tokens: 100, output_tokens: 20 },
+      }), { status: 200, headers: { "content-type": "application/json" } }))],
+    ]);
+    const result = await createAcuJudgeRunner({
+      config, profiles: [first, second], profileClients: clients,
+      rulesDecision: { model: "rules", tier: "MEDIUM", confidence: 1, method: "rules", reasoning: "fixture", costEstimate: 0, baselineCost: 0, savings: 0 },
+    }).run({
+      messages: [], tools: [], trigger: "accepted_response_limit", contextHash: "fixture",
+      webIntentFallbackInput: { recentUserInputs: ["fixture"] }, rawNative: { stateMetadata: {}, rawRequest: "{}" },
+    });
+    expect(result.resultSource).toBe("upstream_live");
+    expect(result.attempts).toHaveLength(2);
+    expect(result.attempts[0]).toMatchObject({ status: "error", errorCategory: expectedCategory });
+    expect(result.attempts[1]).toMatchObject({ status: "success" });
+  });
+
+  it("does not fail over after client cancellation", async () => {
+    const first = profile("first");
+    const second = profile("second");
+    const controller = new AbortController();
+    let calls = 0;
+    const config = readAcuRuntimeConfig({
+      allowMock: true, apiKey: "fixture", judgeModel: "gpt-5.6-luna", judgeProtocol: "responses",
+      primaryProfileId: first.executionProfileId, cachePath: `/tmp/judge-cancel-${randomUUID()}.json`, syncBackupEnabled: false,
+    });
+    const cancellingClient = new AcuJudgeClient(config, async () => {
+      calls += 1;
+      controller.abort();
+      throw new DOMException("cancelled", "AbortError");
+    });
+    const unusedClient = new AcuJudgeClient(config, async () => {
+      calls += 1;
+      throw new Error("must not run");
+    });
+    const runner = createAcuJudgeRunner({
+      config, profiles: [first, second], profileClients: new Map([
+        [first.executionProfileId, cancellingClient], [second.executionProfileId, unusedClient],
+      ]),
+      rulesDecision: { model: "rules", tier: "MEDIUM", confidence: 1, method: "rules", reasoning: "fixture", costEstimate: 0, baselineCost: 0, savings: 0 },
+    });
+    await expect(runner.run({
+      messages: [], tools: [], trigger: "accepted_response_limit", contextHash: "fixture", signal: controller.signal,
+      webIntentFallbackInput: { recentUserInputs: ["fixture"] }, rawNative: { stateMetadata: {}, rawRequest: "{}" },
+    })).rejects.toBeInstanceOf(AcuJudgeClientCancelledError);
+    expect(calls).toBe(1);
+  });
+
+  it("reuses a recent evaluation only after the Luna Profile pool is exhausted", async () => {
+    const first = profile("first");
+    const second = profile("second");
+    const config = readAcuRuntimeConfig({
+      allowMock: true, apiKey: "fixture", judgeModel: "gpt-5.6-luna", judgeProtocol: "responses",
+      primaryProfileId: first.executionProfileId, cachePath: `/tmp/judge-exhaustion-${randomUUID()}.json`, syncBackupEnabled: false,
+    });
+    const valid = {
+      difficulty_score_raw: 42,
+      factors: { reasoning_depth: 4, task_scope: 4, constraint_density: 4, tool_dependency: 4, verification_burden: 4, context_burden: 4 },
+      p_low: 0.1, p_mid: 0.7, p_mid_high: 0.15, p_high: 0.05, confidence: 0.9,
+      signals: [], explanation: "fixture", webIntent: "not_required", webIntentConfidence: 1,
+      webIntentReason: "local", webIntentEvidence: [],
+    };
+    const successfulClient = new AcuJudgeClient(config, async () => new Response(JSON.stringify({
+      model: "gpt-5.6-luna", output: [{ content: [{ type: "output_text", text: JSON.stringify(valid) }] }],
+      usage: { input_tokens: 100, output_tokens: 20 },
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    const rulesDecision = { model: "rules", tier: "MEDIUM" as const, confidence: 1, method: "rules" as const, reasoning: "fixture", costEstimate: 0, baselineCost: 0, savings: 0 };
+    const recentEvaluation = await createAcuJudgeRunner({
+      config, profiles: [first], profileClients: new Map([[first.executionProfileId, successfulClient]]), rulesDecision,
+    }).run({ messages: [], tools: [], trigger: "new_task", contextHash: "fixture", webIntentFallbackInput: { recentUserInputs: ["fixture"] }, rawNative: { stateMetadata: {}, rawRequest: "{}" } });
+    let calls = 0;
+    const failedClient = () => new AcuJudgeClient(config, async () => {
+      calls += 1;
+      return new Response("unavailable", { status: 503 });
+    });
+    const result = await createAcuJudgeRunner({
+      config, profiles: [first, second], profileClients: new Map([
+        [first.executionProfileId, failedClient()], [second.executionProfileId, failedClient()],
+      ]), rulesDecision,
+    }).run({
+      messages: [], tools: [], trigger: "accepted_response_limit", contextHash: "fixture", recentEvaluation,
+      webIntentFallbackInput: { recentUserInputs: ["fixture"] }, rawNative: { stateMetadata: {}, rawRequest: "different" },
+    });
+    expect(calls).toBe(2);
+    expect(result).toMatchObject({ status: "recent_evaluation", resultSource: "recent_evaluation" });
+    expect(result.attempts).toHaveLength(2);
   });
 
   it.each([

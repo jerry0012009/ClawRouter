@@ -30,7 +30,6 @@ import { AcuJudgeClientCancelledError, AcuJudgeContextLengthError } from "../acu
 import { cashCnyPerNominalUsd, providerCostBreakdown, type ProviderEconomics } from "./provider-economics.js";
 import {
   classifyProviderContextOverflow,
-  computeFirstModelEventDeadlineMs,
   contextOverflowRecoveryEligible,
   createRecoveringProviderAdapter,
   ProviderPreOutputError,
@@ -39,6 +38,7 @@ import {
   type ProviderAttemptHandle,
   type ProviderRecoveryTarget,
 } from "./execution.js";
+import { MINIMUM_RECOVERY_ATTEMPT_BUDGET_MS, recoveryBudgetMs, resolveProfileAttemptDeadlineMs } from "./execution-timing.js";
 import { classifyAttemptOutcome, deriveRuntimeEligibility, type AttemptOutcome, type HealthSnapshot } from "./channel-health.js";
 import { recordSharedRuntimeHealthOutcome } from "./runtime-health-outcome.js";
 import { estimateContextAdmission, effectiveContextCeiling } from "./context-admission.js";
@@ -2763,31 +2763,12 @@ export class AlphaRequestProcessor {
       const key = `${profile.executionProfileId}:${longContext ? "long" : "standard"}`;
       const cached = attemptDeadlineCache.get(key);
       if (cached) return cached;
-      const value = Promise.all([
-        this.options.database.query<{ latency_ms: number }>(
-          `SELECT (metadata_json->>'first_model_event_latency_ms')::double precision AS latency_ms
-           FROM acu_attempts
-           WHERE attempt_kind='provider' AND status='success' AND execution_profile_id=$1
-             AND metadata_json ? 'first_model_event_latency_ms'
-             AND CASE WHEN $2::boolean THEN input_tokens>=100000 ELSE input_tokens<100000 END
-             AND completed_at >= now()-interval '24 hours'
-           ORDER BY completed_at DESC LIMIT 50`,
-          [profile.executionProfileId, longContext],
-        ),
-        this.options.database.query<{ error_class: string }>(
-          `SELECT COALESCE(metadata_json->>'errorClass',error_category,'') AS error_class
-           FROM acu_attempts WHERE attempt_kind='provider' AND execution_profile_id=$1
-             AND completed_at >= now()-interval '24 hours'
-           ORDER BY completed_at DESC LIMIT 5`,
-          [profile.executionProfileId],
-        ),
-        repository.profileHealth(profile.executionProfileId),
-      ]).then(([latencies, outcomes, runtime]) => computeFirstModelEventDeadlineMs({
+      const value = resolveProfileAttemptDeadlineMs({
+        database: this.options.database,
+        repository,
+        profile,
         estimatedInputTokens: recoveryContextAdmission.estimatedInputTokens,
-        successfulLatenciesMs: latencies.rows.map((row) => Number(row.latency_ms)),
-        recentErrorClasses: outcomes.rows.map((row) => row.error_class),
-        profileState: runtime?.state ?? profile.health,
-      }));
+      });
       attemptDeadlineCache.set(key, value);
       return value;
     };
@@ -2847,8 +2828,8 @@ export class AlphaRequestProcessor {
     const adapter = createRecoveringProviderAdapter({
       initial: initialAttempt,
       maxAttempts: maxProviderAttempts,
-      recoveryBudgetMs: longContext ? 270_000 : 180_000,
-      minimumAttemptBudgetMs: 15_000,
+      recoveryBudgetMs: recoveryBudgetMs(recoveryContextAdmission.estimatedInputTokens),
+      minimumAttemptBudgetMs: MINIMUM_RECOVERY_ATTEMPT_BUDGET_MS,
       isRecoverableResponse: (response) => isWebSearchProviderError(response, envelope),
       isRecoverableFailure: (failure, current) => {
         if (mode !== "explicit" && isReasoningTransportError(failure)) {

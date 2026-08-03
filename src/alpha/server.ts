@@ -21,6 +21,7 @@ import { combinedMonitorState, mergeSupplyInventory, monitorRangeSpec, monitorRo
 import { AdaptiveProbeWorker } from "./adaptive-probe.js";
 import { deriveRuntimeEligibility } from "./channel-health.js";
 import { recordSharedRuntimeHealthOutcome } from "./runtime-health-outcome.js";
+import { resolveProfileAttemptDeadlineMs } from "./execution-timing.js";
 import {
   DEFAULT_BILLING_POLICY_VERSION,
   parseRetailMarkupMultiplier,
@@ -304,6 +305,12 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
       protocol: "responses",
       outcome,
       wakeProbe: (executionProfileId) => executionProfileId ? adaptiveProbe.enqueue(executionProfileId) : adaptiveProbe.wake(),
+    }),
+    profileAttemptDeadlineMs: (profile, estimatedInputTokens) => resolveProfileAttemptDeadlineMs({
+      database,
+      repository: runtimeRepository,
+      profile,
+      estimatedInputTokens,
     }),
   });
   const processor = new AlphaRequestProcessor({

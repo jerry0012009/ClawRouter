@@ -3670,7 +3670,9 @@ export class AlphaRequestProcessor {
     }
     const transportSuccess = relay.httpStatus >= 200 && relay.httpStatus < 300 && relay.complete;
     const generationFailed = relay.terminalKind === "failed";
+    const generationIncomplete = relay.terminalKind === "incomplete";
     const generationTruncated = relay.terminalKind === "incomplete" && relay.incompleteReason === "max_output_tokens";
+    const generationIncompleteOther = generationIncomplete && !generationTruncated;
     const billing = resolveProviderBilling(usage);
     const canonicalModel = canonicalActualModel(context.selectedProfile, usage.actualModel);
     const actualModelMismatch = Boolean(usage.actualModel && canonicalModel !== context.selectedProfile.modelId);
@@ -3684,7 +3686,7 @@ export class AlphaRequestProcessor {
       hostedWebIncompatible: webRequiredFailure,
       recoveryExecuted: context.recoveryDecisionReason === "executed",
     });
-    const success = transportSuccess && !generationFailed && !webRequiredFailure;
+    const success = transportSuccess && !generationFailed && !generationIncompleteOther && !webRequiredFailure;
     const status = relay.clientCancelled ? "cancelled" : success ? "success" : "error";
     const errorCategory = success
       ? undefined
@@ -3744,6 +3746,7 @@ export class AlphaRequestProcessor {
         complete: relay.complete,
         terminalKind: relay.terminalKind,
         incompleteReason: relay.incompleteReason,
+        generationIncomplete,
         generationTruncated,
         clientCancelled: relay.clientCancelled,
         clientDeclaredWebTool: context.clientDeclaredWebTool,
@@ -3774,7 +3777,7 @@ export class AlphaRequestProcessor {
         recoveryDecisionReason: context.recoveryDecisionReason,
       },
     });
-    if (!recoveryAlreadyFinalized && !generationTruncated
+    if (!recoveryAlreadyFinalized && !generationIncomplete
       && outcome.healthImpact !== "none" && (!webRequiredFailure || transportSuccess)) {
       const strictErrorCode = generationFailed
         ? undefined
@@ -3798,7 +3801,7 @@ export class AlphaRequestProcessor {
         firstTokenLatencyMs: relay.firstModelEventLatencyMs,
       });
     }
-    if (!recoveryAlreadyFinalized && !generationTruncated && !generationFailed
+    if (!recoveryAlreadyFinalized && !generationIncomplete && !generationFailed
       && (transportSuccess || relay.webSearch.actuallyInvoked || webRequiredFailure)) {
       await repository.saveProfileWebHealth({
         executionProfileId: context.selectedProfile.executionProfileId,
@@ -3846,12 +3849,13 @@ export class AlphaRequestProcessor {
       recoveryDecisionReason: context.recoveryDecisionReason,
       terminalKind: relay.terminalKind,
       incompleteReason: relay.incompleteReason,
+      generationIncomplete,
       generationTruncated,
     });
     await repository.completeLogicalRequest({
       logicalRequestId: context.logicalRequestId,
       newapiUserId: context.newapiUserId,
-      status: success ? "completed" : generationFailed ? "failed" : status,
+      status: success ? "completed" : generationFailed || generationIncompleteOther ? "failed" : status,
       acceptedAttemptId: success ? context.attemptId : undefined,
       responsePayloadId,
       errorCategory,

@@ -1310,6 +1310,86 @@ run("Alpha PostgreSQL request processor", () => {
     )).rowCount).toBe(0);
   });
 
+  it("delivers another incomplete terminal without accepting it or changing Profile health", async () => {
+    await database.query("DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id=$1", [primaryProfile.executionProfileId]);
+    await database.query("DELETE FROM acu_profile_probe_queue WHERE execution_profile_id=$1", [primaryProfile.executionProfileId]);
+    const testCase = "generation-incomplete-other";
+    const body = Buffer.from(JSON.stringify({
+      model: "acu-auto",
+      input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "Stop for a content filter" }] }],
+      stream: true,
+      test_case: testCase,
+      test_incomplete_reason: "fixture_other_reason",
+    }));
+    const response = await fetch(`http://127.0.0.1:${gatewayPort}/v1/responses`, {
+      method: "POST", headers: signedHeaders(body, testCase, "user-generation-incomplete-other"), body,
+    });
+    const responseBody = await response.text();
+    expect(responseBody).toContain('"type":"response.output_text.delta"');
+    expect(responseBody).toContain('"type":"response.incomplete"');
+    expect(responseBody).toContain('"reason":"fixture_other_reason"');
+    const state = await database.query<{
+      attempts: string; attempt_status: string; logical_status: string; accepted_attempt_id: string | null;
+      accepted_responses: number; terminal: string; reason: string; incomplete: boolean; truncated: boolean;
+      health_count: string; probe_count: string;
+    }>(
+      `SELECT
+       (SELECT count(*) FROM acu_attempts a WHERE a.logical_request_id=l.logical_request_id) attempts,
+       (SELECT status FROM acu_attempts a WHERE a.logical_request_id=l.logical_request_id) attempt_status,
+       l.status logical_status,l.accepted_attempt_id,
+       (SELECT accepted_responses_since_judge FROM acu_segments s WHERE s.segment_id=l.segment_id) accepted_responses,
+       (SELECT metadata_json->>'terminalKind' FROM acu_attempts a WHERE a.logical_request_id=l.logical_request_id) terminal,
+       (SELECT metadata_json->>'incompleteReason' FROM acu_attempts a WHERE a.logical_request_id=l.logical_request_id) reason,
+       (SELECT (metadata_json->>'generationIncomplete')::boolean FROM acu_attempts a WHERE a.logical_request_id=l.logical_request_id) incomplete,
+       (SELECT (metadata_json->>'generationTruncated')::boolean FROM acu_attempts a WHERE a.logical_request_id=l.logical_request_id) truncated,
+       (SELECT count(*) FROM acu_provider_model_profile_health h WHERE h.execution_profile_id=$2) health_count,
+       (SELECT count(*) FROM acu_profile_probe_queue q WHERE q.execution_profile_id=$2) probe_count
+       FROM acu_logical_requests l WHERE l.newapi_user_id=$1`,
+      ["user-generation-incomplete-other", primaryProfile.executionProfileId],
+    );
+    expect(state.rows[0]).toEqual({
+      attempts: "1", attempt_status: "error", logical_status: "failed", accepted_attempt_id: null,
+      accepted_responses: 0, terminal: "incomplete", reason: "fixture_other_reason",
+      incomplete: true, truncated: false, health_count: "0", probe_count: "0",
+    });
+  });
+
+  it("immediately delivers terminal-only incomplete without retrying or changing health", async () => {
+    await database.query("DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id=$1", [primaryProfile.executionProfileId]);
+    await database.query("DELETE FROM acu_profile_probe_queue WHERE execution_profile_id=$1", [primaryProfile.executionProfileId]);
+    const testCase = "generation-incomplete-terminal-only";
+    const started = Date.now();
+    const responseBody = await send({
+      model: "acu-auto",
+      input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "Terminal-only incomplete" }] }],
+      stream: true,
+      test_case: testCase,
+      test_terminal_only: true,
+      test_incomplete_reason: "fixture_other_reason",
+    }, testCase, "user-generation-incomplete-terminal-only");
+    expect(Date.now() - started).toBeLessThan(5_000);
+    expect(responseBody).toContain('"type":"response.incomplete"');
+    const state = await database.query<{
+      attempts: string; attempt_status: string; terminal: string; reason: string;
+      incomplete: boolean; health_count: string; probe_count: string;
+    }>(
+      `SELECT
+       (SELECT count(*) FROM acu_attempts a WHERE a.logical_request_id=l.logical_request_id) attempts,
+       (SELECT status FROM acu_attempts a WHERE a.logical_request_id=l.logical_request_id) attempt_status,
+       (SELECT metadata_json->>'terminalKind' FROM acu_attempts a WHERE a.logical_request_id=l.logical_request_id) terminal,
+       (SELECT metadata_json->>'incompleteReason' FROM acu_attempts a WHERE a.logical_request_id=l.logical_request_id) reason,
+       (SELECT (metadata_json->>'generationIncomplete')::boolean FROM acu_attempts a WHERE a.logical_request_id=l.logical_request_id) incomplete,
+       (SELECT count(*) FROM acu_provider_model_profile_health h WHERE h.execution_profile_id=$2) health_count,
+       (SELECT count(*) FROM acu_profile_probe_queue q WHERE q.execution_profile_id=$2) probe_count
+       FROM acu_logical_requests l WHERE l.newapi_user_id=$1`,
+      ["user-generation-incomplete-terminal-only", primaryProfile.executionProfileId],
+    );
+    expect(state.rows[0]).toEqual({
+      attempts: "1", attempt_status: "error", terminal: "incomplete", reason: "fixture_other_reason",
+      incomplete: true, health_count: "0", probe_count: "0",
+    });
+  });
+
   it("records response.failed after visible output as a failed logical request without recovery", async () => {
     await database.query("DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id=$1", [primaryProfile.executionProfileId]);
     const acceptedBefore = await database.query<{ count: number }>(

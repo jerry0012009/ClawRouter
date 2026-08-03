@@ -66,6 +66,36 @@ function judgeAt(difficulty: number): AcuJudgeResult {
 }
 
 describe("routing preference v0.4", () => {
+  it("keeps one continuous Luna Max range, then switches to Sol without returning", async () => {
+    const profiles = await productionPricedProfiles();
+    for (const routingPreference of ["economy", "balanced", "quality"] as const) {
+      const selected = Array.from({ length: 51 }, (_, index) => routeWithCurrentAcuFormula({
+        judge: judgeAt(index * 2),
+        judgeCost: 0,
+        inputTokens: 100_000,
+        expectedOutputTokens: 4_000,
+        effectiveQualityTarget: 80,
+        routingPreference,
+        profiles,
+        requirements: {
+          protocol: "responses",
+          requireTools: true,
+          requiredToolTypes: ["function", "custom", "local_tool"],
+          requireThinking: false,
+          contextTokens: 104_000,
+          webIntent: "not_required",
+        },
+      }).recommendation.recommended.candidateId);
+      const maxIndexes = selected.flatMap((candidateId, index) => (
+        candidateId === "gpt-5.6-luna@max" ? [index] : []
+      ));
+      expect(maxIndexes.length).toBeGreaterThan(1);
+      expect(maxIndexes.at(-1)! - maxIndexes[0]! + 1).toBe(maxIndexes.length);
+      expect(selected[maxIndexes.at(-1)! + 1]).toBe("gpt-5.6-sol");
+      expect(selected.slice(maxIndexes.at(-1)! + 1)).not.toContain("gpt-5.6-luna@max");
+    }
+  });
+
   it("trades a limited amount of difficult-task quality for materially lower cost", async () => {
     const profiles = await productionPricedProfiles();
     const route = (preference: RoutingPreference, difficulty: number) => routeWithCurrentAcuFormula({

@@ -21,6 +21,15 @@ export function sigmoid(value: number): number {
   return z / (1 + z);
 }
 
+export function applyLogitShift(probability: number, shift: number): number {
+  const boundedProbability = clamp(probability);
+  const oddsMultiplier = Math.exp(shift);
+  return clamp(
+    (boundedProbability * oddsMultiplier)
+      / (1 - boundedProbability + boundedProbability * oddsMultiplier),
+  );
+}
+
 export function normalizeProbabilities(
   value: Omit<AcuTierProbabilities, "confidence"> & { confidence?: number },
 ): AcuTierProbabilities {

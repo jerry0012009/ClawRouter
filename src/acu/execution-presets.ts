@@ -6,7 +6,7 @@ export type AcuExecutionPreset = {
   modelId: string;
   displayName: string;
   canonicalReasoningEffort: CanonicalReasoningEffort;
-  qualityScoreOffset: number;
+  qualityLogitShift: number;
   expectedOutputTokenMultiplier: number;
   enabled: boolean;
   calibrationStatus: "provisional" | "observed";
@@ -19,7 +19,7 @@ export const ACU_EXECUTION_PRESETS: readonly AcuExecutionPreset[] = [{
   modelId: "gpt-5.6-luna",
   displayName: "GPT-5.6 Luna · Max",
   canonicalReasoningEffort: "max",
-  qualityScoreOffset: 3.5,
+  qualityLogitShift: 0.22,
   expectedOutputTokenMultiplier: 1.6,
   enabled: true,
   calibrationStatus: "provisional",

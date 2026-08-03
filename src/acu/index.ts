@@ -3,6 +3,7 @@ export { AcuJudgeClient, buildJudgeSystemPrompt, computeDifficultyIndex, hasSeve
 export { getAcuCatalog, getAcuModel, buildModelCurve, interpolateModelCurve, publicCatalogPayload } from "./catalog.js";
 export { recommendModel, estimateCallCost, isParetoEfficient, selectValueRoute } from "./decision.js";
 export {
+  applyLogitShift,
   difficultyScore,
   normalizedEntropy,
   estimatedQuality,

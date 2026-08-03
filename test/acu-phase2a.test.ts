@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  applyLogitShift,
   AcuJudgeClient,
   computeDifficultyIndex,
   buildModelCurve,
@@ -34,6 +35,18 @@ afterEach(async () => {
 });
 
 describe("Phase 2A constrained tier model", () => {
+  it("applies a bounded logit shift with diminishing gains near saturation", () => {
+    expect(applyLogitShift(0.42, 0)).toBeCloseTo(0.42, 15);
+    expect(applyLogitShift(0.42, 0.22)).toBeGreaterThan(0.42);
+    expect(applyLogitShift(-1, 0.22)).toBe(0);
+    expect(applyLogitShift(2, 0.22)).toBe(1);
+
+    const middleGain = applyLogitShift(0.5, 0.22) - 0.5;
+    const saturatedGain = applyLogitShift(0.95, 0.22) - 0.95;
+    expect(middleGain).toBeGreaterThan(saturatedGain);
+    expect(applyLogitShift(0.99, 0.22) - 0.99).toBeLessThan(saturatedGain);
+  });
+
   it("normalizes Judge probabilities and computes the documented difficulty", () => {
     const probabilities = normalizeProbabilities({
       pLow: 0.8,

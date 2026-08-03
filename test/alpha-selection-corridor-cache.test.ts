@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { AlphaRequestProcessor, codexSelectionCorridorRequirements } from "../src/alpha/processor.js";
+import { getAcuModel, interpolateModelCurve } from "../src/acu/catalog.js";
+import { applyLogitShift } from "../src/acu/math.js";
 import type { AlphaExecutionProfile } from "../src/alpha/routing.js";
 
 const lunaProfile: AlphaExecutionProfile = {
@@ -111,5 +113,13 @@ describe("selection corridor cache", () => {
       Array.from({ length: 51 }, (_, index) => index * 2),
     );
     expect(result.executionPresetSeries[0]?.points.every((point) => point.estimatedCallCost > 0)).toBe(true);
+    const luna = getAcuModel("gpt-5.6-luna")!;
+    expect(result.executionPresetSeries[0]?.points.every((point) => (
+      Math.abs(
+        point.estimatedQuality / 100
+          - applyLogitShift(interpolateModelCurve(luna, point.difficulty).estimatedQuality, 0.22),
+      ) < 1e-12
+    ))).toBe(true);
+    expect(result.executionPresetSeries[0]?.points.every((point) => point.estimatedQuality < 99.95)).toBe(true);
   });
 });

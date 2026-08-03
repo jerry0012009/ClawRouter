@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { getAcuModel, interpolateModelCurve } from "../src/acu/catalog.js";
 import { recommendModel } from "../src/acu/decision.js";
+import { applyLogitShift } from "../src/acu/math.js";
 import { calculateProviderCost, parseProviderUsage } from "../src/alpha/usage.js";
 
 const input = {
@@ -21,16 +22,31 @@ describe("Luna Max execution preset", () => {
     expect(new Set(estimates.map((item) => item.modelId))).toEqual(new Set(["gpt-5.6-luna"]));
   });
 
-  it("uses +3.5 score points and 1.6x output prediction only", () => {
+  it("uses a 0.22 logit shift and 1.6x output prediction only", () => {
     const luna = getAcuModel("gpt-5.6-luna")!;
     const baseQuality = interpolateModelCurve(luna, input.difficultyScore).estimatedQuality;
     const estimates = recommendModel(input);
     const base = estimates.estimates.find((item) => item.candidateId === "gpt-5.6-luna")!;
     const max = estimates.estimates.find((item) => item.candidateId === "gpt-5.6-luna@max")!;
-    expect(max.estimatedQuality).toBeCloseTo(Math.min(1, baseQuality + 0.035), 12);
+    expect(max.estimatedQuality).toBeCloseTo(applyLogitShift(baseQuality, 0.22), 12);
     expect(max.estimatedCallCost - base.estimatedCallCost).toBeCloseTo(600 * 10 / 1_000_000, 12);
     expect(max.executionPresetId).toBe("gpt-5.6-luna:max");
     expect(max.reasoningEffort).toBe("max");
+  });
+
+  it("produces a finite, monotone Luna Max curve without a 100-point plateau", () => {
+    const points = Array.from({ length: 101 }, (_, difficultyScore) => {
+      const estimates = recommendModel({ ...input, difficultyScore }).estimates;
+      return {
+        base: estimates.find((item) => item.candidateId === "gpt-5.6-luna")!.estimatedQuality,
+        max: estimates.find((item) => item.candidateId === "gpt-5.6-luna@max")!.estimatedQuality,
+      };
+    });
+    expect(points.every(({ base, max }) => Number.isFinite(max) && max >= base && max <= 1)).toBe(true);
+    expect(points.every((point, index) => index === 0 || point.max <= points[index - 1]!.max)).toBe(true);
+    expect(points[0]!.max).toBeLessThan(1);
+    expect(Number((points[0]!.max * 100).toFixed(1))).toBeLessThan(100);
+    expect(points.filter(({ max }) => max === 1)).toHaveLength(0);
   });
 
   it("does not apply the multiplier or reasoning detail to actual billing", () => {

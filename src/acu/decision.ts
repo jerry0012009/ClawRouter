@@ -1,6 +1,6 @@
 import { ACU_DEFAULT_QUALITY_TARGET, ACU_DEFAULT_SWITCH_COST_USD } from "./config.js";
 import { getAcuCatalog, getRoutingEligibleModels, interpolateModelCurve } from "./catalog.js";
-import { clamp, normalizeProbabilities, normalizedEntropy } from "./math.js";
+import { applyLogitShift, clamp, normalizeProbabilities, normalizedEntropy } from "./math.js";
 import { enabledExecutionPresets, type AcuExecutionPreset } from "./execution-presets.js";
 import type {
   AcuModelCatalogEntry,
@@ -61,7 +61,9 @@ function estimateOne(
   preset?: AcuExecutionPreset,
 ): AcuModelEstimate {
   const curvePoint = interpolateModelCurve(model, difficultyScore);
-  const quality = clamp(curvePoint.estimatedQuality + (preset?.qualityScoreOffset ?? 0) / 100);
+  const quality = preset
+    ? applyLogitShift(curvePoint.estimatedQuality, preset.qualityLogitShift)
+    : curvePoint.estimatedQuality;
   const lower = clamp(quality - model.uncertaintyWidth - entropyPenalty / 100);
   const upper = clamp(quality + model.uncertaintyWidth);
   const expectedOutputTokens = Math.round(outputTokens * (preset?.expectedOutputTokenMultiplier ?? 1));

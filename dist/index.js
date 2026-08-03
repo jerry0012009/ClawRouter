@@ -4198,7 +4198,7 @@ import { createHash as createHash5, randomUUID } from "crypto";
 // src/acu/config.ts
 var ACU_PROMPT_VERSION = "acu-tier-requirement-v4";
 var ACU_DIFFICULTY_METHOD_VERSION = "acu-difficulty-index-v1";
-var ACU_ROUTING_MODEL_VERSION = "acu-routing-model-v0.4";
+var ACU_ROUTING_MODEL_VERSION = "acu-routing-model-v0.5";
 var ACU_DEFAULT_JUDGE_MODEL = "gpt-5.6-luna";
 var ACU_DEFAULT_JUDGE_BASE_URL = "https://lucen.cc/v1";
 var ACU_DEFAULT_JUDGE_MODE = "non-thinking";
@@ -6357,6 +6357,8 @@ function enabledExecutionPresets() {
 }
 
 // src/acu/decision.ts
+var ACU_COST_LOG_SCALE = 2.5;
+var VALUE_UTILITY_NEAR_TIE_RATIO = 0.995;
 function estimateCallCost(model, inputTokens, outputTokens) {
   if (model.inputPricePerMillion === null || model.outputPricePerMillion === null) {
     return Number.POSITIVE_INFINITY;
@@ -6424,18 +6426,23 @@ function selectValueRoute(candidates, targetScore, costSensitivity = 1) {
   const qualityExponent = 0.8 + 1.2 * preference;
   const finiteCosts = frontier.map((candidate) => Math.max(1e-9, candidate.riskAdjustedCost));
   const minCost = Math.min(...finiteCosts);
-  const maxCost = Math.max(...finiteCosts);
-  const logRange = Math.log(maxCost / minCost);
+  const allCostsEqual = finiteCosts.every((cost) => Math.abs(cost - minCost) <= 1e-12);
   const utilities = /* @__PURE__ */ new Map();
   for (const candidate of frontier) {
     const conservative = candidate.conservativeScore ?? candidate.predictedScore;
     const riskAdjustedScore = candidate.predictedScore - riskWeight * Math.max(0, candidate.predictedScore - conservative);
     const qualityUtility = Math.pow(Math.max(0, riskAdjustedScore) / Math.max(1, targetScore), qualityExponent);
-    const costUtility = logRange <= 1e-12 ? 1 : 1 - Math.log(Math.max(1e-9, candidate.riskAdjustedCost) / minCost) / logRange;
+    const costUtility = allCostsEqual ? 1 : clamp(
+      1 / (1 + ACU_COST_LOG_SCALE * Math.log(
+        Math.max(1e-9, candidate.riskAdjustedCost) / minCost
+      ))
+    );
     const valueUtility = qualityUtility * (1 - costWeight + costWeight * costUtility);
     utilities.set(candidateIdentity(candidate), { riskAdjustedScore, qualityUtility, costUtility, valueUtility });
   }
-  const selected = frontier.reduce((best, item) => utilities.get(candidateIdentity(item)).valueUtility > utilities.get(candidateIdentity(best)).valueUtility ? item : best);
+  const bestValueUtility = Math.max(...frontier.map((candidate) => utilities.get(candidateIdentity(candidate)).valueUtility));
+  const nearTiedCandidates = frontier.filter((candidate) => utilities.get(candidateIdentity(candidate)).valueUtility >= bestValueUtility * VALUE_UTILITY_NEAR_TIE_RATIO);
+  const selected = nearTiedCandidates.reduce((best, candidate) => candidate.riskAdjustedCost < best.riskAdjustedCost ? candidate : best);
   const saving = bestScore.riskAdjustedCost > 0 ? (1 - selected.riskAdjustedCost / bestScore.riskAdjustedCost) * 100 : 0;
   return {
     selected,
@@ -10230,6 +10237,7 @@ var plugin = {
 };
 var index_default = plugin;
 export {
+  ACU_COST_LOG_SCALE,
   AcuDemoStrategy,
   AcuJudgeClient,
   AcuRoutingStore,
@@ -10240,6 +10248,7 @@ export {
   RequestDeduplicator,
   ResponseCache,
   SessionStore,
+  VALUE_UTILITY_NEAR_TIE_RATIO,
   VERSION,
   applyLogitShift,
   blockrunProvider,

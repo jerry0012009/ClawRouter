@@ -1,0 +1,54 @@
+{
+  "generatedAt": "2026-08-03T09:18:00Z",
+  "sampleJudgeEvaluationId": "judge_67d901cd21ae40d794da41d677e3abfc",
+  "sampleRawBytes": 328104,
+  "sampleHistoricalStatus": "live",
+  "sampleHistoricalRawRequestTokenEstimate": 80391,
+  "method": "One sequential force-refresh request per runtime-eligible Luna Responses profile and timeout. TTFB is fetch response-header time; validJudgeJson is the production AcuJudgeClient parser result.",
+  "summary": [
+    {
+      "timeoutMs": 25000,
+      "profiles": 9,
+      "liveSuccessRate": 0.7777777778,
+      "p50LatencyMs": 11895,
+      "p95LatencyMs": 25009,
+      "timeouts": 2,
+      "semanticParseFailures": 0
+    },
+    {
+      "timeoutMs": 60000,
+      "profiles": 9,
+      "liveSuccessRate": 0.8888888889,
+      "p50LatencyMs": 11871,
+      "p95LatencyMs": 23758,
+      "timeouts": 0,
+      "semanticParseFailures": 1
+    }
+  ],
+  "limitations": {
+    "failoverUsageRate": "not_applicable_independent_profile_probes",
+    "recentEvaluationRate": "not_applicable_no_router_fallback_in_probe",
+    "rulesStrategyRate": "not_applicable_no_router_fallback_in_probe",
+    "productionParameterChanged": false
+  },
+  "results": [
+    {"timeoutMs":25000,"executionProfileId":"blackai-codex-mix-low:gpt-5.6-luna:responses","provider":"blackai","channel":"blackai-codex-mix-low","httpStatus":200,"errorCategory":null,"firstByteMs":12442,"totalLatencyMs":12923,"assistantTextExtracted":true,"validJudgeJson":true,"parserException":null,"inputTokens":106066,"outputTokens":503},
+    {"timeoutMs":25000,"executionProfileId":"blackai-pro-1-4:gpt-5.6-luna:responses","provider":"blackai","channel":"blackai-pro-1-4","httpStatus":200,"errorCategory":null,"firstByteMs":11831,"totalLatencyMs":11860,"assistantTextExtracted":true,"validJudgeJson":true,"parserException":null,"inputTokens":106066,"outputTokens":526},
+    {"timeoutMs":25000,"executionProfileId":"blackai-codex-mix-pro-fallback:gpt-5.6-luna:responses","provider":"blackai","channel":"blackai-codex-mix-pro-fallback","httpStatus":200,"errorCategory":null,"firstByteMs":11847,"totalLatencyMs":11895,"assistantTextExtracted":true,"validJudgeJson":true,"parserException":null,"inputTokens":106362,"outputTokens":478},
+    {"timeoutMs":25000,"executionProfileId":"lucen-cx006-value-dynamic:gpt-5.6-luna:responses","provider":"lucen","channel":"lucen-cx006-value-dynamic","httpStatus":200,"errorCategory":null,"firstByteMs":10550,"totalLatencyMs":10699,"assistantTextExtracted":true,"validJudgeJson":true,"parserException":null,"inputTokens":106104,"outputTokens":452},
+    {"timeoutMs":25000,"executionProfileId":"lucen-cx008-plus-dedicated:gpt-5.6-luna:responses","provider":"lucen","channel":"lucen-cx008-plus-dedicated","httpStatus":null,"errorCategory":"timeout","firstByteMs":null,"totalLatencyMs":25005,"assistantTextExtracted":false,"validJudgeJson":false,"parserException":"Judge total timeout","inputTokens":0,"outputTokens":0},
+    {"timeoutMs":25000,"executionProfileId":"lucen-cx010-plus-fast:gpt-5.6-luna:responses","provider":"lucen","channel":"lucen-cx010-plus-fast","httpStatus":200,"errorCategory":null,"firstByteMs":11160,"totalLatencyMs":11284,"assistantTextExtracted":true,"validJudgeJson":true,"parserException":null,"inputTokens":106104,"outputTokens":495},
+    {"timeoutMs":25000,"executionProfileId":"lucen-cx014-pro-stable:gpt-5.6-luna:responses","provider":"lucen","channel":"lucen-cx014-pro-stable","httpStatus":null,"errorCategory":"timeout","firstByteMs":null,"totalLatencyMs":25009,"assistantTextExtracted":false,"validJudgeJson":false,"parserException":"Judge total timeout","inputTokens":0,"outputTokens":0},
+    {"timeoutMs":25000,"executionProfileId":"lucen-cx017-pro-first-token:gpt-5.6-luna:responses","provider":"lucen","channel":"lucen-cx017-pro-first-token","httpStatus":200,"errorCategory":null,"firstByteMs":12625,"totalLatencyMs":12740,"assistantTextExtracted":true,"validJudgeJson":true,"parserException":null,"inputTokens":106066,"outputTokens":507},
+    {"timeoutMs":25000,"executionProfileId":"lucen-cx025-pro-premium:gpt-5.6-luna:responses","provider":"lucen","channel":"lucen-cx025-pro-premium","httpStatus":200,"errorCategory":null,"firstByteMs":9658,"totalLatencyMs":9747,"assistantTextExtracted":true,"validJudgeJson":true,"parserException":null,"inputTokens":106066,"outputTokens":439},
+    {"timeoutMs":60000,"executionProfileId":"blackai-codex-mix-low:gpt-5.6-luna:responses","provider":"blackai","channel":"blackai-codex-mix-low","httpStatus":200,"errorCategory":null,"firstByteMs":11834,"totalLatencyMs":11871,"assistantTextExtracted":true,"validJudgeJson":true,"parserException":null,"inputTokens":106066,"outputTokens":512},
+    {"timeoutMs":60000,"executionProfileId":"blackai-pro-1-4:gpt-5.6-luna:responses","provider":"blackai","channel":"blackai-pro-1-4","httpStatus":null,"errorCategory":"judge_semantic_parse_failure","firstByteMs":10894,"totalLatencyMs":10948,"assistantTextExtracted":true,"validJudgeJson":false,"parserException":"Expected double-quoted property name in JSON at position 1046 (line 1 column 1047)","inputTokens":106066,"outputTokens":482},
+    {"timeoutMs":60000,"executionProfileId":"blackai-codex-mix-pro-fallback:gpt-5.6-luna:responses","provider":"blackai","channel":"blackai-codex-mix-pro-fallback","httpStatus":200,"errorCategory":null,"firstByteMs":12869,"totalLatencyMs":12910,"assistantTextExtracted":true,"validJudgeJson":true,"parserException":null,"inputTokens":106066,"outputTokens":532},
+    {"timeoutMs":60000,"executionProfileId":"lucen-cx006-value-dynamic:gpt-5.6-luna:responses","provider":"lucen","channel":"lucen-cx006-value-dynamic","httpStatus":200,"errorCategory":null,"firstByteMs":11137,"totalLatencyMs":11250,"assistantTextExtracted":true,"validJudgeJson":true,"parserException":null,"inputTokens":106104,"outputTokens":467},
+    {"timeoutMs":60000,"executionProfileId":"lucen-cx008-plus-dedicated:gpt-5.6-luna:responses","provider":"lucen","channel":"lucen-cx008-plus-dedicated","httpStatus":200,"errorCategory":null,"firstByteMs":11821,"totalLatencyMs":11924,"assistantTextExtracted":true,"validJudgeJson":true,"parserException":null,"inputTokens":106066,"outputTokens":514},
+    {"timeoutMs":60000,"executionProfileId":"lucen-cx010-plus-fast:gpt-5.6-luna:responses","provider":"lucen","channel":"lucen-cx010-plus-fast","httpStatus":200,"errorCategory":null,"firstByteMs":11489,"totalLatencyMs":11605,"assistantTextExtracted":true,"validJudgeJson":true,"parserException":null,"inputTokens":106104,"outputTokens":446},
+    {"timeoutMs":60000,"executionProfileId":"lucen-cx014-pro-stable:gpt-5.6-luna:responses","provider":"lucen","channel":"lucen-cx014-pro-stable","httpStatus":200,"errorCategory":null,"firstByteMs":23660,"totalLatencyMs":23758,"assistantTextExtracted":true,"validJudgeJson":true,"parserException":null,"inputTokens":106066,"outputTokens":491},
+    {"timeoutMs":60000,"executionProfileId":"lucen-cx017-pro-first-token:gpt-5.6-luna:responses","provider":"lucen","channel":"lucen-cx017-pro-first-token","httpStatus":200,"errorCategory":null,"firstByteMs":13210,"totalLatencyMs":13330,"assistantTextExtracted":true,"validJudgeJson":true,"parserException":null,"inputTokens":106066,"outputTokens":592},
+    {"timeoutMs":60000,"executionProfileId":"lucen-cx025-pro-premium:gpt-5.6-luna:responses","provider":"lucen","channel":"lucen-cx025-pro-premium","httpStatus":200,"errorCategory":null,"firstByteMs":11710,"totalLatencyMs":11823,"assistantTextExtracted":true,"validJudgeJson":true,"parserException":null,"inputTokens":106066,"outputTokens":500}
+  ]
+}

@@ -266,6 +266,15 @@ function optionalNumber(value: unknown): number | undefined {
   return value === null || value === undefined || !Number.isFinite(valueAsNumber) ? undefined : valueAsNumber;
 }
 
+export function resolveRouteDifficulty(
+  judge: AlphaJudgeRun | undefined,
+  formulaInputs: JsonObject | undefined,
+): number | undefined {
+  return optionalNumber(judge?.judge.difficultyIndex)
+    ?? optionalNumber(record(formulaInputs?.decisionSnapshot)?.difficultyIndex)
+    ?? optionalNumber(record(formulaInputs?.judge)?.difficultyIndex);
+}
+
 function webIntentFromMetadata(value: JsonObject): WebIntentDecision | undefined {
   if (!isWebIntent(value.webIntent) || !isWebIntentSource(value.webIntentSource)) return undefined;
   const confidence = Number(value.webIntentConfidence);
@@ -305,7 +314,7 @@ function canonicalActualModel(profile: AlphaExecutionProfile, actualModel: strin
   return accepted.has(actualModel) ? profile.modelId : actualModel;
 }
 
-function routeDisplaySummary(
+export function routeDisplaySummary(
   requestedModel: string,
   selectedModel: string,
   routingPreference: string,
@@ -326,12 +335,11 @@ function routeDisplaySummary(
     const selected = candidates.find((candidate) => (
       selectedCandidateId ? candidate.candidateId === selectedCandidateId : candidate.modelId === selectedModel
     ));
-    const storedJudge = record(formulaInputs?.judge);
-    const difficulty = Number(storedJudge?.difficultyIndex);
+    const difficulty = resolveRouteDifficulty(judge, formulaInputs);
     return {
       mode: stringValue(storedRoute.mode) ?? requestedModel,
       routingPreference: stringValue(formulaInputs?.routingPreference) ?? routingPreference,
-      difficulty: Number.isFinite(difficulty) ? difficulty : undefined,
+      difficulty,
       candidateCount: candidates.length,
       selectedModel,
       selectedCandidateId: stringValue(selected?.candidateId),
@@ -368,7 +376,7 @@ function routeDisplaySummary(
   return {
     mode: requestedModel,
     routingPreference: route.preference,
-    difficulty: judge?.judge.difficultyIndex,
+    difficulty: resolveRouteDifficulty(judge, record(storedRoute?.formula_inputs_json)),
     candidateCount: route.candidateEstimates.length,
     selectedModel,
     selectedCandidateId: route.recommendation.recommended.candidateId,

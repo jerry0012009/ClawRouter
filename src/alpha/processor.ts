@@ -675,7 +675,7 @@ export class AlphaRequestProcessor {
     const { profiles } = await this.effectiveProfiles([], false);
     const preferences = ["economy", "balanced", "quality"] as const;
     const executionPresets = enabledExecutionPresets();
-    const corridorDifficulties = ACU_CURVE_DIFFICULTIES.filter((difficulty) => difficulty % 2 === 0);
+    const corridorDifficulties = ACU_CURVE_DIFFICULTIES;
     const executionPresetPoints = new Map(executionPresets.map((preset) => [preset.candidateId, [] as Array<{
       difficulty: number;
       estimatedQuality: number;

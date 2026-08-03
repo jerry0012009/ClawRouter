@@ -1,7 +1,14 @@
 export { AcuDemoStrategy, rulesFallbackJudge } from "./strategy.js";
 export { AcuJudgeClient, buildJudgeSystemPrompt, computeDifficultyIndex, hasSevereTierConflict, parseJudgeResult, serializeVisibleContext, estimateVisibleTokens } from "./judge.js";
 export { getAcuCatalog, getAcuModel, buildModelCurve, interpolateModelCurve, publicCatalogPayload } from "./catalog.js";
-export { recommendModel, estimateCallCost, isParetoEfficient, selectValueRoute } from "./decision.js";
+export {
+  ACU_COST_LOG_SCALE,
+  VALUE_UTILITY_NEAR_TIE_RATIO,
+  recommendModel,
+  estimateCallCost,
+  isParetoEfficient,
+  selectValueRoute,
+} from "./decision.js";
 export {
   applyLogitShift,
   difficultyScore,

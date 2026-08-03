@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { recommendModel, selectValueRoute } from "../src/acu/decision.js";
+import {
+  ACU_COST_LOG_SCALE,
+  VALUE_UTILITY_NEAR_TIE_RATIO,
+  recommendModel,
+  selectValueRoute,
+} from "../src/acu/decision.js";
 import type { AcuJudgeResult } from "../src/acu/types.js";
 import {
   resolveExplicitProfile,
@@ -139,8 +144,8 @@ describe("Alpha current-formula routing", () => {
       inputTokens: 57_307,
       expectedOutputTokens: 1_000,
       qualityTarget: 0.68,
-      costSensitivity: 1.8,
-      fallbackRiskScale: 0.35,
+      costSensitivity: 2.8,
+      fallbackRiskScale: 0.22,
       eligibleModelIds: ["gpt-5.4-mini", "gpt-5.5", "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"],
     };
     const withoutJudgeCost = recommendModel({ ...input, judgeCost: 0 });
@@ -173,9 +178,9 @@ describe("Alpha current-formula routing", () => {
       inputTokens: 12_000,
       expectedOutputTokens: 1_000,
       judgeCost: 0.001,
-      qualityTarget: 0.85,
-      costSensitivity: 1.4,
-      fallbackRiskScale: 0.25,
+      qualityTarget: 0.87,
+      costSensitivity: 1.6,
+      fallbackRiskScale: 0.30,
       eligibleModelIds: ["gpt-5.4-mini", "gpt-5.5"],
       requireToolCallSupport: true,
     });
@@ -204,8 +209,57 @@ describe("Alpha current-formula routing", () => {
     ];
     const result = selectValueRoute(candidates, 88);
     expect(result.utilities.get("cheap")?.costUtility).toBe(1);
-    expect(result.utilities.get("expensive")?.costUtility).toBe(0);
+    expect(result.utilities.get("expensive")?.costUtility).toBeGreaterThan(0);
+    expect(result.utilities.get("expensive")?.costUtility).toBeLessThan(1);
     expect(result.selected.modelId).toBe("cheap");
+  });
+
+  it("uses a fixed monotonic cost scale independent of the highest-cost candidate", () => {
+    expect(ACU_COST_LOG_SCALE).toBe(2.5);
+    const candidates = [
+      { modelId: "cheap", displayName: "Cheap", predictedScore: 70, riskAdjustedCost: 1 },
+      { modelId: "middle", displayName: "Middle", predictedScore: 80, riskAdjustedCost: 2 },
+      { modelId: "expensive", displayName: "Expensive", predictedScore: 90, riskAdjustedCost: 4 },
+    ];
+    const baseline = selectValueRoute(candidates, 80);
+    const withExtreme = selectValueRoute([
+      ...candidates,
+      { modelId: "extreme", displayName: "Extreme", predictedScore: 100, riskAdjustedCost: 1_000_000 },
+    ], 80);
+    expect(baseline.utilities.get("cheap")?.costUtility).toBe(1);
+    expect(baseline.utilities.get("middle")!.costUtility)
+      .toBeGreaterThan(baseline.utilities.get("expensive")!.costUtility);
+    for (const candidate of candidates) {
+      expect(withExtreme.utilities.get(candidate.modelId)?.costUtility)
+        .toBeCloseTo(baseline.utilities.get(candidate.modelId)!.costUtility, 12);
+    }
+  });
+
+  it("assigns equal-cost frontier candidates full cost utility", () => {
+    const result = selectValueRoute([
+      { modelId: "a", displayName: "A", predictedScore: 70, riskAdjustedCost: 1 },
+      { modelId: "b", displayName: "B", predictedScore: 80, riskAdjustedCost: 1 },
+    ], 80);
+    expect([...result.utilities.values()].every((utility) => utility.costUtility === 1)).toBe(true);
+  });
+
+  it("chooses the lower-cost candidate within the value utility near-tie", () => {
+    expect(VALUE_UTILITY_NEAR_TIE_RATIO).toBe(0.995);
+    const result = selectValueRoute([
+      { modelId: "lower-cost", displayName: "Lower cost", predictedScore: 90, riskAdjustedCost: 1 },
+      { modelId: "higher-value", displayName: "Higher value", predictedScore: 90.04, riskAdjustedCost: 1.0001 },
+    ], 80, 0);
+    expect(result.utilities.get("higher-value")!.valueUtility)
+      .toBeGreaterThan(result.utilities.get("lower-cost")!.valueUtility);
+    expect(result.selected.modelId).toBe("lower-cost");
+  });
+
+  it("keeps the highest value utility outside the near-tie", () => {
+    const result = selectValueRoute([
+      { modelId: "lower-cost", displayName: "Lower cost", predictedScore: 90, riskAdjustedCost: 1 },
+      { modelId: "higher-value", displayName: "Higher value", predictedScore: 92, riskAdjustedCost: 1.0001 },
+    ], 80, 0);
+    expect(result.selected.modelId).toBe("higher-value");
   });
 
   it.each(["glm-5.2", "kimi-k3"])("does not select %s when Sol strictly dominates it", (dominatedModelId) => {
@@ -239,7 +293,7 @@ describe("Alpha current-formula routing", () => {
       effectiveQualityTarget: 80, profiles, requirements,
       workPhase: { phase: "inspection", confidence: "high", signals: ["tool:Read"], qualityTargetOffset: -4, policyVersion: "acu-work-phase-policy-v1" },
     });
-    expect(inspection.effectiveQualityTarget).toBe(73);
+    expect(inspection.effectiveQualityTarget).toBe(75);
     expect(inspection.workPhase.phase).toBe("inspection");
     expect(inspection.recommendation.estimates.every((candidate) => candidate.candidateId.length > 0)).toBe(true);
     expect(inspection.recommendation.estimates.some((candidate) => candidate.modelId === "gpt-5.6-luna"
@@ -530,7 +584,7 @@ describe("Alpha current-formula routing", () => {
         ));
         decisions.forEach((decision, index) => {
           selected[(["economy", "balanced", "quality"] as const)[index]].add(decision.selectedProfile.modelId);
-          expect(decision.formulaVersion).toBe("acu-routing-model-v0.4");
+          expect(decision.formulaVersion).toBe("acu-routing-model-v0.5");
         });
         const balancedQuality = decisions[1].recommendation.recommended.estimatedQuality;
         const qualityQuality = decisions[2].recommendation.recommended.estimatedQuality;

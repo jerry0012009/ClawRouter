@@ -46,9 +46,9 @@ export type ProfileBillingPrice = {
 };
 
 export const ROUTING_PREFERENCE_PARAMETERS: Record<RoutingPreference, RoutingPreferenceParameters> = {
-  economy: { qualityTargetOffset: -6, costSensitivity: 1.8, fallbackRiskScale: 0.35 },
-  balanced: { qualityTargetOffset: -3, costSensitivity: 1.4, fallbackRiskScale: 0.25 },
-  quality: { qualityTargetOffset: 8, costSensitivity: 0.45, fallbackRiskScale: 1.25 },
+  economy: { qualityTargetOffset: -6, costSensitivity: 2.8, fallbackRiskScale: 0.22 },
+  balanced: { qualityTargetOffset: -1, costSensitivity: 1.6, fallbackRiskScale: 0.30 },
+  quality: { qualityTargetOffset: 6, costSensitivity: 1.0, fallbackRiskScale: 0.70 },
 };
 
 export type AlphaExecutionProfile = {

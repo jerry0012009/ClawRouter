@@ -518,6 +518,38 @@ run("Alpha PostgreSQL request processor", () => {
     return response.text();
   }
 
+  it.each([
+    ["inspection", "Read", -4],
+    ["implementation", "apply_patch", 0],
+    ["verification", "test", 0],
+    ["planning", "update_plan", 4],
+    ["general", "unknown_tool", 0],
+  ])("persists detected %s Work Phase through Usage decision_summary", async (expectedPhase, toolName, expectedOffset) => {
+    const userId = `user-work-phase-${expectedPhase}`;
+    const callId = `call-${expectedPhase}`;
+    await send({
+      model: "acu-auto",
+      input: [
+        { type: "message", role: "user", content: [{ type: "input_text", text: "Continue the current coding step" }] },
+        { type: "function_call", call_id: callId, name: toolName, arguments: toolName === "update_plan" ? "{\"plan\":[{\"status\":\"in_progress\"}]}" : "{}" },
+        { type: "function_call_output", call_id: callId, output: "ok" },
+      ],
+      stream: true,
+    }, `work-phase-${expectedPhase}`, userId);
+    const report = await database.query<{ phase: string; work_phase: string; work_phase_offset: string }>(
+      `SELECT cost_breakdown_json->>'phase' phase,
+              cost_breakdown_json->'decision_summary'->>'work_phase' work_phase,
+              cost_breakdown_json->'decision_summary'->>'work_phase_quality_target_offset' work_phase_offset
+       FROM acu_usage_reports WHERE newapi_user_id=$1`,
+      [userId],
+    );
+    expect(report.rows[0]).toEqual({
+      phase: expectedPhase === "planning" ? "planning" : "execution",
+      work_phase: expectedPhase,
+      work_phase_offset: String(expectedOffset),
+    });
+  });
+
   it("settles a request cancelled during Judge and immediately accepts a new request", async () => {
     const userId = "user-client-cancel";
     const cancelledBody = Buffer.from(JSON.stringify({
@@ -941,6 +973,13 @@ run("Alpha PostgreSQL request processor", () => {
       [userId],
     );
     expect(recovery.rows[0]).toEqual({ creation_reason: "repeated_failure", phase: "recovery" });
+    const usage = await database.query<{ work_phase: string; work_phase_offset: string }>(
+      `SELECT cost_breakdown_json->'decision_summary'->>'work_phase' work_phase,
+              cost_breakdown_json->'decision_summary'->>'work_phase_quality_target_offset' work_phase_offset
+       FROM acu_usage_reports WHERE newapi_user_id=$1 ORDER BY created_at DESC LIMIT 1`,
+      [userId],
+    );
+    expect(usage.rows[0]).toEqual({ work_phase: "recovery", work_phase_offset: "6" });
   });
 
   it("reuses PlanStarted until the accepted-response limit and Judges PlanFinished", async () => {

@@ -8,7 +8,7 @@ import type { RoutingDecision } from "../router/types.js";
 import { AlphaDatabase } from "./database.js";
 import { createAlphaGatewayServer } from "./gateway.js";
 import { createAcuJudgeRunner } from "./judge-runner.js";
-import { AlphaRequestProcessor } from "./processor.js";
+import { AlphaRequestProcessor, hydrateExecutionProfileRuntime } from "./processor.js";
 import { createNativeProviderAdapter, type NativeProviderConfig } from "./provider.js";
 import { AlphaRepository } from "./repository.js";
 import type { AlphaExecutionProfile } from "./routing.js";
@@ -20,7 +20,6 @@ import { getAcuModel } from "../acu/catalog.js";
 import { combinedMonitorState, mergeSupplyInventory, monitorRangeSpec, monitorRoutingStatus, type MonitorRange } from "./channel-monitor.js";
 import { AdaptiveProbeWorker } from "./adaptive-probe.js";
 import { deriveRuntimeEligibility } from "./channel-health.js";
-import { isRecoveredSupplyProfile } from "./channel-registry.js";
 import { recordSharedRuntimeHealthOutcome } from "./runtime-health-outcome.js";
 import {
   DEFAULT_BILLING_POLICY_VERSION,
@@ -256,7 +255,13 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
   });
   const judgeConfig = readAcuRuntimeConfig();
   const runtimeRepository = new AlphaRepository(database);
-  let adaptiveProbe: AdaptiveProbeWorker;
+  const adapterMap = new Map(profiles.map((item) => [item.profile.executionProfileId, item.adapter]));
+  const adaptiveProbe = new AdaptiveProbeWorker({
+    database,
+    profiles: profiles.map((item) => item.profile),
+    adapters: adapterMap,
+    dailyBudgetCny: Number(process.env.ACU_PROBE_DAILY_BUDGET_CNY ?? "1.00"),
+  });
   const judgeEconomics = serviceConfig.judgeEconomicsProviderId ? serviceConfig.providerEconomics.find((item) => item.providerId === serviceConfig.judgeEconomicsProviderId) : undefined;
   if (serviceConfig.judgeEconomicsProviderId && !judgeEconomics) {
     throw new Error(`No Provider Economics for Judge ${serviceConfig.judgeEconomicsProviderId}`);
@@ -274,24 +279,8 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
       ]);
       return baseProfiles.map((profile) => {
         const runtime = runtimes.get(profile.executionProfileId);
-        const profileState = runtime?.state;
-        const channelState = channels.get(profile.channelId ?? profile.channel)?.state;
-        const fresh = Boolean(runtime?.lastSuccessAt
-          && Date.now() - runtime.lastSuccessAt.getTime() <= 120 * 60_000);
-        const runtimeRecovered = profile.autoRouteEnabled === false
-          && isRecoveredSupplyProfile(runtime ?? {})
-          && (!profile.requiresFreshProbe || fresh);
-        return {
-          ...profile,
-          autoRouteEnabled: profile.autoRouteEnabled !== false || runtimeRecovered,
-          usageTrusted: runtime?.usageTrusted ?? profile.usageTrusted,
-          runtimeHealth: deriveRuntimeEligibility({
-            profileState,
-            channelState,
-            enabled: profile.enabled,
-            administratorAllowed: profile.administratorAllowed,
-          }),
-        };
+        const channel = channels.get(profile.channelId ?? profile.channel);
+        return hydrateExecutionProfileRuntime(profile, runtime, channel);
       });
     },
     profileClients: new Map(profiles.map((item) => {
@@ -316,13 +305,6 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
       outcome,
       wakeProbe: (executionProfileId) => executionProfileId ? adaptiveProbe.enqueue(executionProfileId) : adaptiveProbe.wake(),
     }),
-  });
-  const adapterMap = new Map(profiles.map((item) => [item.profile.executionProfileId, item.adapter]));
-  adaptiveProbe = new AdaptiveProbeWorker({
-    database,
-    profiles: profiles.map((item) => item.profile),
-    adapters: adapterMap,
-    dailyBudgetCny: Number(process.env.ACU_PROBE_DAILY_BUDGET_CNY ?? "1.00"),
   });
   const processor = new AlphaRequestProcessor({
     database,

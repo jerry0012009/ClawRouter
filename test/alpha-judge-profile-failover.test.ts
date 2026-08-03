@@ -5,6 +5,7 @@ import { AcuJudgeClient } from "../src/acu/judge.js";
 import { readAcuRuntimeConfig } from "../src/acu/config.js";
 import { createAcuJudgeRunner, judgeProfileAttemptDeadline } from "../src/alpha/judge-runner.js";
 import { randomUUID } from "node:crypto";
+import { hydrateExecutionProfileRuntime } from "../src/alpha/processor.js";
 
 function profile(id: string, overrides: Partial<AlphaExecutionProfile> = {}): AlphaExecutionProfile {
   return {
@@ -61,6 +62,32 @@ describe("Luna Judge Profile selector", () => {
       requiredContextTokens: 100,
     });
     expect(selected.map((item) => item.executionProfileId)).toEqual(["b", "a"]);
+  });
+
+  it("hydrates shared runtime health before filtering and ranking Judge Profiles", () => {
+    const now = new Date("2026-08-03T12:00:00.000Z");
+    const open = hydrateExecutionProfileRuntime(profile("open"), {
+      state: "open", consecutiveFailures: 3, recentSuccessRate: 0.1,
+      cooldownUntil: new Date("2026-08-03T12:05:00.000Z"), usageTrusted: true,
+    }, undefined, now.getTime());
+    const degraded = hydrateExecutionProfileRuntime(profile("degraded"), {
+      state: "degraded", consecutiveFailures: 1, recentSuccessRate: 0.65,
+      totalLatencyMs: 4_000, usageTrusted: true,
+    }, undefined, now.getTime());
+    const fast = hydrateExecutionProfileRuntime(profile("fast"), {
+      state: "healthy", consecutiveFailures: 0, recentSuccessRate: 0.99,
+      totalLatencyMs: 100, usageTrusted: true,
+    }, undefined, now.getTime());
+    const slow = hydrateExecutionProfileRuntime(profile("slow"), {
+      state: "healthy", consecutiveFailures: 0, recentSuccessRate: 0.8,
+      totalLatencyMs: 20_000, usageTrusted: true,
+    }, undefined, now.getTime());
+
+    expect(open).toMatchObject({ health: "cooldown", recentSuccessRate: 0.1, usageTrusted: true });
+    expect(degraded).toMatchObject({ health: "degraded", recentSuccessRate: 0.65, observedLatencyMs: 4_000 });
+    expect(getEligibleLunaJudgeProfiles({
+      profiles: [open, degraded, slow, fast], preferredProfileId: "slow", requiredContextTokens: 100,
+    }).map((item) => item.executionProfileId)).toEqual(["fast", "slow", "degraded"]);
   });
 
   it("fails over from preferred Lucen to another Luna without cross-model backup", async () => {

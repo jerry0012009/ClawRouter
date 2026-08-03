@@ -36,7 +36,7 @@ import {
   type ProviderAttemptHandle,
   type ProviderRecoveryTarget,
 } from "./execution.js";
-import { classifyAttemptOutcome, deriveRuntimeEligibility, type AttemptOutcome } from "./channel-health.js";
+import { classifyAttemptOutcome, deriveRuntimeEligibility, type AttemptOutcome, type HealthSnapshot } from "./channel-health.js";
 import { recordSharedRuntimeHealthOutcome } from "./runtime-health-outcome.js";
 import { estimateContextAdmission, effectiveContextCeiling } from "./context-admission.js";
 import {
@@ -186,6 +186,8 @@ export type AlphaResolutionContext = {
     selectedProvider?: string;
   };
   phase?: string;
+  workPhase?: WorkPhaseDecision["phase"];
+  workPhaseQualityTargetOffset?: number;
   judgeExplanation?: string;
   judgeTrigger?: string;
   judgeCalls: number;
@@ -200,6 +202,50 @@ export type AlphaResolutionContext = {
   wireReasoningEffort?: string;
   reasoningMappingStatus?: string;
 };
+
+type ProfileRuntimeSnapshot = HealthSnapshot & {
+  usageTrusted?: boolean;
+  metadata?: Record<string, unknown>;
+  observedSuccessfulInputTokens?: number;
+};
+
+export function hydrateExecutionProfileRuntime(
+  profile: AlphaExecutionProfile,
+  runtime?: ProfileRuntimeSnapshot,
+  channel?: HealthSnapshot,
+  now = Date.now(),
+): AlphaExecutionProfile {
+  const lastSuccessAt = runtime?.lastSuccessAt;
+  const fresh = Boolean(lastSuccessAt && now - lastSuccessAt.getTime() <= 120 * 60_000);
+  const runtimeRecovered = profile.autoRouteEnabled === false
+    && isRecoveredSupplyProfile(runtime ?? {})
+    && (!profile.requiresFreshProbe || fresh);
+  const staleFreshnessRequired = profile.requiresFreshProbe === true && !fresh;
+  const runtimeHealth = deriveRuntimeEligibility({
+    profileState: runtime?.state ?? profile.health,
+    channelState: channel?.state,
+    providerState: profile.economics?.health,
+    probeState: staleFreshnessRequired ? "stale" : "fresh",
+    enabled: profile.enabled,
+    administratorAllowed: profile.administratorAllowed,
+    cooldownUntil: runtime?.cooldownUntil ?? channel?.cooldownUntil,
+  });
+  return {
+    ...profile,
+    autoRouteEnabled: profile.autoRouteEnabled !== false || runtimeRecovered,
+    runtimeHealth,
+    health: runtimeHealth.effectiveState === "temporarily_unavailable" ? "cooldown"
+      : runtimeHealth.effectiveState === "disabled" ? "disabled"
+        : runtimeHealth.effectiveState === "degraded" ? "degraded" : "healthy",
+    usageTrusted: runtime?.usageTrusted ?? profile.usageTrusted,
+    recentSuccessRate: runtime?.recentSuccessRate ?? profile.recentSuccessRate ?? 1,
+    observedLatencyMs: runtime?.totalLatencyMs ?? profile.observedLatencyMs,
+    observedSuccessfulInputTokens: Math.max(
+      runtime?.observedSuccessfulInputTokens ?? 0,
+      profile.observedSuccessfulInputTokens ?? 0,
+    ),
+  };
+}
 
 type PreparedState = {
   sessionId: string;
@@ -568,38 +614,13 @@ export class AlphaRequestProcessor {
       const channelId = profile.channelId ?? profile.channel;
       const channel = channelHealth.get(channelId);
       const runtime = profileHealth.get(profile.executionProfileId);
-      const lastSuccessAt = runtime?.lastSuccessAt;
-      const fresh = Boolean(lastSuccessAt && Date.now() - lastSuccessAt.getTime() <= 120 * 60_000);
-      const runtimeRecovered = profile.autoRouteEnabled === false
-        && isRecoveredSupplyProfile(runtime ?? {})
-        && (!profile.requiresFreshProbe || fresh);
-      const staleFreshnessRequired = profile.requiresFreshProbe === true && !fresh;
-      const runtimeHealth = deriveRuntimeEligibility({
-        profileState: runtime?.state ?? profile.health,
-        channelState: channel?.state,
-        providerState: profile.economics?.health,
-        probeState: staleFreshnessRequired ? "stale" : "fresh",
-        enabled: profile.enabled,
-        administratorAllowed: profile.administratorAllowed,
-        cooldownUntil: runtime?.cooldownUntil ?? channel?.cooldownUntil,
-      });
+      const hydrated = hydrateExecutionProfileRuntime(profile, runtime, channel);
+      const staleFreshnessRequired = hydrated.runtimeHealth?.probeState === "stale";
       if ((!allowed || allowed.has(profile.executionProfileId)) && profile.modelId === demandedModelId
         && (staleFreshnessRequired || channel?.state === "open" || channel?.state === "half_open"
         || runtime?.state === "open" || runtime?.state === "half_open")) probeCandidateIds.push(profile.executionProfileId);
       return {
-        ...profile,
-        autoRouteEnabled: profile.autoRouteEnabled !== false || runtimeRecovered,
-        runtimeHealth,
-        health: runtimeHealth.effectiveState === "temporarily_unavailable" ? "cooldown" as const
-          : runtimeHealth.effectiveState === "disabled" ? "disabled" as const
-            : runtimeHealth.effectiveState === "degraded" ? "degraded" as const : "healthy" as const,
-        usageTrusted: runtime?.usageTrusted ?? profile.usageTrusted,
-        recentSuccessRate: runtime?.recentSuccessRate ?? profile.recentSuccessRate ?? 1,
-        observedLatencyMs: runtime?.totalLatencyMs ?? profile.observedLatencyMs,
-        observedSuccessfulInputTokens: Math.max(
-          runtime?.observedSuccessfulInputTokens ?? 0,
-          profile.observedSuccessfulInputTokens ?? 0,
-        ),
+        ...hydrated,
         webSearchRecentSuccessRate: optionalNumber(runtime?.metadata?.webSearchRecentSuccessRate)
           ?? profile.webSearchRecentSuccessRate,
         webSearchObservedLatencyMs: optionalNumber(runtime?.metadata?.webSearchObservedLatencyMs)
@@ -2459,6 +2480,8 @@ export class AlphaRequestProcessor {
             attemptedProviders: [replayProfile.provider],
             attemptedNetworkEndpoints: [],
             phase: stringValue(replaySegment?.phase),
+            workPhase: state.workPhase.phase,
+            workPhaseQualityTargetOffset: state.workPhase.qualityTargetOffset,
             judgeCalls: 0,
             judgeReused: Boolean(replaySegment?.judge_evaluation_id),
             reusedJudgeEvaluationId: stringValue(replaySegment?.judge_evaluation_id),
@@ -2688,6 +2711,8 @@ export class AlphaRequestProcessor {
       attemptedProviders: [result.profile.provider],
       attemptedNetworkEndpoints: initialAttempt.networkEndpoint ? [initialAttempt.networkEndpoint] : [],
       phase: state.decision.phase,
+      workPhase: state.workPhase.phase,
+      workPhaseQualityTargetOffset: state.workPhase.qualityTargetOffset,
       judgeExplanation: result.judge?.judge.explanation,
       judgeTrigger: routeRefreshReason ? "reuse_route" : state.decision.reason,
       judgeCalls: result.judge ? 1 : 0,
@@ -3367,9 +3392,8 @@ export class AlphaRequestProcessor {
         judge_explanation: input.context.judgeExplanation,
         route_decision: routeDecisionView,
         decision_summary: {
-          work_phase: input.context.phase,
-          work_phase_quality_target_offset: optionalNumber(savedDecisionSnapshot?.workPhaseQualityTargetOffset
-            ?? savedFormulaInputs?.workPhaseQualityTargetOffset),
+          work_phase: input.context.workPhase,
+          work_phase_quality_target_offset: input.context.workPhaseQualityTargetOffset,
           judge_trigger: input.context.judgeTrigger,
           judge_status: input.context.judgeStatus,
           judge_result_source: input.context.judgeResultSource,

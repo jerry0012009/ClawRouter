@@ -22,7 +22,7 @@ import type { AlphaGatewayTrace, AlphaIngressContext, AlphaExecutionResolution }
 import type { NativeProviderAdapter } from "./provider.js";
 import type { TrustedNewApiIdentity } from "./trusted-identity.js";
 import { parseProviderUsage, resolveProviderBilling } from "./usage.js";
-import { buildModelCurve, getAcuModel } from "../acu/catalog.js";
+import { ACU_CURVE_DIFFICULTIES, buildModelCurve, getAcuModel } from "../acu/catalog.js";
 import { ACU_ROUTING_MODEL_VERSION } from "../acu/config.js";
 import { enabledExecutionPresets } from "../acu/execution-presets.js";
 import { AcuJudgeClientCancelledError, AcuJudgeContextLengthError } from "../acu/judge.js";
@@ -689,7 +689,7 @@ export class AlphaRequestProcessor {
       contextBurden: 0,
     };
     const series = Object.fromEntries(preferences.map((preference) => {
-      const points = Array.from({ length: 51 }, (_, index) => index * 2).flatMap((difficulty) => {
+      const points = ACU_CURVE_DIFFICULTIES.flatMap((difficulty) => {
         try {
           const route = routeWithCurrentAcuFormula({
             judge: {

@@ -45,6 +45,10 @@ export type AcuModelCatalog = {
 
 const catalog = rawCatalog as AcuModelCatalog;
 
+export const ACU_CURVE_DIFFICULTIES: readonly number[] = Object.freeze(
+  Array.from({ length: 101 }, (_, difficultyScore) => difficultyScore),
+);
+
 export function getAcuCatalog(): AcuModelCatalog {
   return catalog;
 }
@@ -60,7 +64,7 @@ export function getRoutingEligibleModels(eligibleModelIds?: string[]): AcuModelC
 
 export function buildModelCurve(model: AcuModelCatalogEntry): AcuCurvePoint[] {
   const points: AcuCurvePoint[] = [];
-  for (let difficultyScore = 0; difficultyScore <= 100; difficultyScore += 1) {
+  for (const difficultyScore of ACU_CURVE_DIFFICULTIES) {
     const probabilities = continuousTierProbabilities(difficultyScore / 100);
     const quality = estimatedQuality(probabilities, model);
     points.push({

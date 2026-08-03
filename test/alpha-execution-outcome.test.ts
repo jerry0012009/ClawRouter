@@ -40,8 +40,8 @@ describe("Alpha execution outcome boundaries", () => {
     expect(isRecoveredSupplyProfile({ ...base, state: "degraded" })).toBe(false);
   });
 
-  it("caps unverified long context at the bootstrap ceiling", () => {
+  it("does not turn unverified context metadata into a hard admission cap", () => {
     expect(effectiveContextCeiling({ modelId: "gpt-5.6-terra", contextCapabilityStatus: "unverified_long_context" }))
-      .toBe(65_536);
+      .toBe(Number.MAX_SAFE_INTEGER);
   });
 });

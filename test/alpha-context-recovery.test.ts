@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { classifyProviderContextOverflow, contextOverflowRecoveryEligible, createRecoveringProviderAdapter, type ProviderAttemptHandle } from "../src/alpha/execution.js";
-import { contextModelRerouteReason, filterObservedContextFailures, learnContextFailureThreshold } from "../src/alpha/processor.js";
+import { effectiveContextCeiling } from "../src/alpha/context-admission.js";
+import { contextModelRerouteReason } from "../src/alpha/processor.js";
 import type { NativeProviderRequest } from "../src/alpha/provider.js";
 import { routeWithCurrentAcuFormula, type AlphaExecutionProfile } from "../src/alpha/routing.js";
 import type { AcuJudgeResult } from "../src/acu/types.js";
@@ -24,6 +25,15 @@ describe("context overflow recovery", () => {
       .toEqual({ isContextOverflow: true, reportedContextLimit: 128000 });
     expect(classifyProviderContextOverflow(JSON.stringify({ error: { type: "invalid_request_error", message: "unsupported parameter" } })))
       .toEqual({ isContextOverflow: false });
+  });
+
+  it("does not infer a reported limit from request data echoed by an SSE response", () => {
+    const stream = [
+      `data: ${JSON.stringify({ type: "response.created", response: { instructions: "budget 3,600,000 tokens" } })}`,
+      `data: ${JSON.stringify({ type: "error", error: { code: "context_length_exceeded", message: "Input exceeds the context window" } })}`,
+      "",
+    ].join("\n");
+    expect(classifyProviderContextOverflow(stream)).toEqual({ isContextOverflow: true, reportedContextLimit: undefined });
   });
 
   it("requires automatic routing, zero output, and a connected client", () => {
@@ -84,12 +94,11 @@ describe("context overflow recovery", () => {
       .toBe("context_model_reroute:glm-5.2->gpt-5.6-sol");
   });
 
-  it("excludes all Profiles of the failed model only at and above the learned threshold", () => {
-    const profiles = [profile("glm-a", "glm-5.2"), profile("glm-b", "glm-5.2"), profile("sol", "gpt-5.6-sol")];
-    const thresholds = new Map<string, number>();
-    learnContextFailureThreshold(thresholds, "glm-5.2", 100_000);
-    expect(filterObservedContextFailures(profiles, thresholds, 120_000).map((item) => item.executionProfileId)).toEqual(["sol"]);
-    expect(filterObservedContextFailures(profiles, thresholds, 20_000)).toHaveLength(3);
+  it("does not impose an admission ceiling without a verified Provider hard cap", () => {
+    expect(effectiveContextCeiling({ modelId: "gpt-5.6-sol", canonicalAdvertisedContextWindow: 1_000 }))
+      .toBe(Number.MAX_SAFE_INTEGER);
+    expect(effectiveContextCeiling({ modelId: "gpt-5.6-sol", canonicalAdvertisedContextWindow: 1_000,
+      providerHardContextCap: 800_000 })).toBe(800_000);
   });
 
   it("uses route direction any so recovery may select a lower-tier model", () => {

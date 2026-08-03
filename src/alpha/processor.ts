@@ -82,27 +82,6 @@ export function codexSelectionCorridorRequirements(
 
 type JsonObject = Record<string, unknown>;
 
-export function learnContextFailureThreshold(
-  thresholds: Map<string, number>,
-  modelId: string,
-  requiredTotalContextTokens: number,
-): number {
-  const learned = Math.min(thresholds.get(modelId) ?? Number.POSITIVE_INFINITY, requiredTotalContextTokens);
-  thresholds.set(modelId, learned);
-  return learned;
-}
-
-export function filterObservedContextFailures(
-  profiles: AlphaExecutionProfile[],
-  thresholds: ReadonlyMap<string, number>,
-  requiredTotalContextTokens: number,
-): AlphaExecutionProfile[] {
-  return profiles.filter((profile) => {
-    const threshold = thresholds.get(profile.modelId);
-    return threshold === undefined || requiredTotalContextTokens < threshold;
-  });
-}
-
 export function contextModelRerouteReason(previousModelId: string, nextModelId: string): string {
   return `context_model_reroute:${previousModelId}->${nextModelId}`;
 }
@@ -594,7 +573,6 @@ function updatePlanningMetadata(current: JsonObject, events: AlphaDomainEvent[])
 
 export class AlphaRequestProcessor {
   private readonly expectedOutputTokens: number;
-  private readonly contextFailureThresholdByModel = new Map<string, number>();
   private readonly selectionCorridorCache = new Map<string, {
     expiresAt: number;
     result: Promise<Record<string, unknown>>;
@@ -1056,11 +1034,7 @@ export class AlphaRequestProcessor {
     const { profiles: runtimeProfiles, probeClaims } = await this.effectiveProfiles(
       identity.allowedProfileIds, true, demandedModelId,
     );
-    const effectiveProfiles = demandedModelId ? runtimeProfiles : filterObservedContextFailures(
-      runtimeProfiles,
-      this.contextFailureThresholdByModel,
-      contextAdmission.requiredTotalContextTokens,
-    );
+    const effectiveProfiles = runtimeProfiles;
     const recoveryProfiles = identity.allowedProfileIds.length > 0
       ? effectiveProfiles.filter((profile) => identity.allowedProfileIds.includes(profile.executionProfileId))
       : effectiveProfiles;
@@ -2103,7 +2077,6 @@ export class AlphaRequestProcessor {
     contextOverflow?: {
       reportedContextLimit?: number;
       requiredTotalContextTokens: number;
-      learnedContextFailureThreshold?: number;
     };
     reasoningTransportError?: boolean;
     clientCancelled?: boolean;
@@ -2178,7 +2151,6 @@ export class AlphaRequestProcessor {
         canonicalModelId: input.contextOverflow ? input.attempt.profile.modelId : undefined,
         reportedContextLimit: input.contextOverflow?.reportedContextLimit,
         requiredTotalContextTokens: input.contextOverflow?.requiredTotalContextTokens,
-        learnedContextFailureThreshold: input.contextOverflow?.learnedContextFailureThreshold,
         endpoint: input.attempt.networkEndpoint,
         cfRay: responseHeaders?.["cf-ray"],
         contentType,
@@ -2255,7 +2227,6 @@ export class AlphaRequestProcessor {
         canonicalModelId: input.contextOverflow ? input.attempt.profile.modelId : undefined,
         reportedContextLimit: input.contextOverflow?.reportedContextLimit,
         requiredTotalContextTokens: input.contextOverflow?.requiredTotalContextTokens,
-        learnedContextFailureThreshold: input.contextOverflow?.learnedContextFailureThreshold,
         cooldownUntil: health?.cooldownUntil?.toISOString(),
         recoveryEligible: (observation?.modelVisibleOutputBytes ?? 0) === 0,
         recoveryAction: input.contextOverflow ? "context_model_reroute" : undefined,
@@ -2829,13 +2800,11 @@ export class AlphaRequestProcessor {
     const attemptedIdentities = new Set([
       attemptIdentity(initialAttempt.profile, initialAttempt.networkEndpoint),
     ]);
-    const contextFailedModels = new Set<string>();
     const reasoningRejectedProfiles = new Set<string>();
     let reasoningTerminalFallbackUsed = false;
     let pendingContextOverflow: {
       modelId: string;
       reportedContextLimit?: number;
-      learnedThreshold: number;
     } | undefined;
     const routeProfiles = (result.route?.providerCandidateEstimates ?? [])
       .filter((candidate) => candidate.health === "healthy" && candidate.usageTrusted)
@@ -2885,17 +2854,9 @@ export class AlphaRequestProcessor {
           clientDisconnected: ingress.signal.aborted,
           automaticRouting: mode !== "explicit",
         })) return false;
-        const modelId = current.profile.modelId;
-        const learnedThreshold = learnContextFailureThreshold(
-          this.contextFailureThresholdByModel,
-          modelId,
-          recoveryContextAdmission.requiredTotalContextTokens,
-        );
-        contextFailedModels.add(modelId);
         pendingContextOverflow = {
-          modelId,
+          modelId: current.profile.modelId,
           reportedContextLimit: classified.reportedContextLimit,
-          learnedThreshold,
         };
         return true;
       },
@@ -2931,14 +2892,28 @@ export class AlphaRequestProcessor {
           }
           if (pendingContextOverflow && !result.routingJudge) return undefined;
           if (pendingContextOverflow) {
+            for (const profile of recoveryPool) {
+              if (profile.modelId === current.profile.modelId
+                && !attemptedProfiles.has(profile.executionProfileId)
+                && !attemptedIdentities.has(attemptIdentity(profile, this.endpoints(profile)[0]?.endpoint))
+                && profile.enabled && profile.administratorAllowed && profile.health === "healthy"
+                && profile.usageTrusted !== false
+                && profile.protocols.includes(envelope.protocol)
+                && (!envelope.requiredToolTypes.length || profile.toolCallSupport)
+                && envelope.requiredToolTypes.every((toolType) => profile.supportedToolTypes?.includes(toolType))
+                && resolveWebEligibility(profile, envelope).eligible
+                && (!envelope.containsThinking || profile.thinkingSupport)
+                && this.options.adapters.has(profile.executionProfileId)
+                && await profileCurrentlyRoutable(profile)) {
+                return { profile, networkEndpointIndex: 0, reason: "same_model_channel_fallback" };
+              }
+            }
             const routingJudge = result.routingJudge!;
-            const rerouteProfiles = filterObservedContextFailures(
-              result.recoveryProfiles,
-              this.contextFailureThresholdByModel,
-              recoveryContextAdmission.requiredTotalContextTokens,
-            ).filter((profile) => !contextFailedModels.has(profile.modelId)
+            const rerouteProfiles = result.recoveryProfiles.filter((profile) => (
+              profile.modelId !== current.profile.modelId
               && !attemptedProfiles.has(profile.executionProfileId)
-              && this.options.adapters.has(profile.executionProfileId));
+              && this.options.adapters.has(profile.executionProfileId)
+            ));
             try {
               const reroute = routeWithCurrentAcuFormula({
                 judge: routingJudge,
@@ -2997,9 +2972,6 @@ export class AlphaRequestProcessor {
       recordFailedAttempt: async ({ attempt, response, error, latencyMs, clientCancelled,
         attemptsBudgetExhausted, timeBudgetExhausted }) => {
         const contextOverflow = response ? classifyProviderContextOverflow(response) : { isContextOverflow: false };
-        const threshold = contextOverflow.isContextOverflow
-          ? this.contextFailureThresholdByModel.get(attempt.profile.modelId)
-          : undefined;
         await this.recordProviderFailure({
           identity,
           state,
@@ -3017,7 +2989,6 @@ export class AlphaRequestProcessor {
           contextOverflow: contextOverflow.isContextOverflow ? {
             reportedContextLimit: contextOverflow.reportedContextLimit,
             requiredTotalContextTokens: recoveryContextAdmission.requiredTotalContextTokens,
-            learnedContextFailureThreshold: threshold,
           } : undefined,
           reasoningTransportError: reasoningRejectedProfiles.has(attempt.profile.executionProfileId),
         });

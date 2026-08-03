@@ -174,7 +174,7 @@ describe("Luna Judge Profile selector", () => {
       profiles: [
         profile("open", { health: "open" }),
         profile("untrusted", { usageTrusted: false }),
-        profile("unverified", { contextCapabilityStatus: "unverified_long_context" }),
+        profile("hard-capped", { providerHardContextCap: 65_536 }),
         profile("healthy"),
       ],
       requiredContextTokens: 66_000,

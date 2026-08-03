@@ -113,20 +113,38 @@ export function classifyProviderContextOverflow(
   failure: Pick<BufferedProviderFailure, "body"> | string,
 ): ContextOverflowClassification {
   const raw = typeof failure === "string" ? failure : failure.body.toString("utf8");
-  let evidence = raw;
+  const structuredErrors: string[] = [];
+  const collect = (value: unknown): void => {
+    if (!value || typeof value !== "object") return;
+    const record = value as Record<string, unknown>;
+    const response = record.response && typeof record.response === "object"
+      ? record.response as Record<string, unknown> : undefined;
+    for (const candidate of [record.error, response?.error]) {
+      if (!candidate || typeof candidate !== "object") continue;
+      const error = candidate as Record<string, unknown>;
+      const evidence = [error.type, error.code, error.message]
+        .filter((item): item is string => typeof item === "string")
+        .join(" ");
+      if (evidence) structuredErrors.push(evidence);
+    }
+  };
   try {
-    const parsed = JSON.parse(raw) as { error?: { type?: unknown; code?: unknown; message?: unknown } };
-    const structured = [parsed.error?.type, parsed.error?.code, parsed.error?.message]
-      .filter((value): value is string => typeof value === "string")
-      .join(" ");
-    if (structured) evidence = structured;
+    collect(JSON.parse(raw));
   } catch {
-    // Some Providers return plain text or HTML error bodies.
+    for (const line of raw.split(/\r?\n/)) {
+      if (!line.startsWith("data:")) continue;
+      const data = line.slice(5).trim();
+      if (!data || data === "[DONE]") continue;
+      try { collect(JSON.parse(data)); } catch { /* Ignore non-JSON SSE data. */ }
+    }
   }
+  const evidence = structuredErrors.join(" ") || raw;
   const normalized = evidence.toLowerCase();
   const isContextOverflow = /context[_ -]length[_ -]exceeded|context[_ -]window[_ -]exceeded|maximum context length|context window exceeded|prompt is too long|input exceeds the context window|too many tokens for this model/.test(normalized);
   if (!isContextOverflow) return { isContextOverflow: false };
-  const limitMatch = /(?:maximum|max(?:imum)?|limit|context window)[^0-9]{0,32}([0-9][0-9,]{3,})/i.exec(evidence);
+  const limitMatch = structuredErrors.length > 0
+    ? /(?:maximum|max(?:imum)?|limit|context window)[^0-9]{0,32}([0-9][0-9,]{3,})/i.exec(evidence)
+    : undefined;
   const reportedContextLimit = limitMatch?.[1] ? Number(limitMatch[1].replaceAll(",", "")) : undefined;
   return {
     isContextOverflow: true,

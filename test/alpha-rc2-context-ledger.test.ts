@@ -45,10 +45,10 @@ function route(profiles: AlphaExecutionProfile[], requiredTotalContextTokens: nu
 }
 
 describe("Alpha RC2 context admission and ledger contract", () => {
-  it("uses canonical ceilings and treats observed successful input as a floor", () => {
+  it("keeps canonical context metadata without using it as an admission ceiling", () => {
     expect(canonicalAdvertisedContextWindow("gpt-5.4-mini")).toBe(400_000);
     expect(canonicalAdvertisedContextWindow("gpt-5.6-luna")).toBe(1_050_000);
-    expect(effectiveContextCeiling(profile())).toBe(1_050_000);
+    expect(effectiveContextCeiling(profile())).toBe(Number.MAX_SAFE_INTEGER);
     expect(route([profile()], 32_222).selectedProfile.modelId).toBe("gpt-5.6-luna");
     expect(route([profile()], 229_815).selectedProfile.modelId).toBe("gpt-5.6-luna");
   });
@@ -70,7 +70,7 @@ describe("Alpha RC2 context admission and ledger contract", () => {
       .toBeGreaterThan(estimateContextAdmission(small, 800).estimatedInputTokens + 90_000);
   });
 
-  it("conservatively admits the 229K synthetic fixture only to a long-context model", () => {
+  it("forwards the synthetic long-context fixture when Profiles have no verified hard cap", () => {
     const envelope = normalizeResponsesRequest({
       model: "acu-auto",
       input: "Reply with exactly OK.\n" + "alpha ".repeat(229_000),
@@ -87,11 +87,11 @@ describe("Alpha RC2 context admission and ledger contract", () => {
       }),
       profile(),
     ], estimate.requiredTotalContextTokens);
-    expect(selected.selectedProfile.modelId).toBe("gpt-5.6-luna");
+    expect(["gpt-5.4-mini", "gpt-5.6-luna"]).toContain(selected.selectedProfile.modelId);
   });
 
-  it("returns a typed HTTP 400 when context is the sole admission blocker", () => {
-    expect(() => route([profile({ canonicalAdvertisedContextWindow: 32_768 })], 40_000)).toThrowError(
+  it("returns a typed HTTP 400 only for a verified Provider hard cap", () => {
+    expect(() => route([profile({ canonicalAdvertisedContextWindow: 32_768, providerHardContextCap: 32_768 })], 40_000)).toThrowError(
       expect.objectContaining<Partial<AlphaAdmissionError>>({
         errorType: "context_length_exceeded", statusCode: 400,
         details: expect.objectContaining({

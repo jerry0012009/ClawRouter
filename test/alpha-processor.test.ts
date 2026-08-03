@@ -120,6 +120,31 @@ run("Alpha PostgreSQL request processor", () => {
         response.end();
         return;
       }
+      if (requestBody.test_context_overflow_once === true && testCaseCall === 1) {
+        response.statusCode = 200;
+        response.setHeader("content-type", "text/event-stream");
+        response.setHeader("x-request-id", `provider-${testCase}-context-1`);
+        response.end([
+          "event: response.created",
+          `data: ${JSON.stringify({ type: "response.created", response: { id: `response-${testCase}-1`, model: requestBody.model } })}`,
+          "",
+          "event: error",
+          `data: ${JSON.stringify({ type: "error", error: {
+            type: "invalid_request_error", code: "context_length_exceeded",
+            message: "Input exceeds the context window",
+          } })}`,
+          "",
+          "event: response.failed",
+          `data: ${JSON.stringify({ type: "response.failed", response: {
+            id: `response-${testCase}-1`, model: requestBody.model, status: "failed",
+            error: { type: "invalid_request_error", code: "context_length_exceeded",
+              message: "Input exceeds the context window" },
+          } })}`,
+          "",
+          "",
+        ].join("\n"));
+        return;
+      }
       const failuresBeforeSuccess = Number(requestBody.test_failures_before_success ?? 0);
       if (testCase && testCaseCall <= failuresBeforeSuccess) {
         response.statusCode = Number(requestBody.test_failure_status ?? 503);
@@ -247,6 +272,7 @@ run("Alpha PostgreSQL request processor", () => {
       supportedReasoningEfforts: ["low", "medium", "high"],
       reasoningControlMode: "standard_effort",
       contextWindow: 1_000_000,
+      providerHardContextCap: 400_000,
       health: "healthy",
       enabled: true,
       administratorAllowed: true,
@@ -1700,6 +1726,45 @@ run("Alpha PostgreSQL request processor", () => {
       "SELECT count(*) FROM acu_logical_requests WHERE newapi_user_id='user-three-channel'",
     );
     expect(requestCount.rows[0].count).toBe("1");
+  });
+
+  it("tries another same-model Profile before a context model reroute", async () => {
+    await database.query("DELETE FROM acu_channel_health WHERE channel_id IN ('test-channel','test-recovery-channel','test-cross-provider-channel')");
+    await database.query(
+      "DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id IN ('test:gpt-5.4-mini:responses','test:gpt-5.4-mini:recovery','test:gpt-5.4-mini:cross-provider-recovery')",
+    );
+    const testCase = "context-same-model-first";
+    const responseBody = await send({
+      model: "acu-auto",
+      input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "Retry the same model first" }] }],
+      stream: true,
+      test_case: testCase,
+      test_context_overflow_once: true,
+    }, testCase, "user-context-same-model-first");
+    expect(responseBody).toContain("response.completed");
+    const attempts = await database.query<{
+      attempt_index: number; execution_profile_id: string; actual_model: string; status: string;
+      metadata_json: Record<string, unknown>;
+    }>(
+      `SELECT attempt_index,execution_profile_id,actual_model,status,metadata_json FROM acu_attempts
+       WHERE logical_request_id=(SELECT logical_request_id FROM acu_logical_requests
+         WHERE newapi_user_id='user-context-same-model-first') ORDER BY attempt_index`,
+    );
+    expect(attempts.rows).toHaveLength(2);
+    expect(attempts.rows[0]).toMatchObject({
+      attempt_index: 1,
+      actual_model: "gpt-5.4-mini",
+      status: "error",
+      metadata_json: {
+        errorClass: "provider_context_overflow",
+        nextRecoveryAction: "same_model_channel_fallback",
+      },
+    });
+    expect(attempts.rows[1]).toMatchObject({
+      attempt_index: 2,
+      actual_model: "gpt-5.4-mini",
+      status: "success",
+    });
   });
 
   it("never recovers through a Profile outside the Token allowlist", async () => {

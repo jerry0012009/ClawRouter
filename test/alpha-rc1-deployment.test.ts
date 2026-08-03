@@ -64,7 +64,9 @@ describe("Alpha RC1 deployment profiles", () => {
         expect(catalog?.inputPricePerMillion).toBeTypeOf("number");
         expect(catalog?.outputPricePerMillion).toBeTypeOf("number");
         expect(catalog?.cachedInputPricePerMillion).toBeTypeOf("number");
-        expect(effectiveContextCeiling(profile)).toBeLessThanOrEqual(catalog?.contextWindow ?? 0);
+        expect(effectiveContextCeiling(profile)).toBe(
+          profile.providerHardContextCap ?? Number.MAX_SAFE_INTEGER,
+        );
         expect(profile.baseUrlEnv).toMatch(/^(?:ACU_CHANNEL_)?(?:CLOSEAI|LUCEN|BLACKAI)_/);
         expect(profile.apiKeyEnv).toMatch(/^(?:ACU_CHANNEL_)?(?:CLOSEAI|LUCEN|BLACKAI).+API_KEY$/);
       }

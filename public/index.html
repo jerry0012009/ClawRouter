@@ -25,7 +25,7 @@
     </div>
     <div class="hero-side">
       <div class="side-row"><span>Step 01</span><strong>Define Quality</strong></div>
-      <div class="side-row"><span>Step 02</span><strong>Compare Quality Ceiling vs Router</strong></div>
+      <div class="side-row"><span>Step 02</span><strong>Compare Opus Baseline vs Router</strong></div>
       <div class="side-row"><span>Step 03</span><strong>Collect Preference</strong></div>
       <div class="side-row"><span>Ledger</span><strong>Private Capacity Trace</strong></div>
     </div>
@@ -65,18 +65,18 @@
   <section class="section glass">
     <div class="head"><span class="num">02</span><span class="title">发送测试 Prompt</span></div>
     <div class="tabs" id="preset-bar"></div>
-    <div class="prompt-row"><textarea id="prompt-input" placeholder="输入本次任务，系统将对比当前任务质量上界模型与 ACU Router…"></textarea><button class="btn" id="run-btn" onclick="runComparison()">对比</button></div>
+    <div class="prompt-row"><textarea id="prompt-input" placeholder="输入本次任务，系统将对比固定 Claude Opus 4.8 旗舰基准与 ACU Router…"></textarea><button class="btn" id="run-btn" onclick="runComparison()">对比</button></div>
   </section>
 
   <div class="grid2">
-    <section class="panel"><div class="label strong">质量上界对照 / 当前任务最高预计得分模型</div><div class="answer" id="baseline-answer"><span class="subtle">等待输入…</span></div><div class="meta" id="baseline-meta"></div></section>
+    <section class="panel"><div class="label strong">固定旗舰基准 / Claude Opus 4.8</div><div class="answer" id="baseline-answer"><span class="subtle">等待输入…</span></div><div class="meta" id="baseline-meta"></div></section>
     <section class="panel"><div class="label router">ACU Router / 任务识别 · 质量成本路由</div><div class="answer" id="router-answer"><span class="subtle">等待输入…</span></div><div class="meta" id="router-meta"></div></section>
   </div>
   <div id="savings-banner"></div>
 
   <section class="section glass acu-decision-module" id="acu-decision-module">
     <div class="head"><span class="num">ACU</span><span class="title">模型能力与成本决策说明</span><span class="acu-source-badge" id="acu-source-badge">等待任务评估</span><span class="acu-source-badge" id="acu-routing-mode">路由模式：等待执行</span></div>
-    <p class="section-intro">系统综合任务难度、质量偏好与调用成本选择当前模型。</p>
+    <p class="section-intro">系统综合任务难度、质量偏好与调用成本选择当前模型；曲线同时标记固定 Opus 4.8 基准与当前预计质量最高模型。</p>
     <div class="acu-task-overview" id="acu-task-overview">
       <div><span>任务类型</span><strong id="acu-task-type">—</strong></div>
       <div><span>预计难度指数</span><strong id="acu-live-difficulty">—</strong><small id="acu-difficulty-level">—</small></div>
@@ -103,19 +103,19 @@
   <section class="section glass">
     <div class="head"><span class="num">03</span><span class="title">Quality Evidence / 质量判断与用户反馈</span></div>
     <div class="quality-grid">
-      <div id="baseline-quality" class="scorebox"><div class="score">-</div><div class="scoretext">等待质量上界模型输出评分</div></div>
+      <div id="baseline-quality" class="scorebox"><div class="score">-</div><div class="scoretext">等待 Claude Opus 4.8 固定旗舰基准输出评分</div></div>
       <div id="router-quality" class="scorebox"><div class="score">-</div><div class="scoretext">等待 ACU Router 输出评分</div></div>
     </div>
-    <div class="feedback" id="feedback-row" style="display:none"><button onclick="recordFeedback('router_win')">Router 更好</button><button onclick="recordFeedback('baseline_win')">质量上界模型更好</button><button onclick="recordFeedback('tie')">差不多</button><button onclick="recordFeedback('router_adopted')">采用 Router</button><button onclick="recordFeedback('router_thumb_up')">👍 Router 满意</button><button onclick="recordFeedback('router_thumb_down')">👎 Router 不满意</button></div>
+    <div class="feedback" id="feedback-row" style="display:none"><button onclick="recordFeedback('router_win')">Router 更好</button><button onclick="recordFeedback('baseline_win')">Opus 基准更好</button><button onclick="recordFeedback('tie')">差不多</button><button onclick="recordFeedback('router_adopted')">采用 Router</button><button onclick="recordFeedback('router_thumb_up')">👍 Router 满意</button><button onclick="recordFeedback('router_thumb_down')">👎 Router 不满意</button></div>
     <p class="note" id="feedback-summary" style="margin-top:12px">反馈将用于持续校准模型选择。</p>
   </section>
 
   <section class="section glass"><div class="head"><span class="num">04</span><span class="title">Routing Trace</span></div><div class="meta trace-box" id="trace-grid"><span class="pill">发送请求后显示路由详情</span></div></section>
-  <section class="section glass"><div class="head"><span class="num">05</span><span class="title">Cost & Quality Ledger / 最近请求</span></div><div class="table-wrap"><table><thead><tr><th>时间</th><th>任务类型</th><th>质量偏好</th><th>ACU模型</th><th>ACU实际成本</th><th>质量上界成本</th><th>节省</th><th>质量状态</th><th>Validator</th><th>切换</th><th>延迟</th></tr></thead><tbody id="ledger-body"><tr><td colspan="11" class="subtle">暂无数据</td></tr></tbody></table></div><div class="footer-sum" id="ledger-summary"></div></section>
+  <section class="section glass"><div class="head"><span class="num">05</span><span class="title">Cost & Quality Ledger / 最近请求</span></div><div class="table-wrap"><table><thead><tr><th>时间</th><th>任务类型</th><th>质量偏好</th><th>ACU模型</th><th>ACU账单估算</th><th>Opus同Token基准</th><th>净节省</th><th>质量状态</th><th>Validator</th><th>切换</th><th>延迟</th></tr></thead><tbody id="ledger-body"><tr><td colspan="11" class="subtle">暂无数据</td></tr></tbody></table></div><div class="footer-sum" id="ledger-summary"></div></section>
   <section class="section glass"><div class="head"><span class="num">06</span><span class="title">Model Catalog</span></div><div class="model-wrap"><table><thead><tr><th>模型</th><th>上游</th><th>输入 $/1M</th><th>输出 $/1M</th><th>Context</th><th>标签</th></tr></thead><tbody id="models-body"><tr><td colspan="6" class="subtle">正在加载模型列表…</td></tr></tbody></table></div></section>
 </div>
-<script src="./public/acu-main.js?v=20260727-restore-catalog" defer></script>
-<script src="./public/acu-chart-core.js" defer></script>
-<script src="./public/acu-integrated.js" defer></script>
+<script src="./public/acu-chart-core.js?v=20260803-fixed-opus-baseline" defer></script>
+<script src="./public/acu-main.js?v=20260803-fixed-opus-baseline" defer></script>
+<script src="./public/acu-integrated.js?v=20260803-fixed-opus-baseline" defer></script>
 </body>
 </html>

@@ -270,7 +270,8 @@ describe("ACU Router demo reliability", () => {
     const main = await readFile(join(process.cwd(), "public", "acu-main.js"), "utf8");
     const integrated = await readFile(join(process.cwd(), "public", "acu-integrated.js"), "utf8");
     expect(html).toContain("acu-decision-module");
-    expect(html).toContain("当前任务最高预计得分模型");
+    expect(html).toContain("固定旗舰基准 / Claude Opus 4.8");
+    expect(html).toContain("Opus同Token基准");
     expect(html).toContain("全部备选");
     expect(html).toContain("<span class=\"num\">04</span>");
     expect(html).toContain("<span class=\"num\">05</span>");
@@ -286,14 +287,14 @@ describe("ACU Router demo reliability", () => {
     expect(main).toContain("body.appendChild(row)");
     expect(main).toContain("Promise.allSettled");
     expect(main).toContain("exhaustedWithoutVisibleOutput");
-    expect(main).toContain("已自动重试，成本含两次调用");
+    expect(main).toContain("已自动重试，估算含两次调用");
     expect(main).not.toContain("推理过程耗尽");
     expect(main).toContain("reasoning: 4096");
     expect(main).not.toContain("reasoning: 1200");
     expect(main).toContain("estimatedOutputTokensForTask");
     expect(main).toContain("planTask(messages, spec.threshold / 100, expectedOutputTokens)");
-    expect(main).toContain("chatComplete(ROUTER_MODEL, messages, spec.threshold / 100, { acu_plan_id: plan.planId })");
-    expect(main).not.toContain("max_tokens: maxTokens");
+    expect(main).toContain("acu_plan_id: plan.planId");
+    expect(main).toContain("max_tokens: expectedOutputTokens");
     expect(main).not.toContain("element.textContent = text || '(empty)'");
     expect(main).not.toContain("BASELINE_MODEL");
     expect(main).not.toContain("localStorage");
@@ -303,7 +304,8 @@ describe("ACU Router demo reliability", () => {
     expect(integrated).toContain("function visibleModelIds()");
     expect(integrated).toContain("ACU推荐");
     expect(integrated).toContain("实际执行");
-    expect(integrated).toContain("质量上界");
+    expect(integrated).toContain("固定旗舰基准");
+    expect(integrated).toContain("预计质量最高");
     expect(integrated).toContain("推荐模型${reason}，已切换");
     expect(integrated).toContain("质量复核后升级");
     expect(integrated).toContain("state.locked.size >= 3");

@@ -8003,6 +8003,13 @@ var OVERLOAD_COOLDOWN_MS = 15e3;
 var MAX_MESSAGES = 200;
 var ACU_PREFIX_PATTERN = /^\/acu-router(?:-dev)?(?=\/|\?|$)/;
 var DEFAULT_BASELINE_MODEL = "claude-opus-4-7";
+var ACU_DEMO_BENCHMARK_MODEL_ID = "claude-opus-4-8";
+var ACU_DEMO_BENCHMARK_PRICING = {
+  modelId: ACU_DEMO_BENCHMARK_MODEL_ID,
+  inputPricePerMillion: 10,
+  outputPricePerMillion: 50,
+  label: "Anthropic Opus 4.8 Fast mode \u5B98\u65B9\u4EF7\uFF08Demo\u57FA\u51C6\uFF09"
+};
 var ROUTING_PROFILES = /* @__PURE__ */ new Set(["auto", "eco", "premium"]);
 var rateLimitedModels = /* @__PURE__ */ new Map();
 var overloadedModels = /* @__PURE__ */ new Map();
@@ -8375,6 +8382,13 @@ function qualityCeilingCandidate(candidates) {
     return displayedScoreDifference || right.conservativeScore - left.conservativeScore || healthRank(left.healthStatus) - healthRank(right.healthStatus) || (left.p50LatencyMs ?? Number.POSITIVE_INFINITY) - (right.p50LatencyMs ?? Number.POSITIVE_INFINITY) || evidenceRank(left.evidenceConfidence) - evidenceRank(right.evidenceConfidence) || left.modelId.localeCompare(right.modelId);
   })[0];
 }
+function benchmarkBaselineCandidate(candidates) {
+  const benchmark = candidates.find((candidate) => candidate.candidateId === ACU_DEMO_BENCHMARK_MODEL_ID);
+  if (!benchmark) {
+    throw new Error(`Fixed ACU benchmark ${ACU_DEMO_BENCHMARK_MODEL_ID} is unavailable for this request`);
+  }
+  return benchmark;
+}
 function buildPlanRecord(args) {
   const displayRecommendation = recommendModel({
     probabilities: args.evaluation.judge,
@@ -8385,7 +8399,20 @@ function buildPlanRecord(args) {
     qualityTarget: args.evaluation.qualityTarget,
     eligibleModelIds: args.allCompatibleModelIds
   });
-  const displayCandidates = displayRecommendation.estimates.map((estimate) => decoratePlanCandidate(estimate, args.evaluation.difficultyScore, args.store));
+  const routedDisplayCandidates = displayRecommendation.estimates.map((estimate) => decoratePlanCandidate(estimate, args.evaluation.difficultyScore, args.store));
+  const benchmarkCandidate = benchmarkBaselineCandidate(routedDisplayCandidates);
+  const benchmarkCallCost = (args.evaluation.contextTokenEstimate * ACU_DEMO_BENCHMARK_PRICING.inputPricePerMillion + args.expectedOutputTokens * ACU_DEMO_BENCHMARK_PRICING.outputPricePerMillion) / 1e6;
+  const benchmarkSelectionCost = benchmarkCallCost + benchmarkCandidate.expectedFallbackCost;
+  const benchmarkBaselineModel = {
+    ...benchmarkCandidate,
+    estimatedCallCost: benchmarkCallCost,
+    selectionCost: benchmarkSelectionCost,
+    expectedEndToEndCost: args.evaluation.judgeCost + benchmarkSelectionCost,
+    expectedTotalCost: args.evaluation.judgeCost + benchmarkSelectionCost,
+    riskAdjustedCost: benchmarkSelectionCost
+  };
+  const displayCandidates = routedDisplayCandidates.map((candidate) => candidate.modelId === benchmarkBaselineModel.modelId ? benchmarkBaselineModel : candidate);
+  const qualityLeaderModel = qualityCeilingCandidate(displayCandidates);
   const now = Date.now();
   return {
     evaluation: args.evaluation,
@@ -8394,7 +8421,10 @@ function buildPlanRecord(args) {
     contextSha256: args.evaluation.contextSha256,
     qualityTarget: args.evaluation.qualityTarget,
     expectedOutputTokens: args.expectedOutputTokens,
-    qualityCeilingModel: qualityCeilingCandidate(displayCandidates),
+    benchmarkBaselineModel,
+    benchmarkPricing: ACU_DEMO_BENCHMARK_PRICING,
+    qualityLeaderModel,
+    qualityCeilingModel: qualityLeaderModel,
     displayCandidates
   };
 }
@@ -8948,6 +8978,9 @@ async function handleRequest(req, res, ctx) {
         ...evaluation,
         planId,
         planExpiresAt: new Date(plan.expiresAt).toISOString(),
+        benchmarkBaselineModel: plan.benchmarkBaselineModel,
+        benchmarkPricing: plan.benchmarkPricing,
+        qualityLeaderModel: plan.qualityLeaderModel,
         qualityCeilingModel: plan.qualityCeilingModel,
         displayCandidates: plan.displayCandidates,
         planningOnly: true,

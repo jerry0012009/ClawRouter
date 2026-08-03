@@ -65,9 +65,21 @@
       && availableCurves.has(candidate.modelId));
   }
 
-  function featuredModelIds({ candidates, ceilingId, recommendedId, actualId, attemptIds }) {
+  function benchmarkCounterfactualCost(pricing, usage) {
+    const inputTokens = Number(usage?.inputTokens ?? usage?.prompt_tokens ?? usage?.input_tokens ?? 0);
+    const outputTokens = Number(usage?.completionTokens ?? usage?.completion_tokens ?? usage?.output_tokens ?? 0);
+    const inputPrice = Number(pricing?.inputPricePerMillion);
+    const outputPrice = Number(pricing?.outputPricePerMillion);
+    if (!Number.isFinite(inputTokens) || !Number.isFinite(outputTokens)
+      || !Number.isFinite(inputPrice) || !Number.isFinite(outputPrice)
+      || inputTokens <= 0 || outputTokens < 0 || inputPrice < 0 || outputPrice < 0) return null;
+    return (inputTokens * inputPrice + outputTokens * outputPrice) / 1e6;
+  }
+
+  function featuredModelIds({ candidates, benchmarkId, qualityLeaderId, ceilingId, recommendedId, actualId, attemptIds }) {
     const compatible = new Map(candidates.map((candidate) => [candidate.modelId, candidate]));
-    const fixed = [ceilingId, recommendedId, actualId, ...(attemptIds || [])].filter((id) => compatible.has(id));
+    const fixed = [benchmarkId, qualityLeaderId, ceilingId, recommendedId, actualId, ...(attemptIds || [])]
+      .filter((id) => compatible.has(id));
     const remaining = candidates.filter((candidate) => !fixed.includes(candidate.modelId));
     const valueModel = sortCandidates(remaining, 'value')[0]?.modelId;
     const lowCostModel = sortCandidates(remaining.filter((candidate) => candidate.modelId !== valueModel), 'cost')[0]?.modelId;
@@ -82,6 +94,7 @@
     normalizeDomain,
     sortCandidates,
     visibleCandidates,
+    benchmarkCounterfactualCost,
     featuredModelIds,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -4,7 +4,7 @@
   const modelCatalogMap = {};
   let currentRun = null;
   let running = false;
-  let totalCeilingCost = 0;
+  let totalBenchmarkCost = 0;
   let totalRouterCost = 0;
 
   const PRESETS = [
@@ -109,6 +109,9 @@
     if (trace?.acu_demo) {
       const plan = window.__latestAcuPlan;
       if (plan) {
+        trace.acu_demo.benchmarkBaselineModel = plan.benchmarkBaselineModel;
+        trace.acu_demo.benchmarkPricing = plan.benchmarkPricing;
+        trace.acu_demo.qualityLeaderModel = plan.qualityLeaderModel;
         trace.acu_demo.qualityCeilingModel = plan.qualityCeilingModel;
         trace.acu_demo.displayCandidates = plan.displayCandidates;
       }
@@ -153,7 +156,17 @@
 
   function usageSourceLabel(response, trace) {
     const source = trace?.usage_audit?.usageSource || (response?.usage ? 'upstream_usage' : 'usage缺失');
-    return source === 'max_token_estimate' ? '上限估算，不是实际成本' : source;
+    return ({
+      upstream_cost: '上游返回金额',
+      upstream_usage: '按目录价 × 上游 Token',
+      response_text_estimate: '按回答文本估算',
+      max_token_estimate: '按输出上限估算',
+    }[source] || source);
+  }
+
+  function benchmarkCounterfactualCost(plan, response, trace) {
+    const usage = trace?.usage_audit || response?.usage;
+    return window.AcuChartCore.benchmarkCounterfactualCost(plan?.benchmarkPricing, usage);
   }
 
   function extractJsonCandidate(text) {
@@ -198,29 +211,38 @@
   }
 
   function updateComparisonSummary(state) {
-    if (!state.ceiling || !state.router) return;
-    const ceiling = state.plan.qualityCeilingModel;
+    if (!state.benchmark || !state.router) return;
+    const benchmark = state.plan.benchmarkBaselineModel || state.plan.qualityCeilingModel;
+    const qualityLeader = state.plan.qualityLeaderModel || state.plan.qualityCeilingModel;
     const recommended = state.plan.recommendation.recommended;
-    const actualSavings = state.ceiling.cost > 0 ? (1 - state.router.cost / state.ceiling.cost) * 100 : 0;
+    const normalizedBenchmarkCost = benchmarkCounterfactualCost(state.plan, state.router.response, state.router.trace);
+    const actualSavings = normalizedBenchmarkCost > 0 ? (1 - state.router.cost / normalizedBenchmarkCost) * 100 : null;
+    state.router.normalizedBenchmarkCost = normalizedBenchmarkCost;
+    const benchmarkLabel = state.plan.benchmarkPricing?.label || 'Opus 4.8 Demo基准价';
     const banner = $('savings-banner');
     banner.className = `banner ${state.router.quality.score >= state.spec.threshold ? 'ok' : 'warn'}`;
-    if (ceiling.modelId === recommended.modelId) {
-      banner.textContent = `该任务已接近质量上界，当前没有可靠的降配空间。本次质量上界成本 US$${state.ceiling.cost.toFixed(5)}，ACU 总成本 US$${state.router.cost.toFixed(5)}。`;
+    if (state.router.model === benchmark.modelId) {
+      banner.textContent = `ACU判断当前任务需要保留${benchmark.displayName}。按 Router 同等 Token 重算（${benchmarkLabel}），旗舰基准 US$${(normalizedBenchmarkCost ?? 0).toFixed(5)}；ACU 总成本 US$${state.router.cost.toFixed(5)}。`;
     } else {
-      const gap = Math.max(0, ceiling.predictedScore - recommended.predictedScore);
-      const costPhrase = actualSavings >= 0 ? `成本降低 ${actualSavings.toFixed(1)}%` : `成本增加 ${Math.abs(actualSavings).toFixed(1)}%`;
-      banner.textContent = `ACU 预计以 ${gap.toFixed(1)}分的模型得分差距，换取${costPhrase}。质量上界实际成本 US$${state.ceiling.cost.toFixed(5)}；ACU 本次实际成本 US$${state.router.cost.toFixed(5)}。`;
+      const gap = benchmark.predictedScore - recommended.predictedScore;
+      const costPhrase = actualSavings === null
+        ? '成本口径暂不可用'
+        : actualSavings >= 0 ? `同 Token 成本降低 ${actualSavings.toFixed(1)}%` : `同 Token 成本增加 ${Math.abs(actualSavings).toFixed(1)}%`;
+      const leaderNote = qualityLeader?.modelId === recommended.modelId
+        ? `；推荐接近预计质量最高模型 ${qualityLeader.displayName}`
+        : '';
+      banner.textContent = `相对固定旗舰基准 ${benchmark.displayName}，ACU以预计得分差 ${gap.toFixed(1)}分换取${costPhrase}${leaderNote}。${benchmarkLabel}：US$${(normalizedBenchmarkCost ?? 0).toFixed(5)}；ACU 总成本 US$${state.router.cost.toFixed(5)}。`;
     }
     if (!state.ledgerAdded) {
       state.ledgerAdded = true;
-      totalCeilingCost += state.ceiling.cost;
+      totalBenchmarkCost += normalizedBenchmarkCost ?? 0;
       totalRouterCost += state.router.cost;
       addLedgerRow({
         time: new Date().toLocaleTimeString(), task: detectTaskType($('prompt-input').value), preference: `${state.spec.threshold}分`,
-        model: state.router.model, cost: state.router.cost, ceiling: state.ceiling.cost, savings: actualSavings,
+        model: state.router.model, cost: state.router.cost, benchmark: normalizedBenchmarkCost ?? 0, savings: actualSavings ?? 0,
         quality: `${state.router.quality.label} ${state.router.quality.score}分`, validator: validatorLabel(state.router.trace),
         switched: (state.router.trace?.attempts?.length || 0) > 1 ? '是' : '否',
-        latency: `ACU ${state.router.latency}ms / 上界 ${state.ceiling.latency}ms`,
+        latency: `ACU ${state.router.latency}ms / Opus ${state.benchmark.latency}ms`,
       });
     }
   }
@@ -235,7 +257,8 @@
     const values = {
       difficulty_index: plan.difficultyIndex ?? plan.difficultyScore,
       difficulty_raw: plan.difficultyScoreRaw ?? '—',
-      quality_ceiling: plan.qualityCeilingModel?.modelId || '—',
+      benchmark_baseline: plan.benchmarkBaselineModel?.modelId || plan.qualityCeilingModel?.modelId || '—',
+      quality_leader: plan.qualityLeaderModel?.modelId || plan.qualityCeilingModel?.modelId || '—',
       recommended: plan.recommendation?.recommended?.modelId || '—',
       actual: trace?.actual_model_used || '—', attempts,
       usage_source: trace?.usage_audit?.usageSource || '—',
@@ -248,10 +271,10 @@
     const body = $('ledger-body');
     if (body.querySelector('.subtle')) body.innerHTML = '';
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${row.time}</td><td>${row.task}</td><td>${row.preference}</td><td>${row.model}</td><td class="green-text">$${row.cost.toFixed(5)}</td><td>$${row.ceiling.toFixed(5)}</td><td class="green-text">${row.savings.toFixed(1)}%</td><td>${row.quality}</td><td>${row.validator}</td><td>${row.switched}</td><td>${row.latency}</td>`;
+    tr.innerHTML = `<td>${row.time}</td><td>${row.task}</td><td>${row.preference}</td><td>${row.model}</td><td class="green-text">$${row.cost.toFixed(5)}</td><td>$${row.benchmark.toFixed(5)}</td><td class="${row.savings >= 0 ? 'green-text' : 'yellow-text'}">${row.savings.toFixed(1)}%</td><td>${row.quality}</td><td>${row.validator}</td><td>${row.switched}</td><td>${row.latency}</td>`;
     body.prepend(tr);
     [...body.children].slice(8).forEach((node) => node.remove());
-    $('ledger-summary').innerHTML = `<span>累计ACU实际成本 $${totalRouterCost.toFixed(5)}</span><span>质量上界成本 $${totalCeilingCost.toFixed(5)}</span><span>累计节省 $${(totalCeilingCost - totalRouterCost).toFixed(5)}</span>`;
+    $('ledger-summary').innerHTML = `<span>累计ACU账单估算 $${totalRouterCost.toFixed(5)}</span><span>累计Opus同Token基准 $${totalBenchmarkCost.toFixed(5)}</span><span>累计净节省 $${(totalBenchmarkCost - totalRouterCost).toFixed(5)}</span>`;
   }
 
   async function runComparison() {
@@ -261,49 +284,55 @@
     $('run-btn').disabled = true;
     $('feedback-row').style.display = 'none';
     $('savings-banner').innerHTML = '';
-    $('baseline-answer').textContent = '正在评估当前任务并选择质量上界模型…';
+    $('baseline-answer').textContent = '正在准备 Claude Opus 4.8 固定旗舰基准…';
     $('router-answer').textContent = '正在评估当前任务并规划质量成本路由…';
     const spec = getQualitySpec();
     const expectedOutputTokens = estimatedOutputTokensForTask(spec.task_type, prompt);
     const messages = [{ role: 'system', content: qualitySpecPrompt(spec) }, { role: 'user', content: prompt }];
     renderQualityPreview();
-    const state = { plan: null, ceiling: null, router: null, ceilingDone: false, routerDone: false, ledgerAdded: false, spec };
+    const state = { plan: null, benchmark: null, router: null, benchmarkDone: false, routerDone: false, ledgerAdded: false, spec };
     try {
       const plan = await planTask(messages, spec.threshold / 100, expectedOutputTokens);
       state.plan = plan;
       window.__latestAcuPlan = plan;
       window.__acuPageContext = { taskType: spec.task_type === 'auto' ? detectTaskType(prompt) : ({ structured_extraction: '结构化抽取', code_fix: '代码修复', summary: '摘要', writing: '写作', reasoning: '复杂推理' }[spec.task_type] || '通用任务'), qualityTarget: spec.threshold, prompt };
       window.dispatchEvent(new CustomEvent('acu:plan', { detail: { plan } }));
-      const ceiling = plan.qualityCeilingModel;
-      $('baseline-answer').textContent = `${ceiling.displayName} 正在生成质量上界对照…`;
+      const benchmark = plan.benchmarkBaselineModel || plan.qualityCeilingModel;
+      $('baseline-answer').textContent = `${benchmark.displayName} 正在生成固定旗舰质量对照…`;
       $('router-answer').textContent = `${plan.recommendation.recommended.displayName} 正在执行 ACU 推荐…`;
-      const finish = () => { if (state.ceilingDone && state.routerDone) { running = false; $('run-btn').disabled = false; } };
-      const ceilingExtra = ceiling.thinkingMode === 'disabled' ? { enable_thinking: false } : {};
-      const ceilingStarted = Date.now();
-      const ceilingPromise = chatComplete(ceiling.modelId, messages, undefined, ceilingExtra).then(async (firstResponse) => {
+      const finish = () => { if (state.benchmarkDone && state.routerDone) { running = false; $('run-btn').disabled = false; } };
+      const benchmarkExtra = {
+        max_tokens: expectedOutputTokens,
+        ...(benchmark.thinkingMode === 'disabled' ? { enable_thinking: false } : {}),
+      };
+      const benchmarkStarted = Date.now();
+      const benchmarkPromise = chatComplete(benchmark.modelId, messages, undefined, benchmarkExtra).then(async (firstResponse) => {
         let response = firstResponse;
         let emptyOutputRetry = false;
         let retryCost = 0;
         if (exhaustedWithoutVisibleOutput(firstResponse)) {
           emptyOutputRetry = true;
-          retryCost = actualModelCost(firstResponse, ceiling.modelId);
-          response = await chatComplete(ceiling.modelId, messages, undefined, ceilingExtra);
+          retryCost = actualModelCost(firstResponse, benchmark.modelId);
+          response = await chatComplete(benchmark.modelId, messages, undefined, benchmarkExtra);
         }
-        const latency = Date.now() - ceilingStarted;
+        const latency = Date.now() - benchmarkStarted;
         const content = responseText(response);
-        const cost = retryCost + actualModelCost(response, ceiling.modelId);
+        const observedCost = retryCost + actualModelCost(response, benchmark.modelId);
         const quality = evaluateQuality(content, prompt, spec, null);
         renderAnswer($('baseline-answer'), response, content);
-        renderQualityResult('baseline-quality', '质量上界模型', quality, spec);
-        $('baseline-meta').innerHTML = `<span class="pill warn">${ceiling.displayName}</span><span class="pill">预计 ${ceiling.predictedScore.toFixed(1)}分</span><span class="pill">${modeLabel(ceiling)}</span><span class="pill">模型调用 ${latency}ms</span><span class="pill warn">本次实际成本 US$${cost.toFixed(5)}</span><span class="pill">${usageSourceLabel(response)}</span>${emptyOutputRetry ? '<span class="pill warn">已自动重试，成本含两次调用</span>' : ''}`;
-        state.ceiling = { response, model: ceiling.modelId, cost, quality, latency, predictedScore: ceiling.predictedScore };
+        renderQualityResult('baseline-quality', 'Claude Opus 4.8 固定旗舰基准', quality, spec);
+        $('baseline-meta').innerHTML = `<span class="pill warn">${benchmark.displayName}</span><span class="pill">预计 ${benchmark.predictedScore.toFixed(1)}分</span><span class="pill">${modeLabel(benchmark)}</span><span class="pill">模型调用 ${latency}ms</span><span class="pill warn">独立调用账单估算 US$${observedCost.toFixed(5)}</span><span class="pill">${usageSourceLabel(response)}</span><span class="pill">基准估算 ${plan.benchmarkPricing?.inputPricePerMillion ?? 10}/${plan.benchmarkPricing?.outputPricePerMillion ?? 50} $/M</span><span class="pill">仅作质量对照，不计入节省率</span>${emptyOutputRetry ? '<span class="pill warn">已自动重试，估算含两次调用</span>' : ''}`;
+        state.benchmark = { response, model: benchmark.modelId, observedCost, quality, latency, predictedScore: benchmark.predictedScore };
       }).catch((error) => {
-        $('baseline-answer').textContent = `质量上界模型调用失败：${error.message}`;
+        $('baseline-answer').textContent = `固定旗舰基准调用失败：${error.message}`;
         $('baseline-meta').innerHTML = '<span class="pill bad">对照失败，不影响 ACU Router 结果</span>';
-      }).finally(() => { state.ceilingDone = true; updateComparisonSummary(state); finish(); });
+      }).finally(() => { state.benchmarkDone = true; updateComparisonSummary(state); finish(); });
 
       const routerStarted = Date.now();
-      const routerPromise = chatComplete(ROUTER_MODEL, messages, spec.threshold / 100, { acu_plan_id: plan.planId }).then((response) => {
+      const routerPromise = chatComplete(ROUTER_MODEL, messages, spec.threshold / 100, {
+        acu_plan_id: plan.planId,
+        max_tokens: expectedOutputTokens,
+      }).then((response) => {
         const wallLatency = Date.now() - routerStarted;
         const trace = getTrace(response);
         const model = trace?.actual_model_used || response.model || 'unknown';
@@ -313,17 +342,17 @@
         const latency = trace?.latency_breakdown || {};
         renderAnswer($('router-answer'), response, content);
         renderQualityResult('router-quality', 'ACU Router', quality, spec);
-        $('router-meta').innerHTML = `<span class="pill ok">实际 ${model}</span><span class="pill">任务评估 ${latency.judge_latency_ms ?? 0}ms</span><span class="pill">模型调用 ${trace?.attempts?.[0]?.latency_ms ?? 0}ms</span><span class="pill">总耗时 ${latency.total_router_latency_ms ?? wallLatency}ms</span><span class="pill ok">本次实际成本 US$${cost.toFixed(5)}</span><span class="pill">${usageSourceLabel(response, trace)}</span>`;
+        $('router-meta').innerHTML = `<span class="pill ok">实际 ${model}</span><span class="pill">任务评估 ${latency.judge_latency_ms ?? 0}ms</span><span class="pill">模型调用 ${trace?.attempts?.[0]?.latency_ms ?? 0}ms</span><span class="pill">总耗时 ${latency.total_router_latency_ms ?? wallLatency}ms</span><span class="pill ok">ACU总账单估算 US$${cost.toFixed(5)}</span><span class="pill">${usageSourceLabel(response, trace)}</span>`;
         state.router = { response, trace, model, cost, quality, latency: wallLatency };
         renderTrace(trace, plan);
-        currentRun = { routerQuality: quality, spec, model, ceilingModel: ceiling.modelId };
+        currentRun = { routerQuality: quality, spec, model, benchmarkModel: benchmark.modelId };
         $('feedback-row').style.display = 'flex';
-        if (!state.ceilingDone) $('baseline-answer').textContent = 'ACU Router 已完成；质量上界模型仍在生成…';
+        if (!state.benchmarkDone) $('baseline-answer').textContent = 'ACU Router 已完成；Opus 4.8 固定旗舰基准仍在生成…';
       }).catch((error) => {
         $('router-answer').textContent = `ACU Router 失败：${error.message}`;
-        $('router-meta').innerHTML = '<span class="pill bad">Router 失败，不清空已完成的质量上界结果</span>';
+        $('router-meta').innerHTML = '<span class="pill bad">Router 失败，不清空已完成的旗舰基准结果</span>';
       }).finally(() => { state.routerDone = true; updateComparisonSummary(state); finish(); });
-      await Promise.allSettled([ceilingPromise, routerPromise]);
+      await Promise.allSettled([benchmarkPromise, routerPromise]);
     } catch (error) {
       $('baseline-answer').textContent = `任务评估失败：${error.message}`;
       $('router-answer').textContent = '未执行模型调用。';

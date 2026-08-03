@@ -46,9 +46,18 @@
 
   function candidate(modelId) { return candidates().find((item) => item.modelId === modelId); }
 
+  function benchmarkModel() {
+    return state.plan?.benchmarkBaselineModel || state.plan?.qualityCeilingModel;
+  }
+
+  function qualityLeaderModel() {
+    return state.plan?.qualityLeaderModel || state.plan?.qualityCeilingModel;
+  }
+
   function roleLabels(modelId) {
     const labels = [];
-    if (modelId === state.plan?.qualityCeilingModel?.modelId) labels.push('质量上界');
+    if (modelId === benchmarkModel()?.modelId) labels.push('固定旗舰基准');
+    if (modelId === qualityLeaderModel()?.modelId) labels.push('预计质量最高');
     if (modelId === state.plan?.recommendation?.recommended?.modelId) labels.push('ACU推荐');
     if (modelId === (state.evaluation?.actualModel || state.trace?.actual_model_used)) labels.push('实际执行');
     (state.trace?.attempts || []).forEach((attempt, index) => { if (attempt.model === modelId) labels.push(`第${index + 1}次尝试`); });
@@ -57,7 +66,8 @@
   }
 
   function modelColor(modelId, fallbackIndex) {
-    if (modelId === state.plan?.qualityCeilingModel?.modelId) return '#9fc7ff';
+    if (modelId === benchmarkModel()?.modelId) return '#9fc7ff';
+    if (modelId === qualityLeaderModel()?.modelId) return '#b7a1ff';
     if (modelId === (state.evaluation?.actualModel || state.trace?.actual_model_used)) return '#ffd76a';
     if (modelId === state.plan?.recommendation?.recommended?.modelId) return '#90e8a0';
     return colors[fallbackIndex % colors.length];
@@ -68,7 +78,8 @@
     if (state.mode === 'all') return all.map((item) => item.modelId);
     return core.featuredModelIds({
       candidates: all,
-      ceilingId: state.plan?.qualityCeilingModel?.modelId,
+      benchmarkId: benchmarkModel()?.modelId,
+      qualityLeaderId: qualityLeaderModel()?.modelId,
       recommendedId: state.plan?.recommendation?.recommended?.modelId,
       actualId: state.evaluation?.actualModel || state.trace?.actual_model_used,
       attemptIds: (state.trace?.attempts || []).map((attempt) => attempt.model),
@@ -139,13 +150,16 @@
     const recommended = state.plan?.recommendation?.recommended || evaluation.recommendation.recommended;
     const actualId = state.evaluation?.actualModel || state.trace?.actual_model_used;
     const actual = candidate(actualId);
+    const benchmark = benchmarkModel();
+    const leader = qualityLeaderModel();
     $('acu-live-recommendation').textContent = `${recommended.displayName} · ${score(recommended.predictedScore)} · ${money(recommended.expectedTotalCost)}`;
     $('acu-live-actual').textContent = actualId ? `${actual?.displayName || actualId} · ${modeLabel(actual)}` : '等待模型执行';
     $('acu-live-application').textContent = executionStatus();
-    const ceiling = state.plan?.qualityCeilingModel;
-    $('acu-live-reason').textContent = ceiling?.modelId === recommended.modelId
-      ? '该任务已接近质量上界，当前没有可靠的降配空间。'
-      : evaluation.recommendation.reason;
+    $('acu-live-reason').textContent = actualId === benchmark?.modelId
+      ? 'ACU判断当前任务需要保留固定旗舰基准，未进行不可靠的降配。'
+      : leader?.modelId === recommended.modelId
+        ? '当前推荐接近任务预计质量最高模型，Router优先保留质量。'
+        : evaluation.recommendation.reason;
     updateOverview();
   }
 
@@ -170,7 +184,12 @@
 
   function labelModels(modelIds) {
     if (state.mode === 'featured') return modelIds;
-    const permanent = [state.plan?.qualityCeilingModel?.modelId, state.plan?.recommendation?.recommended?.modelId, state.evaluation?.actualModel || state.trace?.actual_model_used];
+    const permanent = [
+      benchmarkModel()?.modelId,
+      qualityLeaderModel()?.modelId,
+      state.plan?.recommendation?.recommended?.modelId,
+      state.evaluation?.actualModel || state.trace?.actual_model_used,
+    ];
     return [...new Set([...permanent, ...state.locked].filter((id) => modelIds.includes(id)))];
   }
 
@@ -189,7 +208,13 @@
       const placeRight = item.px < (bounds.left + bounds.right) / 2;
       const boxX = placeRight ? Math.min(bounds.right - width, item.px + 13) : Math.max(bounds.left, item.px - width - 13);
       ctx.strokeStyle = item.color; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(item.px, item.py); ctx.lineTo(placeRight ? boxX : boxX + width, item.labelY); ctx.stroke();
-      ctx.fillStyle = item.modelId === state.plan?.qualityCeilingModel?.modelId ? 'rgba(30,49,73,.97)' : item.modelId === state.plan?.recommendation?.recommended?.modelId ? 'rgba(35,62,42,.97)' : 'rgba(15,15,17,.97)';
+      ctx.fillStyle = item.modelId === benchmarkModel()?.modelId
+        ? 'rgba(30,49,73,.97)'
+        : item.modelId === qualityLeaderModel()?.modelId
+          ? 'rgba(49,34,66,.97)'
+          : item.modelId === state.plan?.recommendation?.recommended?.modelId
+            ? 'rgba(35,62,42,.97)'
+            : 'rgba(15,15,17,.97)';
       ctx.fillRect(boxX, item.labelY - height / 2, width, height); ctx.strokeStyle = item.color; ctx.strokeRect(boxX, item.labelY - height / 2, width, height);
       ctx.textAlign = 'left'; ctx.fillStyle = '#f3f3f4'; ctx.font = '600 10px sans-serif'; ctx.fillText(item.candidate.displayName, boxX + 7, item.labelY - 3);
       ctx.font = '600 9px ui-monospace, monospace'; ctx.fillText(`${score(item.candidate.predictedScore)}    ${money(item.candidate.expectedTotalCost)}`, boxX + 7, item.labelY + 11);
@@ -263,7 +288,7 @@
     const items = core.sortCandidates(candidates().filter((item) => selectedIds.has(item.modelId)), sortKey);
     $('acu-integrated-legend').innerHTML = items.map((item) => {
       const roles = roleLabels(item.modelId);
-      const emphasis = `${roles.includes('质量上界') ? ' ceiling' : ''}${roles.includes('ACU推荐') ? ' recommended' : ''}${roles.includes('实际执行') ? ' actual' : ''}`;
+      const emphasis = `${roles.includes('固定旗舰基准') ? ' benchmark' : ''}${roles.includes('预计质量最高') ? ' leader' : ''}${roles.includes('ACU推荐') ? ' recommended' : ''}${roles.includes('实际执行') ? ' actual' : ''}`;
       return `<button type="button" class="acu-model-row${emphasis}${state.selected === item.modelId || state.locked.has(item.modelId) ? ' selected' : ''}" data-model-id="${item.modelId}"><span class="acu-model-title"><b>${item.displayName}</b><em>${roles.map((role) => `<i>${role}</i>`).join('')}</em></span><span class="acu-model-metrics"><strong>${score(item.predictedScore)}<small>预计得分</small></strong><strong>${money(item.expectedTotalCost)}<small>预计综合成本</small></strong></span><span class="acu-model-detail">预计P50 ${(displayLatencyMs(item) / 1000).toFixed(1)}s · ${healthLabel(item.healthStatus)}</span></button>`;
     }).join('');
   }
@@ -274,6 +299,7 @@
     const attempts = (trace.attempts || []).map((item, index) => `#${index + 1} ${item.model}: ${item.status}${item.error_category ? `/${item.error_category}` : ''} · ${item.attempt_type || 'initial'} · ${item.execution_profile_id || 'default'} · ${item.latency_ms}ms`).join('<br>') || '—';
     const fields = [
       ['任务评估来源', sourceLabel(evaluation)[0]], ['执行状态', executionStatus()], ['路由模式', evaluation.shadowMode ? 'Shadow观察' : 'ACU实际执行'],
+      ['固定旗舰基准', benchmarkModel()?.displayName ?? benchmarkModel()?.modelId], ['预计质量最高', qualityLeaderModel()?.displayName ?? qualityLeaderModel()?.modelId],
       ['Judge模型', evaluation.judgeModel], ['Prompt版本', evaluation.promptVersion], ['缓存状态', evaluation.judgeStatus], ['Context Hash', `…${evaluation.contextSha256.slice(-8)}`],
       ['最终难度指数', evaluation.difficultyIndex ?? evaluation.difficultyScore], ['Judge原始总分', evaluation.difficultyScoreRaw ?? '旧记录无此字段'],
       ['六因子', Object.entries(evaluation.difficultyFactors || {}).map(([key, value]) => `${factorLabels[key] || key} ${value}`).join(' · ') || '—'],
@@ -283,7 +309,7 @@
       ['executionProfileId', trace.execution_profile_id], ['完整Attempts', attempts], ['validator_result', trace.validator_result], ['validator', trace.validator],
       ['validator_reason', trace.validator_reason], ['quality_fallback_used', String(trace.quality_fallback_used === true)], ['任务评估耗时', `${latency.judge_latency_ms ?? evaluation.judgeLatencyMs} ms`],
       ['Router总耗时', `${latency.total_router_latency_ms ?? 0} ms`], ['Completion / Reasoning Token', `${usage.completionTokens ?? '—'} / ${usage.reasoningTokens ?? '—'}`],
-      ['Usage来源', usage.usageSource], ['Judge成本', money(costs.judge_cost)], ['模型成本', money(costs.model_call_cost)], ['本次实际总成本', money(costs.total_acu_cost)],
+      ['Usage来源', usage.usageSource], ['Judge成本', money(costs.judge_cost)], ['模型成本', money(costs.model_call_cost)], ['ACU账单估算', money(costs.total_acu_cost)],
     ];
     $('acu-technical-details').innerHTML = fields.map(([key, value]) => `<div><dt>${key}</dt><dd>${value ?? '—'}</dd></div>`).join('');
   }
@@ -348,7 +374,12 @@
 
   function lockModel(modelId) {
     if (!modelId) return;
-    const permanent = new Set([state.plan?.qualityCeilingModel?.modelId, state.plan?.recommendation?.recommended?.modelId, state.evaluation?.actualModel]);
+    const permanent = new Set([
+      benchmarkModel()?.modelId,
+      qualityLeaderModel()?.modelId,
+      state.plan?.recommendation?.recommended?.modelId,
+      state.evaluation?.actualModel,
+    ]);
     if (!permanent.has(modelId)) {
       if (state.locked.has(modelId)) state.locked.delete(modelId);
       else { while (state.locked.size >= 3) state.locked.delete(state.locked.values().next().value); state.locked.add(modelId); }
@@ -406,5 +437,19 @@
   window.addEventListener('resize', drawChart);
   safeFetch(`${api}/catalog`).then((response) => response.json()).then((catalog) => { state.catalog = catalog; drawChart(); }).catch(() => {});
   bindInteractions();
-  window.AcuInteractiveChart = { setMode, autoFit, zoom, getState: () => ({ mode: state.mode, view: currentView(), visibleModelIds: visibleModelIds(), locked: [...state.locked], recommendedModel: state.plan?.recommendation?.recommended?.modelId, qualityCeilingModel: state.plan?.qualityCeilingModel?.modelId, actualModel: state.evaluation?.actualModel }) };
+  window.AcuInteractiveChart = {
+    setMode,
+    autoFit,
+    zoom,
+    getState: () => ({
+      mode: state.mode,
+      view: currentView(),
+      visibleModelIds: visibleModelIds(),
+      locked: [...state.locked],
+      benchmarkBaselineModel: benchmarkModel()?.modelId,
+      qualityLeaderModel: qualityLeaderModel()?.modelId,
+      recommendedModel: state.plan?.recommendation?.recommended?.modelId,
+      actualModel: state.evaluation?.actualModel,
+    }),
+  };
 })();

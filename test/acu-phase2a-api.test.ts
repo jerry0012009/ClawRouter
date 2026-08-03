@@ -273,7 +273,7 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
     );
   });
 
-  it("reuses one planning evaluation for the quality ceiling and ACU route without duplicate database writes", async () => {
+  it("reuses one planning evaluation for the fixed benchmark and ACU route without duplicate database writes", async () => {
     const summary = () => fetch(`${proxy.baseUrl}/acu/api/data-summary`, { headers: { Authorization: AUTHORIZATION } })
       .then((response) => response.json()) as Promise<{ realRequestCount: number }>;
     const before = await summary();
@@ -289,6 +289,9 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
       planId: string;
       planningOnly: boolean;
       databaseWrites: number;
+      benchmarkBaselineModel: { modelId: string; predictedScore: number };
+      benchmarkPricing: { modelId: string; inputPricePerMillion: number; outputPricePerMillion: number; label: string };
+      qualityLeaderModel: { modelId: string; predictedScore: number };
       qualityCeilingModel: { modelId: string; predictedScore: number };
       displayCandidates: Array<{ modelId: string; predictedScore: number; routingEligible: boolean }>;
     };
@@ -297,7 +300,15 @@ describe("Phase 2A API and RulesStrategy fallback", () => {
     expect((await summary()).realRequestCount).toBe(before.realRequestCount);
     expect(receivedModels).toEqual(["gpt-5.6-luna"]);
     const compatibleScores = plan.displayCandidates.filter((item) => item.routingEligible).map((item) => Number(item.predictedScore.toFixed(1)));
-    expect(Number(plan.qualityCeilingModel.predictedScore.toFixed(1))).toBe(Math.max(...compatibleScores));
+    expect(plan.benchmarkBaselineModel.modelId).toBe("claude-opus-4-8");
+    expect(plan.benchmarkPricing).toEqual({
+      modelId: "claude-opus-4-8",
+      inputPricePerMillion: 10,
+      outputPricePerMillion: 50,
+      label: "Anthropic Opus 4.8 Fast mode 官方价（Demo基准）",
+    });
+    expect(Number(plan.qualityLeaderModel.predictedScore.toFixed(1))).toBe(Math.max(...compatibleScores));
+    expect(plan.qualityCeilingModel.modelId).toBe(plan.qualityLeaderModel.modelId);
 
     const routedResponse = await fetch(`${proxy.baseUrl}/v1/chat/completions`, {
       method: "POST",

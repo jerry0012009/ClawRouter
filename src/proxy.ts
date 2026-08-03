@@ -96,6 +96,13 @@ const OVERLOAD_COOLDOWN_MS = 15_000;
 const MAX_MESSAGES = 200;
 const ACU_PREFIX_PATTERN = /^\/acu-router(?:-dev)?(?=\/|\?|$)/;
 const DEFAULT_BASELINE_MODEL = "claude-opus-4-7";
+const ACU_DEMO_BENCHMARK_MODEL_ID = "claude-opus-4-8";
+const ACU_DEMO_BENCHMARK_PRICING = {
+  modelId: ACU_DEMO_BENCHMARK_MODEL_ID,
+  inputPricePerMillion: 10,
+  outputPricePerMillion: 50,
+  label: "Anthropic Opus 4.8 Fast mode 官方价（Demo基准）",
+};
 
 // ── Routing profile virtual models ──
 const ROUTING_PROFILES = new Set(["auto", "eco", "premium"]);
@@ -309,6 +316,15 @@ type AcuPlanRecord = {
   contextSha256: string;
   qualityTarget: number;
   expectedOutputTokens: number;
+  benchmarkBaselineModel: AcuPlanCandidate;
+  benchmarkPricing: {
+    modelId: string;
+    inputPricePerMillion: number;
+    outputPricePerMillion: number;
+    label: string;
+  };
+  qualityLeaderModel: AcuPlanCandidate;
+  /** Backward-compatible alias for clients that still expect the old field. */
   qualityCeilingModel: AcuPlanCandidate;
   displayCandidates: AcuPlanCandidate[];
 };
@@ -780,6 +796,16 @@ function qualityCeilingCandidate(candidates: AcuPlanCandidate[]): AcuPlanCandida
   })[0];
 }
 
+function benchmarkBaselineCandidate(candidates: AcuPlanCandidate[]): AcuPlanCandidate {
+  const benchmark = candidates.find((candidate) => (
+    candidate.candidateId === ACU_DEMO_BENCHMARK_MODEL_ID
+  ));
+  if (!benchmark) {
+    throw new Error(`Fixed ACU benchmark ${ACU_DEMO_BENCHMARK_MODEL_ID} is unavailable for this request`);
+  }
+  return benchmark;
+}
+
 function buildPlanRecord(args: {
   evaluation: AcuEvaluation;
   allCompatibleModelIds: string[];
@@ -795,9 +821,27 @@ function buildPlanRecord(args: {
     qualityTarget: args.evaluation.qualityTarget,
     eligibleModelIds: args.allCompatibleModelIds,
   });
-  const displayCandidates = displayRecommendation.estimates.map((estimate) => (
+  const routedDisplayCandidates = displayRecommendation.estimates.map((estimate) => (
     decoratePlanCandidate(estimate, args.evaluation.difficultyScore, args.store)
   ));
+  const benchmarkCandidate = benchmarkBaselineCandidate(routedDisplayCandidates);
+  const benchmarkCallCost = (
+    args.evaluation.contextTokenEstimate * ACU_DEMO_BENCHMARK_PRICING.inputPricePerMillion
+    + args.expectedOutputTokens * ACU_DEMO_BENCHMARK_PRICING.outputPricePerMillion
+  ) / 1_000_000;
+  const benchmarkSelectionCost = benchmarkCallCost + benchmarkCandidate.expectedFallbackCost;
+  const benchmarkBaselineModel = {
+    ...benchmarkCandidate,
+    estimatedCallCost: benchmarkCallCost,
+    selectionCost: benchmarkSelectionCost,
+    expectedEndToEndCost: args.evaluation.judgeCost + benchmarkSelectionCost,
+    expectedTotalCost: args.evaluation.judgeCost + benchmarkSelectionCost,
+    riskAdjustedCost: benchmarkSelectionCost,
+  };
+  const displayCandidates = routedDisplayCandidates.map((candidate) => (
+    candidate.modelId === benchmarkBaselineModel.modelId ? benchmarkBaselineModel : candidate
+  ));
+  const qualityLeaderModel = qualityCeilingCandidate(displayCandidates);
   const now = Date.now();
   return {
     evaluation: args.evaluation,
@@ -806,7 +850,10 @@ function buildPlanRecord(args: {
     contextSha256: args.evaluation.contextSha256,
     qualityTarget: args.evaluation.qualityTarget,
     expectedOutputTokens: args.expectedOutputTokens,
-    qualityCeilingModel: qualityCeilingCandidate(displayCandidates),
+    benchmarkBaselineModel,
+    benchmarkPricing: ACU_DEMO_BENCHMARK_PRICING,
+    qualityLeaderModel,
+    qualityCeilingModel: qualityLeaderModel,
     displayCandidates,
   };
 }
@@ -1478,6 +1525,9 @@ async function handleRequest(
         ...evaluation,
         planId,
         planExpiresAt: new Date(plan.expiresAt).toISOString(),
+        benchmarkBaselineModel: plan.benchmarkBaselineModel,
+        benchmarkPricing: plan.benchmarkPricing,
+        qualityLeaderModel: plan.qualityLeaderModel,
         qualityCeilingModel: plan.qualityCeilingModel,
         displayCandidates: plan.displayCandidates,
         planningOnly: true,

@@ -45,13 +45,20 @@ describe("investor chart presentation helpers", () => {
     expect(domain[1]).toBeLessThanOrEqual(100);
   });
 
-  it("filters unavailable models and always features ceiling, recommendation and actual execution", async () => {
+  it("filters unavailable models and always features benchmark, quality leader, recommendation and actual execution", async () => {
     const core = await loadCore();
-    const candidates = [candidate("ceiling", 95, .1), candidate("recommended", 90, .01), candidate("actual", 89, .02), candidate("four", 88, .03), candidate("five", 87, .04), candidate("six", 86, .05), candidate("cooldown", 99, .03, { healthStatus: "cooldown" })];
-    const visible = core.visibleCandidates(candidates, ["ceiling", "recommended", "actual", "four", "five", "six", "cooldown"]) as Candidate[];
-    expect(visible.map((item) => item.modelId)).toEqual(["ceiling", "recommended", "actual", "four", "five", "six"]);
-    const featured = core.featuredModelIds({ candidates: visible, ceilingId: "ceiling", recommendedId: "recommended", actualId: "actual", attemptIds: [] }) as string[];
-    expect(featured).toEqual(expect.arrayContaining(["ceiling", "recommended", "actual"]));
+    const candidates = [candidate("benchmark", 92, .1), candidate("leader", 95, .2), candidate("recommended", 90, .01), candidate("actual", 89, .02), candidate("five", 87, .04), candidate("six", 86, .05), candidate("cooldown", 99, .03, { healthStatus: "cooldown" })];
+    const visible = core.visibleCandidates(candidates, ["benchmark", "leader", "recommended", "actual", "five", "six", "cooldown"]) as Candidate[];
+    expect(visible.map((item) => item.modelId)).toEqual(["benchmark", "leader", "recommended", "actual", "five", "six"]);
+    const featured = core.featuredModelIds({
+      candidates: visible,
+      benchmarkId: "benchmark",
+      qualityLeaderId: "leader",
+      recommendedId: "recommended",
+      actualId: "actual",
+      attemptIds: [],
+    }) as string[];
+    expect(featured).toEqual(expect.arrayContaining(["benchmark", "leader", "recommended", "actual"]));
     expect(featured).toHaveLength(6);
   });
 
@@ -62,5 +69,18 @@ describe("investor chart presentation helpers", () => {
     const items = [candidate("costly", 95, .2), candidate("value", 90, .01)];
     expect((core.sortCandidates(items, "cost") as Candidate[])[0].modelId).toBe("value");
     expect((core.sortCandidates(items, "score") as Candidate[])[0].modelId).toBe("costly");
+  });
+
+  it("normalizes the flagship benchmark to the Router token workload", async () => {
+    const core = await loadCore();
+    expect(core.benchmarkCounterfactualCost(
+      { inputPricePerMillion: 5, outputPricePerMillion: 25 },
+      { inputTokens: 173, completionTokens: 1_604 },
+    )).toBeCloseTo(0.040965, 12);
+    expect(core.benchmarkCounterfactualCost(
+      { inputPricePerMillion: 5, outputPricePerMillion: 25 },
+      { prompt_tokens: 124, completion_tokens: 638 },
+    )).toBeCloseTo(0.01657, 12);
+    expect(core.benchmarkCounterfactualCost({}, {})).toBeNull();
   });
 });

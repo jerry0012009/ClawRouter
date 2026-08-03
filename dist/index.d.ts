@@ -12,6 +12,7 @@ type AcuRuntimeConfig = {
     maxOutputTokens: number;
     apiKey?: string;
     judgeProvider: string;
+    judgeProtocol: "responses" | "chat_completions";
     backupJudgeModel?: string;
     backupJudgeBaseUrl?: string;
     backupApiKey?: string;
@@ -1158,6 +1159,7 @@ declare function buildModelCurve(model: AcuModelCatalogEntry): AcuCurvePoint[];
 declare function interpolateModelCurve(model: AcuModelCatalogEntry, difficultyScore: number): AcuCurvePoint;
 declare function publicCatalogPayload(): Record<string, unknown>;
 
+declare function applyLogitShift(probability: number, shift: number): number;
 declare function normalizeProbabilities(value: Omit<AcuTierProbabilities, "confidence"> & {
     confidence?: number;
 }): AcuTierProbabilities;
@@ -1408,4 +1410,4 @@ declare const VERSION: string;
 
 declare const plugin: OpenClawPluginDefinition;
 
-export { ACU_TIERS, type AcuBenchmarkEvidence, type AcuCurvePoint, AcuDemoStrategy, type AcuDifficultyFactors, type AcuEvaluateInput, type AcuEvaluation, AcuJudgeClient, type AcuJudgeResult, type AcuJudgeResultSource, type AcuJudgeStatus, type AcuModelCatalogEntry, type AcuModelEstimate, type AcuRecommendation, AcuRoutingStore, type AcuRuntimeConfig, type AcuTier, type AcuTierProbabilities, type AcuVisibleMessage, BLOCKRUN_MODELS, type CachedResponse, DEFAULT_ROUTING_CONFIG, type ExecutionProfile, type ExecutionProfileHealth, type FeedbackInput, MODEL_ALIASES, OPENCLAW_MODELS, type OutcomeInput, RequestDeduplicator, ResponseCache, type RoutingConfig, type RoutingDecision, type RoutingRecordMetadata, type SessionConfig, type SessionEntry, SessionStore, type ThinkingMode, type Tier, type UsageEntry, VERSION, blockrunProvider, buildJudgeSystemPrompt, buildModelCurve, buildProviderModels, calculateModelCost, computeDifficultyIndex, continuousTierProbabilities, plugin as default, difficultyScore, estimateCallCost, estimateVisibleTokens, estimatedQuality, executionProfileFor, getAcuCatalog, getAcuModel, getFallbackChain, getModelContextWindow, getProxyPort, getSessionId, hasSevereTierConflict, hashRequestContent, hashSession, interpolateModelCurve, isParetoEfficient, isReasoningModel, logUsage, normalizeProbabilities, normalizedEntropy, openAcuRoutingStore, parseJudgeResult, publicCatalogPayload, readAcuRuntimeConfig, recommendModel, resolveApiKey, resolveModelAlias, route, rulesFallbackJudge, saveApiKey, selectValueRoute, serializeVisibleContext, solveAbilityParameter, startProxy, supportsToolCalling, supportsVision, tierSufficiency };
+export { ACU_TIERS, type AcuBenchmarkEvidence, type AcuCurvePoint, AcuDemoStrategy, type AcuDifficultyFactors, type AcuEvaluateInput, type AcuEvaluation, AcuJudgeClient, type AcuJudgeResult, type AcuJudgeResultSource, type AcuJudgeStatus, type AcuModelCatalogEntry, type AcuModelEstimate, type AcuRecommendation, AcuRoutingStore, type AcuRuntimeConfig, type AcuTier, type AcuTierProbabilities, type AcuVisibleMessage, BLOCKRUN_MODELS, type CachedResponse, DEFAULT_ROUTING_CONFIG, type ExecutionProfile, type ExecutionProfileHealth, type FeedbackInput, MODEL_ALIASES, OPENCLAW_MODELS, type OutcomeInput, RequestDeduplicator, ResponseCache, type RoutingConfig, type RoutingDecision, type RoutingRecordMetadata, type SessionConfig, type SessionEntry, SessionStore, type ThinkingMode, type Tier, type UsageEntry, VERSION, applyLogitShift, blockrunProvider, buildJudgeSystemPrompt, buildModelCurve, buildProviderModels, calculateModelCost, computeDifficultyIndex, continuousTierProbabilities, plugin as default, difficultyScore, estimateCallCost, estimateVisibleTokens, estimatedQuality, executionProfileFor, getAcuCatalog, getAcuModel, getFallbackChain, getModelContextWindow, getProxyPort, getSessionId, hasSevereTierConflict, hashRequestContent, hashSession, interpolateModelCurve, isParetoEfficient, isReasoningModel, logUsage, normalizeProbabilities, normalizedEntropy, openAcuRoutingStore, parseJudgeResult, publicCatalogPayload, readAcuRuntimeConfig, recommendModel, resolveApiKey, resolveModelAlias, route, rulesFallbackJudge, saveApiKey, selectValueRoute, serializeVisibleContext, solveAbilityParameter, startProxy, supportsToolCalling, supportsVision, tierSufficiency };

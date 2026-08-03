@@ -175,7 +175,7 @@ describe("Alpha RC1 deployment profiles", () => {
     });
 
     expect(decision.candidateEstimates.map((estimate) => estimate.candidateId).sort())
-      .toEqual(["gpt-5.6-luna", "gpt-5.6-luna@max", "gpt-5.6-sol"]);
+      .toEqual(["gpt-5.6-luna", "gpt-5.6-luna@max", "gpt-5.6-sol", "gpt-5.6-sol@high", "gpt-5.6-sol@xhigh"]);
     expect(decision.excludedProfiles.filter((profile) => profile.reasons.includes("model_policy")).length)
       .toBeGreaterThanOrEqual(8);
   });

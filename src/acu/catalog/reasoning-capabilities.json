@@ -1,7 +1,7 @@
 [
   {"modelId":"gpt-5.6-luna","protocols":{"responses":{"controlMode":"standard_effort","supportedEfforts":["low","medium","high","max"]}},"source":"observed","status":"verified","observedAt":"2026-08-02"},
-  {"modelId":"gpt-5.6-sol","protocols":{"responses":{"controlMode":"standard_effort","supportedEfforts":["low","medium","high"]}},"source":"observed","status":"verified","observedAt":"2026-08-02"},
-  {"modelId":"gpt-5.6-terra","protocols":{"responses":{"controlMode":"standard_effort","supportedEfforts":["low","medium","high"]}},"source":"observed","status":"verified","observedAt":"2026-08-02"},
+  {"modelId":"gpt-5.6-sol","protocols":{"responses":{"controlMode":"standard_effort","supportedEfforts":["low","medium","high","xhigh"]}},"source":"reasoning-capability-20260803T033605Z","status":"verified","observedAt":"2026-08-03"},
+  {"modelId":"gpt-5.6-terra","protocols":{"responses":{"controlMode":"standard_effort","supportedEfforts":["low","medium","high","max"]}},"source":"reasoning-capability-20260803T033605Z","status":"verified","observedAt":"2026-08-03"},
   {"modelId":"gpt-5.5","protocols":{"responses":{"controlMode":"standard_effort","supportedEfforts":["low","medium","high"]}},"source":"observed","status":"verified","observedAt":"2026-08-02"},
   {"modelId":"gpt-5.4-mini","protocols":{"responses":{"controlMode":"standard_effort","supportedEfforts":["low","medium","high"]}},"source":"observed","status":"verified","observedAt":"2026-08-02"},
   {"modelId":"claude-opus-4-8","protocols":{"messages":{"controlMode":"client_thinking_passthrough","supportedEfforts":["low","medium","high"]}},"source":"observed","status":"verified","observedAt":"2026-08-02"},

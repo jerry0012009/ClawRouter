@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { getAcuModel, interpolateModelCurve } from "../src/acu/catalog.js";
+import { getAcuCatalog, getAcuModel, interpolateModelCurve } from "../src/acu/catalog.js";
 import { recommendModel } from "../src/acu/decision.js";
 import { applyLogitShift } from "../src/acu/math.js";
 import { calculateProviderCost, parseProviderUsage } from "../src/alpha/usage.js";
+import { ACU_EXECUTION_PRESETS, enabledExecutionPresets } from "../src/acu/execution-presets.js";
 
 const input = {
   probabilities: { pLow: 0.1, pMid: 0.2, pMidHigh: 0.5, pHigh: 0.2, confidence: 0.8 },
@@ -10,43 +11,59 @@ const input = {
   eligibleModelIds: ["gpt-5.6-luna"], effectivePrices: { "gpt-5.6-luna": { inputPricePerMillion: 2, outputPricePerMillion: 10 } },
 };
 
-afterEach(() => delete process.env.ACU_LUNA_MAX_PRESET_ENABLED);
+const presetFlags = ACU_EXECUTION_PRESETS.map((preset) => preset.featureFlagEnv);
 
-describe("Luna Max execution preset", () => {
-  it("adds one candidate without adding a canonical model", () => {
-    process.env.ACU_LUNA_MAX_PRESET_ENABLED = "false";
-    expect(recommendModel(input).estimates.map((item) => item.candidateId)).toEqual(["gpt-5.6-luna"]);
-    process.env.ACU_LUNA_MAX_PRESET_ENABLED = "true";
-    const estimates = recommendModel(input).estimates;
-    expect(estimates.map((item) => item.candidateId).sort()).toEqual(["gpt-5.6-luna", "gpt-5.6-luna@max"]);
-    expect(new Set(estimates.map((item) => item.modelId))).toEqual(new Set(["gpt-5.6-luna"]));
+afterEach(() => presetFlags.forEach((flag) => delete process.env[flag]));
+
+describe("execution presets", () => {
+  it("has unique candidate IDs and defaults every flag to enabled", () => {
+    expect(new Set(ACU_EXECUTION_PRESETS.map((preset) => preset.candidateId)).size).toBe(4);
+    expect(enabledExecutionPresets()).toEqual(ACU_EXECUTION_PRESETS);
   });
 
-  it("uses a 0.22 logit shift and 1.6x output prediction only", () => {
-    const luna = getAcuModel("gpt-5.6-luna")!;
-    const baseQuality = interpolateModelCurve(luna, input.difficultyScore).estimatedQuality;
-    const estimates = recommendModel(input);
-    const base = estimates.estimates.find((item) => item.candidateId === "gpt-5.6-luna")!;
-    const max = estimates.estimates.find((item) => item.candidateId === "gpt-5.6-luna@max")!;
-    expect(max.estimatedQuality).toBeCloseTo(applyLogitShift(baseQuality, 0.22), 12);
-    expect(max.estimatedCallCost - base.estimatedCallCost).toBeCloseTo(600 * 10 / 1_000_000, 12);
-    expect(max.executionPresetId).toBe("gpt-5.6-luna:max");
-    expect(max.reasoningEffort).toBe("max");
+  it.each(ACU_EXECUTION_PRESETS)("switches $candidateId independently", (disabled) => {
+    process.env[disabled.featureFlagEnv] = "FaLsE";
+    expect(enabledExecutionPresets().map((preset) => preset.candidateId)).toEqual(
+      ACU_EXECUTION_PRESETS.filter((preset) => preset !== disabled).map((preset) => preset.candidateId),
+    );
   });
 
-  it("produces a finite, monotone Luna Max curve without a 100-point plateau", () => {
-    const points = Array.from({ length: 101 }, (_, difficultyScore) => {
-      const estimates = recommendModel({ ...input, difficultyScore }).estimates;
-      return {
-        base: estimates.find((item) => item.candidateId === "gpt-5.6-luna")!.estimatedQuality,
-        max: estimates.find((item) => item.candidateId === "gpt-5.6-luna@max")!.estimatedQuality,
-      };
-    });
-    expect(points.every(({ base, max }) => Number.isFinite(max) && max >= base && max <= 1)).toBe(true);
-    expect(points.every((point, index) => index === 0 || point.max <= points[index - 1]!.max)).toBe(true);
-    expect(points[0]!.max).toBeLessThan(1);
-    expect(Number((points[0]!.max * 100).toFixed(1))).toBeLessThan(100);
-    expect(points.filter(({ max }) => max === 1)).toHaveLength(0);
+  it("adds candidates without adding canonical models", () => {
+    const catalogModelIds = getAcuCatalog().models.map((model) => model.modelId);
+    expect(catalogModelIds).toHaveLength(25);
+    expect(catalogModelIds.some((modelId) => modelId.includes("@"))).toBe(false);
+    expect(catalogModelIds.some((modelId) => ACU_EXECUTION_PRESETS.some((preset) => preset.candidateId === modelId))).toBe(false);
+    const estimates = recommendModel({ ...input, eligibleModelIds: ["gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra"] }).estimates;
+    expect(estimates.filter((item) => item.executionPresetId).map((item) => item.candidateId).sort()).toEqual(
+      ACU_EXECUTION_PRESETS.map((preset) => preset.candidateId).sort(),
+    );
+    expect(new Set(estimates.map((item) => item.modelId))).toEqual(
+      new Set(["gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra"]),
+    );
+  });
+
+  it.each(ACU_EXECUTION_PRESETS)("applies $candidateId quality and output calibration", (preset) => {
+    const model = getAcuModel(preset.modelId)!;
+    const baseQuality = interpolateModelCurve(model, input.difficultyScore).estimatedQuality;
+    const result = recommendModel({ ...input, eligibleModelIds: [preset.modelId],
+      effectivePrices: { [preset.modelId]: { inputPricePerMillion: 2, outputPricePerMillion: 10 } } });
+    const base = result.estimates.find((item) => item.candidateId === preset.modelId)!;
+    const candidate = result.estimates.find((item) => item.candidateId === preset.candidateId)!;
+    const extraOutput = Math.round(input.expectedOutputTokens * preset.expectedOutputTokenMultiplier) - input.expectedOutputTokens;
+    expect(candidate.estimatedQuality).toBeCloseTo(applyLogitShift(baseQuality, preset.qualityLogitShift), 12);
+    expect(candidate.estimatedCallCost - base.estimatedCallCost).toBeCloseTo(extraOutput * 10 / 1_000_000, 12);
+    expect(candidate.executionPresetId).toBe(preset.presetId);
+    expect(candidate.reasoningEffort).toBe(preset.canonicalReasoningEffort);
+  });
+
+  it.each(ACU_EXECUTION_PRESETS)("produces a finite, smooth, monotone $candidateId curve without a 100-point plateau", (preset) => {
+    const points = Array.from({ length: 101 }, (_, difficultyScore) => recommendModel({ ...input, difficultyScore,
+      eligibleModelIds: [preset.modelId] }).estimates.find((item) => item.candidateId === preset.candidateId)!.estimatedQuality);
+    expect(points.every((quality) => Number.isFinite(quality) && quality > 0 && quality < 1)).toBe(true);
+    expect(points.every((quality, index) => index === 0 || quality <= points[index - 1]!)).toBe(true);
+    expect(points.every((quality, index) => index === 0 || Math.abs(quality - points[index - 1]!) < 0.1)).toBe(true);
+    expect(Number((points[0]! * 100).toFixed(1))).toBeLessThan(100);
+    expect(points.filter((quality) => quality === 1)).toHaveLength(0);
   });
 
   it("does not apply the multiplier or reasoning detail to actual billing", () => {

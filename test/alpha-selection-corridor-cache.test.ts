@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { AlphaRequestProcessor, codexSelectionCorridorRequirements } from "../src/alpha/processor.js";
-import { ACU_CURVE_DIFFICULTIES, buildModelCurve, getAcuModel, interpolateModelCurve } from "../src/acu/catalog.js";
+import { ACU_CURVE_DIFFICULTIES, getAcuModel, interpolateModelCurve } from "../src/acu/catalog.js";
 import { applyLogitShift } from "../src/acu/math.js";
 import type { AlphaExecutionProfile } from "../src/alpha/routing.js";
 
@@ -81,7 +81,11 @@ describe("selection corridor cache", () => {
       effectiveProfiles: () => Promise<{ profiles: AlphaExecutionProfile[]; probeClaims: [] }>;
       calculateSelectionCorridor: (inputTokens: number, outputTokens: number) => Promise<Record<string, unknown>>;
     };
-    internal.effectiveProfiles = async () => ({ profiles: [lunaProfile], probeClaims: [] });
+    internal.effectiveProfiles = async () => ({ profiles: [
+      lunaProfile,
+      { ...lunaProfile, executionProfileId: "verified:gpt-5.6-sol:responses", modelId: "gpt-5.6-sol" },
+      { ...lunaProfile, executionProfileId: "verified:gpt-5.6-terra:responses", modelId: "gpt-5.6-terra" },
+    ], probeClaims: [] });
 
     const result = await internal.calculateSelectionCorridor(100_000, 4_000) as {
       executionPresetSeries: Array<{
@@ -97,7 +101,7 @@ describe("selection corridor cache", () => {
       }>;
     };
 
-    expect(result.executionPresetSeries).toHaveLength(1);
+    expect(result.executionPresetSeries).toHaveLength(4);
     expect(result.executionPresetSeries[0]).toMatchObject({
       candidateId: "gpt-5.6-luna@max",
       modelId: "gpt-5.6-luna",
@@ -109,9 +113,9 @@ describe("selection corridor cache", () => {
       estimatedOutputTokens: 6_400,
     });
     const luna = getAcuModel("gpt-5.6-luna")!;
-    expect(result.executionPresetSeries[0]?.points).toHaveLength(buildModelCurve(luna).length);
+    expect(result.executionPresetSeries[0]?.points).toHaveLength(51);
     expect(result.executionPresetSeries[0]?.points.map((point) => point.difficulty)).toEqual(
-      ACU_CURVE_DIFFICULTIES,
+      ACU_CURVE_DIFFICULTIES.filter((difficulty) => difficulty % 2 === 0),
     );
     expect(result.executionPresetSeries[0]?.points.every((point) => point.estimatedCallCost > 0)).toBe(true);
     expect(result.executionPresetSeries[0]?.points.every((point) => (
@@ -121,5 +125,20 @@ describe("selection corridor cache", () => {
       ) < 1e-12
     ))).toBe(true);
     expect(result.executionPresetSeries[0]?.points.every((point) => point.estimatedQuality < 99.95)).toBe(true);
+    expect(result.executionPresetSeries.map((series) => series.candidateId)).toEqual([
+      "gpt-5.6-luna@max", "gpt-5.6-sol@high", "gpt-5.6-sol@xhigh", "gpt-5.6-terra@max",
+    ]);
+    expect(result.executionPresetSeries.map((series) => [series.candidateId, series.points.length])).toEqual([
+      ["gpt-5.6-luna@max", 51], ["gpt-5.6-sol@high", 51], ["gpt-5.6-sol@xhigh", 51], ["gpt-5.6-terra@max", 51],
+    ]);
+    expect(result.executionPresetSeries.find((series) => series.candidateId === "gpt-5.6-sol@high")).toMatchObject({
+      estimatedOutputTokens: 7_000, reasoningEffort: "high", expectedOutputTokenMultiplier: 1.75,
+    });
+    expect(result.executionPresetSeries.find((series) => series.candidateId === "gpt-5.6-sol@xhigh")).toMatchObject({
+      estimatedOutputTokens: 11_667, reasoningEffort: "xhigh", expectedOutputTokenMultiplier: 35 / 12,
+    });
+    expect(result.executionPresetSeries.find((series) => series.candidateId === "gpt-5.6-terra@max")).toMatchObject({
+      estimatedOutputTokens: 38_400, reasoningEffort: "max", expectedOutputTokenMultiplier: 9.6,
+    });
   });
 });

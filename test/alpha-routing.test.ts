@@ -115,7 +115,8 @@ describe("Alpha current-formula routing", () => {
       },
     });
     expect(result.candidateEstimates.map((candidate) => candidate.candidateId).sort()).toEqual([
-      "gpt-5.6-luna", "gpt-5.6-luna@max", "gpt-5.6-sol", "gpt-5.6-terra",
+      "gpt-5.6-luna", "gpt-5.6-luna@max", "gpt-5.6-sol", "gpt-5.6-sol@high",
+      "gpt-5.6-sol@xhigh", "gpt-5.6-terra", "gpt-5.6-terra@max",
     ]);
   });
 

@@ -4240,6 +4240,7 @@ function readAcuRuntimeConfig(overrides = {}) {
     maxOutputTokens: ACU_DEFAULT_MAX_OUTPUT_TOKENS,
     apiKey: process.env.ACU_JUDGE_API_KEY?.trim(),
     judgeProvider: process.env.ACU_JUDGE_PROVIDER?.trim() || "lucen",
+    judgeProtocol: "chat_completions",
     backupJudgeModel: process.env.ACU_JUDGE_BACKUP_MODEL?.trim() || void 0,
     backupJudgeBaseUrl: process.env.ACU_JUDGE_BACKUP_BASE_URL?.trim() || void 0,
     backupApiKey: process.env.ACU_JUDGE_BACKUP_API_KEY?.trim() || void 0,
@@ -4288,6 +4289,13 @@ function sigmoid(value) {
   }
   const z = Math.exp(value);
   return z / (1 + z);
+}
+function applyLogitShift(probability, shift) {
+  const boundedProbability = clamp(probability);
+  const oddsMultiplier = Math.exp(shift);
+  return clamp(
+    boundedProbability * oddsMultiplier / (1 - boundedProbability + boundedProbability * oddsMultiplier)
+  );
 }
 function normalizeProbabilities(value) {
   const raw = [value.pLow, value.pMid, value.pMidHigh, value.pHigh];
@@ -6174,6 +6182,9 @@ var twin_product_presets_default = {
 
 // src/acu/catalog.ts
 var catalog = model_catalog_default;
+var ACU_CURVE_DIFFICULTIES = Object.freeze(
+  Array.from({ length: 101 }, (_, difficultyScore2) => difficultyScore2)
+);
 function getAcuCatalog() {
   return catalog;
 }
@@ -6186,7 +6197,7 @@ function getRoutingEligibleModels(eligibleModelIds) {
 }
 function buildModelCurve(model) {
   const points = [];
-  for (let difficultyScore2 = 0; difficultyScore2 <= 100; difficultyScore2 += 1) {
+  for (const difficultyScore2 of ACU_CURVE_DIFFICULTIES) {
     const probabilities = continuousTierProbabilities(difficultyScore2 / 100);
     const quality = estimatedQuality(probabilities, model);
     points.push({
@@ -6241,15 +6252,51 @@ var ACU_EXECUTION_PRESETS = [{
   modelId: "gpt-5.6-luna",
   displayName: "GPT-5.6 Luna \xB7 Max",
   canonicalReasoningEffort: "max",
-  qualityScoreOffset: 3.5,
+  qualityLogitShift: 0.22,
   expectedOutputTokenMultiplier: 1.6,
+  featureFlagEnv: "ACU_LUNA_MAX_PRESET_ENABLED",
   enabled: true,
   calibrationStatus: "provisional",
   source: "acu-execution-preset-v1"
+}, {
+  presetId: "gpt-5.6-sol:high",
+  candidateId: "gpt-5.6-sol@high",
+  modelId: "gpt-5.6-sol",
+  displayName: "GPT-5.6 Sol \xB7 High",
+  canonicalReasoningEffort: "high",
+  qualityLogitShift: 0.081,
+  expectedOutputTokenMultiplier: 1.75,
+  featureFlagEnv: "ACU_SOL_HIGH_PRESET_ENABLED",
+  enabled: true,
+  calibrationStatus: "provisional",
+  source: "artificial-analysis-v4.1-sol-medium-to-high"
+}, {
+  presetId: "gpt-5.6-sol:xhigh",
+  candidateId: "gpt-5.6-sol@xhigh",
+  modelId: "gpt-5.6-sol",
+  displayName: "GPT-5.6 Sol \xB7 XHigh",
+  canonicalReasoningEffort: "xhigh",
+  qualityLogitShift: 0.162,
+  expectedOutputTokenMultiplier: 35 / 12,
+  featureFlagEnv: "ACU_SOL_XHIGH_PRESET_ENABLED",
+  enabled: true,
+  calibrationStatus: "provisional",
+  source: "artificial-analysis-v4.1-sol-medium-to-xhigh"
+}, {
+  presetId: "gpt-5.6-terra:max",
+  candidateId: "gpt-5.6-terra@max",
+  modelId: "gpt-5.6-terra",
+  displayName: "GPT-5.6 Terra \xB7 Max",
+  canonicalReasoningEffort: "max",
+  qualityLogitShift: 0.361,
+  expectedOutputTokenMultiplier: 9.6,
+  featureFlagEnv: "ACU_TERRA_MAX_PRESET_ENABLED",
+  enabled: true,
+  calibrationStatus: "provisional",
+  source: "artificial-analysis-v4.1-terra-medium-to-max"
 }];
 function enabledExecutionPresets() {
-  const featureEnabled = process.env.ACU_LUNA_MAX_PRESET_ENABLED?.toLowerCase() !== "false";
-  return featureEnabled ? ACU_EXECUTION_PRESETS.filter((preset) => preset.enabled) : [];
+  return ACU_EXECUTION_PRESETS.filter((preset) => preset.enabled && process.env[preset.featureFlagEnv]?.toLowerCase() !== "false");
 }
 
 // src/acu/decision.ts
@@ -6261,7 +6308,7 @@ function estimateCallCost(model, inputTokens, outputTokens) {
 }
 function estimateOne(model, difficultyScore2, entropyPenalty, inputTokens, outputTokens, judgeCost, fallbackCallCost, qualityTarget, switchCost, fallbackRiskScale, effectivePrice, preset) {
   const curvePoint = interpolateModelCurve(model, difficultyScore2);
-  const quality = clamp(curvePoint.estimatedQuality + (preset?.qualityScoreOffset ?? 0) / 100);
+  const quality = preset ? applyLogitShift(curvePoint.estimatedQuality, preset.qualityLogitShift) : curvePoint.estimatedQuality;
   const lower = clamp(quality - model.uncertaintyWidth - entropyPenalty / 100);
   const upper = clamp(quality + model.uncertaintyWidth);
   const expectedOutputTokens = Math.round(outputTokens * (preset?.expectedOutputTokenMultiplier ?? 1));
@@ -6553,6 +6600,24 @@ var AcuJudgeAttemptError = class extends Error {
   }
   attempt;
 };
+var JudgeProviderProtocolError = class extends Error {
+  name = "JudgeProviderProtocolError";
+};
+var JudgeSemanticParseError = class extends Error {
+  name = "JudgeSemanticParseError";
+};
+function looksLikeHtml(body, contentType) {
+  return /text\/html/i.test(contentType) || /^\s*(?:<!doctype\s+html|<html\b)/i.test(body);
+}
+function extractResponsesAssistantText(payload) {
+  const output = Array.isArray(payload.output) ? payload.output : [];
+  const text = output.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const content = Array.isArray(item.content) ? item.content : [];
+    return content.flatMap((part) => part && typeof part === "object" && part.type === "output_text" && typeof part.text === "string" ? [part.text] : []);
+  }).join("");
+  return text || void 0;
+}
 function judgeNominalCostUsd(modelId, promptTokens, cachedPromptTokens, completionTokens) {
   const price = modelId === "mimo-v2.5-pro" ? { input: 0.435, cached: 36e-4, output: 0.87 } : (() => {
     const model = getAcuCatalog().models.find((entry) => entry.modelId === modelId);
@@ -6685,11 +6750,45 @@ function buildJudgeSystemPrompt() {
   ].join("\n\n");
 }
 function extractJson(text) {
-  const cleaned = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
-  const start = cleaned.indexOf("{");
-  const end = cleaned.lastIndexOf("}");
-  if (start < 0 || end <= start) throw new Error("Judge response does not contain a JSON object");
-  const parsed = JSON.parse(cleaned.slice(start, end + 1));
+  const raw = text.trim();
+  const candidates = [raw];
+  const fenced = raw.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i)?.[1];
+  if (fenced !== void 0) candidates.push(fenced.trim());
+  let objectText;
+  for (const candidate of candidates) {
+    try {
+      const direct = JSON.parse(candidate);
+      if (direct && typeof direct === "object" && !Array.isArray(direct)) return direct;
+    } catch {
+    }
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    let start = -1;
+    for (let index = 0; index < candidate.length; index += 1) {
+      const character = candidate[index];
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (character === "\\") escaped = true;
+        else if (character === '"') inString = false;
+        continue;
+      }
+      if (character === '"') inString = true;
+      else if (character === "{") {
+        if (depth === 0) start = index;
+        depth += 1;
+      } else if (character === "}" && depth > 0) {
+        depth -= 1;
+        if (depth === 0 && start >= 0) {
+          objectText = candidate.slice(start, index + 1);
+          break;
+        }
+      }
+    }
+    if (objectText) break;
+  }
+  if (!objectText) throw new SyntaxError("Judge response does not contain a complete JSON object");
+  const parsed = JSON.parse(objectText);
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Judge response JSON must be an object");
   return parsed;
 }
@@ -6893,17 +6992,26 @@ ${contextSha256}`).digest("hex");
       let payload;
       let response;
       let rawResponseBody = "";
+      let responseContentType = "";
+      let providerEnvelopeValid = false;
+      let assistantTextExtracted = false;
       try {
-        response = await this.fetchImplementation(`${this.config.judgeBaseUrl.replace(/\/$/, "")}/chat/completions`, {
+        const useResponses = this.config.judgeProtocol === "responses";
+        const systemPrompt = buildJudgeSystemPrompt();
+        const userPrompt = `\u5F53\u524DAPI\u4E0A\u4E0B\u6587\uFF1A
+${truncated.text}`;
+        response = await this.fetchImplementation(`${this.config.judgeBaseUrl.replace(/\/$/, "")}/${useResponses ? "responses" : "chat/completions"}`, {
           method: "POST",
           headers: { Authorization: `Bearer ${this.config.apiKey}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
+          body: JSON.stringify(useResponses ? {
             model: this.config.judgeModel,
-            messages: [
-              { role: "system", content: buildJudgeSystemPrompt() },
-              { role: "user", content: `\u5F53\u524DAPI\u4E0A\u4E0B\u6587\uFF1A
-${truncated.text}` }
-            ],
+            instructions: systemPrompt,
+            input: [{ role: "user", content: [{ type: "input_text", text: userPrompt }] }],
+            max_output_tokens: Math.min(300, this.config.maxOutputTokens),
+            stream: false
+          } : {
+            model: this.config.judgeModel,
+            messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
             temperature: 0,
             max_tokens: Math.min(300, this.config.maxOutputTokens),
             response_format: { type: "json_object" },
@@ -6913,6 +7021,7 @@ ${truncated.text}` }
           signal: clientSignal ? AbortSignal.any([controller.signal, clientSignal]) : controller.signal
         });
         if (firstByteTimeout) clearTimeout(firstByteTimeout);
+        responseContentType = response.headers.get("content-type") ?? "";
         rawResponseBody = await response.text();
         if (!response.ok) {
           const isContextError = upstreamContextError(response.status, rawResponseBody);
@@ -6937,21 +7046,41 @@ ${truncated.text}` }
             contextTokenEstimate,
             rawRequestBytes,
             rawRequestTokenEstimate,
-            judgeContextLimit
+            judgeContextLimit,
+            failureLayer: "transport_failure",
+            responseContentType,
+            providerEnvelopeValid: false,
+            assistantTextExtracted: false
           });
         }
-        payload = JSON.parse(rawResponseBody);
-        if (!payload) throw new Error("ACU Judge returned an invalid JSON payload");
-        if (payload?.model && payload.model !== this.config.judgeModel) {
-          throw new Error(`ACU Judge actual model mismatch: ${payload.model}`);
+        if (looksLikeHtml(rawResponseBody, responseContentType)) {
+          throw new JudgeProviderProtocolError("ACU Judge returned HTML instead of a provider envelope");
         }
-        const content = payload?.choices?.[0]?.message?.content;
-        if (!content) throw new Error("ACU Judge returned no content");
-        const result = parseJudgeResult(content);
-        const usageStatus = payload.usage?.prompt_tokens !== void 0 && payload.usage?.completion_tokens !== void 0 ? "reported" : "usage_missing";
-        const promptTokens = payload.usage?.prompt_tokens ?? truncated.tokenEstimate;
-        const cachedPromptTokens = payload.usage?.prompt_tokens_details?.cached_tokens ?? 0;
-        const completionTokens = payload.usage?.completion_tokens ?? this.config.maxOutputTokens;
+        try {
+          payload = JSON.parse(rawResponseBody);
+        } catch {
+          throw new JudgeProviderProtocolError("ACU Judge returned an invalid JSON provider envelope");
+        }
+        if (!payload || typeof payload !== "object") throw new JudgeProviderProtocolError("ACU Judge returned an invalid provider envelope");
+        if (payload?.model && payload.model !== this.config.judgeModel) {
+          throw new JudgeProviderProtocolError(`ACU Judge actual model mismatch: ${payload.model}`);
+        }
+        const content = useResponses ? extractResponsesAssistantText(payload) : payload?.choices?.[0]?.message?.content;
+        providerEnvelopeValid = useResponses ? Array.isArray(payload.output) : Array.isArray(payload.choices);
+        if (!providerEnvelopeValid || !content) throw new JudgeProviderProtocolError("ACU Judge returned no valid Assistant output");
+        assistantTextExtracted = true;
+        let result;
+        try {
+          result = parseJudgeResult(content);
+        } catch (error) {
+          throw new JudgeSemanticParseError(error instanceof Error ? error.message : "Judge JSON is invalid", { cause: error });
+        }
+        const reportedInputTokens = payload.usage?.prompt_tokens ?? payload.usage?.input_tokens;
+        const reportedOutputTokens = payload.usage?.completion_tokens ?? payload.usage?.output_tokens;
+        const usageStatus = reportedInputTokens !== void 0 && reportedOutputTokens !== void 0 ? "reported" : "usage_missing";
+        const promptTokens = reportedInputTokens ?? truncated.tokenEstimate;
+        const cachedPromptTokens = payload.usage?.prompt_tokens_details?.cached_tokens ?? payload.usage?.input_tokens_details?.cached_tokens ?? 0;
+        const completionTokens = reportedOutputTokens ?? this.config.maxOutputTokens;
         const cost = judgeNominalCostUsd(this.config.judgeModel, promptTokens, cachedPromptTokens, completionTokens);
         const upstreamRequestId = payload.id ?? response.headers.get("x-request-id");
         const createdAt = (/* @__PURE__ */ new Date()).toISOString();
@@ -6996,12 +7125,15 @@ ${truncated.text}` }
       } catch (error) {
         if (error instanceof AcuJudgeAttemptError) throw error;
         if (clientSignal?.aborted) throw new AcuJudgeClientCancelledError();
-        const promptTokens = payload?.usage?.prompt_tokens ?? 0;
-        const cachedPromptTokens = payload?.usage?.prompt_tokens_details?.cached_tokens ?? 0;
-        const completionTokens = payload?.usage?.completion_tokens ?? 0;
+        const promptTokens = payload?.usage?.prompt_tokens ?? payload?.usage?.input_tokens ?? 0;
+        const cachedPromptTokens = payload?.usage?.prompt_tokens_details?.cached_tokens ?? payload?.usage?.input_tokens_details?.cached_tokens ?? 0;
+        const completionTokens = payload?.usage?.completion_tokens ?? payload?.usage?.output_tokens ?? 0;
         const message = error instanceof Error ? error.message : "ACU Judge transport failure";
         const networkFailure = error instanceof TypeError || error instanceof DOMException || controller.signal.aborted;
-        const invalidSuccessfulResponse = response?.ok === true;
+        const semanticFailure = error instanceof JudgeSemanticParseError;
+        const protocolFailure = error instanceof JudgeProviderProtocolError;
+        const failureLayer = semanticFailure ? "judge_semantic_parse_failure" : protocolFailure ? "provider_protocol_failure" : "transport_failure";
+        const errorCategory = semanticFailure ? "judge_semantic_parse_failure" : protocolFailure ? "provider_protocol_failure" : controller.signal.aborted ? "timeout" : networkFailure ? "network_error" : "provider_transport_error";
         throw new AcuJudgeAttemptError(message, {
           provider: metadata.provider,
           model: this.config.judgeModel,
@@ -7011,19 +7143,23 @@ ${truncated.text}` }
           promptTokens,
           cachedPromptTokens,
           completionTokens,
-          usageStatus: payload?.usage?.prompt_tokens !== void 0 && payload.usage?.completion_tokens !== void 0 ? "reported" : "usage_missing",
-          errorCategory: controller.signal.aborted ? "timeout" : networkFailure ? "network_error" : "invalid_response",
-          backupEligible: networkFailure || invalidSuccessfulResponse,
-          backupReason: controller.signal.aborted ? "primary_timeout" : networkFailure ? "primary_network_error" : invalidSuccessfulResponse ? "primary_schema_or_json_invalid" : "not_backup_eligible",
+          usageStatus: (payload?.usage?.prompt_tokens ?? payload?.usage?.input_tokens) !== void 0 && (payload?.usage?.completion_tokens ?? payload?.usage?.output_tokens) !== void 0 ? "reported" : "usage_missing",
+          errorCategory,
+          backupEligible: networkFailure || protocolFailure || semanticFailure,
+          backupReason: controller.signal.aborted ? "primary_timeout" : networkFailure ? "primary_network_error" : protocolFailure ? "primary_provider_protocol_invalid" : semanticFailure ? "primary_judge_semantic_invalid" : "not_backup_eligible",
           responseHeaders: response ? responseHeaders(response.headers) : {},
           rawResponseBody,
-          parserExceptionType: error instanceof Error ? error.name : typeof error,
+          parserExceptionType: semanticFailure && error.cause instanceof Error ? error.cause.name : error instanceof Error ? error.name : typeof error,
           parserExceptionMessage: message,
           contextSha256,
           contextTokenEstimate,
           rawRequestBytes,
           rawRequestTokenEstimate,
-          judgeContextLimit
+          judgeContextLimit,
+          failureLayer,
+          responseContentType,
+          providerEnvelopeValid,
+          assistantTextExtracted
         });
       }
     } finally {

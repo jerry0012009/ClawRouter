@@ -675,6 +675,7 @@ export class AlphaRequestProcessor {
     const { profiles } = await this.effectiveProfiles([], false);
     const preferences = ["economy", "balanced", "quality"] as const;
     const executionPresets = enabledExecutionPresets();
+    const corridorDifficulties = ACU_CURVE_DIFFICULTIES.filter((difficulty) => difficulty % 2 === 0);
     const executionPresetPoints = new Map(executionPresets.map((preset) => [preset.candidateId, [] as Array<{
       difficulty: number;
       estimatedQuality: number;
@@ -689,7 +690,7 @@ export class AlphaRequestProcessor {
       contextBurden: 0,
     };
     const series = Object.fromEntries(preferences.map((preference) => {
-      const points = ACU_CURVE_DIFFICULTIES.flatMap((difficulty) => {
+      const points = corridorDifficulties.flatMap((difficulty) => {
         try {
           const route = routeWithCurrentAcuFormula({
             judge: {

@@ -91,7 +91,7 @@ describe("routing preference v0.4", () => {
       ));
       expect(maxIndexes.length).toBeGreaterThan(1);
       expect(maxIndexes.at(-1)! - maxIndexes[0]! + 1).toBe(maxIndexes.length);
-      expect(selected[maxIndexes.at(-1)! + 1]).toBe("gpt-5.6-sol");
+      expect(selected[maxIndexes.at(-1)! + 1]).toMatch(/^gpt-5\.6-sol(?:@(?:high|xhigh))?$/);
       expect(selected.slice(maxIndexes.at(-1)! + 1)).not.toContain("gpt-5.6-luna@max");
     }
   });

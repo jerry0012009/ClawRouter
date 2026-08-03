@@ -28,6 +28,19 @@ describe("model-level reasoning capability", () => {
     expect(decideReasoning({ mode: "acu-auto", clientEffort: "weird", presetEffort: "max", modelId: "gpt-5.6-luna", protocol: "responses" })).toMatchObject({ resolvedReasoningEffort: "weird", mappingStatus: "unknown_client_value" });
   });
 
+  it.each([
+    ["gpt-5.6-sol", "high"],
+    ["gpt-5.6-sol", "xhigh"],
+    ["gpt-5.6-terra", "max"],
+  ] as const)("maps the verified %s %s preset exactly to the wire", (modelId, effort) => {
+    expect(decideReasoning({ mode: "acu-auto", presetEffort: effort, modelId, protocol: "responses" })).toMatchObject({
+      targetCanonicalReasoningEffort: effort,
+      resolvedReasoningEffort: effort,
+      wireReasoningEffort: effort,
+      mappingStatus: "exact",
+    });
+  });
+
   it("preserves explicit effort and body exactly apart from model resolution", () => {
     const decision = decideReasoning({ mode: "explicit", clientEffort: "max", modelId: "gpt-5.6-luna", protocol: "responses" });
     const body = prepareProviderBody(Buffer.from(JSON.stringify({ model: "gpt-5.6-luna", input: [], reasoning: { effort: "max", summary: "auto" } })), "gpt-5.6-luna", envelope("responses", "max"), profile("responses"), decision);

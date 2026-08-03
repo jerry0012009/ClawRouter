@@ -207,7 +207,7 @@ services:
       ACU_SCHEMA_VERSION: 0008_alpha_final_user_loop
       ACU_JUDGE_PRIMARY_MODEL: gpt-5.6-luna
       ACU_JUDGE_BACKUP_MODEL: mimo-v2.5-pro
-      ACU_ROUTING_FORMULA_VERSION: acu-routing-model-v0.4
+      ACU_ROUTING_FORMULA_VERSION: acu-routing-model-v0.5
     volumes:
       - newapi-logs:/app/logs
       - ./newapi-acu-catalog.json:/app/acu-catalog/newapi-acu-catalog.json:ro

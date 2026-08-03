@@ -773,7 +773,7 @@ run("Alpha PostgreSQL request processor", () => {
         reasons: ["disabled", "health_disabled"],
       }],
       routing_preference: "balanced",
-      routing_model_version: "acu-routing-model-v0.4",
+      routing_model_version: "acu-routing-model-v0.5",
     });
     const payloadKinds = await database.query<{ payload_kind: string }>(
       "SELECT payload_kind FROM acu_payloads WHERE newapi_user_id='user-auto' ORDER BY created_at,payload_kind",

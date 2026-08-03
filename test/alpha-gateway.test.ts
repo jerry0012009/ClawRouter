@@ -58,7 +58,7 @@ describe("Alpha native protocol gateway", () => {
         token: "corridor-token",
         async load(inputTokens, expectedOutputTokens) {
           calls.push({ inputTokens, expectedOutputTokens });
-          return { formulaVersion: "acu-routing-model-v0.4", series: { balanced: [] } };
+          return { formulaVersion: "acu-routing-model-v0.5", series: { balanced: [] } };
         },
       },
       async resolveExecution() { throw new Error("corridor projection must not route an execution"); },
@@ -71,7 +71,7 @@ describe("Alpha native protocol gateway", () => {
     );
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
-    expect(await response.json()).toMatchObject({ formulaVersion: "acu-routing-model-v0.4" });
+    expect(await response.json()).toMatchObject({ formulaVersion: "acu-routing-model-v0.5" });
     expect(calls).toEqual([{ inputTokens: 24000, expectedOutputTokens: 1200 }]);
   });
 
@@ -109,7 +109,7 @@ describe("Alpha native protocol gateway", () => {
       latestMigration: "0007_rc22_judge_cutover",
       judgePrimaryModel: "mimo-v2.5-pro",
       judgeBackupModel: "deepseek-v4-flash",
-      routingFormulaVersion: "acu-routing-model-v0.4",
+      routingFormulaVersion: "acu-routing-model-v0.5",
     };
     const gatewayPort = await listen(createAlphaGatewayServer({
       trustedIdentitySecret: sharedSecret,

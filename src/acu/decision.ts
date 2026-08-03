@@ -9,6 +9,9 @@ import type {
   AcuTierProbabilities,
 } from "./types.js";
 
+export const ACU_COST_LOG_SCALE = 2.5;
+export const VALUE_UTILITY_NEAR_TIE_RATIO = 0.995;
+
 export type AcuDecisionInput = {
   probabilities: AcuTierProbabilities;
   difficultyScore: number;
@@ -145,8 +148,7 @@ export function selectValueRoute<T extends ValueCandidate>(
   const qualityExponent = 0.8 + 1.2 * preference;
   const finiteCosts = frontier.map((candidate) => Math.max(1e-9, candidate.riskAdjustedCost));
   const minCost = Math.min(...finiteCosts);
-  const maxCost = Math.max(...finiteCosts);
-  const logRange = Math.log(maxCost / minCost);
+  const allCostsEqual = finiteCosts.every((cost) => Math.abs(cost - minCost) <= 1e-12);
   const utilities = new Map<string, {
     riskAdjustedScore: number;
     qualityUtility: number;
@@ -158,14 +160,25 @@ export function selectValueRoute<T extends ValueCandidate>(
     const riskAdjustedScore = candidate.predictedScore
       - riskWeight * Math.max(0, candidate.predictedScore - conservative);
     const qualityUtility = Math.pow(Math.max(0, riskAdjustedScore) / Math.max(1, targetScore), qualityExponent);
-    const costUtility = logRange <= 1e-12
+    const costUtility = allCostsEqual
       ? 1
-      : 1 - Math.log(Math.max(1e-9, candidate.riskAdjustedCost) / minCost) / logRange;
+      : clamp(
+        1 / (1 + ACU_COST_LOG_SCALE * Math.log(
+          Math.max(1e-9, candidate.riskAdjustedCost) / minCost,
+        )),
+      );
     const valueUtility = qualityUtility * ((1 - costWeight) + costWeight * costUtility);
     utilities.set(candidateIdentity(candidate), { riskAdjustedScore, qualityUtility, costUtility, valueUtility });
   }
-  const selected = frontier.reduce((best, item) => (
-    utilities.get(candidateIdentity(item))!.valueUtility > utilities.get(candidateIdentity(best))!.valueUtility ? item : best
+  const bestValueUtility = Math.max(...frontier.map((candidate) => (
+    utilities.get(candidateIdentity(candidate))!.valueUtility
+  )));
+  const nearTiedCandidates = frontier.filter((candidate) => (
+    utilities.get(candidateIdentity(candidate))!.valueUtility
+      >= bestValueUtility * VALUE_UTILITY_NEAR_TIE_RATIO
+  ));
+  const selected = nearTiedCandidates.reduce((best, candidate) => (
+    candidate.riskAdjustedCost < best.riskAdjustedCost ? candidate : best
   ));
   const saving = bestScore.riskAdjustedCost > 0
     ? (1 - selected.riskAdjustedCost / bestScore.riskAdjustedCost) * 100

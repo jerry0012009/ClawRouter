@@ -1,6 +1,6 @@
 export const ACU_PROMPT_VERSION = "acu-tier-requirement-v4";
 export const ACU_DIFFICULTY_METHOD_VERSION = "acu-difficulty-index-v1" as const;
-export const ACU_ROUTING_MODEL_VERSION = "acu-routing-model-v0.4";
+export const ACU_ROUTING_MODEL_VERSION = "acu-routing-model-v0.5";
 export const ACU_DEFAULT_JUDGE_MODEL = "gpt-5.6-luna";
 export const ACU_DEFAULT_JUDGE_BASE_URL = "https://lucen.cc/v1";
 export const ACU_DEFAULT_JUDGE_MODE = "non-thinking" as const;

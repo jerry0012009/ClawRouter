@@ -857,6 +857,10 @@ export class AlphaRequestProcessor {
           const candidates = [...route.candidateEstimates]
             .filter((candidate) => utilityPolicy.formulaMode === "legacy" ? candidate.paretoEfficient : true)
             .sort((left, right) => right.valueUtility - left.valueUtility);
+          const modelCandidateUtilities = route.v2Counterfactual?.modelCandidates ?? candidates;
+          const selectedModelUtility = modelCandidateUtilities.find((candidate) => (
+            candidate.candidateId === route.v2Counterfactual?.selectedCandidateId
+          ));
           const selectedProfileUtility = route.providerCandidateEstimates
             .find((candidate) => candidate.selected)?.profileUtilityV2;
           return [{
@@ -868,12 +872,12 @@ export class AlphaRequestProcessor {
             selectedQuality: route.recommendation.recommended.estimatedQuality * 100,
             selectedCostCny: route.recommendation.recommended.estimatedCallCost,
             effectiveQualityBias: route.effectiveQualityBias,
-            qualityWeight: route.recommendation.recommended.qualityWeight,
-            costWeight: route.recommendation.recommended.costWeight,
+            qualityWeight: selectedModelUtility?.qualityWeight,
+            costWeight: selectedModelUtility?.costWeight,
             selectedExecutionProfileId: route.selectedProfile.executionProfileId,
             selectedProvider: route.selectedProfile.provider,
             selectedProfileUtility: selectedProfileUtility?.profileUtility,
-            modelCandidateUtilities: candidates,
+            modelCandidateUtilities,
             profileCandidateUtilities: route.v2Counterfactual?.profileCandidates ?? [],
             formulaVersion: route.formulaVersion,
             routingUtilityVersion: route.routingUtilityVersion,

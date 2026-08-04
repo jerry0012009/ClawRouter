@@ -231,4 +231,43 @@ describe("selection corridor cache", () => {
     expect(result.defaultPreference).toBe("economy");
     expect(result.series.economy?.flatMap((point) => point.candidates).every((candidate) => candidate.modelId === "gpt-5.6-sol")).toBe(true);
   });
+
+  it("publishes V2 model utilities while shadow keeps the legacy selection", async () => {
+    const processor = new AlphaRequestProcessor({} as never);
+    const profiles = [
+      lunaProfile,
+      { ...lunaProfile, executionProfileId: "verified:gpt-5.6-sol:responses", modelId: "gpt-5.6-sol" },
+      { ...lunaProfile, executionProfileId: "verified:gpt-5.6-terra:responses", modelId: "gpt-5.6-terra" },
+    ];
+    const internal = processor as unknown as {
+      effectiveProfiles: () => Promise<{ profiles: AlphaExecutionProfile[]; probeClaims: [] }>;
+      withProfileRuntimeMetrics: (profiles: AlphaExecutionProfile[]) => Promise<AlphaExecutionProfile[]>;
+      calculateSelectionCorridor: (inputTokens: number, outputTokens: number, policy: Record<string, unknown>) => Promise<Record<string, unknown>>;
+    };
+    internal.effectiveProfiles = async () => ({ profiles, probeClaims: [] });
+    internal.withProfileRuntimeMetrics = async (values) => values;
+
+    const result = await internal.calculateSelectionCorridor(10_000, 1_000, {
+      formulaMode: "shadow", routingPreference: "economy", qualityBias: -60,
+    }) as { effective: Array<{
+      formulaVersion: string; qualityWeight?: number; costWeight?: number;
+      modelCandidateUtilities: Array<{ qualityUtility: number; costUtility: number;
+        qualityWeight?: number; costWeight?: number; formulaVersion?: string }>;
+    }> };
+    const point = result.effective[50];
+
+    expect(point.formulaVersion).not.toBe("acu-model-utility-v2");
+    expect(point.qualityWeight).toBeCloseTo(0.2, 12);
+    expect(point.costWeight).toBeCloseTo(0.8, 12);
+    expect(point.modelCandidateUtilities.length).toBeGreaterThan(0);
+    for (const candidate of point.modelCandidateUtilities) {
+      expect(candidate.formulaVersion).toBe("acu-model-utility-v2");
+      expect(candidate.qualityUtility).toBeGreaterThanOrEqual(0);
+      expect(candidate.qualityUtility).toBeLessThanOrEqual(1);
+      expect(candidate.costUtility).toBeGreaterThanOrEqual(0);
+      expect(candidate.costUtility).toBeLessThanOrEqual(1);
+      expect(candidate.qualityWeight).toBeCloseTo(0.2, 12);
+      expect(candidate.costWeight).toBeCloseTo(0.8, 12);
+    }
+  });
 });

@@ -183,6 +183,8 @@ export type AcuEvaluation = {
   estimateLabel: "public-benchmark constrained estimate";
   promptVersion: string;
   judgeModel: string;
+  /** The reasoning preset used by the live Judge request. */
+  judgeReasoningEffort?: "max";
   judgeMode: "non-thinking";
   judge: AcuJudgeResult;
   judgeStatus: AcuJudgeStatus;

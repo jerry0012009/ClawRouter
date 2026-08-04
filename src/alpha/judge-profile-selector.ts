@@ -50,6 +50,11 @@ export function getEligibleLunaJudgeProfiles(input: {
     profile.modelId === "gpt-5.6-luna"
     && profile.providerModelId === "gpt-5.6-luna"
     && profile.protocols.includes("responses")
+    // Judge Max requires the provider's standard Responses reasoning control.
+    // The Luna catalog marks Max as verified globally; profile-local legacy
+    // effort lists may lag behind that capability observation.
+    && profile.thinkingSupport === true
+    && profile.reasoningControlMode === "standard_effort"
     && profile.enabled
     && profile.administratorAllowed
     && profile.verificationStatus !== "rejected"

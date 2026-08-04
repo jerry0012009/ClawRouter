@@ -2,6 +2,7 @@ export const ACU_PROMPT_VERSION = "acu-tier-requirement-v4";
 export const ACU_DIFFICULTY_METHOD_VERSION = "acu-difficulty-index-v1" as const;
 export const ACU_ROUTING_MODEL_VERSION = "acu-routing-model-v0.5";
 export const ACU_DEFAULT_JUDGE_MODEL = "gpt-5.6-luna";
+export const ACU_DEFAULT_JUDGE_REASONING_EFFORT = "max" as const;
 export const ACU_DEFAULT_JUDGE_BASE_URL = "https://lucen.cc/v1";
 export const ACU_DEFAULT_JUDGE_MODE = "non-thinking" as const;
 export const ACU_DEFAULT_JUDGE_FIRST_BYTE_TIMEOUT_MS = 0;
@@ -55,6 +56,7 @@ function booleanValue(value: string | undefined, fallback = false): boolean {
 export type AcuRuntimeConfig = {
   enabled: boolean;
   judgeModel: string;
+  judgeReasoningEffort: "max";
   judgeBaseUrl: string;
   judgeMode: "non-thinking";
   promptVersion: string;
@@ -87,6 +89,8 @@ export function readAcuRuntimeConfig(overrides: Partial<AcuRuntimeConfig> = {}):
   const config: AcuRuntimeConfig = {
     enabled,
     judgeModel: process.env.ACU_JUDGE_MODEL?.trim() || ACU_DEFAULT_JUDGE_MODEL,
+    judgeReasoningEffort: process.env.ACU_JUDGE_REASONING_EFFORT?.trim() === "max"
+      ? "max" : ACU_DEFAULT_JUDGE_REASONING_EFFORT,
     judgeBaseUrl: process.env.ACU_JUDGE_BASE_URL?.trim() || ACU_DEFAULT_JUDGE_BASE_URL,
     judgeMode: ACU_DEFAULT_JUDGE_MODE,
     promptVersion: process.env.ACU_JUDGE_PROMPT_VERSION?.trim() || ACU_PROMPT_VERSION,

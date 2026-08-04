@@ -32,7 +32,7 @@ function profileFixture(): AlphaExecutionProfile {
   return {
     executionProfileId: "judge-profile", modelId: "gpt-5.6-luna", providerModelId: "gpt-5.6-luna",
     provider: "fixture", channel: "fixture", protocols: ["responses"], toolCallSupport: true,
-    thinkingSupport: true, health: "healthy", enabled: true, administratorAllowed: true,
+    thinkingSupport: true, reasoningControlMode: "standard_effort", health: "healthy", enabled: true, administratorAllowed: true,
     autoRouteEnabled: true, usageTrusted: true,
   };
 }

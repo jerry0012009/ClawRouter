@@ -113,7 +113,7 @@ export class AcuDemoStrategy {
       judge = rulesFallbackJudge(rulesDecision);
       judgeStatus = "rules_fallback";
       judgeErrorCategory = error instanceof Error ? error.message.slice(0, 160) : "unknown_live_error";
-      cacheKeySha256 = createHash("sha256").update(`${this.config.promptVersion}\n${this.config.judgeModel}\n${contextSha256}`).digest("hex");
+      cacheKeySha256 = createHash("sha256").update(`${this.config.promptVersion}\n${this.config.judgeModel}\n${this.config.judgeReasoningEffort}\n${this.config.judgeProtocol}\n${contextSha256}`).digest("hex");
     }
     const entropy = normalizedEntropy(judge);
     const recommendation = recommendModel({
@@ -132,6 +132,7 @@ export class AcuDemoStrategy {
       estimateLabel: "public-benchmark constrained estimate",
       promptVersion: this.config.promptVersion,
       judgeModel: this.config.judgeModel,
+      judgeReasoningEffort: this.config.judgeReasoningEffort,
       judgeMode: "non-thinking",
       judge,
       judgeStatus,

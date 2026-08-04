@@ -557,7 +557,7 @@ export class AcuJudgeClient {
     const judgeContextLimit = this.config.maxContextTokens;
     const contextTokenEstimate = rawNative ? estimateJudgeContextTokens(rawNative) : estimateVisibleTokens(visible);
     const truncated = { text: visible, tokenEstimate: contextTokenEstimate, truncated: false };
-    const key = createHash("sha256").update(`${this.config.promptVersion}\n${this.config.judgeModel}\n${contextSha256}`).digest("hex");
+    const key = createHash("sha256").update(`${this.config.promptVersion}\n${this.config.judgeModel}\n${this.config.judgeReasoningEffort}\n${this.config.judgeProtocol}\n${contextSha256}`).digest("hex");
     const path = cachePath(this.config);
     const cache = readCache(path);
     const cached = cache.entries[key];
@@ -616,6 +616,7 @@ export class AcuJudgeClient {
             model: this.config.judgeModel,
             instructions: systemPrompt,
             input: [{ role: "user", content: [{ type: "input_text", text: userPrompt }] }],
+            reasoning: { effort: this.config.judgeReasoningEffort, summary: "auto" },
             max_output_tokens: Math.min(300, this.config.maxOutputTokens),
             stream: false,
           } : {

@@ -400,6 +400,24 @@ describe("Phase 2A Judge transport", () => {
     expect(await readFile(legacyCachePath, "utf8")).toBe(legacyContents);
   });
 
+  it("sends Luna Max reasoning effort on Responses Judge requests", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
+      id: "judge-max",
+      model: "gpt-5.6-luna",
+      output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify({
+        difficulty_score_raw: 20, factors: { reasoning_depth: 2, task_scope: 2, constraint_density: 2, tool_dependency: 2, verification_burden: 2, context_burden: 2 },
+        p_low: 0.9, p_mid: 0.05, p_mid_high: 0.03, p_high: 0.02, confidence: 0.9, signals: [], explanation: "simple",
+        webIntent: "not_required", webIntentConfidence: 0.99, webIntentReason: "simple", webIntentEvidence: [],
+      }) }] }],
+      usage: { input_tokens: 10, output_tokens: 10 },
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    const config = readAcuRuntimeConfig({ enabled: true, apiKey: "secret", judgeProtocol: "responses", cachePath: join(tmpdir(), `acu-judge-max-${Date.now()}.json`) });
+    const client = new AcuJudgeClient(config, fetchMock);
+    await client.judge([{ role: "user", content: "Reply OK" }]);
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body)) as Record<string, unknown>;
+    expect(body.reasoning).toEqual({ effort: "max", summary: "auto" });
+  });
+
   it("serializes tool calls, tool results, structured content, and tools deterministically", () => {
     const messages = [
       { role: "assistant", content: null, tool_calls: [{ id: "call_123", type: "function", function: { name: "run_shell", arguments: '{"command":"npm test"}' } }] },

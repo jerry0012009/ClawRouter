@@ -6302,6 +6302,13 @@ function enabledExecutionPresets() {
 // src/acu/decision.ts
 var ACU_COST_LOG_SCALE = 2.5;
 var VALUE_UTILITY_NEAR_TIE_RATIO = 0.995;
+var ACU_QUALITY_SATISFACTION_ANCHORS = Object.freeze([
+  { quality: 0, satisfaction: 0 },
+  { quality: 0.5, satisfaction: 0.65 },
+  { quality: 0.8, satisfaction: 0.9 },
+  { quality: 0.95, satisfaction: 0.985 },
+  { quality: 1, satisfaction: 1 }
+]);
 function estimateCallCost(model, inputTokens, outputTokens) {
   if (model.inputPricePerMillion === null || model.outputPricePerMillion === null) {
     return Number.POSITIVE_INFINITY;

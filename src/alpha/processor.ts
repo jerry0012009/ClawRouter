@@ -30,7 +30,10 @@ import {
 import { parseProviderUsage, resolveProviderBilling } from "./usage.js";
 import { ACU_CURVE_DIFFICULTIES, buildModelCurve, getAcuModel } from "../acu/catalog.js";
 import { ACU_ROUTING_MODEL_VERSION } from "../acu/config.js";
-import { ACU_MODEL_UTILITY_V2_VERSION } from "../acu/decision.js";
+import {
+  ACU_MODEL_UTILITY_V2_VERSION,
+  ACU_QUALITY_SATISFACTION_VERSION,
+} from "../acu/decision.js";
 import { enabledExecutionPresets } from "../acu/execution-presets.js";
 import { continuousTierProbabilities } from "../acu/math.js";
 import { AcuJudgeClientCancelledError, AcuJudgeContextLengthError } from "../acu/judge.js";
@@ -764,8 +767,8 @@ export class AlphaRequestProcessor {
 
   selectionCorridor(inputTokens: number, expectedOutputTokens: number, policy?: SelectionCorridorPolicy): Promise<Record<string, unknown>> {
     const qualityPresets = policy?.qualityPresets ?? {
-      economy: 0,
-      balanced: 40,
+      economy: -10,
+      balanced: 20,
       quality: 70,
     };
     if ([qualityPresets.economy, qualityPresets.balanced, qualityPresets.quality]
@@ -922,6 +925,8 @@ export class AlphaRequestProcessor {
               valueUtility: candidate.valueUtility,
               rawQualityUtility: candidate.rawQualityUtility,
               rawCostUtility: candidate.rawCostUtility,
+              qualitySatisfactionUtility: candidate.qualitySatisfactionUtility,
+              qualitySatisfactionVersion: candidate.qualitySatisfactionVersion,
               qualityUtility: candidate.qualityUtility,
               costUtility: candidate.costUtility,
               normalizedQualityUtility: candidate.normalizedQualityUtility,
@@ -945,8 +950,8 @@ export class AlphaRequestProcessor {
       return points;
     };
     const presetBias = policy.qualityPresets ?? {
-      economy: 0,
-      balanced: 40,
+      economy: -10,
+      balanced: 20,
       quality: 70,
     };
     const series = Object.fromEntries(preferences.map((preference) => [
@@ -986,6 +991,7 @@ export class AlphaRequestProcessor {
         corridorBand: "selected_candidate_uncertainty",
         corridorCenter: "selected_candidate_quality",
         corridorInterpolation: "client_visual_only",
+        qualitySatisfactionVersion: ACU_QUALITY_SATISFACTION_VERSION,
       },
       executionPresetSeries: executionPresets.map((preset) => ({
         candidateId: preset.candidateId,

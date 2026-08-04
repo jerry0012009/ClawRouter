@@ -269,7 +269,10 @@ describe("selection corridor cache", () => {
     });
     expect(point.modelCandidateUtilities.length).toBeGreaterThan(0);
     for (const candidate of point.modelCandidateUtilities) {
-      expect(candidate.formulaVersion).toBe("acu-model-utility-v2.1");
+      expect(candidate.formulaVersion).toBe("acu-model-utility-v2.2");
+      expect(candidate).toMatchObject({
+        qualitySatisfactionVersion: "acu-quality-satisfaction-v1",
+      });
       expect(candidate.qualityUtility).toBeGreaterThanOrEqual(0);
       expect(candidate.qualityUtility).toBeLessThanOrEqual(1);
       expect(candidate.costUtility).toBeGreaterThanOrEqual(0);

@@ -3,9 +3,9 @@ import { getAcuCatalog, getRoutingEligibleModels, interpolateModelCurve } from "
 import {
   applyLogitShift,
   clamp,
-  normalizeBenefitUtilities,
   normalizeProbabilities,
   normalizedEntropy,
+  piecewiseLinearSatisfaction,
 } from "./math.js";
 import { enabledExecutionPresets, type AcuExecutionPreset } from "./execution-presets.js";
 import type {
@@ -17,9 +17,15 @@ import type {
 
 export const ACU_COST_LOG_SCALE = 2.5;
 export const VALUE_UTILITY_NEAR_TIE_RATIO = 0.995;
-export const ACU_MODEL_UTILITY_V2_VERSION = "acu-model-utility-v2.1";
-export const MODEL_QUALITY_MINIMUM_MEANINGFUL_RANGE = 0.2;
-export const MODEL_COST_MINIMUM_MEANINGFUL_RANGE = 0.25;
+export const ACU_MODEL_UTILITY_V2_VERSION = "acu-model-utility-v2.2";
+export const ACU_QUALITY_SATISFACTION_VERSION = "acu-quality-satisfaction-v1";
+export const ACU_QUALITY_SATISFACTION_ANCHORS = Object.freeze([
+  { quality: 0, satisfaction: 0 },
+  { quality: 0.5, satisfaction: 0.65 },
+  { quality: 0.8, satisfaction: 0.9 },
+  { quality: 0.95, satisfaction: 0.985 },
+  { quality: 1, satisfaction: 1 },
+]);
 
 export type AcuDecisionInput = {
   probabilities: AcuTierProbabilities;
@@ -342,6 +348,9 @@ export function recommendModelV2(
   );
   const rawQualityUtilities = estimates.map((estimate) =>
     selectable.includes(estimate) ? clamp(estimate.conservativeQuality) : Number.NaN);
+  const satisfactionUtilities = rawQualityUtilities.map((quality) => Number.isFinite(quality)
+    ? piecewiseLinearSatisfaction(quality, ACU_QUALITY_SATISFACTION_ANCHORS)
+    : 0);
   const rawCostUtilities = estimates.map((estimate) =>
     selectable.includes(estimate)
       ? logarithmicRelativeUtility(
@@ -350,20 +359,6 @@ export function recommendModelV2(
           input.modelCostLogScale,
         )
       : Number.NaN);
-  const normalizedQualityUtilities = normalizeBenefitUtilities(
-    rawQualityUtilities,
-    MODEL_QUALITY_MINIMUM_MEANINGFUL_RANGE,
-  );
-  const normalizedCostUtilities = normalizeBenefitUtilities(
-    rawCostUtilities,
-    MODEL_COST_MINIMUM_MEANINGFUL_RANGE,
-  );
-  const finiteRawQualities = rawQualityUtilities.filter(Number.isFinite);
-  const finiteRawCosts = rawCostUtilities.filter(Number.isFinite);
-  const qualityRange = Math.max(...finiteRawQualities) - Math.min(...finiteRawQualities);
-  const costRange = Math.max(...finiteRawCosts) - Math.min(...finiteRawCosts);
-  const qualityDenominator = Math.max(qualityRange, MODEL_QUALITY_MINIMUM_MEANINGFUL_RANGE);
-  const costDenominator = Math.max(costRange, MODEL_COST_MINIMUM_MEANINGFUL_RANGE);
   const qualityBias = Math.max(-100, Math.min(100, input.qualityBias));
   const qualityWeight = (qualityBias + 100) / 200;
   const costWeight = 1 - qualityWeight;
@@ -375,10 +370,12 @@ export function recommendModelV2(
     estimate.rawCostUtility = Number.isFinite(rawCostUtilities[index])
       ? rawCostUtilities[index]
       : 0;
-    estimate.qualityUtility = normalizedQualityUtilities[index];
-    estimate.costUtility = normalizedCostUtilities[index];
-    estimate.normalizedQualityUtility = estimate.qualityUtility;
-    estimate.normalizedCostUtility = estimate.costUtility;
+    estimate.qualitySatisfactionUtility = satisfactionUtilities[index];
+    estimate.qualitySatisfactionVersion = ACU_QUALITY_SATISFACTION_VERSION;
+    estimate.qualityUtility = estimate.qualitySatisfactionUtility;
+    estimate.costUtility = estimate.rawCostUtility;
+    estimate.normalizedQualityUtility = undefined;
+    estimate.normalizedCostUtility = undefined;
     estimate.qualityWeight = qualityWeight;
     estimate.costWeight = costWeight;
     estimate.qualityContribution = qualityWeight * estimate.qualityUtility;
@@ -386,11 +383,11 @@ export function recommendModelV2(
     estimate.valueUtility = selectableEstimate
       ? estimate.qualityContribution + estimate.costContribution
       : Number.NEGATIVE_INFINITY;
-    estimate.normalizationQualityRange = qualityRange;
-    estimate.normalizationCostRange = costRange;
-    estimate.normalizationQualityDenominator = qualityDenominator;
-    estimate.normalizationCostDenominator = costDenominator;
-    estimate.normalizationVersion = "acu-benefit-range-v1";
+    estimate.normalizationQualityRange = undefined;
+    estimate.normalizationCostRange = undefined;
+    estimate.normalizationQualityDenominator = undefined;
+    estimate.normalizationCostDenominator = undefined;
+    estimate.normalizationVersion = undefined;
     estimate.formulaVersion = ACU_MODEL_UTILITY_V2_VERSION;
     estimate.selected = false;
   }
@@ -429,7 +426,7 @@ export function recommendModelV2(
   )[0];
   const reason =
     `当前质量权重 ${(qualityWeight * 100).toFixed(0)}%，成本权重 ${(costWeight * 100).toFixed(0)}%；` +
-    `${recommended.displayName} 的保守质量效用 ${recommended.qualityUtility.toFixed(4)} 和相对成本效用 ` +
+    `${recommended.displayName} 的质量满意度 ${recommended.qualityUtility.toFixed(4)} 和相对成本效用 ` +
     `${recommended.costUtility.toFixed(4)} 产生最高综合分 ${recommended.valueUtility.toFixed(4)}。`;
   recommended.selectionReason = reason;
   return {

@@ -3,6 +3,9 @@ export { AcuJudgeClient, buildJudgeSystemPrompt, computeDifficultyIndex, hasSeve
 export { getAcuCatalog, getAcuModel, buildModelCurve, interpolateModelCurve, publicCatalogPayload } from "./catalog.js";
 export {
   ACU_COST_LOG_SCALE,
+  ACU_MODEL_UTILITY_V2_VERSION,
+  ACU_QUALITY_SATISFACTION_ANCHORS,
+  ACU_QUALITY_SATISFACTION_VERSION,
   VALUE_UTILITY_NEAR_TIE_RATIO,
   recommendModel,
   estimateCallCost,
@@ -16,6 +19,7 @@ export {
   estimatedQuality,
   normalizeProbabilities,
   normalizeBenefitUtilities,
+  piecewiseLinearSatisfaction,
   solveAbilityParameter,
   tierSufficiency,
   continuousTierProbabilities,

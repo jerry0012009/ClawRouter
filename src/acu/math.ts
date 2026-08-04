@@ -29,6 +29,47 @@ export function normalizeBenefitUtilities(
     : 0);
 }
 
+export type QualitySatisfactionAnchor = Readonly<{
+  quality: number;
+  satisfaction: number;
+}>;
+
+/** Map absolute quality to user satisfaction using validated linear segments. */
+export function piecewiseLinearSatisfaction(
+  value: number,
+  anchors: readonly QualitySatisfactionAnchor[],
+): number {
+  if (anchors.length < 2) {
+    throw new Error("Quality satisfaction requires at least two anchors");
+  }
+  for (const [index, anchor] of anchors.entries()) {
+    if (!Number.isFinite(anchor.quality) || !Number.isFinite(anchor.satisfaction)
+      || anchor.quality < 0 || anchor.quality > 1
+      || anchor.satisfaction < 0 || anchor.satisfaction > 1) {
+      throw new Error("Quality satisfaction anchors must be finite values in [0, 1]");
+    }
+    if (index > 0 && anchor.quality <= anchors[index - 1].quality) {
+      throw new Error("Quality satisfaction anchor qualities must be strictly increasing");
+    }
+    if (index > 0 && anchor.satisfaction < anchors[index - 1].satisfaction) {
+      throw new Error("Quality satisfaction values must be non-decreasing");
+    }
+  }
+  if (anchors[0].quality !== 0 || anchors[anchors.length - 1].quality !== 1) {
+    throw new Error("Quality satisfaction anchors must cover quality 0 through 1");
+  }
+  const boundedValue = clamp(Number.isNaN(value) ? 0 : value);
+  for (let index = 1; index < anchors.length; index += 1) {
+    const left = anchors[index - 1];
+    const right = anchors[index];
+    if (boundedValue <= right.quality) {
+      const position = (boundedValue - left.quality) / (right.quality - left.quality);
+      return clamp(left.satisfaction + position * (right.satisfaction - left.satisfaction));
+    }
+  }
+  return anchors[anchors.length - 1].satisfaction;
+}
+
 export function sigmoid(value: number): number {
   if (value >= 0) {
     const z = Math.exp(-value);

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { recommendModelV2 } from "../src/acu/decision.js";
-import { continuousTierProbabilities } from "../src/acu/math.js";
+import {
+  ACU_MODEL_UTILITY_V2_VERSION,
+  ACU_QUALITY_SATISFACTION_ANCHORS,
+  ACU_QUALITY_SATISFACTION_VERSION,
+  recommendModelV2,
+} from "../src/acu/decision.js";
+import { continuousTierProbabilities, piecewiseLinearSatisfaction } from "../src/acu/math.js";
 import type { AlphaExecutionProfile } from "../src/alpha/routing.js";
 import { resolveExplicitProfileDecision, routeWithCurrentAcuFormula } from "../src/alpha/routing.js";
 import { routingReuseInvalidationReason } from "../src/alpha/processor.js";
@@ -90,11 +95,42 @@ describe("ACU Router V2 model utility", () => {
       );
       expect(Number.isFinite(candidate.rawQualityUtility)).toBe(true);
       expect(Number.isFinite(candidate.rawCostUtility)).toBe(true);
-      expect(candidate.normalizedQualityUtility).toBe(candidate.qualityUtility);
-      expect(candidate.normalizedCostUtility).toBe(candidate.costUtility);
-      expect(candidate.normalizationVersion).toBe("acu-benefit-range-v1");
+      expect(candidate.qualitySatisfactionUtility).toBeCloseTo(
+        piecewiseLinearSatisfaction(candidate.conservativeQuality, ACU_QUALITY_SATISFACTION_ANCHORS),
+        12,
+      );
+      expect(candidate.qualitySatisfactionVersion).toBe(ACU_QUALITY_SATISFACTION_VERSION);
+      expect(candidate.qualityUtility).toBe(candidate.qualitySatisfactionUtility);
+      expect(candidate.costUtility).toBe(candidate.rawCostUtility);
+      expect(candidate.normalizedQualityUtility).toBeUndefined();
+      expect(candidate.normalizedCostUtility).toBeUndefined();
+      expect(candidate.normalizationVersion).toBeUndefined();
+      expect(candidate.formulaVersion).toBe(ACU_MODEL_UTILITY_V2_VERSION);
       expect(Number.isFinite(candidate.valueUtility)).toBe(true);
     }
+  });
+
+  it("values the same quality gain more at low quality than above 95 percent", () => {
+    const satisfaction = (quality: number) => piecewiseLinearSatisfaction(
+      quality,
+      ACU_QUALITY_SATISFACTION_ANCHORS,
+    );
+    expect(satisfaction(0.4) - satisfaction(0.39)).toBeGreaterThan(
+      satisfaction(0.97) - satisfaction(0.96),
+    );
+  });
+
+  it("keeps absolute quality utility independent of the eligible candidate set", () => {
+    const lunaOnly = recommendModelV2({
+      ...modelInput,
+      eligibleModelIds: ["gpt-5.6-luna"],
+      qualityBias: 0,
+      modelCostLogScale: 0.75,
+    });
+    const both = recommendModelV2({ ...modelInput, qualityBias: 0, modelCostLogScale: 0.75 });
+    const luna = both.estimates.find((candidate) => candidate.modelId === "gpt-5.6-luna")!;
+    expect(luna.qualityUtility).toBeCloseTo(lunaOnly.recommended.qualityUtility, 12);
+    expect(luna.qualityUtility).toBeLessThan(1);
   });
 
   it("keeps shadow selection legacy and switches only in active mode", () => {
@@ -158,7 +194,7 @@ describe("ACU Router V2 model utility", () => {
       ...base,
       utilityPolicy: { ...DEFAULT_ROUTING_UTILITY_POLICY, formulaMode: "active" },
     });
-    expect(active.formulaVersion).toBe("acu-model-utility-v2.1");
+    expect(active.formulaVersion).toBe(ACU_MODEL_UTILITY_V2_VERSION);
     expect(active.recommendation.recommended.candidateId).toBe(
       active.v2Counterfactual?.selectedCandidateId,
     );

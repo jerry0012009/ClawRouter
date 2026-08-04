@@ -4315,6 +4315,35 @@ function normalizeBenefitUtilities(values, minimumMeaningfulRange) {
   const denominator = Math.max(range, Math.max(0, minimumMeaningfulRange));
   return values.map((value) => Number.isFinite(value) ? clamp((value - minimum) / denominator) : 0);
 }
+function piecewiseLinearSatisfaction(value, anchors) {
+  if (anchors.length < 2) {
+    throw new Error("Quality satisfaction requires at least two anchors");
+  }
+  for (const [index, anchor] of anchors.entries()) {
+    if (!Number.isFinite(anchor.quality) || !Number.isFinite(anchor.satisfaction) || anchor.quality < 0 || anchor.quality > 1 || anchor.satisfaction < 0 || anchor.satisfaction > 1) {
+      throw new Error("Quality satisfaction anchors must be finite values in [0, 1]");
+    }
+    if (index > 0 && anchor.quality <= anchors[index - 1].quality) {
+      throw new Error("Quality satisfaction anchor qualities must be strictly increasing");
+    }
+    if (index > 0 && anchor.satisfaction < anchors[index - 1].satisfaction) {
+      throw new Error("Quality satisfaction values must be non-decreasing");
+    }
+  }
+  if (anchors[0].quality !== 0 || anchors[anchors.length - 1].quality !== 1) {
+    throw new Error("Quality satisfaction anchors must cover quality 0 through 1");
+  }
+  const boundedValue = clamp(Number.isNaN(value) ? 0 : value);
+  for (let index = 1; index < anchors.length; index += 1) {
+    const left = anchors[index - 1];
+    const right = anchors[index];
+    if (boundedValue <= right.quality) {
+      const position = (boundedValue - left.quality) / (right.quality - left.quality);
+      return clamp(left.satisfaction + position * (right.satisfaction - left.satisfaction));
+    }
+  }
+  return anchors[anchors.length - 1].satisfaction;
+}
 function sigmoid(value) {
   if (value >= 0) {
     const z2 = Math.exp(-value);
@@ -6369,6 +6398,15 @@ function enabledExecutionPresets() {
 // src/acu/decision.ts
 var ACU_COST_LOG_SCALE = 2.5;
 var VALUE_UTILITY_NEAR_TIE_RATIO = 0.995;
+var ACU_MODEL_UTILITY_V2_VERSION = "acu-model-utility-v2.2";
+var ACU_QUALITY_SATISFACTION_VERSION = "acu-quality-satisfaction-v1";
+var ACU_QUALITY_SATISFACTION_ANCHORS = Object.freeze([
+  { quality: 0, satisfaction: 0 },
+  { quality: 0.5, satisfaction: 0.65 },
+  { quality: 0.8, satisfaction: 0.9 },
+  { quality: 0.95, satisfaction: 0.985 },
+  { quality: 1, satisfaction: 1 }
+]);
 function estimateCallCost(model, inputTokens, outputTokens) {
   if (model.inputPricePerMillion === null || model.outputPricePerMillion === null) {
     return Number.POSITIVE_INFINITY;
@@ -10313,6 +10351,9 @@ var plugin = {
 var index_default = plugin;
 export {
   ACU_COST_LOG_SCALE,
+  ACU_MODEL_UTILITY_V2_VERSION,
+  ACU_QUALITY_SATISFACTION_ANCHORS,
+  ACU_QUALITY_SATISFACTION_VERSION,
   AcuDemoStrategy,
   AcuJudgeClient,
   AcuRoutingStore,
@@ -10357,6 +10398,7 @@ export {
   normalizedEntropy,
   openAcuRoutingStore,
   parseJudgeResult,
+  piecewiseLinearSatisfaction,
   publicCatalogPayload,
   readAcuRuntimeConfig,
   recommendModel,

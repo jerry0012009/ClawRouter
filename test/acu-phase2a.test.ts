@@ -15,6 +15,7 @@ import {
   interpolateModelCurve,
   normalizeProbabilities,
   normalizeBenefitUtilities,
+  piecewiseLinearSatisfaction,
   parseJudgeResult,
   buildJudgeSystemPrompt,
   recommendModel,
@@ -36,6 +37,62 @@ afterEach(async () => {
 });
 
 describe("Phase 2A constrained tier model", () => {
+  it("interpolates absolute quality satisfaction with validated diminishing slopes", () => {
+    const anchors = [
+      { quality: 0, satisfaction: 0 },
+      { quality: 0.5, satisfaction: 0.65 },
+      { quality: 0.8, satisfaction: 0.9 },
+      { quality: 0.95, satisfaction: 0.985 },
+      { quality: 1, satisfaction: 1 },
+    ] as const;
+    for (const anchor of anchors) {
+      expect(piecewiseLinearSatisfaction(anchor.quality, anchors)).toBeCloseTo(anchor.satisfaction, 12);
+    }
+    expect(piecewiseLinearSatisfaction(0.25, anchors)).toBeCloseTo(0.325, 12);
+    expect(piecewiseLinearSatisfaction(0.65, anchors)).toBeCloseTo(0.775, 12);
+    expect(piecewiseLinearSatisfaction(-1, anchors)).toBe(0);
+    expect(piecewiseLinearSatisfaction(2, anchors)).toBe(1);
+    expect(piecewiseLinearSatisfaction(Number.NEGATIVE_INFINITY, anchors)).toBe(0);
+    expect(piecewiseLinearSatisfaction(Number.POSITIVE_INFINITY, anchors)).toBe(1);
+    expect(piecewiseLinearSatisfaction(Number.NaN, anchors)).toBe(0);
+
+    const slopes = anchors.slice(1).map((right, index) => {
+      const left = anchors[index];
+      return (right.satisfaction - left.satisfaction) / (right.quality - left.quality);
+    });
+    expect(slopes).toEqual([
+      1.3,
+      expect.closeTo(5 / 6, 12),
+      expect.closeTo(17 / 30, 12),
+      expect.closeTo(0.3, 12),
+    ]);
+    expect(slopes.every((slope, index) => index === 0 || slope < slopes[index - 1])).toBe(true);
+  });
+
+  it("rejects malformed quality satisfaction anchors", () => {
+    expect(() => piecewiseLinearSatisfaction(0.5, [{ quality: 0, satisfaction: 0 }])).toThrow(
+      "at least two",
+    );
+    expect(() => piecewiseLinearSatisfaction(0.5, [
+      { quality: 0, satisfaction: 0 },
+      { quality: 0, satisfaction: 1 },
+      { quality: 1, satisfaction: 1 },
+    ])).toThrow("strictly increasing");
+    expect(() => piecewiseLinearSatisfaction(0.5, [
+      { quality: 0, satisfaction: 0.5 },
+      { quality: 0.5, satisfaction: 0.4 },
+      { quality: 1, satisfaction: 1 },
+    ])).toThrow("non-decreasing");
+    expect(() => piecewiseLinearSatisfaction(0.5, [
+      { quality: 0.1, satisfaction: 0 },
+      { quality: 1, satisfaction: 1 },
+    ])).toThrow("cover quality 0 through 1");
+    expect(() => piecewiseLinearSatisfaction(0.5, [
+      { quality: 0, satisfaction: 0 },
+      { quality: 1, satisfaction: Number.POSITIVE_INFINITY },
+    ])).toThrow("finite values");
+  });
+
   it("soft-normalizes benefit utilities without amplifying noise or invalid values", () => {
     expect(normalizeBenefitUtilities([0.7], 0.2)).toEqual([0.5]);
     expect(normalizeBenefitUtilities([0.7, 0.7], 0.2)).toEqual([0.5, 0.5]);

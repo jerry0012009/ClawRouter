@@ -122,6 +122,8 @@ type AcuModelEstimate = {
     valueUtility: number;
     rawQualityUtility?: number;
     rawCostUtility?: number;
+    qualitySatisfactionUtility?: number;
+    qualitySatisfactionVersion?: string;
     normalizedQualityUtility?: number;
     normalizedCostUtility?: number;
     qualityContribution?: number;
@@ -223,6 +225,12 @@ type AcuCurvePoint = {
 
 declare const ACU_COST_LOG_SCALE = 2.5;
 declare const VALUE_UTILITY_NEAR_TIE_RATIO = 0.995;
+declare const ACU_MODEL_UTILITY_V2_VERSION = "acu-model-utility-v2.2";
+declare const ACU_QUALITY_SATISFACTION_VERSION = "acu-quality-satisfaction-v1";
+declare const ACU_QUALITY_SATISFACTION_ANCHORS: readonly {
+    quality: number;
+    satisfaction: number;
+}[];
 type AcuDecisionInput = {
     probabilities: AcuTierProbabilities;
     difficultyScore: number;
@@ -1179,6 +1187,12 @@ declare function publicCatalogPayload(): Record<string, unknown>;
 
 /** Normalize benefit-oriented utilities within the current eligible set. */
 declare function normalizeBenefitUtilities(values: number[], minimumMeaningfulRange: number): number[];
+type QualitySatisfactionAnchor = Readonly<{
+    quality: number;
+    satisfaction: number;
+}>;
+/** Map absolute quality to user satisfaction using validated linear segments. */
+declare function piecewiseLinearSatisfaction(value: number, anchors: readonly QualitySatisfactionAnchor[]): number;
 declare function applyLogitShift(probability: number, shift: number): number;
 declare function normalizeProbabilities(value: Omit<AcuTierProbabilities, "confidence"> & {
     confidence?: number;
@@ -1430,4 +1444,4 @@ declare const VERSION: string;
 
 declare const plugin: OpenClawPluginDefinition;
 
-export { ACU_COST_LOG_SCALE, ACU_TIERS, type AcuBenchmarkEvidence, type AcuCurvePoint, AcuDemoStrategy, type AcuDifficultyFactors, type AcuEvaluateInput, type AcuEvaluation, AcuJudgeClient, type AcuJudgeResult, type AcuJudgeResultSource, type AcuJudgeStatus, type AcuModelCatalogEntry, type AcuModelEstimate, type AcuRecommendation, AcuRoutingStore, type AcuRuntimeConfig, type AcuTier, type AcuTierProbabilities, type AcuVisibleMessage, BLOCKRUN_MODELS, type CachedResponse, DEFAULT_ROUTING_CONFIG, type ExecutionProfile, type ExecutionProfileHealth, type FeedbackInput, MODEL_ALIASES, OPENCLAW_MODELS, type OutcomeInput, RequestDeduplicator, ResponseCache, type RoutingConfig, type RoutingDecision, type RoutingRecordMetadata, type SessionConfig, type SessionEntry, SessionStore, type ThinkingMode, type Tier, type UsageEntry, VALUE_UTILITY_NEAR_TIE_RATIO, VERSION, applyLogitShift, blockrunProvider, buildJudgeSystemPrompt, buildModelCurve, buildProviderModels, calculateModelCost, computeDifficultyIndex, continuousTierProbabilities, plugin as default, difficultyScore, estimateCallCost, estimateVisibleTokens, estimatedQuality, executionProfileFor, getAcuCatalog, getAcuModel, getFallbackChain, getModelContextWindow, getProxyPort, getSessionId, hasSevereTierConflict, hashRequestContent, hashSession, interpolateModelCurve, isParetoEfficient, isReasoningModel, logUsage, normalizeBenefitUtilities, normalizeProbabilities, normalizedEntropy, openAcuRoutingStore, parseJudgeResult, publicCatalogPayload, readAcuRuntimeConfig, recommendModel, resolveApiKey, resolveModelAlias, route, rulesFallbackJudge, saveApiKey, selectValueRoute, serializeVisibleContext, solveAbilityParameter, startProxy, supportsToolCalling, supportsVision, tierSufficiency };
+export { ACU_COST_LOG_SCALE, ACU_MODEL_UTILITY_V2_VERSION, ACU_QUALITY_SATISFACTION_ANCHORS, ACU_QUALITY_SATISFACTION_VERSION, ACU_TIERS, type AcuBenchmarkEvidence, type AcuCurvePoint, AcuDemoStrategy, type AcuDifficultyFactors, type AcuEvaluateInput, type AcuEvaluation, AcuJudgeClient, type AcuJudgeResult, type AcuJudgeResultSource, type AcuJudgeStatus, type AcuModelCatalogEntry, type AcuModelEstimate, type AcuRecommendation, AcuRoutingStore, type AcuRuntimeConfig, type AcuTier, type AcuTierProbabilities, type AcuVisibleMessage, BLOCKRUN_MODELS, type CachedResponse, DEFAULT_ROUTING_CONFIG, type ExecutionProfile, type ExecutionProfileHealth, type FeedbackInput, MODEL_ALIASES, OPENCLAW_MODELS, type OutcomeInput, RequestDeduplicator, ResponseCache, type RoutingConfig, type RoutingDecision, type RoutingRecordMetadata, type SessionConfig, type SessionEntry, SessionStore, type ThinkingMode, type Tier, type UsageEntry, VALUE_UTILITY_NEAR_TIE_RATIO, VERSION, applyLogitShift, blockrunProvider, buildJudgeSystemPrompt, buildModelCurve, buildProviderModels, calculateModelCost, computeDifficultyIndex, continuousTierProbabilities, plugin as default, difficultyScore, estimateCallCost, estimateVisibleTokens, estimatedQuality, executionProfileFor, getAcuCatalog, getAcuModel, getFallbackChain, getModelContextWindow, getProxyPort, getSessionId, hasSevereTierConflict, hashRequestContent, hashSession, interpolateModelCurve, isParetoEfficient, isReasoningModel, logUsage, normalizeBenefitUtilities, normalizeProbabilities, normalizedEntropy, openAcuRoutingStore, parseJudgeResult, piecewiseLinearSatisfaction, publicCatalogPayload, readAcuRuntimeConfig, recommendModel, resolveApiKey, resolveModelAlias, route, rulesFallbackJudge, saveApiKey, selectValueRoute, serializeVisibleContext, solveAbilityParameter, startProxy, supportsToolCalling, supportsVision, tierSufficiency };

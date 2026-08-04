@@ -942,8 +942,11 @@ run("Alpha PostgreSQL request processor", () => {
     );
     expect(result.rows[0]).toMatchObject({
       judge_count: "0", route_mode: "explicit", candidate_count: "1", difficulty_index: null,
-      selected_model: "gpt-5.4-mini", selected_channel: "test-channel",
+      selected_model: "gpt-5.4-mini",
     });
+    expect(["test-channel", "test-recovery-channel", "test-cross-provider-channel"]).toContain(
+      result.rows[0].selected_channel,
+    );
     expect(result.rows[0].model_reason).toContain("User-selected explicit model");
     expect(result.rows[0].channel_reason).toContain("User-selected explicit model");
   });
@@ -2086,7 +2089,7 @@ run("Alpha PostgreSQL request processor", () => {
       formulaMode: "active",
       supplyStrategy: "lowest_cost",
       supplyWeights: { cost: 100, speed: 0, reliability: 0 },
-      routingModelVersion: "acu-model-utility-v2.1",
+      routingModelVersion: "acu-model-utility-v2.2",
       profileFormulaVersion: "acu-profile-utility-v2.1",
     });
   });

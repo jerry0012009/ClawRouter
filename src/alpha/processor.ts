@@ -26,6 +26,7 @@ import { parseProviderUsage, resolveProviderBilling } from "./usage.js";
 import { ACU_CURVE_DIFFICULTIES, buildModelCurve, getAcuModel } from "../acu/catalog.js";
 import { ACU_ROUTING_MODEL_VERSION } from "../acu/config.js";
 import { enabledExecutionPresets } from "../acu/execution-presets.js";
+import { continuousTierProbabilities } from "../acu/math.js";
 import { AcuJudgeClientCancelledError, AcuJudgeContextLengthError } from "../acu/judge.js";
 import { cashCnyPerNominalUsd, providerCostBreakdown, type ProviderEconomics } from "./provider-economics.js";
 import {
@@ -77,6 +78,32 @@ export function codexSelectionCorridorRequirements(
     contextTokens: inputTokens + expectedOutputTokens,
     expectedOutputTokens,
     webIntent: "not_required" as const,
+  };
+}
+
+const SELECTION_CORRIDOR_ZERO_FACTORS = {
+  reasoningDepth: 0,
+  taskScope: 0,
+  constraintDensity: 0,
+  toolDependency: 0,
+  verificationBurden: 0,
+  contextBurden: 0,
+};
+
+export function selectionCorridorJudge(difficulty: number): AcuJudgeResult {
+  const boundedDifficulty = Number.isFinite(difficulty)
+    ? Math.min(100, Math.max(0, difficulty))
+    : 0;
+  return {
+    ...continuousTierProbabilities(boundedDifficulty / 100),
+    difficultyScoreRaw: boundedDifficulty,
+    factors: { ...SELECTION_CORRIDOR_ZERO_FACTORS },
+    factorComposite: boundedDifficulty,
+    difficultyIndex: boundedDifficulty,
+    difficultyMethodVersion: "acu-difficulty-index-v1",
+    difficultyScore: boundedDifficulty,
+    signals: [],
+    explanation: "",
   };
 }
 
@@ -689,33 +716,11 @@ export class AlphaRequestProcessor {
       estimatedQuality: number;
       estimatedCallCost: number;
     }>]));
-    const factors = {
-      reasoningDepth: 0,
-      taskScope: 0,
-      constraintDensity: 0,
-      toolDependency: 0,
-      verificationBurden: 0,
-      contextBurden: 0,
-    };
     const series = Object.fromEntries(preferences.map((preference) => {
       const points = corridorDifficulties.flatMap((difficulty) => {
         try {
           const route = routeWithCurrentAcuFormula({
-            judge: {
-              pLow: 0.25,
-              pMid: 0.25,
-              pMidHigh: 0.25,
-              pHigh: 0.25,
-              confidence: 1,
-              difficultyScoreRaw: difficulty,
-              factors,
-              factorComposite: difficulty,
-              difficultyIndex: difficulty,
-              difficultyMethodVersion: "acu-difficulty-index-v1",
-              difficultyScore: difficulty,
-              signals: [],
-              explanation: "",
-            },
+            judge: selectionCorridorJudge(difficulty),
             judgeCost: 0,
             inputTokens,
             expectedOutputTokens,
@@ -789,6 +794,8 @@ export class AlphaRequestProcessor {
         judgeCostIncluded: false,
         currentHealthApplied: true,
         candidateDefinition: "selected_and_near_optimal_pareto_within_15pct_value",
+        difficultyDistribution: "continuous_tier_probabilities",
+        difficultyDistributionVersion: "acu-curve-thresholds-v1",
       },
       executionPresetSeries: executionPresets.map((preset) => ({
         candidateId: preset.candidateId,

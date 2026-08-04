@@ -5,6 +5,16 @@ export type MonitorRange = "1h" | "6h" | "24h" | "7d";
 
 export type MonitorHealthRow = Record<string, unknown>;
 
+export function monitorReasoningMetadata(profile: ConfiguredExecutionProfile): {
+  supportedReasoningEfforts: string[];
+  reasoningControlMode: NonNullable<ConfiguredExecutionProfile["reasoningControlMode"]> | "none";
+} {
+  return {
+    supportedReasoningEfforts: [...new Set(profile.supportedReasoningEfforts ?? [])].sort(),
+    reasoningControlMode: profile.reasoningControlMode ?? "none",
+  };
+}
+
 export function monitorRangeSpec(range: MonitorRange): { interval: string; bucket: string } {
   if (range === "7d") return { interval: "7 days", bucket: "1 hour" };
   if (range === "24h") return { interval: "24 hours", bucket: "15 minutes" };

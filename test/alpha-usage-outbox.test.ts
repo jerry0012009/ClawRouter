@@ -128,6 +128,60 @@ describe("Alpha Usage Finalize outbox", () => {
     });
     await expect(worker.runOnce()).resolves.toBe(1);
     expect(acknowledge).not.toHaveBeenCalled();
-    expect(fail).toHaveBeenCalledWith("usage_1", "New API Usage Finalize returned HTTP 503", 10);
+    expect(fail).toHaveBeenCalledWith(
+      "usage_1",
+      "New API Usage Finalize returned HTTP 503: temporarily unavailable",
+      10,
+    );
+  });
+
+  it("bounds finalize error bodies without exposing request secrets and preserves retry backoff", async () => {
+    const fail = vi.fn(async () => undefined);
+    const secret = "test-only-shared-secret";
+    const responseBody = `ACU wallet balance is insufficient ${"x".repeat(700)}`;
+    const worker = new UsageOutboxWorker({
+      repository: {
+        claimUsageReports: vi.fn(async () => [report({ sendAttemptCount: 3 })]),
+        acknowledgeUsageReport: vi.fn(async () => undefined),
+        failUsageReport: fail,
+      },
+      baseUrl: "http://new-api:3000",
+      sharedSecret: secret,
+      fetch: vi.fn(async () => new Response(responseBody, {
+        status: 409,
+        headers: { "x-sensitive-header": secret },
+      })) as typeof fetch,
+    });
+
+    await expect(worker.runOnce()).resolves.toBe(1);
+    const lastError = fail.mock.calls[0]?.[1] ?? "";
+    expect(lastError).toContain("New API Usage Finalize returned HTTP 409: ACU wallet balance is insufficient");
+    expect(lastError).not.toContain(secret);
+    expect(lastError.length).toBeLessThanOrEqual("New API Usage Finalize returned HTTP 409: ".length + 500);
+    expect(fail).toHaveBeenCalledWith("usage_1", expect.any(String), 20);
+  });
+
+  it("extracts the public New API error message from a 409 JSON body", async () => {
+    const fail = vi.fn(async () => undefined);
+    const worker = new UsageOutboxWorker({
+      repository: {
+        claimUsageReports: vi.fn(async () => [report()]),
+        acknowledgeUsageReport: vi.fn(async () => undefined),
+        failUsageReport: fail,
+      },
+      baseUrl: "http://new-api:3000",
+      sharedSecret: "test-only-shared-secret",
+      fetch: vi.fn(async () => new Response(
+        JSON.stringify({ error: "ACU wallet balance is insufficient" }),
+        { status: 409 },
+      )) as typeof fetch,
+    });
+
+    await expect(worker.runOnce()).resolves.toBe(1);
+    expect(fail).toHaveBeenCalledWith(
+      "usage_1",
+      "New API Usage Finalize returned HTTP 409: ACU wallet balance is insufficient",
+      5,
+    );
   });
 });

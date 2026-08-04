@@ -1,36 +1,5 @@
 import { C as CanonicalReasoningEffort } from './reasoning-capability-C7Gled43.js';
 
-type AcuRuntimeConfig = {
-    enabled: boolean;
-    judgeModel: string;
-    judgeBaseUrl: string;
-    judgeMode: "non-thinking";
-    promptVersion: string;
-    firstByteTimeoutMs: number;
-    timeoutMs: number;
-    maxContextTokens: number;
-    maxOutputTokens: number;
-    apiKey?: string;
-    judgeProvider: string;
-    judgeProtocol: "responses" | "chat_completions";
-    backupJudgeModel?: string;
-    backupJudgeBaseUrl?: string;
-    backupApiKey?: string;
-    backupJudgeProvider?: string;
-    backupMaxContextTokens: number;
-    syncBackupEnabled: boolean;
-    sameModelFailoverEnabled: boolean;
-    maxProfileAttempts: number;
-    primaryProfileId?: string;
-    cachePath?: string;
-    allowMock: boolean;
-    shadowMode: boolean;
-    allowForceRefresh: boolean;
-    databasePath: string;
-    judgeEntropyPenalty: number;
-};
-declare function readAcuRuntimeConfig(overrides?: Partial<AcuRuntimeConfig>): AcuRuntimeConfig;
-
 declare const ACU_TIERS: readonly ["low", "mid", "mid_high", "high"];
 type AcuTier = (typeof ACU_TIERS)[number];
 type AcuTierProbabilities = {
@@ -151,6 +120,11 @@ type AcuModelEstimate = {
     qualityUtility: number;
     costUtility: number;
     valueUtility: number;
+    qualityWeight?: number;
+    costWeight?: number;
+    rank?: number;
+    selected?: boolean;
+    formulaVersion?: string;
     scoreGapVsBest: number;
     costSavingsVsBest: number;
     paretoEfficient: boolean;
@@ -1035,6 +1009,37 @@ declare function getSessionId(headers: Record<string, string | string[] | undefi
  * Normalizes whitespace to avoid false negatives from minor formatting diffs.
  */
 declare function hashRequestContent(lastUserContent: string, toolCallNames?: string[]): string;
+
+type AcuRuntimeConfig = {
+    enabled: boolean;
+    judgeModel: string;
+    judgeBaseUrl: string;
+    judgeMode: "non-thinking";
+    promptVersion: string;
+    firstByteTimeoutMs: number;
+    timeoutMs: number;
+    maxContextTokens: number;
+    maxOutputTokens: number;
+    apiKey?: string;
+    judgeProvider: string;
+    judgeProtocol: "responses" | "chat_completions";
+    backupJudgeModel?: string;
+    backupJudgeBaseUrl?: string;
+    backupApiKey?: string;
+    backupJudgeProvider?: string;
+    backupMaxContextTokens: number;
+    syncBackupEnabled: boolean;
+    sameModelFailoverEnabled: boolean;
+    maxProfileAttempts: number;
+    primaryProfileId?: string;
+    cachePath?: string;
+    allowMock: boolean;
+    shadowMode: boolean;
+    allowForceRefresh: boolean;
+    databasePath: string;
+    judgeEntropyPenalty: number;
+};
+declare function readAcuRuntimeConfig(overrides?: Partial<AcuRuntimeConfig>): AcuRuntimeConfig;
 
 type JudgeRequestResult = {
     result: AcuJudgeResult;

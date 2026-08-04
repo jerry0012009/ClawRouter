@@ -98,6 +98,51 @@ describe("selection corridor cache", () => {
     expect(calculate).toHaveBeenCalledTimes(2);
   });
 
+  it("includes administrator quality presets and utility policy in the cache key", async () => {
+    const processor = new AlphaRequestProcessor({} as never);
+    const calculate = vi.fn(
+      async (
+        _input: number,
+        _output: number,
+        policy?: Record<string, unknown>,
+      ) => policy ?? {},
+    );
+    const internal = processor as unknown as {
+      calculateSelectionCorridor: typeof calculate;
+    };
+    internal.calculateSelectionCorridor = calculate;
+    const base = {
+      formulaMode: "active" as const,
+      qualityPresets: { economy: -60, balanced: 0, quality: 60 },
+      supplyWeights: { cost: 40, speed: 25, reliability: 35 },
+    };
+    await processor.selectionCorridor(10_000, 1_000, base);
+    await processor.selectionCorridor(10_000, 1_000, base);
+    await processor.selectionCorridor(10_000, 1_000, {
+      ...base,
+      qualityPresets: { ...base.qualityPresets, economy: -70 },
+    });
+    await processor.selectionCorridor(10_000, 1_000, {
+      ...base,
+      supplyWeights: { cost: 100, speed: 0, reliability: 0 },
+    });
+    expect(calculate).toHaveBeenCalledTimes(3);
+  });
+
+  it("rejects malformed utility weights and presets before calculation", () => {
+    const processor = new AlphaRequestProcessor({} as never);
+    expect(() =>
+      processor.selectionCorridor(10_000, 1_000, {
+        supplyWeights: { cost: 40, speed: 25, reliability: 34 },
+      }),
+    ).toThrow("sum to 100");
+    expect(() =>
+      processor.selectionCorridor(10_000, 1_000, {
+        qualityPresets: { economy: -101, balanced: 0, quality: 60 },
+      }),
+    ).toThrow("quality presets");
+  });
+
   it("publishes enabled execution presets as candidate-identity series", async () => {
     const processor = new AlphaRequestProcessor({} as never);
     const internal = processor as unknown as {

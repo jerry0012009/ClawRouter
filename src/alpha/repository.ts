@@ -10,6 +10,11 @@ export type AlphaIdPrefix = "ses" | "task" | "seg" | "evt" | "judge" | "route" |
 export function alphaId(prefix: AlphaIdPrefix): string {
   return `${prefix}_${randomUUID().replaceAll("-", "")}`;
 }
+import type {
+  LatencyPolicy,
+  ProfileRuntimeMetric,
+  ReliabilityPolicy,
+} from "./routing-utility-v2.js";
 
 export function sha256(value: string): string {
   return createHash("sha256").update(value).digest("hex");
@@ -1229,7 +1234,8 @@ export class AlphaRepository {
       `UPDATE acu_attempts SET status=$2,actual_model=$3,provider_request_id=$4,error_category=$5,
        http_status=$6,input_tokens=$7,cached_input_tokens=$8,output_tokens=$9,reasoning_tokens=$10,
        usage_source=$11,actual_cost_usd=$12,provider_billed=$13,latency_ms=$14,
-       visible_output_bytes=$15,completed_at=now(),metadata_json=metadata_json || $16::jsonb WHERE attempt_id=$1`,
+       visible_output_bytes=$15,completed_at=now(),metadata_json=metadata_json || $16::jsonb
+         || jsonb_build_object('outcome',$2,'total_latency_ms',$14) WHERE attempt_id=$1`,
       [input.attemptId, input.status, input.actualModel ?? null, input.providerRequestId ?? null,
         input.errorCategory ?? null, input.httpStatus ?? null, input.inputTokens ?? 0n,
         input.cachedInputTokens ?? 0n, input.outputTokens ?? 0n, input.reasoningTokens ?? 0n,
@@ -1381,6 +1387,52 @@ export class AlphaRepository {
       costBreakdown: row.cost_breakdown_json,
       sendAttemptCount: row.send_attempt_count,
     }));
+  }
+
+  async batchProfileRuntimeMetrics(
+    executionProfileIds: string[],
+    contextBucket: "standard" | "long",
+    latency: LatencyPolicy,
+    reliability: ReliabilityPolicy,
+  ): Promise<Map<string, ProfileRuntimeMetric>> {
+    const ids = [...new Set(executionProfileIds)];
+    if (ids.length === 0) return new Map();
+    const result = await this.database.query<Record<string, unknown>>(
+      `SELECT execution_profile_id,
+         count(*) FILTER (WHERE status='success' AND started_at>=now()-($3::text||' hours')::interval
+           AND coalesce(metadata_json->>'context_bucket','standard')=$2
+           AND metadata_json ? 'first_model_event_latency_ms')::int first_event_samples,
+         percentile_cont(.5) WITHIN GROUP (ORDER BY (metadata_json->>'first_model_event_latency_ms')::double precision)
+           FILTER (WHERE status='success' AND started_at>=now()-($3::text||' hours')::interval
+             AND coalesce(metadata_json->>'context_bucket','standard')=$2
+             AND metadata_json ? 'first_model_event_latency_ms') first_event_p50_ms,
+         count(*) FILTER (WHERE status='success' AND started_at>=now()-($3::text||' hours')::interval
+           AND coalesce(metadata_json->>'context_bucket','standard')=$2
+           AND (latency_ms IS NOT NULL OR metadata_json ? 'total_latency_ms'))::int total_latency_samples,
+         percentile_cont(.5) WITHIN GROUP (ORDER BY coalesce(latency_ms,(metadata_json->>'total_latency_ms')::double precision))
+           FILTER (WHERE status='success' AND started_at>=now()-($3::text||' hours')::interval
+             AND coalesce(metadata_json->>'context_bucket','standard')=$2
+             AND (latency_ms IS NOT NULL OR metadata_json ? 'total_latency_ms')) total_latency_p50_ms,
+         count(*) FILTER (WHERE started_at>=now()-($4::text||' hours')::interval
+           AND coalesce(error_category,'') NOT IN ('client_cancelled','client_error','invalid_request','context_length_exceeded')
+           AND (http_status IS NULL OR http_status<400 OR http_status>=500 OR http_status IN (408,429)))::int considered_attempts,
+         count(*) FILTER (WHERE started_at>=now()-($4::text||' hours')::interval AND status='success')::int successful_attempts
+       FROM acu_attempts
+       WHERE attempt_kind='provider' AND execution_profile_id=ANY($1::text[])
+       GROUP BY execution_profile_id`,
+      [ids, contextBucket, latency.windowHours, reliability.windowHours],
+    );
+    return new Map(result.rows.map((row) => [
+      String(row.execution_profile_id),
+      {
+        firstEventP50Ms: Number(row.first_event_p50_ms) || undefined,
+        firstEventSamples: Number(row.first_event_samples) || 0,
+        totalLatencyP50Ms: Number(row.total_latency_p50_ms) || undefined,
+        totalLatencySamples: Number(row.total_latency_samples) || 0,
+        consideredAttempts: Number(row.considered_attempts) || 0,
+        successfulAttempts: Number(row.successful_attempts) || 0,
+      },
+    ]));
   }
 
   async acknowledgeUsageReport(usageReportId: string): Promise<void> {

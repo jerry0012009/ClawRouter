@@ -121,6 +121,11 @@ export type AcuModelEstimate = {
   qualityUtility: number;
   costUtility: number;
   valueUtility: number;
+  qualityWeight?: number;
+  costWeight?: number;
+  rank?: number;
+  selected?: boolean;
+  formulaVersion?: string;
   scoreGapVsBest: number;
   costSavingsVsBest: number;
   paretoEfficient: boolean;

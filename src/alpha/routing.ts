@@ -1,6 +1,10 @@
 import { getAcuModel } from "../acu/catalog.js";
 import { ACU_DEFAULT_SWITCH_COST_USD, ACU_ROUTING_MODEL_VERSION } from "../acu/config.js";
-import { recommendModel } from "../acu/decision.js";
+import {
+  ACU_MODEL_UTILITY_V2_VERSION,
+  recommendModel,
+  recommendModelV2,
+} from "../acu/decision.js";
 import type { AcuEvaluation, AcuJudgeResult, AcuModelEstimate } from "../acu/types.js";
 import type { AlphaProtocol } from "./repository.js";
 import type { WebIntent } from "./protocol/types.js";
@@ -12,11 +16,39 @@ import {
   type WebTransportStatus,
 } from "./web-capability.js";
 import type { RuntimeHealth } from "./channel-health.js";
+import type { HealthSnapshot } from "./channel-health.js";
 import type { WorkPhaseDecision } from "./work-phase.js";
+import {
+  resolveEffectiveQualityBias,
+  scoreExecutionProfilesV2,
+  type ProfileRuntimeMetric,
+  type ProfileUtilityV2,
+  type RoutingUtilityPolicy,
+} from "./routing-utility-v2.js";
 import type { ProfileReasoningOverride, ReasoningControlMode } from "./reasoning-capability.js";
 
 export type ProfileHealth = "healthy" | "degraded" | "cooldown" | "open" | "half_open" | "disabled" | "unknown";
 export type RoutingPreference = "economy" | "balanced" | "quality";
+export type WorkPhaseBiasInput = {
+  qualityBias: number;
+  acuHighBiasOffset: number;
+  routeMode: "acu-auto" | "acu-high";
+  workPhase: WorkPhaseDecision["phase"];
+  workPhaseBiasOffsets: Record<WorkPhaseDecision["phase"], number>;
+  systemQualityBiasFloor?: number;
+};
+
+export const DEFAULT_WORK_PHASE_BIAS_OFFSETS: Record<
+  WorkPhaseDecision["phase"],
+  number
+> = {
+  inspection: -10,
+  general: 0,
+  implementation: 0,
+  verification: 0,
+  planning: 10,
+  recovery: 20,
+};
 export type ToolCapability =
   | "function"
   | "custom"
@@ -102,6 +134,12 @@ export type AlphaExecutionProfile = {
   autoRouteEnabled?: boolean;
   requiresFreshProbe?: boolean;
   runtimeHealth?: RuntimeHealth;
+  utilityEffectivePrices?: {
+    inputPricePerMillion: number;
+    outputPricePerMillion: number;
+  };
+  utilityRuntimeMetric?: ProfileRuntimeMetric;
+  utilityHealthSnapshot?: HealthSnapshot;
 };
 
 export type AlphaRouteRequirements = {
@@ -133,6 +171,10 @@ export type AlphaRouteInput = {
   currentProfile?: AlphaExecutionProfile;
   workPhase?: WorkPhaseDecision;
   includeExecutionPresets?: boolean;
+  routeMode?: "acu-auto" | "acu-high";
+  utilityPolicy?: RoutingUtilityPolicy;
+  workPhaseBiasOffsets?: Record<WorkPhaseDecision["phase"], number>;
+  systemQualityBiasFloor?: number;
 };
 
 export type ExcludedProfile = { executionProfileId: string; reasons: string[] };
@@ -192,7 +234,7 @@ export class AlphaAdmissionError extends Error {
 }
 
 export type AlphaRouteDecision = {
-  formulaVersion: typeof ACU_ROUTING_MODEL_VERSION;
+  formulaVersion: string;
   effectiveQualityTarget: number;
   preference: RoutingPreference;
   preferenceParameters: RoutingPreferenceParameters;
@@ -214,6 +256,8 @@ export type AlphaRouteDecision = {
     effectiveCostStatus: "verified" | "estimated" | "missing";
     observedLatencyMs?: number;
     selected: boolean;
+    v2Selected?: boolean;
+    profileUtilityV2?: ProfileUtilityV2;
   }>;
   recommendation: ReturnType<typeof recommendModel>;
   candidateEstimates: Array<AcuModelEstimate & {
@@ -226,6 +270,28 @@ export type AlphaRouteDecision = {
   eligibleProfileIds: string[];
   profileEvaluations: ProfileEvaluation[];
   modelAvailability: Array<{ canonicalModelId: string; available: boolean; eligibleProfileCount: number; excludedProfileCount: number }>;
+  effectiveQualityBias?: number;
+  routingUtilityVersion?: string;
+  formulaMode?: RoutingUtilityPolicy["formulaMode"];
+  v2Counterfactual?: {
+    selectedCandidateId: string;
+    selectedModelId: string;
+    selectedExecutionProfileId: string;
+    differsFromLegacy: boolean;
+    differenceReason:
+      | "same_selection"
+      | "model_selection_changed"
+      | "profile_selection_changed";
+    modelFormulaVersion: string;
+    profileFormulaVersion: string;
+    modelCandidates: AcuModelEstimate[];
+    profileCandidates: ProfileUtilityV2[];
+  };
+  legacyCounterfactual?: {
+    selectedCandidateId: string;
+    selectedModelId: string;
+    selectedExecutionProfileId: string;
+  };
 };
 
 function nominalPrice(modelId: string): { inputPricePerMillion: number; outputPricePerMillion: number } {
@@ -506,24 +572,24 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
     0,
     Math.min(100, input.effectiveQualityTarget + preferenceParameters.qualityTargetOffset + workPhase.qualityTargetOffset),
   );
-  const bestProfileByModel = new Map<string, AlphaExecutionProfile>();
+  const legacyBestProfileByModel = new Map<string, AlphaExecutionProfile>();
   for (const profile of eligibleProfiles) {
-    const current = bestProfileByModel.get(profile.modelId);
+    const current = legacyBestProfileByModel.get(profile.modelId);
     const webPreference = current ? compareWebPreference(profile, current, input.requirements) : 0;
     if (!current || webPreference < 0 || (webPreference === 0
       && effectiveProviderSelectionScore(profile, input.requirements, input.inputTokens, input.expectedOutputTokens)
       < effectiveProviderSelectionScore(current, input.requirements, input.inputTokens, input.expectedOutputTokens))) {
-      bestProfileByModel.set(profile.modelId, profile);
+      legacyBestProfileByModel.set(profile.modelId, profile);
     }
   }
-  const effectivePrices = Object.fromEntries([...bestProfileByModel].map(([modelId, profile]) => (
+  const legacyEffectivePrices = Object.fromEntries([...legacyBestProfileByModel].map(([modelId, profile]) => (
     [modelId, profileEffectivePrices(profile)]
   )));
   const referenceEconomics = input.profiles.find((profile) => profile.provider === "closeai" && profile.economics?.enabled)?.economics
     ?? eligibleProfiles.find((profile) => profile.economics)?.economics;
   const effectiveSwitchCost = ACU_DEFAULT_SWITCH_COST_USD
     * (referenceEconomics ? cashCnyPerNominalUsd(referenceEconomics) : 1);
-  const recommendation = recommendModel({
+  const legacyRecommendation = recommendModel({
     probabilities: input.judge,
     difficultyScore: input.judge.difficultyIndex,
     inputTokens: input.inputTokens,
@@ -534,10 +600,74 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
     fallbackRiskScale: preferenceParameters.fallbackRiskScale,
     eligibleModelIds,
     requireToolCallSupport: input.requirements.requireTools,
-    effectivePrices,
+    effectivePrices: legacyEffectivePrices,
     switchCost: effectiveSwitchCost,
     includeExecutionPresets: input.includeExecutionPresets,
   });
+  const utilityPolicy = input.utilityPolicy;
+  const shouldComputeV2 =
+    utilityPolicy?.formulaMode === "shadow" ||
+    utilityPolicy?.formulaMode === "active";
+  const v2BestProfileByModel = new Map<string, AlphaExecutionProfile>();
+  const v2ProfileUtilitiesByModel = new Map<string, ProfileUtilityV2[]>();
+  let v2Recommendation: ReturnType<typeof recommendModelV2> | undefined;
+  let effectiveQualityBias: number | undefined;
+  if (shouldComputeV2 && utilityPolicy) {
+    for (const modelId of eligibleModelIds) {
+      const modelProfiles = eligibleProfiles
+        .filter((profile) => profile.modelId === modelId)
+        .map((profile) => ({
+          ...profile,
+          utilityEffectivePrices: profileEffectivePrices(profile),
+        }));
+      const scored = scoreExecutionProfilesV2(
+        modelProfiles,
+        input.inputTokens,
+        input.expectedOutputTokens,
+        utilityPolicy,
+      );
+      v2BestProfileByModel.set(modelId, scored.selected);
+      v2ProfileUtilitiesByModel.set(modelId, scored.utilities);
+    }
+    effectiveQualityBias = resolveEffectiveQualityBias({
+      qualityBias: utilityPolicy.qualityBias,
+      acuHighBiasOffset: utilityPolicy.acuHighBiasOffset,
+      routeMode: input.routeMode ?? "acu-auto",
+      workPhase: workPhase.phase,
+      workPhaseBiasOffsets:
+        input.workPhaseBiasOffsets ??
+        utilityPolicy.workPhaseBiasOffsets ??
+        DEFAULT_WORK_PHASE_BIAS_OFFSETS,
+      systemQualityBiasFloor: input.systemQualityBiasFloor,
+    });
+    const v2EffectivePrices = Object.fromEntries(
+      [...v2BestProfileByModel].map(([modelId, profile]) => [
+        modelId,
+        profileEffectivePrices(profile),
+      ]),
+    );
+    v2Recommendation = recommendModelV2({
+      probabilities: input.judge,
+      difficultyScore: input.judge.difficultyIndex,
+      inputTokens: input.inputTokens,
+      expectedOutputTokens: input.expectedOutputTokens,
+      judgeCost: input.judgeCost,
+      qualityTarget: preferenceQualityTarget / 100,
+      eligibleModelIds,
+      requireToolCallSupport: input.requirements.requireTools,
+      effectivePrices: v2EffectivePrices,
+      switchCost: effectiveSwitchCost,
+      includeExecutionPresets: input.includeExecutionPresets,
+      qualityBias: effectiveQualityBias,
+      modelCostLogScale: utilityPolicy.modelCostLogScale,
+    });
+  }
+  const activeV2 =
+    utilityPolicy?.formulaMode === "active" && v2Recommendation !== undefined;
+  const recommendation = activeV2 ? v2Recommendation! : legacyRecommendation;
+  const bestProfileByModel = activeV2
+    ? v2BestProfileByModel
+    : legacyBestProfileByModel;
   const expectedCandidateModelIds = eligibleModelIds
     .filter((modelId) => getAcuModel(modelId)?.routingEligible === true)
     .sort();
@@ -554,6 +684,8 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
   }
   const selectedProfile = bestProfileByModel.get(recommendation.recommended.modelId);
   if (!selectedProfile) throw new Error("Selected model has no compatible execution profile");
+  const selectedModelV2Utilities =
+    v2ProfileUtilitiesByModel.get(recommendation.recommended.modelId) ?? [];
   const providerCandidateEstimates = eligibleProfiles
     .filter((profile) => profile.modelId === selectedProfile.modelId)
     .map((profile) => ({
@@ -575,26 +707,59 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
       effectiveCostStatus: profile.effectiveCostStatus ?? "verified",
       observedLatencyMs: profile.observedLatencyMs,
       selected: profile.executionProfileId === selectedProfile.executionProfileId,
-    })).sort((left, right) => left.providerSelectionScore - right.providerSelectionScore);
+      v2Selected: selectedModelV2Utilities.find(
+        (utility) => utility.executionProfileId === profile.executionProfileId,
+      )?.selected,
+      profileUtilityV2: selectedModelV2Utilities.find(
+        (utility) => utility.executionProfileId === profile.executionProfileId,
+      ),
+    })).sort((left, right) =>
+      activeV2
+        ? (left.profileUtilityV2?.rank ?? Number.POSITIVE_INFINITY) -
+          (right.profileUtilityV2?.rank ?? Number.POSITIVE_INFINITY)
+        : left.providerSelectionScore - right.providerSelectionScore,
+    );
   const selectedProviderEstimate = providerCandidateEstimates.find((candidate) => candidate.selected)!;
   const nextProviderEstimate = providerCandidateEstimates.find((candidate) => !candidate.selected);
   const selectedWebEligibility = resolveWebEligibility(selectedProfile, input.requirements);
-  const providerSelectionReason = [
-    `Selected ${selectedProfile.provider}/${selectedProfile.channelId ?? selectedProfile.channel}/${selectedProfile.providerModelId ?? selectedProfile.modelId}`,
-    `for canonical model ${selectedProfile.modelId}`,
-    `using effective cash cost, health=${selectedProfile.health}`,
-    `success_rate=${(selectedProfile.recentSuccessRate ?? 1).toFixed(3)}`,
-    `usage_trusted=${selectedProfile.usageTrusted !== false}`,
-    `effective_cost_status=${selectedProfile.effectiveCostStatus ?? "verified"}`,
-    `latency_ms=${selectedProfile.observedLatencyMs ?? "unknown"}`,
-    `web_model_capability=${selectedWebEligibility.modelCapability}`,
-    `web_transport=${selectedWebEligibility.transportStatus}`,
-    `web_eligibility=${selectedWebEligibility.confidence}`,
-    `effective_cash_estimate=${selectedProviderEstimate.effectiveCashCost.toFixed(8)}`,
-    nextProviderEstimate ? `next_channel=${nextProviderEstimate.channelId}:${nextProviderEstimate.effectiveCashCost.toFixed(8)}` : "next_channel=none",
-  ].join("; ");
+  const selectedProfileV2Utility = selectedProviderEstimate.profileUtilityV2;
+  const providerSelectionReason =
+    activeV2 && utilityPolicy && selectedProfileV2Utility
+      ? [
+          `Selected ${selectedProfile.provider}/${selectedProfile.channelId ?? selectedProfile.channel}/${selectedProfile.providerModelId ?? selectedProfile.modelId}`,
+          `for canonical model ${selectedProfile.modelId}`,
+          `with Profile utility ${selectedProfileV2Utility.profileUtility.toFixed(4)}`,
+          `weights cost=${utilityPolicy.supplyWeights.cost}% speed=${utilityPolicy.supplyWeights.speed}% reliability=${utilityPolicy.supplyWeights.reliability}%`,
+          `utilities cost=${selectedProfileV2Utility.costUtility.toFixed(4)} speed=${selectedProfileV2Utility.speedUtility.toFixed(4)} reliability=${selectedProfileV2Utility.reliabilityUtility.toFixed(4)}`,
+          `latency_source=${selectedProfileV2Utility.metricSource}`,
+        ].join("; ")
+      : [
+          `Selected ${selectedProfile.provider}/${selectedProfile.channelId ?? selectedProfile.channel}/${selectedProfile.providerModelId ?? selectedProfile.modelId}`,
+          `for canonical model ${selectedProfile.modelId}`,
+          `using effective cash cost, health=${selectedProfile.health}`,
+          `success_rate=${(selectedProfile.recentSuccessRate ?? 1).toFixed(3)}`,
+          `usage_trusted=${selectedProfile.usageTrusted !== false}`,
+          `effective_cost_status=${selectedProfile.effectiveCostStatus ?? "verified"}`,
+          `latency_ms=${selectedProfile.observedLatencyMs ?? "unknown"}`,
+          `web_model_capability=${selectedWebEligibility.modelCapability}`,
+          `web_transport=${selectedWebEligibility.transportStatus}`,
+          `web_eligibility=${selectedWebEligibility.confidence}`,
+          `effective_cash_estimate=${selectedProviderEstimate.effectiveCashCost.toFixed(8)}`,
+          nextProviderEstimate
+            ? `next_channel=${nextProviderEstimate.channelId}:${nextProviderEstimate.effectiveCashCost.toFixed(8)}`
+            : "next_channel=none",
+        ].join("; ");
+  const legacySelectedProfileId = legacyBestProfileByModel.get(
+    legacyRecommendation.recommended.modelId,
+  )!.executionProfileId;
+  const v2SelectedProfileId = v2Recommendation
+    ? v2BestProfileByModel.get(v2Recommendation.recommended.modelId)!
+        .executionProfileId
+    : undefined;
   return {
-    formulaVersion: ACU_ROUTING_MODEL_VERSION,
+    formulaVersion: activeV2
+      ? ACU_MODEL_UTILITY_V2_VERSION
+      : ACU_ROUTING_MODEL_VERSION,
     effectiveQualityTarget: preferenceQualityTarget,
     preference,
     preferenceParameters,
@@ -619,6 +784,42 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
     eligibleProfileIds: eligibleProfiles.map((profile) => profile.executionProfileId),
     profileEvaluations,
     modelAvailability,
+    effectiveQualityBias,
+    routingUtilityVersion: utilityPolicy?.routingUtilityVersion,
+    formulaMode: utilityPolicy?.formulaMode ?? "legacy",
+    v2Counterfactual: v2Recommendation
+      ? {
+          selectedCandidateId: v2Recommendation.recommended.candidateId,
+          selectedModelId: v2Recommendation.recommended.modelId,
+          selectedExecutionProfileId: v2BestProfileByModel.get(
+            v2Recommendation.recommended.modelId,
+          )!.executionProfileId,
+          differsFromLegacy:
+            v2Recommendation.recommended.candidateId !==
+              legacyRecommendation.recommended.candidateId ||
+            v2SelectedProfileId !== legacySelectedProfileId,
+          differenceReason:
+            v2Recommendation.recommended.candidateId !==
+            legacyRecommendation.recommended.candidateId
+              ? "model_selection_changed"
+              : v2SelectedProfileId !== legacySelectedProfileId
+                ? "profile_selection_changed"
+                : "same_selection",
+          modelFormulaVersion: ACU_MODEL_UTILITY_V2_VERSION,
+          profileFormulaVersion: "acu-profile-utility-v2",
+          modelCandidates: v2Recommendation.estimates,
+          profileCandidates: [...v2ProfileUtilitiesByModel.values()].flat(),
+        }
+      : undefined,
+    legacyCounterfactual: activeV2
+      ? {
+          selectedCandidateId: legacyRecommendation.recommended.candidateId,
+          selectedModelId: legacyRecommendation.recommended.modelId,
+          selectedExecutionProfileId: legacyBestProfileByModel.get(
+            legacyRecommendation.recommended.modelId,
+          )!.executionProfileId,
+        }
+      : undefined,
   };
 }
 

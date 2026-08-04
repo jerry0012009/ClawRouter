@@ -200,6 +200,25 @@ export function createAlphaGatewayServer(options: AlphaGatewayOptions): Server {
             allowedModelIds: Array.isArray(body.allowedModelIds) ? body.allowedModelIds.filter((value): value is string => typeof value === "string") : [],
             allowedProfileIds: Array.isArray(body.allowedProfileIds) ? body.allowedProfileIds.filter((value): value is string => typeof value === "string") : [],
             routingPreference: ["economy", "balanced", "quality"].includes(String(body.routingPreference)) ? String(body.routingPreference) as SelectionCorridorPolicy["routingPreference"] : "balanced",
+            qualityBias: Number.isFinite(Number(body.qualityBias)) ? Number(body.qualityBias) : undefined,
+            qualityPresets: body.qualityPresets as SelectionCorridorPolicy["qualityPresets"],
+            supplyStrategy: ["lowest_cost", "balanced", "low_latency", "high_reliability"]
+              .includes(String(body.supplyStrategy))
+              ? String(body.supplyStrategy) as SelectionCorridorPolicy["supplyStrategy"]
+              : undefined,
+            supplyWeights: body.supplyWeights as SelectionCorridorPolicy["supplyWeights"],
+            acuHighBiasOffset: Number.isFinite(Number(body.acuHighBiasOffset)) ? Number(body.acuHighBiasOffset) : undefined,
+            modelCostLogScale: Number.isFinite(Number(body.modelCostLogScale)) ? Number(body.modelCostLogScale) : undefined,
+            profileCostLogScale: Number.isFinite(Number(body.profileCostLogScale)) ? Number(body.profileCostLogScale) : undefined,
+            profileSpeedLogScale: Number.isFinite(Number(body.profileSpeedLogScale)) ? Number(body.profileSpeedLogScale) : undefined,
+            latencyPolicy: body.latencyPolicy as SelectionCorridorPolicy["latencyPolicy"],
+            reliabilityPolicy: body.reliabilityPolicy as SelectionCorridorPolicy["reliabilityPolicy"],
+            workPhaseBiasOffsets: body.workPhaseBiasOffsets as SelectionCorridorPolicy["workPhaseBiasOffsets"],
+            routeMode: body.routeMode === "acu-high" ? "acu-high" : "acu-auto",
+            routingUtilityVersion: typeof body.routingUtilityVersion === "string" ? body.routingUtilityVersion : undefined,
+            formulaMode: ["legacy", "shadow", "active"].includes(String(body.formulaMode))
+              ? String(body.formulaMode) as SelectionCorridorPolicy["formulaMode"]
+              : undefined,
           };
         }
         inputTokens = Math.max(1, Math.min(1_000_000, inputTokens));

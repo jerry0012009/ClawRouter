@@ -21,7 +21,10 @@ import {
 } from "./routing.js";
 import type { AlphaGatewayTrace, AlphaIngressContext, AlphaExecutionResolution } from "./gateway.js";
 import type { NativeProviderAdapter } from "./provider.js";
-import type { TrustedNewApiIdentity } from "./trusted-identity.js";
+import {
+  resolvedRoutingUtilityPolicy,
+  type TrustedNewApiIdentity,
+} from "./trusted-identity.js";
 import { parseProviderUsage, resolveProviderBilling } from "./usage.js";
 import { ACU_CURVE_DIFFICULTIES, buildModelCurve, getAcuModel } from "../acu/catalog.js";
 import { ACU_ROUTING_MODEL_VERSION } from "../acu/config.js";
@@ -61,6 +64,14 @@ import {
   DEFAULT_BILLING_POLICY_VERSION,
   DEFAULT_RETAIL_MARKUP_MULTIPLIER,
 } from "./retail-charge.js";
+import {
+  DEFAULT_ROUTING_UTILITY_POLICY,
+  type LatencyPolicy,
+  type ReliabilityPolicy,
+  type RoutingUtilityPolicy,
+  type SupplyStrategy,
+  type SupplyWeights,
+} from "./routing-utility-v2.js";
 
 const POLICY_VERSION = "alpha-p0-policy-v1";
 const QUALITY_CURVE_VERSION = "acu-catalog-v0.1";
@@ -111,6 +122,20 @@ export type SelectionCorridorPolicy = {
   allowedModelIds?: string[];
   allowedProfileIds?: string[];
   routingPreference?: "economy" | "balanced" | "quality";
+  qualityBias?: number;
+  qualityPresets?: Record<"economy" | "balanced" | "quality", number>;
+  supplyStrategy?: SupplyStrategy;
+  supplyWeights?: SupplyWeights;
+  acuHighBiasOffset?: number;
+  modelCostLogScale?: number;
+  profileCostLogScale?: number;
+  profileSpeedLogScale?: number;
+  latencyPolicy?: LatencyPolicy;
+  reliabilityPolicy?: ReliabilityPolicy;
+  workPhaseBiasOffsets?: RoutingUtilityPolicy["workPhaseBiasOffsets"];
+  routeMode?: "acu-auto" | "acu-high";
+  routingUtilityVersion?: string;
+  formulaMode?: "legacy" | "shadow" | "active";
 };
 
 type JsonObject = Record<string, unknown>;
@@ -256,6 +281,7 @@ export function hydrateExecutionProfileRuntime(
     usageTrusted: runtime?.usageTrusted ?? profile.usageTrusted,
     recentSuccessRate: runtime?.recentSuccessRate ?? profile.recentSuccessRate ?? 1,
     observedLatencyMs: runtime?.totalLatencyMs ?? profile.observedLatencyMs,
+    utilityHealthSnapshot: runtime,
     observedSuccessfulInputTokens: Math.max(
       runtime?.observedSuccessfulInputTokens ?? 0,
       profile.observedSuccessfulInputTokens ?? 0,
@@ -687,11 +713,62 @@ export class AlphaRequestProcessor {
     return { profiles, probeClaims: [] };
   }
 
+  private async withProfileRuntimeMetrics(
+    profiles: AlphaExecutionProfile[],
+    inputTokens: number,
+    policy: ReturnType<typeof resolvedRoutingUtilityPolicy>,
+  ): Promise<AlphaExecutionProfile[]> {
+    if (policy.formulaMode === "legacy") return profiles;
+    const repository = new AlphaRepository(this.options.database);
+    const contextBucket = inputTokens >= policy.latency.longContextThresholdTokens
+      ? "long"
+      : "standard";
+    const metrics = await repository.batchProfileRuntimeMetrics(
+      profiles.map((profile) => profile.executionProfileId),
+      contextBucket,
+      policy.latency,
+      policy.reliability,
+    );
+    return profiles.map((profile) => ({
+      ...profile,
+      utilityRuntimeMetric: metrics.get(profile.executionProfileId),
+    }));
+  }
+
   selectionCorridor(inputTokens: number, expectedOutputTokens: number, policy?: SelectionCorridorPolicy): Promise<Record<string, unknown>> {
+    const qualityPresets = policy?.qualityPresets ?? {
+      economy: -60,
+      balanced: 0,
+      quality: 60,
+    };
+    if ([qualityPresets.economy, qualityPresets.balanced, qualityPresets.quality]
+      .some((value) => !Number.isInteger(value) || value < -100 || value > 100)) {
+      throw new Error("Selection Corridor quality presets are invalid");
+    }
+    const supplyWeights = policy?.supplyWeights ?? DEFAULT_ROUTING_UTILITY_POLICY.supplyWeights;
+    if (![supplyWeights.cost, supplyWeights.speed, supplyWeights.reliability]
+      .every((value) => Number.isInteger(value) && value >= 0 && value <= 100)
+      || supplyWeights.cost + supplyWeights.speed + supplyWeights.reliability !== 100) {
+      throw new Error("Selection Corridor supply weights must sum to 100");
+    }
     const normalizedPolicy = {
       allowedModelIds: [...new Set(policy?.allowedModelIds ?? [])].sort(),
       allowedProfileIds: [...new Set(policy?.allowedProfileIds ?? [])].sort(),
       routingPreference: policy?.routingPreference ?? "balanced",
+      qualityBias: Math.max(-100, Math.min(100, policy?.qualityBias ?? 0)),
+      qualityPresets,
+      supplyStrategy: policy?.supplyStrategy ?? "balanced",
+      supplyWeights,
+      acuHighBiasOffset: policy?.acuHighBiasOffset ?? DEFAULT_ROUTING_UTILITY_POLICY.acuHighBiasOffset,
+      modelCostLogScale: policy?.modelCostLogScale ?? DEFAULT_ROUTING_UTILITY_POLICY.modelCostLogScale,
+      profileCostLogScale: policy?.profileCostLogScale ?? DEFAULT_ROUTING_UTILITY_POLICY.profileCostLogScale,
+      profileSpeedLogScale: policy?.profileSpeedLogScale ?? DEFAULT_ROUTING_UTILITY_POLICY.profileSpeedLogScale,
+      latencyPolicy: policy?.latencyPolicy ?? DEFAULT_ROUTING_UTILITY_POLICY.latency,
+      reliabilityPolicy: policy?.reliabilityPolicy ?? DEFAULT_ROUTING_UTILITY_POLICY.reliability,
+      workPhaseBiasOffsets: policy?.workPhaseBiasOffsets ?? DEFAULT_ROUTING_UTILITY_POLICY.workPhaseBiasOffsets,
+      routeMode: policy?.routeMode ?? "acu-auto",
+      routingUtilityVersion: policy?.routingUtilityVersion ?? DEFAULT_ROUTING_UTILITY_POLICY.routingUtilityVersion,
+      formulaMode: policy?.formulaMode ?? "legacy",
     };
     const key = `${inputTokens}:${expectedOutputTokens}:${JSON.stringify(normalizedPolicy)}`;
     const now = Date.now();
@@ -718,11 +795,26 @@ export class AlphaRequestProcessor {
     const { profiles: allProfiles } = await this.effectiveProfiles([], false);
     const allowedModels = new Set(policy.allowedModelIds ?? []);
     const allowedProfiles = new Set(policy.allowedProfileIds ?? []);
-    const profiles = allProfiles.filter((profile) =>
+    const filteredProfiles = allProfiles.filter((profile) =>
       (allowedModels.size === 0 || allowedModels.has(profile.modelId))
       && (allowedProfiles.size === 0 || allowedProfiles.has(profile.executionProfileId))
     );
-    if (profiles.length === 0) throw new Error("No execution profile satisfies the routing policy");
+    if (filteredProfiles.length === 0) throw new Error("No execution profile satisfies the routing policy");
+    const utilityPolicy: RoutingUtilityPolicy = {
+      formulaMode: policy.formulaMode ?? "legacy",
+      qualityBias: policy.qualityBias ?? 0,
+      supplyStrategy: policy.supplyStrategy ?? "balanced",
+      supplyWeights: policy.supplyWeights ?? DEFAULT_ROUTING_UTILITY_POLICY.supplyWeights,
+      acuHighBiasOffset: policy.acuHighBiasOffset ?? DEFAULT_ROUTING_UTILITY_POLICY.acuHighBiasOffset,
+      modelCostLogScale: policy.modelCostLogScale ?? DEFAULT_ROUTING_UTILITY_POLICY.modelCostLogScale,
+      profileCostLogScale: policy.profileCostLogScale ?? DEFAULT_ROUTING_UTILITY_POLICY.profileCostLogScale,
+      profileSpeedLogScale: policy.profileSpeedLogScale ?? DEFAULT_ROUTING_UTILITY_POLICY.profileSpeedLogScale,
+      latency: policy.latencyPolicy ?? DEFAULT_ROUTING_UTILITY_POLICY.latency,
+      reliability: policy.reliabilityPolicy ?? DEFAULT_ROUTING_UTILITY_POLICY.reliability,
+      workPhaseBiasOffsets: policy.workPhaseBiasOffsets ?? DEFAULT_ROUTING_UTILITY_POLICY.workPhaseBiasOffsets,
+      routingUtilityVersion: policy.routingUtilityVersion ?? DEFAULT_ROUTING_UTILITY_POLICY.routingUtilityVersion,
+    };
+    const profiles = await this.withProfileRuntimeMetrics(filteredProfiles, inputTokens, utilityPolicy);
     const preferences = ["economy", "balanced", "quality"] as const;
     const executionPresets = enabledExecutionPresets();
     const corridorDifficulties = ACU_CURVE_DIFFICULTIES;
@@ -731,7 +823,11 @@ export class AlphaRequestProcessor {
       estimatedQuality: number;
       estimatedCallCost: number;
     }>]));
-    const series = Object.fromEntries(preferences.map((preference) => {
+    const buildSeries = (
+      preference: "economy" | "balanced" | "quality",
+      qualityBias: number,
+      collectPresets: boolean,
+    ) => {
       const points = corridorDifficulties.flatMap((difficulty) => {
         try {
           const route = routeWithCurrentAcuFormula({
@@ -743,8 +839,10 @@ export class AlphaRequestProcessor {
             routingPreference: preference,
             profiles,
             requirements: codexSelectionCorridorRequirements(inputTokens, expectedOutputTokens),
+            routeMode: policy.routeMode ?? "acu-auto",
+            utilityPolicy: { ...utilityPolicy, qualityBias },
           });
-          if (preference === "balanced") {
+          if (collectPresets) {
             for (const preset of executionPresets) {
               const estimate = route.candidateEstimates.find((candidate) => candidate.candidateId === preset.candidateId);
               if (estimate) {
@@ -756,14 +854,11 @@ export class AlphaRequestProcessor {
               }
             }
           }
-          const selectedUtility = route.recommendation.recommended.valueUtility;
           const candidates = [...route.candidateEstimates]
-            .filter((candidate) => candidate.paretoEfficient && (
-              candidate.modelId === route.recommendation.recommended.modelId
-              || candidate.valueUtility >= selectedUtility * 0.85
-            ))
-            .sort((left, right) => right.valueUtility - left.valueUtility)
-            .slice(0, 3);
+            .filter((candidate) => utilityPolicy.formulaMode === "legacy" ? candidate.paretoEfficient : true)
+            .sort((left, right) => right.valueUtility - left.valueUtility);
+          const selectedProfileUtility = route.providerCandidateEstimates
+            .find((candidate) => candidate.selected)?.profileUtilityV2;
           return [{
             difficulty,
             selectedModelId: route.recommendation.recommended.modelId,
@@ -772,6 +867,16 @@ export class AlphaRequestProcessor {
             reasoningEffort: route.recommendation.recommended.reasoningEffort,
             selectedQuality: route.recommendation.recommended.estimatedQuality * 100,
             selectedCostCny: route.recommendation.recommended.estimatedCallCost,
+            effectiveQualityBias: route.effectiveQualityBias,
+            qualityWeight: route.recommendation.recommended.qualityWeight,
+            costWeight: route.recommendation.recommended.costWeight,
+            selectedExecutionProfileId: route.selectedProfile.executionProfileId,
+            selectedProvider: route.selectedProfile.provider,
+            selectedProfileUtility: selectedProfileUtility?.profileUtility,
+            modelCandidateUtilities: candidates,
+            profileCandidateUtilities: route.v2Counterfactual?.profileCandidates ?? [],
+            formulaVersion: route.formulaVersion,
+            routingUtilityVersion: route.routingUtilityVersion,
             qualityLower: Math.min(...candidates.map((candidate) => candidate.qualityLower * 100)),
             qualityUpper: Math.max(...candidates.map((candidate) => candidate.qualityUpper * 100)),
             candidates: candidates.map((candidate) => ({
@@ -784,17 +889,40 @@ export class AlphaRequestProcessor {
               quality: candidate.estimatedQuality * 100,
               costCny: candidate.estimatedCallCost,
               valueUtility: candidate.valueUtility,
+              qualityUtility: candidate.qualityUtility,
+              costUtility: candidate.costUtility,
+              qualityWeight: candidate.qualityWeight,
+              costWeight: candidate.costWeight,
+              rank: candidate.rank,
             })),
           }];
         } catch {
           return [];
         }
       });
-      return [preference, points];
-    }));
+      return points;
+    };
+    const presetBias = policy.qualityPresets ?? {
+      economy: -60,
+      balanced: 0,
+      quality: 60,
+    };
+    const series = Object.fromEntries(preferences.map((preference) => [
+      preference,
+      buildSeries(preference, presetBias[preference], preference === "balanced"),
+    ]));
+    const effective = buildSeries(
+      policy.routingPreference ?? "balanced",
+      policy.qualityBias ?? presetBias[policy.routingPreference ?? "balanced"],
+      false,
+    );
     return {
       defaultPreference: policy.routingPreference ?? "balanced",
-      formulaVersion: ACU_ROUTING_MODEL_VERSION,
+      formulaVersion: utilityPolicy.formulaMode === "active" ? "acu-model-utility-v2" : ACU_ROUTING_MODEL_VERSION,
+      routingUtilityVersion: utilityPolicy.routingUtilityVersion,
+      resolvedQualityBias: policy.qualityBias ?? presetBias[policy.routingPreference ?? "balanced"],
+      supplyStrategy: utilityPolicy.supplyStrategy,
+      supplyWeights: utilityPolicy.supplyWeights,
       generatedAt: new Date().toISOString(),
       inputTokens,
       expectedOutputTokens,
@@ -808,7 +936,9 @@ export class AlphaRequestProcessor {
         baseQualityTarget: 80,
         judgeCostIncluded: false,
         currentHealthApplied: true,
-        candidateDefinition: "selected_and_near_optimal_pareto_within_15pct_value",
+        candidateDefinition: utilityPolicy.formulaMode === "legacy"
+          ? "pareto_frontier"
+          : "all_eligible_additive_utility",
         difficultyDistribution: "continuous_tier_probabilities",
         difficultyDistributionVersion: "acu-curve-thresholds-v1",
       },
@@ -824,6 +954,7 @@ export class AlphaRequestProcessor {
         points: executionPresetPoints.get(preset.candidateId) ?? [],
       })),
       series,
+      effective,
     };
   }
 
@@ -1083,7 +1214,12 @@ export class AlphaRequestProcessor {
     const { profiles: runtimeProfiles, probeClaims } = await this.effectiveProfiles(
       identity.allowedProfileIds, true, demandedModelId,
     );
-    const effectiveProfiles = runtimeProfiles;
+    const routingUtilityPolicy = resolvedRoutingUtilityPolicy(identity);
+    const effectiveProfiles = await this.withProfileRuntimeMetrics(
+      runtimeProfiles,
+      contextAdmission.estimatedInputTokens,
+      routingUtilityPolicy,
+    );
     const recoveryProfiles = identity.allowedProfileIds.length > 0
       ? effectiveProfiles.filter((profile) => identity.allowedProfileIds.includes(profile.executionProfileId))
       : effectiveProfiles;
@@ -1386,6 +1522,11 @@ export class AlphaRequestProcessor {
           routeDirection: state.decision.routeDirection,
           currentProfile: originalStoredProfile,
           workPhase: state.workPhase,
+          routeMode: envelope.requestedModel === "acu-high" ? "acu-high" : "acu-auto",
+          utilityPolicy: routingUtilityPolicy,
+          systemQualityBiasFloor: state.capabilityEscalationFloor > 0
+            ? Math.max(-100, Math.min(100, state.capabilityEscalationFloor * 2 - 100))
+            : undefined,
           includeExecutionPresets: envelope.reasoningEffort === undefined || canonicalReasoningEffort(envelope.reasoningEffort) !== undefined,
         });
       } catch (error) {
@@ -1460,6 +1601,11 @@ export class AlphaRequestProcessor {
           allowedModelIds: identity.allowedModelIds,
           allowedProfileIds: identity.allowedProfileIds,
           providerCandidateEstimates: route.providerCandidateEstimates,
+          formulaMode: route.formulaMode,
+          effectiveQualityBias: route.effectiveQualityBias,
+          routingUtilityVersion: route.routingUtilityVersion,
+          v2Counterfactual: route.v2Counterfactual,
+          legacyCounterfactual: route.legacyCounterfactual,
           excludedProfiles: route.excludedProfiles,
           eligibleProfileIds: route.eligibleProfileIds,
           profileEvaluations: route.profileEvaluations,
@@ -1523,6 +1669,16 @@ export class AlphaRequestProcessor {
         phase: state.decision.phase,
         trigger: state.decision.reason,
         priorJudgeEvaluationId: stringValue(storedSegment?.judge_evaluation_id),
+          routeMode:
+            envelope.requestedModel === "acu-high" ? "acu-high" : "acu-auto",
+          utilityPolicy: routingUtilityPolicy,
+          systemQualityBiasFloor:
+            state.capabilityEscalationFloor > 0
+              ? Math.max(
+                  -100,
+                  Math.min(100, state.capabilityEscalationFloor * 2 - 100),
+                )
+              : undefined,
         currentExecutionProfileId: stringValue(storedSegment?.selected_execution_profile_id),
       },
       rawRequest: nativeContext.body,
@@ -1835,6 +1991,11 @@ export class AlphaRequestProcessor {
       routeDirection: state.decision.routeDirection,
       currentProfile: reused,
       workPhase: state.workPhase,
+      routeMode: envelope.requestedModel === "acu-high" ? "acu-high" : "acu-auto",
+      utilityPolicy: routingUtilityPolicy,
+      systemQualityBiasFloor: state.capabilityEscalationFloor > 0
+        ? Math.max(-100, Math.min(100, state.capabilityEscalationFloor * 2 - 100))
+        : undefined,
       includeExecutionPresets: envelope.reasoningEffort === undefined || canonicalReasoningEffort(envelope.reasoningEffort) !== undefined,
       });
     } catch (error) {
@@ -2010,6 +2171,11 @@ export class AlphaRequestProcessor {
         costUnit: "CNY",
         providerSelectionReason: route.providerSelectionReason,
         providerCandidateEstimates: route.providerCandidateEstimates,
+        formulaMode: route.formulaMode,
+        effectiveQualityBias: route.effectiveQualityBias,
+        routingUtilityVersion: route.routingUtilityVersion,
+        v2Counterfactual: route.v2Counterfactual,
+        legacyCounterfactual: route.legacyCounterfactual,
         reasoningEffort: state.effectiveReasoningEffort,
         clientRequestedReasoningEffort: routeReasoningDecision.clientRequestedReasoningEffort ?? null,
         presetReasoningEffort: routeReasoningDecision.presetReasoningEffort ?? null,
@@ -2335,6 +2501,10 @@ export class AlphaRequestProcessor {
     const catalogModel = getAcuModel(input.profile.modelId);
     const billingPrice = resolveProfileBillingPrice(input.profile);
     const webEligibility = resolveWebEligibility(input.profile, input.envelope);
+    const estimatedInputTokens = estimateContextAdmission(
+      input.envelope,
+      this.expectedOutputTokens,
+    ).estimatedInputTokens;
     await repository.createAttempt({
       attemptId,
       logicalRequestId: input.logicalRequestId,
@@ -2378,6 +2548,10 @@ export class AlphaRequestProcessor {
         modelId: input.profile.modelId,
         executionPresetId: input.executionPresetId,
         executionProfileId: input.profile.executionProfileId,
+        estimated_input_tokens: estimatedInputTokens,
+        context_bucket: estimatedInputTokens >= resolvedRoutingUtilityPolicy(input.identity).latency.longContextThresholdTokens
+          ? "long"
+          : "standard",
         billingPriceSource: input.profile.billingPrice?.source ?? "official_catalog_fallback",
         billingPriceObservedAt: input.profile.billingPrice?.observedAt,
       },
@@ -2993,6 +3167,11 @@ export class AlphaRequestProcessor {
                 requirements: originalRequirements,
                 routeDirection: "any",
                 workPhase: state.workPhase,
+                routeMode: envelope.requestedModel === "acu-high" ? "acu-high" : "acu-auto",
+                utilityPolicy: resolvedRoutingUtilityPolicy(identity),
+                systemQualityBiasFloor: state.capabilityEscalationFloor > 0
+                  ? Math.max(-100, Math.min(100, state.capabilityEscalationFloor * 2 - 100))
+                  : undefined,
                 includeExecutionPresets: envelope.reasoningEffort === undefined || canonicalReasoningEffort(envelope.reasoningEffort) !== undefined,
               });
               const profile = reroute.selectedProfile;

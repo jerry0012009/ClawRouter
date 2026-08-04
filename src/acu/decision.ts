@@ -11,6 +11,7 @@ import type {
 
 export const ACU_COST_LOG_SCALE = 2.5;
 export const VALUE_UTILITY_NEAR_TIE_RATIO = 0.995;
+export const ACU_MODEL_UTILITY_V2_VERSION = "acu-model-utility-v2";
 
 export type AcuDecisionInput = {
   probabilities: AcuTierProbabilities;
@@ -274,6 +275,132 @@ export function recommendModel(input: AcuDecisionInput): AcuRecommendation {
     fallbackModel: flagshipAlternative,
     estimates: estimates.sort((left, right) => left.riskAdjustedCost - right.riskAdjustedCost),
     reason: route.reason,
+  };
+}
+
+export type AcuModelUtilityV2Input = AcuDecisionInput & {
+  qualityBias: number;
+  modelCostLogScale: number;
+};
+
+export function logarithmicRelativeUtility(
+  value: number,
+  minimum: number,
+  scale: number,
+): number {
+  if (
+    !Number.isFinite(value) ||
+    value < 0 ||
+    !Number.isFinite(minimum) ||
+    minimum < 0
+  )
+    return 0;
+  if (value === minimum) return 1;
+  const stableMinimum = Math.max(minimum, 1e-12);
+  const stableValue = Math.max(value, stableMinimum);
+  return clamp(
+    1 / (1 + Math.max(0.1, scale) * Math.log(stableValue / stableMinimum)),
+  );
+}
+
+export function recommendModelV2(
+  input: AcuModelUtilityV2Input,
+): AcuRecommendation {
+  const legacyEstimate = recommendModel({
+    ...input,
+    fallbackRiskScale: 0,
+    costSensitivity: 1,
+  });
+  const estimates = legacyEstimate.estimates.map((estimate) => ({
+    ...estimate,
+    expectedFallbackCost: 0,
+    selectionCost: estimate.estimatedCallCost,
+    riskAdjustedCost: estimate.estimatedCallCost,
+    expectedEndToEndCost:
+      Math.max(0, input.judgeCost) + estimate.estimatedCallCost,
+    expectedTotalCost:
+      Math.max(0, input.judgeCost) + estimate.estimatedCallCost,
+  }));
+  const selectable = estimates.filter(
+    (estimate) =>
+      Number.isFinite(estimate.estimatedCallCost) &&
+      estimate.estimatedCallCost >= 0 &&
+      Number.isFinite(estimate.conservativeQuality),
+  );
+  if (selectable.length === 0)
+    throw new Error("No ACU V2 candidate has a finite non-negative cost");
+  const minimumCost = Math.min(
+    ...selectable.map((estimate) => estimate.estimatedCallCost),
+  );
+  const qualityBias = Math.max(-100, Math.min(100, input.qualityBias));
+  const qualityWeight = (qualityBias + 100) / 200;
+  const costWeight = 1 - qualityWeight;
+  for (const estimate of estimates) {
+    const selectableEstimate = selectable.includes(estimate);
+    estimate.qualityUtility = selectableEstimate
+      ? clamp(estimate.conservativeQuality)
+      : 0;
+    estimate.costUtility = selectableEstimate
+      ? logarithmicRelativeUtility(
+          estimate.estimatedCallCost,
+          minimumCost,
+          input.modelCostLogScale,
+        )
+      : 0;
+    estimate.qualityWeight = qualityWeight;
+    estimate.costWeight = costWeight;
+    estimate.valueUtility = selectableEstimate
+      ? qualityWeight * estimate.qualityUtility +
+        costWeight * estimate.costUtility
+      : Number.NEGATIVE_INFINITY;
+    estimate.formulaVersion = ACU_MODEL_UTILITY_V2_VERSION;
+    estimate.selected = false;
+  }
+  const ordered = [...selectable].sort((left, right) => {
+    if (qualityBias === -100) {
+      return (
+        left.estimatedCallCost - right.estimatedCallCost ||
+        right.conservativeQuality - left.conservativeQuality ||
+        left.candidateId.localeCompare(right.candidateId)
+      );
+    }
+    if (qualityBias === 100) {
+      return (
+        right.conservativeQuality - left.conservativeQuality ||
+        left.estimatedCallCost - right.estimatedCallCost ||
+        left.candidateId.localeCompare(right.candidateId)
+      );
+    }
+    return (
+      right.valueUtility - left.valueUtility ||
+      right.conservativeQuality - left.conservativeQuality ||
+      left.estimatedCallCost - right.estimatedCallCost ||
+      left.candidateId.localeCompare(right.candidateId)
+    );
+  });
+  ordered.forEach((estimate, index) => {
+    estimate.rank = index + 1;
+  });
+  const recommended = ordered[0];
+  recommended.selected = true;
+  const highestQuality = [...selectable].sort(
+    (left, right) =>
+      right.conservativeQuality - left.conservativeQuality ||
+      left.estimatedCallCost - right.estimatedCallCost ||
+      left.candidateId.localeCompare(right.candidateId),
+  )[0];
+  const reason =
+    `当前质量权重 ${(qualityWeight * 100).toFixed(0)}%，成本权重 ${(costWeight * 100).toFixed(0)}%；` +
+    `${recommended.displayName} 的保守质量效用 ${recommended.qualityUtility.toFixed(4)} 和相对成本效用 ` +
+    `${recommended.costUtility.toFixed(4)} 产生最高综合分 ${recommended.valueUtility.toFixed(4)}。`;
+  recommended.selectionReason = reason;
+  return {
+    recommended,
+    valueAlternative: ordered[1] ?? null,
+    flagshipAlternative: highestQuality,
+    fallbackModel: highestQuality,
+    estimates,
+    reason,
   };
 }
 

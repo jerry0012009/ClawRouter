@@ -386,7 +386,7 @@ describe("Phase 2A Judge transport", () => {
     const request = fetchMock.mock.calls[0][1];
     const body = JSON.parse(String(request?.body)) as Record<string, unknown>;
     expect(body).toMatchObject({
-      model: "gpt-5.6-luna",
+      model: "gpt-5.6-sol",
       max_tokens: 300,
       stream: false,
       thinking: { type: "disabled" },
@@ -400,10 +400,10 @@ describe("Phase 2A Judge transport", () => {
     expect(await readFile(legacyCachePath, "utf8")).toBe(legacyContents);
   });
 
-  it("sends Luna Max reasoning effort on Responses Judge requests", async () => {
+  it("omits reasoning controls for the default Sol Judge", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
       id: "judge-max",
-      model: "gpt-5.6-luna",
+      model: "gpt-5.6-sol",
       output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify({
         difficulty_score_raw: 20, factors: { reasoning_depth: 2, task_scope: 2, constraint_density: 2, tool_dependency: 2, verification_burden: 2, context_burden: 2 },
         p_low: 0.9, p_mid: 0.05, p_mid_high: 0.03, p_high: 0.02, confidence: 0.9, signals: [], explanation: "simple",
@@ -415,7 +415,8 @@ describe("Phase 2A Judge transport", () => {
     const client = new AcuJudgeClient(config, fetchMock);
     await client.judge([{ role: "user", content: "Reply OK" }]);
     const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body)) as Record<string, unknown>;
-    expect(body.reasoning).toEqual({ effort: "max", summary: "auto" });
+    expect(body.model).toBe("gpt-5.6-sol");
+    expect(body).not.toHaveProperty("reasoning");
   });
 
   it("serializes tool calls, tool results, structured content, and tools deterministically", () => {

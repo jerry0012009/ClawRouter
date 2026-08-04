@@ -65,10 +65,10 @@ function config() {
   });
 }
 
-it("defaults Luna Judge to 270 seconds with synchronous cross-model backup disabled", () => {
+it("defaults Sol Judge to 270 seconds with synchronous cross-model backup disabled", () => {
   const runtime = readAcuRuntimeConfig({});
   expect(runtime).toMatchObject({
-    judgeModel: "gpt-5.6-luna",
+    judgeModel: "gpt-5.6-sol",
     judgeProvider: "lucen",
     judgeBaseUrl: "https://lucen.cc/v1",
     syncBackupEnabled: false,

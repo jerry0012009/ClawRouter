@@ -184,7 +184,7 @@ export type AcuEvaluation = {
   promptVersion: string;
   judgeModel: string;
   /** The reasoning preset used by the live Judge request. */
-  judgeReasoningEffort?: "max";
+  judgeReasoningEffort?: "default" | "low" | "medium" | "high" | "max";
   judgeMode: "non-thinking";
   judge: AcuJudgeResult;
   judgeStatus: AcuJudgeStatus;

@@ -39,22 +39,22 @@ function observedJudgeFailureThreshold(profile: AlphaExecutionProfile): number {
   return Number.isFinite(value) ? value : Number.POSITIVE_INFINITY;
 }
 
-export function getEligibleLunaJudgeProfiles(input: {
+export function getEligibleJudgeProfiles(input: {
   profiles: AlphaExecutionProfile[];
+  judgeModel: string;
+  judgeReasoningEffort?: "default" | "low" | "medium" | "high" | "max";
   requiredContextTokens: number;
   preferredProfileId?: string;
   maxProfiles?: number;
   expectedOutputTokens?: number;
 }): AlphaExecutionProfile[] {
   const eligible = input.profiles.filter((profile) =>
-    profile.modelId === "gpt-5.6-luna"
-    && profile.providerModelId === "gpt-5.6-luna"
+    profile.modelId === input.judgeModel
+    && profile.providerModelId === input.judgeModel
     && profile.protocols.includes("responses")
-    // Judge Max requires the provider's standard Responses reasoning control.
-    // The Luna catalog marks Max as verified globally; profile-local legacy
-    // effort lists may lag behind that capability observation.
-    && profile.thinkingSupport === true
-    && profile.reasoningControlMode === "standard_effort"
+    && (input.judgeReasoningEffort === undefined || input.judgeReasoningEffort === "default" || (
+      profile.thinkingSupport === true && profile.reasoningControlMode === "standard_effort"
+    ))
     && profile.enabled
     && profile.administratorAllowed
     && profile.verificationStatus !== "rejected"
@@ -82,4 +82,8 @@ export function getEligibleLunaJudgeProfiles(input: {
     return left.executionProfileId.localeCompare(right.executionProfileId);
   });
   return diversifyJudgeProviders(ranked, input.maxProfiles ?? 3);
+}
+
+export function getEligibleLunaJudgeProfiles(input: Omit<Parameters<typeof getEligibleJudgeProfiles>[0], "judgeModel">): AlphaExecutionProfile[] {
+  return getEligibleJudgeProfiles({ ...input, judgeModel: "gpt-5.6-luna", judgeReasoningEffort: input.judgeReasoningEffort ?? "max" });
 }

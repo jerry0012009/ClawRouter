@@ -289,7 +289,7 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
     profileClients: new Map(profiles.map((item) => {
       const profileConfig = {
       ...judgeConfig,
-      judgeModel: "gpt-5.6-luna",
+      judgeModel: judgeConfig.judgeModel,
       judgeProvider: item.profile.provider,
       judgeBaseUrl: item.judgeBaseUrl,
       judgeProtocol: item.profile.protocols.includes("responses") ? "responses" as const : "chat_completions" as const,

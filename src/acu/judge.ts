@@ -616,7 +616,9 @@ export class AcuJudgeClient {
             model: this.config.judgeModel,
             instructions: systemPrompt,
             input: [{ role: "user", content: [{ type: "input_text", text: userPrompt }] }],
-            reasoning: { effort: this.config.judgeReasoningEffort, summary: "auto" },
+            ...(this.config.judgeReasoningEffort === "default" ? {} : {
+              reasoning: { effort: this.config.judgeReasoningEffort, summary: "auto" },
+            }),
             max_output_tokens: Math.min(300, this.config.maxOutputTokens),
             stream: false,
           } : {

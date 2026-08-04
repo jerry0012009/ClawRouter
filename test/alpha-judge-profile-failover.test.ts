@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getEligibleLunaJudgeProfiles } from "../src/alpha/judge-profile-selector.js";
+import { getEligibleJudgeProfiles, getEligibleLunaJudgeProfiles } from "../src/alpha/judge-profile-selector.js";
 import type { AlphaExecutionProfile } from "../src/alpha/routing.js";
 import { AcuJudgeClient, AcuJudgeClientCancelledError } from "../src/acu/judge.js";
 import { readAcuRuntimeConfig } from "../src/acu/config.js";
@@ -30,6 +30,19 @@ function profile(id: string, overrides: Partial<AlphaExecutionProfile> = {}): Al
 }
 
 describe("Luna Judge Profile selector", () => {
+  it("selects only the configured Sol model and permits default reasoning Profiles", () => {
+    const sol = profile("sol-default", {
+      modelId: "gpt-5.6-sol", providerModelId: "gpt-5.6-sol",
+      thinkingSupport: false, reasoningControlMode: "none",
+    });
+    expect(getEligibleJudgeProfiles({
+      profiles: [profile("luna"), sol],
+      judgeModel: "gpt-5.6-sol",
+      judgeReasoningEffort: "default",
+      requiredContextTokens: 100,
+    }).map((item) => item.executionProfileId)).toEqual(["sol-default"]);
+  });
+
   it("uses Router context defaults, recovery budgets and minimum attempt budget", () => {
     expect(computeFirstModelEventDeadlineMs({ estimatedInputTokens: 80_000, successfulLatenciesMs: [], recentErrorClasses: [] })).toBe(45_000);
     expect(computeFirstModelEventDeadlineMs({ estimatedInputTokens: 100_000, successfulLatenciesMs: [], recentErrorClasses: [] })).toBe(75_000);
@@ -199,7 +212,7 @@ describe("Luna Judge Profile selector", () => {
     const first = profile("first", { observedSuccessfulInputTokens: 100 });
     const second = profile("second", { observedSuccessfulInputTokens: 100 });
     const config = readAcuRuntimeConfig({
-      allowMock: true, apiKey: "fixture", judgeProtocol: "responses", maxProfileAttempts: 5,
+      allowMock: true, apiKey: "fixture", judgeModel: "gpt-5.6-luna", judgeProtocol: "responses", maxProfileAttempts: 5,
       cachePath: `/tmp/judge-context-failover-${randomUUID()}.json`, syncBackupEnabled: false,
     });
     const valid = {
@@ -392,7 +405,7 @@ describe("Luna Judge Profile selector", () => {
   it("writes a successful Judge attempt to shared health", async () => {
     const selected = profile("selected");
     const config = readAcuRuntimeConfig({
-      allowMock: true, apiKey: "fixture", judgeProtocol: "responses",
+      allowMock: true, apiKey: "fixture", judgeModel: "gpt-5.6-luna", judgeProtocol: "responses",
       cachePath: `/tmp/judge-success-${randomUUID()}.json`, syncBackupEnabled: false,
     });
     const valid = {

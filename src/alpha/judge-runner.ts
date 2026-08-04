@@ -7,7 +7,7 @@ import type { RoutingDecision } from "../router/types.js";
 import type { WebIntentDecision } from "./protocol/types.js";
 import type { TriggerReason } from "./state-machine.js";
 import { classifyWebIntentFallback, type WebIntentFallbackInput, withWebIntentSource } from "./web-intent.js";
-import { getEligibleLunaJudgeProfiles } from "./judge-profile-selector.js";
+import { getEligibleJudgeProfiles } from "./judge-profile-selector.js";
 import type { AlphaExecutionProfile } from "./routing.js";
 import { cashCnyPerNominalUsd } from "./provider-economics.js";
 import type { AttemptOutcome } from "./channel-health.js";
@@ -314,7 +314,7 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
         const availableProfiles = options.loadProfiles ? await options.loadProfiles() : options.profiles;
         if (input.signal?.aborted) throw new AcuJudgeClientCancelledError();
         const profiles = availableProfiles?.length
-          ? getEligibleLunaJudgeProfiles({ profiles: availableProfiles, requiredContextTokens, preferredProfileId: options.config.primaryProfileId, maxProfiles: options.config.sameModelFailoverEnabled ? options.config.maxProfileAttempts : 1 })
+          ? getEligibleJudgeProfiles({ profiles: availableProfiles, judgeModel: options.config.judgeModel, judgeReasoningEffort: options.config.judgeReasoningEffort, requiredContextTokens, preferredProfileId: options.config.primaryProfileId, maxProfiles: options.config.sameModelFailoverEnabled ? options.config.maxProfileAttempts : 1 })
           : [];
         const candidates: Array<{ profile?: AlphaExecutionProfile; client: AcuJudgeClient }> = profiles.length
           ? profiles.map((profile) => ({ profile, client: profileClients.get(profile.executionProfileId)! })).filter((candidate) => candidate.client)

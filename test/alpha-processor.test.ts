@@ -764,6 +764,19 @@ run("Alpha PostgreSQL request processor", () => {
       payloads: "6",
       usage: "1",
     });
+    const timing = await database.query<{
+      first_model_event_latency_ms: string | null;
+      latency_ms: number | null;
+      total_latency_ms: string | null;
+    }>(
+      `SELECT a.metadata_json->>'first_model_event_latency_ms' first_model_event_latency_ms,
+       a.latency_ms,a.metadata_json->>'total_latency_ms' total_latency_ms
+       FROM acu_attempts a JOIN acu_logical_requests r USING (logical_request_id)
+       WHERE r.newapi_user_id='user-auto'`,
+    );
+    expect(Number(timing.rows[0]?.first_model_event_latency_ms)).toBeGreaterThanOrEqual(0);
+    expect(timing.rows[0]?.latency_ms).toBeGreaterThanOrEqual(0);
+    expect(Number(timing.rows[0]?.total_latency_ms)).toBe(timing.rows[0]?.latency_ms);
     const routeEvidence = await database.query<{
       configured_profiles: string;
       protocol_profiles: string;

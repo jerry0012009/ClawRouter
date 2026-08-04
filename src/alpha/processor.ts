@@ -3948,6 +3948,10 @@ export class AlphaRequestProcessor {
     const providerRequestId = relay.responseHeaders["x-request-id"]
       ?? relay.responseHeaders["request-id"]
       ?? relay.responseHeaders["x-oneapi-request-id"];
+    const attemptStartedAtMs = context.attemptStartedAt ? Date.parse(context.attemptStartedAt) : Number.NaN;
+    const totalLatencyMs = Number.isFinite(attemptStartedAtMs)
+      ? Math.max(0, Date.now() - attemptStartedAtMs)
+      : undefined;
     if (!recoveryAlreadyFinalized) await repository.completeAttempt({
       attemptId: context.attemptId,
       status,
@@ -3962,6 +3966,7 @@ export class AlphaRequestProcessor {
       usageSource: usage.usageSource,
       actualCostUsd: billing.actualCostUsd,
       providerBilled: billing.providerBilled,
+      latencyMs: totalLatencyMs,
       visibleOutputBytes: relay.modelVisibleOutputBytes,
       metadata: {
         complete: relay.complete,
@@ -4020,6 +4025,7 @@ export class AlphaRequestProcessor {
         usageTrusted: usage.usageSource === "provider_usage",
         errorMessage: generationFailed ? relay.body.toString("utf8").slice(0, 512) : outcome.deliveryStatus,
         firstTokenLatencyMs: relay.firstModelEventLatencyMs,
+        totalLatencyMs,
       });
     }
     if (!recoveryAlreadyFinalized && !generationIncomplete && !generationFailed

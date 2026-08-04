@@ -91,6 +91,12 @@ export function deriveProbeValidation(input: {
   };
 }
 
+export function adaptiveProbePayload(protocol: string, providerModel: string): Json {
+  return protocol === "messages"
+    ? { model: providerModel, max_tokens: 4, stream: true, messages: [{ role: "user", content: "只输出 OK" }] }
+    : { model: providerModel, input: "只输出 OK", max_output_tokens: 16, stream: true };
+}
+
 export type AdaptiveProbeWorkerOptions = {
   database: AlphaDatabase;
   profiles: AlphaExecutionProfile[];
@@ -345,9 +351,7 @@ export class AdaptiveProbeWorker {
   ): Promise<{ success: boolean; costCny: number; failureScope: HealthScope }> {
     const protocol = profile.protocols.includes("responses") ? "responses" : profile.protocols[0];
     const providerModel = profile.providerModelId ?? profile.modelId;
-    const payload = protocol === "messages"
-      ? { model: providerModel, max_tokens: 4, stream: true, messages: [{ role: "user", content: "只输出 OK" }] }
-      : { model: providerModel, input: "只输出 OK", max_output_tokens: 16, stream: true };
+    const payload = adaptiveProbePayload(protocol, providerModel);
     const body = Buffer.from(JSON.stringify(payload));
     const startedAt = new Date();
     const probeAttemptId = `probe_${alphaId("att").slice(4)}`;

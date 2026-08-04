@@ -17,10 +17,11 @@ import { UsageOutboxWorker } from "./usage-outbox.js";
 import { canonicalAdvertisedContextWindow } from "./context-admission.js";
 import { ACU_ROUTING_MODEL_VERSION } from "../acu/config.js";
 import { getAcuModel } from "../acu/catalog.js";
-import { combinedMonitorState, mergeSupplyInventory, monitorRangeSpec, monitorRoutingStatus, type MonitorRange } from "./channel-monitor.js";
+import { combinedMonitorState, mergeSupplyInventory, monitorRangeSpec, monitorReasoningMetadata, monitorRoutingStatus, type MonitorRange } from "./channel-monitor.js";
 import { AdaptiveProbeWorker } from "./adaptive-probe.js";
 import { deriveRuntimeEligibility } from "./channel-health.js";
 import { recordSharedRuntimeHealthOutcome } from "./runtime-health-outcome.js";
+import { resolveProfileAttemptDeadlineMs } from "./execution-timing.js";
 import {
   DEFAULT_BILLING_POLICY_VERSION,
   parseRetailMarkupMultiplier,
@@ -337,6 +338,12 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
         },
       });
     },
+    profileAttemptDeadlineMs: (profile, estimatedInputTokens) => resolveProfileAttemptDeadlineMs({
+      database,
+      repository: runtimeRepository,
+      profile,
+      estimatedInputTokens,
+    }),
   });
   const processor = new AlphaRequestProcessor({
     database,
@@ -493,6 +500,7 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
           return {
             executionProfileId: profile.executionProfileId,
             canonicalModel: profile.modelId,
+            ...monitorReasoningMetadata(profile),
             protocol: profile.protocols,
             provider: profile.provider,
             channel: profile.channelId ?? profile.channel,
@@ -661,7 +669,7 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
     },
     adminSelectionCorridor: {
       token: serviceConfig.adminTraceToken,
-      load: (inputTokens, expectedOutputTokens) => processor.selectionCorridor(inputTokens, expectedOutputTokens),
+      load: (inputTokens, expectedOutputTokens, policy) => processor.selectionCorridor(inputTokens, expectedOutputTokens, policy),
     },
     models: profiles.map((item) => item.profile.modelId),
     maxRequestBytes: serviceConfig.maxRequestBytes,

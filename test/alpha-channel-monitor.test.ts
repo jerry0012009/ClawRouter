@@ -3,6 +3,7 @@ import {
   combinedMonitorState,
   mergeSupplyInventory,
   monitorRangeSpec,
+  monitorReasoningMetadata,
   monitorRoutingStatus,
 } from "../src/alpha/channel-monitor.js";
 import type { ConfiguredExecutionProfile } from "../src/alpha/server.js";
@@ -27,6 +28,20 @@ function profile(overrides: Partial<ConfiguredExecutionProfile> = {}): Configure
 }
 
 describe("Supply observability semantics", () => {
+  it("publishes configured reasoning capability metadata", () => {
+    expect(monitorReasoningMetadata(profile({
+      supportedReasoningEfforts: ["xhigh", "high", "high"],
+      reasoningControlMode: "standard_effort",
+    }))).toEqual({
+      supportedReasoningEfforts: ["high", "xhigh"],
+      reasoningControlMode: "standard_effort",
+    });
+    expect(monitorReasoningMetadata(profile())).toEqual({
+      supportedReasoningEfforts: [],
+      reasoningControlMode: "none",
+    });
+  });
+
   it("merges discovery, preflight rejection, and active Profiles", () => {
     const profiles = [
       profile(),

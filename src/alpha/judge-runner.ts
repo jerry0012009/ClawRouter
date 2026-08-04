@@ -1,4 +1,4 @@
-import { AcuJudgeAttemptError, AcuJudgeClient, AcuJudgeClientCancelledError, AcuJudgeContextLengthError, estimateJudgeContextTokens, judgeNominalCostUsd, type JudgeRequestResult, type RawNativeJudgeContext } from "../acu/judge.js";
+import { AcuJudgeAttemptError, AcuJudgeClient, AcuJudgeClientCancelledError, AcuJudgeContextLengthError, estimateJudgeContextTokens, estimateVisibleTokens, judgeNominalCostUsd, type JudgeRequestResult, type RawNativeJudgeContext } from "../acu/judge.js";
 import { normalizedEntropy } from "../acu/math.js";
 import { rulesFallbackJudge } from "../acu/strategy.js";
 import type { AcuRuntimeConfig } from "../acu/config.js";
@@ -12,21 +12,16 @@ import type { AlphaExecutionProfile } from "./routing.js";
 import { cashCnyPerNominalUsd } from "./provider-economics.js";
 import type { AttemptOutcome } from "./channel-health.js";
 import type { RuntimeHealthOutcomeResult } from "./runtime-health-outcome.js";
+import { computeFirstModelEventDeadlineMs, hasRecoveryAttemptBudget, recoveryBudgetMs } from "./execution-timing.js";
 
 const MIMO_JUDGE_BLENDED_COST_FACTOR = 0.5;
 const MIMO_JUDGE_COST_SOURCE = "midpoint_openrouter_payg_and_mimo99_plan_v1";
-const MIN_FAILOVER_ATTEMPT_WINDOW_MS = 8_000;
-
 export function judgeProfileAttemptDeadline(input: {
   now: number;
-  globalDeadlineAt?: number;
-  profilesRemaining: number;
-}): number | undefined {
-  if (input.globalDeadlineAt === undefined) return undefined;
-  const remainingMs = Math.max(0, input.globalDeadlineAt - input.now);
-  const reserveMs = input.profilesRemaining > 0 && remainingMs >= MIN_FAILOVER_ATTEMPT_WINDOW_MS * 2
-    ? MIN_FAILOVER_ATTEMPT_WINDOW_MS : 0;
-  return input.globalDeadlineAt - reserveMs;
+  poolDeadlineAt: number;
+  profileDeadlineMs: number;
+}): number {
+  return input.now + Math.min(input.profileDeadlineMs, Math.max(0, input.poolDeadlineAt - input.now));
 }
 
 export type AlphaJudgeRun = {
@@ -145,6 +140,7 @@ export type AcuJudgeRunnerOptions = {
     profile: AlphaExecutionProfile,
     evidence: { successInputTokens?: number; judgeFailureThresholdTokens?: number },
   ) => Promise<void>;
+  profileAttemptDeadlineMs?: (profile: AlphaExecutionProfile, estimatedInputTokens: number) => Promise<number>;
 };
 
 function canReuseRecent(trigger: TriggerReason): boolean {
@@ -312,7 +308,11 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
         : 0;
       const deadlineAt = options.config.timeoutMs > 0 ? Date.now() + options.config.timeoutMs : undefined;
       try {
+        if (input.signal?.aborted) throw new AcuJudgeClientCancelledError();
+        const estimatedInputTokens = estimateVisibleTokens(input.rawNative.rawRequest);
+        const poolDeadlineAt = Date.now() + recoveryBudgetMs(estimatedInputTokens);
         const availableProfiles = options.loadProfiles ? await options.loadProfiles() : options.profiles;
+        if (input.signal?.aborted) throw new AcuJudgeClientCancelledError();
         const profiles = availableProfiles?.length
           ? getEligibleLunaJudgeProfiles({ profiles: availableProfiles, requiredContextTokens, preferredProfileId: options.config.primaryProfileId, maxProfiles: options.config.sameModelFailoverEnabled ? options.config.maxProfileAttempts : 1 })
           : [];
@@ -321,15 +321,21 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
           : [{ profile: undefined, client }];
         let lastError: unknown;
         for (let index = 0; index < candidates.length; index += 1) {
-          if (deadlineAt && Date.now() >= deadlineAt) break;
+          if (input.signal?.aborted) throw new AcuJudgeClientCancelledError();
+          if (!hasRecoveryAttemptBudget(poolDeadlineAt, Date.now())) break;
           const candidate = candidates[index];
           const candidateClient = candidate.profile ? profileClients.get(candidate.profile.executionProfileId) : candidate.client;
           if (!candidateClient) continue;
           try {
+            const profileDeadlineMs = candidate.profile && options.profileAttemptDeadlineMs
+              ? await options.profileAttemptDeadlineMs(candidate.profile, estimatedInputTokens)
+              : computeFirstModelEventDeadlineMs({ estimatedInputTokens, successfulLatenciesMs: [], recentErrorClasses: [], profileState: candidate.profile?.health });
+            if (input.signal?.aborted) throw new AcuJudgeClientCancelledError();
+            if (!hasRecoveryAttemptBudget(poolDeadlineAt, Date.now())) break;
             const attemptDeadlineAt = judgeProfileAttemptDeadline({
               now: Date.now(),
-              globalDeadlineAt: deadlineAt,
-              profilesRemaining: candidates.length - index - 1,
+              poolDeadlineAt,
+              profileDeadlineMs,
             });
             const result = await candidateClient.judge(input.messages, [], false, input.rawNative, input.signal, attemptDeadlineAt);
             if (result.status === "live") {

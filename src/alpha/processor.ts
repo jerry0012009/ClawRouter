@@ -26,11 +26,11 @@ import { parseProviderUsage, resolveProviderBilling } from "./usage.js";
 import { ACU_CURVE_DIFFICULTIES, buildModelCurve, getAcuModel } from "../acu/catalog.js";
 import { ACU_ROUTING_MODEL_VERSION } from "../acu/config.js";
 import { enabledExecutionPresets } from "../acu/execution-presets.js";
+import { continuousTierProbabilities } from "../acu/math.js";
 import { AcuJudgeClientCancelledError, AcuJudgeContextLengthError } from "../acu/judge.js";
 import { cashCnyPerNominalUsd, providerCostBreakdown, type ProviderEconomics } from "./provider-economics.js";
 import {
   classifyProviderContextOverflow,
-  computeFirstModelEventDeadlineMs,
   contextOverflowRecoveryEligible,
   createRecoveringProviderAdapter,
   ProviderPreOutputError,
@@ -39,6 +39,7 @@ import {
   type ProviderAttemptHandle,
   type ProviderRecoveryTarget,
 } from "./execution.js";
+import { MINIMUM_RECOVERY_ATTEMPT_BUDGET_MS, recoveryBudgetMs, resolveProfileAttemptDeadlineMs } from "./execution-timing.js";
 import { classifyAttemptOutcome, deriveRuntimeEligibility, type AttemptOutcome, type HealthSnapshot } from "./channel-health.js";
 import { recordSharedRuntimeHealthOutcome } from "./runtime-health-outcome.js";
 import { estimateContextAdmission, effectiveContextCeiling } from "./context-admission.js";
@@ -79,6 +80,38 @@ export function codexSelectionCorridorRequirements(
     webIntent: "not_required" as const,
   };
 }
+
+const SELECTION_CORRIDOR_ZERO_FACTORS = {
+  reasoningDepth: 0,
+  taskScope: 0,
+  constraintDensity: 0,
+  toolDependency: 0,
+  verificationBurden: 0,
+  contextBurden: 0,
+};
+
+export function selectionCorridorJudge(difficulty: number): AcuJudgeResult {
+  const boundedDifficulty = Number.isFinite(difficulty)
+    ? Math.min(100, Math.max(0, difficulty))
+    : 0;
+  return {
+    ...continuousTierProbabilities(boundedDifficulty / 100),
+    difficultyScoreRaw: boundedDifficulty,
+    factors: { ...SELECTION_CORRIDOR_ZERO_FACTORS },
+    factorComposite: boundedDifficulty,
+    difficultyIndex: boundedDifficulty,
+    difficultyMethodVersion: "acu-difficulty-index-v1",
+    difficultyScore: boundedDifficulty,
+    signals: [],
+    explanation: "",
+  };
+}
+
+export type SelectionCorridorPolicy = {
+  allowedModelIds?: string[];
+  allowedProfileIds?: string[];
+  routingPreference?: "economy" | "balanced" | "quality";
+};
 
 type JsonObject = Record<string, unknown>;
 
@@ -281,6 +314,15 @@ function optionalNumber(value: unknown): number | undefined {
   return value === null || value === undefined || !Number.isFinite(valueAsNumber) ? undefined : valueAsNumber;
 }
 
+export function resolveRouteDifficulty(
+  judge: AlphaJudgeRun | undefined,
+  formulaInputs: JsonObject | undefined,
+): number | undefined {
+  return optionalNumber(judge?.judge.difficultyIndex)
+    ?? optionalNumber(record(formulaInputs?.decisionSnapshot)?.difficultyIndex)
+    ?? optionalNumber(record(formulaInputs?.judge)?.difficultyIndex);
+}
+
 function webIntentFromMetadata(value: JsonObject): WebIntentDecision | undefined {
   if (!isWebIntent(value.webIntent) || !isWebIntentSource(value.webIntentSource)) return undefined;
   const confidence = Number(value.webIntentConfidence);
@@ -320,7 +362,7 @@ function canonicalActualModel(profile: AlphaExecutionProfile, actualModel: strin
   return accepted.has(actualModel) ? profile.modelId : actualModel;
 }
 
-function routeDisplaySummary(
+export function routeDisplaySummary(
   requestedModel: string,
   selectedModel: string,
   routingPreference: string,
@@ -341,12 +383,11 @@ function routeDisplaySummary(
     const selected = candidates.find((candidate) => (
       selectedCandidateId ? candidate.candidateId === selectedCandidateId : candidate.modelId === selectedModel
     ));
-    const storedJudge = record(formulaInputs?.judge);
-    const difficulty = Number(storedJudge?.difficultyIndex);
+    const difficulty = resolveRouteDifficulty(judge, formulaInputs);
     return {
       mode: stringValue(storedRoute.mode) ?? requestedModel,
       routingPreference: stringValue(formulaInputs?.routingPreference) ?? routingPreference,
-      difficulty: Number.isFinite(difficulty) ? difficulty : undefined,
+      difficulty,
       candidateCount: candidates.length,
       selectedModel,
       selectedCandidateId: stringValue(selected?.candidateId),
@@ -383,7 +424,7 @@ function routeDisplaySummary(
   return {
     mode: requestedModel,
     routingPreference: route.preference,
-    difficulty: judge?.judge.difficultyIndex,
+    difficulty: resolveRouteDifficulty(judge, record(storedRoute?.formula_inputs_json)),
     candidateCount: route.candidateEstimates.length,
     selectedModel,
     selectedCandidateId: route.recommendation.recommended.candidateId,
@@ -646,14 +687,19 @@ export class AlphaRequestProcessor {
     return { profiles, probeClaims: [] };
   }
 
-  selectionCorridor(inputTokens: number, expectedOutputTokens: number): Promise<Record<string, unknown>> {
-    const key = `${inputTokens}:${expectedOutputTokens}`;
+  selectionCorridor(inputTokens: number, expectedOutputTokens: number, policy?: SelectionCorridorPolicy): Promise<Record<string, unknown>> {
+    const normalizedPolicy = {
+      allowedModelIds: [...new Set(policy?.allowedModelIds ?? [])].sort(),
+      allowedProfileIds: [...new Set(policy?.allowedProfileIds ?? [])].sort(),
+      routingPreference: policy?.routingPreference ?? "balanced",
+    };
+    const key = `${inputTokens}:${expectedOutputTokens}:${JSON.stringify(normalizedPolicy)}`;
     const now = Date.now();
     const cached = this.selectionCorridorCache.get(key);
     if (cached && cached.expiresAt > now) return cached.result;
     if (cached) this.selectionCorridorCache.delete(key);
 
-    const result = this.calculateSelectionCorridor(inputTokens, expectedOutputTokens);
+    const result = this.calculateSelectionCorridor(inputTokens, expectedOutputTokens, normalizedPolicy);
     this.selectionCorridorCache.set(key, { expiresAt: now + 60_000, result });
     void result.catch(() => {
       if (this.selectionCorridorCache.get(key)?.result === result) {
@@ -668,8 +714,15 @@ export class AlphaRequestProcessor {
     return result;
   }
 
-  private async calculateSelectionCorridor(inputTokens: number, expectedOutputTokens: number): Promise<Record<string, unknown>> {
-    const { profiles } = await this.effectiveProfiles([], false);
+  private async calculateSelectionCorridor(inputTokens: number, expectedOutputTokens: number, policy: SelectionCorridorPolicy = {}): Promise<Record<string, unknown>> {
+    const { profiles: allProfiles } = await this.effectiveProfiles([], false);
+    const allowedModels = new Set(policy.allowedModelIds ?? []);
+    const allowedProfiles = new Set(policy.allowedProfileIds ?? []);
+    const profiles = allProfiles.filter((profile) =>
+      (allowedModels.size === 0 || allowedModels.has(profile.modelId))
+      && (allowedProfiles.size === 0 || allowedProfiles.has(profile.executionProfileId))
+    );
+    if (profiles.length === 0) throw new Error("No execution profile satisfies the routing policy");
     const preferences = ["economy", "balanced", "quality"] as const;
     const executionPresets = enabledExecutionPresets();
     const corridorDifficulties = ACU_CURVE_DIFFICULTIES;
@@ -678,33 +731,11 @@ export class AlphaRequestProcessor {
       estimatedQuality: number;
       estimatedCallCost: number;
     }>]));
-    const factors = {
-      reasoningDepth: 0,
-      taskScope: 0,
-      constraintDensity: 0,
-      toolDependency: 0,
-      verificationBurden: 0,
-      contextBurden: 0,
-    };
     const series = Object.fromEntries(preferences.map((preference) => {
       const points = corridorDifficulties.flatMap((difficulty) => {
         try {
           const route = routeWithCurrentAcuFormula({
-            judge: {
-              pLow: 0.25,
-              pMid: 0.25,
-              pMidHigh: 0.25,
-              pHigh: 0.25,
-              confidence: 1,
-              difficultyScoreRaw: difficulty,
-              factors,
-              factorComposite: difficulty,
-              difficultyIndex: difficulty,
-              difficultyMethodVersion: "acu-difficulty-index-v1",
-              difficultyScore: difficulty,
-              signals: [],
-              explanation: "",
-            },
+            judge: selectionCorridorJudge(difficulty),
             judgeCost: 0,
             inputTokens,
             expectedOutputTokens,
@@ -762,6 +793,7 @@ export class AlphaRequestProcessor {
       return [preference, points];
     }));
     return {
+      defaultPreference: policy.routingPreference ?? "balanced",
       formulaVersion: ACU_ROUTING_MODEL_VERSION,
       generatedAt: new Date().toISOString(),
       inputTokens,
@@ -777,6 +809,8 @@ export class AlphaRequestProcessor {
         judgeCostIncluded: false,
         currentHealthApplied: true,
         candidateDefinition: "selected_and_near_optimal_pareto_within_15pct_value",
+        difficultyDistribution: "continuous_tier_probabilities",
+        difficultyDistributionVersion: "acu-curve-thresholds-v1",
       },
       executionPresetSeries: executionPresets.map((preset) => ({
         candidateId: preset.candidateId,
@@ -2791,31 +2825,12 @@ export class AlphaRequestProcessor {
       const key = `${profile.executionProfileId}:${longContext ? "long" : "standard"}`;
       const cached = attemptDeadlineCache.get(key);
       if (cached) return cached;
-      const value = Promise.all([
-        this.options.database.query<{ latency_ms: number }>(
-          `SELECT (metadata_json->>'first_model_event_latency_ms')::double precision AS latency_ms
-           FROM acu_attempts
-           WHERE attempt_kind='provider' AND status='success' AND execution_profile_id=$1
-             AND metadata_json ? 'first_model_event_latency_ms'
-             AND CASE WHEN $2::boolean THEN input_tokens>=100000 ELSE input_tokens<100000 END
-             AND completed_at >= now()-interval '24 hours'
-           ORDER BY completed_at DESC LIMIT 50`,
-          [profile.executionProfileId, longContext],
-        ),
-        this.options.database.query<{ error_class: string }>(
-          `SELECT COALESCE(metadata_json->>'errorClass',error_category,'') AS error_class
-           FROM acu_attempts WHERE attempt_kind='provider' AND execution_profile_id=$1
-             AND completed_at >= now()-interval '24 hours'
-           ORDER BY completed_at DESC LIMIT 5`,
-          [profile.executionProfileId],
-        ),
-        repository.profileHealth(profile.executionProfileId),
-      ]).then(([latencies, outcomes, runtime]) => computeFirstModelEventDeadlineMs({
+      const value = resolveProfileAttemptDeadlineMs({
+        database: this.options.database,
+        repository,
+        profile,
         estimatedInputTokens: recoveryContextAdmission.estimatedInputTokens,
-        successfulLatenciesMs: latencies.rows.map((row) => Number(row.latency_ms)),
-        recentErrorClasses: outcomes.rows.map((row) => row.error_class),
-        profileState: runtime?.state ?? profile.health,
-      }));
+      });
       attemptDeadlineCache.set(key, value);
       return value;
     };
@@ -2877,8 +2892,8 @@ export class AlphaRequestProcessor {
     const adapter = createRecoveringProviderAdapter({
       initial: initialAttempt,
       maxAttempts: maxProviderAttempts,
-      recoveryBudgetMs: longContext ? 270_000 : 180_000,
-      minimumAttemptBudgetMs: 15_000,
+      recoveryBudgetMs: recoveryBudgetMs(recoveryContextAdmission.estimatedInputTokens),
+      minimumAttemptBudgetMs: MINIMUM_RECOVERY_ATTEMPT_BUDGET_MS,
       isRecoverableResponse: (response) => isWebSearchProviderError(response, envelope),
       isRecoverableFailure: (failure, current) => {
         if (mode !== "explicit" && isReasoningTransportError(failure)) {

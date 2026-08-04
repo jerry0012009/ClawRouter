@@ -5,6 +5,7 @@ import {
   FULL_POOL_BUDGET_FRACTION,
   activeRecoveryRequired,
   adaptiveProbeIntervalMinutes,
+  adaptiveProbePayload,
   fullPoolProbeDue,
   fullPoolBudgetLimit,
   recoveredAfterLastFailure,
@@ -69,5 +70,23 @@ describe("adaptive Probe scheduling", () => {
     expect(server).toContain('ACU_PROBE_DAILY_BUDGET_CNY ?? "1.00"');
     expect(compose).toContain("ACU_PROBE_DAILY_BUDGET_CNY:-1.00");
     expect(envExample).toContain("ACU_PROBE_DAILY_BUDGET_CNY=1.00");
+  });
+});
+
+describe("adaptive probe payload", () => {
+  it("uses the Responses minimum output allowance accepted by CloseAI", () => {
+    expect(adaptiveProbePayload("responses", "gpt-5.6-luna")).toMatchObject({
+      model: "gpt-5.6-luna",
+      max_output_tokens: 16,
+      stream: true,
+    });
+  });
+
+  it("preserves the Messages probe payload", () => {
+    expect(adaptiveProbePayload("messages", "gpt-5.6-luna")).toMatchObject({
+      model: "gpt-5.6-luna",
+      max_tokens: 4,
+      stream: true,
+    });
   });
 });

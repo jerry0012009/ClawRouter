@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { AlphaRequestProcessor, codexSelectionCorridorRequirements } from "../src/alpha/processor.js";
+import { AlphaRequestProcessor, codexSelectionCorridorRequirements, selectionCorridorJudge } from "../src/alpha/processor.js";
 import { ACU_CURVE_DIFFICULTIES, getAcuModel, interpolateModelCurve } from "../src/acu/catalog.js";
-import { applyLogitShift } from "../src/acu/math.js";
+import { applyLogitShift, continuousTierProbabilities } from "../src/acu/math.js";
 import type { AlphaExecutionProfile } from "../src/alpha/routing.js";
 
 const lunaProfile: AlphaExecutionProfile = {
@@ -21,6 +21,29 @@ const lunaProfile: AlphaExecutionProfile = {
 };
 
 describe("selection corridor cache", () => {
+  it("derives corridor tier probabilities from the continuous difficulty distribution", () => {
+    for (const difficulty of ACU_CURVE_DIFFICULTIES) {
+      const result = selectionCorridorJudge(difficulty);
+      const expected = continuousTierProbabilities(difficulty / 100);
+      expect(result.pLow).toBe(expected.pLow);
+      expect(result.pMid).toBe(expected.pMid);
+      expect(result.pMidHigh).toBe(expected.pMidHigh);
+      expect(result.pHigh).toBe(expected.pHigh);
+      expect([result.pLow, result.pMid, result.pMidHigh, result.pHigh]
+        .every((probability) => Number.isFinite(probability) && probability >= 0 && probability <= 1)).toBe(true);
+      expect(result.pLow + result.pMid + result.pMidHigh + result.pHigh).toBeCloseTo(1, 12);
+      expect(result.difficultyIndex).toBe(difficulty);
+      expect(result.difficultyScore).toBe(difficulty);
+    }
+    expect(selectionCorridorJudge(0).pLow).toBeGreaterThan(selectionCorridorJudge(0).pHigh);
+    expect(selectionCorridorJudge(50).pMid + selectionCorridorJudge(50).pMidHigh).toBeGreaterThan(
+      selectionCorridorJudge(50).pLow + selectionCorridorJudge(50).pHigh,
+    );
+    expect(selectionCorridorJudge(100).pHigh).toBeGreaterThan(selectionCorridorJudge(100).pLow);
+    expect(selectionCorridorJudge(0).pLow).toBeGreaterThan(selectionCorridorJudge(100).pLow);
+    expect(selectionCorridorJudge(0).pHigh).toBeLessThan(selectionCorridorJudge(100).pHigh);
+  });
+
   it("uses ordinary Codex Agent tool requirements", () => {
     expect(codexSelectionCorridorRequirements(10_000, 1_000)).toEqual({
       protocol: "responses",
@@ -150,5 +173,17 @@ describe("selection corridor cache", () => {
     expect(result.executionPresetSeries.find((series) => series.candidateId === "gpt-5.6-terra@max")).toMatchObject({
       estimatedOutputTokens: 38_400, reasoningEffort: "max", expectedOutputTokenMultiplier: 9.6,
     });
+  });
+
+  it("recomputes the corridor from the supplied policy and cache key", async () => {
+    const processor = new AlphaRequestProcessor({} as never);
+    const internal = processor as unknown as {
+      effectiveProfiles: () => Promise<{ profiles: AlphaExecutionProfile[]; probeClaims: [] }>;
+      calculateSelectionCorridor: (inputTokens: number, outputTokens: number, policy?: { allowedModelIds?: string[]; allowedProfileIds?: string[]; routingPreference?: "economy" | "balanced" | "quality" }) => Promise<Record<string, unknown>>;
+    };
+    internal.effectiveProfiles = async () => ({ profiles: [lunaProfile, { ...lunaProfile, executionProfileId: "verified:gpt-5.6-sol:responses", modelId: "gpt-5.6-sol" }], probeClaims: [] });
+    const result = await internal.calculateSelectionCorridor(100_000, 4_000, { allowedModelIds: ["gpt-5.6-sol"], routingPreference: "economy" }) as { series: Record<string, Array<{ candidates: Array<{ modelId: string }> }>>; defaultPreference: string };
+    expect(result.defaultPreference).toBe("economy");
+    expect(result.series.economy?.flatMap((point) => point.candidates).every((candidate) => candidate.modelId === "gpt-5.6-sol")).toBe(true);
   });
 });

@@ -96,7 +96,18 @@ export async function sendUsageFinalize(
         "x-acu-signature": signed.signature,
       },
     });
-    if (!response.ok) throw new Error(`New API Usage Finalize returned HTTP ${response.status}`);
+    if (!response.ok) {
+      const responseBody = (await response.text()).trim().slice(0, 500);
+      let responseDetail = responseBody;
+      try {
+        const parsed = JSON.parse(responseBody) as { error?: unknown };
+        if (typeof parsed.error === "string") responseDetail = parsed.error.trim().slice(0, 500);
+      } catch {
+        // Keep non-JSON response bodies as bounded plain text.
+      }
+      const detail = responseDetail ? `: ${responseDetail}` : "";
+      throw new Error(`New API Usage Finalize returned HTTP ${response.status}${detail}`);
+    }
     const payload = await response.json() as { status?: unknown };
     if (payload.status !== "acknowledged") throw new Error("New API Usage Finalize acknowledgment is invalid");
   } finally {

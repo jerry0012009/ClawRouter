@@ -80,6 +80,12 @@ export function codexSelectionCorridorRequirements(
   };
 }
 
+export type SelectionCorridorPolicy = {
+  allowedModelIds?: string[];
+  allowedProfileIds?: string[];
+  routingPreference?: "economy" | "balanced" | "quality";
+};
+
 type JsonObject = Record<string, unknown>;
 
 export function contextModelRerouteReason(previousModelId: string, nextModelId: string): string {
@@ -639,14 +645,19 @@ export class AlphaRequestProcessor {
     return { profiles, probeClaims: [] };
   }
 
-  selectionCorridor(inputTokens: number, expectedOutputTokens: number): Promise<Record<string, unknown>> {
-    const key = `${inputTokens}:${expectedOutputTokens}`;
+  selectionCorridor(inputTokens: number, expectedOutputTokens: number, policy?: SelectionCorridorPolicy): Promise<Record<string, unknown>> {
+    const normalizedPolicy = {
+      allowedModelIds: [...new Set(policy?.allowedModelIds ?? [])].sort(),
+      allowedProfileIds: [...new Set(policy?.allowedProfileIds ?? [])].sort(),
+      routingPreference: policy?.routingPreference ?? "balanced",
+    };
+    const key = `${inputTokens}:${expectedOutputTokens}:${JSON.stringify(normalizedPolicy)}`;
     const now = Date.now();
     const cached = this.selectionCorridorCache.get(key);
     if (cached && cached.expiresAt > now) return cached.result;
     if (cached) this.selectionCorridorCache.delete(key);
 
-    const result = this.calculateSelectionCorridor(inputTokens, expectedOutputTokens);
+    const result = this.calculateSelectionCorridor(inputTokens, expectedOutputTokens, normalizedPolicy);
     this.selectionCorridorCache.set(key, { expiresAt: now + 60_000, result });
     void result.catch(() => {
       if (this.selectionCorridorCache.get(key)?.result === result) {
@@ -661,8 +672,15 @@ export class AlphaRequestProcessor {
     return result;
   }
 
-  private async calculateSelectionCorridor(inputTokens: number, expectedOutputTokens: number): Promise<Record<string, unknown>> {
-    const { profiles } = await this.effectiveProfiles([], false);
+  private async calculateSelectionCorridor(inputTokens: number, expectedOutputTokens: number, policy: SelectionCorridorPolicy = {}): Promise<Record<string, unknown>> {
+    const { profiles: allProfiles } = await this.effectiveProfiles([], false);
+    const allowedModels = new Set(policy.allowedModelIds ?? []);
+    const allowedProfiles = new Set(policy.allowedProfileIds ?? []);
+    const profiles = allProfiles.filter((profile) =>
+      (allowedModels.size === 0 || allowedModels.has(profile.modelId))
+      && (allowedProfiles.size === 0 || allowedProfiles.has(profile.executionProfileId))
+    );
+    if (profiles.length === 0) throw new Error("No execution profile satisfies the routing policy");
     const preferences = ["economy", "balanced", "quality"] as const;
     const executionPresets = enabledExecutionPresets();
     const corridorDifficulties = ACU_CURVE_DIFFICULTIES;
@@ -755,6 +773,7 @@ export class AlphaRequestProcessor {
       return [preference, points];
     }));
     return {
+      defaultPreference: policy.routingPreference ?? "balanced",
       formulaVersion: ACU_ROUTING_MODEL_VERSION,
       generatedAt: new Date().toISOString(),
       inputTokens,

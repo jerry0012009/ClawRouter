@@ -636,7 +636,7 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
     },
     adminSelectionCorridor: {
       token: serviceConfig.adminTraceToken,
-      load: (inputTokens, expectedOutputTokens) => processor.selectionCorridor(inputTokens, expectedOutputTokens),
+      load: (inputTokens, expectedOutputTokens, policy) => processor.selectionCorridor(inputTokens, expectedOutputTokens, policy),
     },
     models: profiles.map((item) => item.profile.modelId),
     maxRequestBytes: serviceConfig.maxRequestBytes,

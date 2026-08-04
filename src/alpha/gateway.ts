@@ -8,6 +8,7 @@ import { relayProviderResponse, type RelayResult } from "./stream-relay.js";
 import { verifyTrustedIdentity, type TrustedNewApiIdentity } from "./trusted-identity.js";
 import { AlphaAdmissionError } from "./routing.js";
 import type { MonitorRange } from "./channel-monitor.js";
+import type { SelectionCorridorPolicy } from "./processor.js";
 
 export type AlphaExecutionResolution = {
   adapter: NativeProviderAdapter;
@@ -50,7 +51,7 @@ export type AlphaGatewayOptions = {
   };
   adminSelectionCorridor?: {
     token: string;
-    load(inputTokens: number, expectedOutputTokens: number): Promise<Record<string, unknown>>;
+    load(inputTokens: number, expectedOutputTokens: number, policy?: SelectionCorridorPolicy): Promise<Record<string, unknown>>;
   };
   models?: string[];
   requirePrivateNetwork?: boolean;
@@ -177,7 +178,7 @@ export function createAlphaGatewayServer(options: AlphaGatewayOptions): Server {
       }
       return;
     }
-    if (url.pathname === "/internal/admin/selection-corridor" && request.method === "GET") {
+    if (url.pathname === "/internal/admin/selection-corridor" && (request.method === "GET" || request.method === "POST")) {
       if (!options.adminSelectionCorridor) {
         jsonError(response, 404, "Unsupported ACU endpoint");
         return;
@@ -188,9 +189,22 @@ export function createAlphaGatewayServer(options: AlphaGatewayOptions): Server {
         return;
       }
       try {
-        const inputTokens = Math.max(1, Math.min(1_000_000, Number(url.searchParams.get("inputTokens")) || 100_000));
-        const expectedOutputTokens = Math.max(1, Math.min(100_000, Number(url.searchParams.get("expectedOutputTokens")) || 4_000));
-        const result = await options.adminSelectionCorridor.load(inputTokens, expectedOutputTokens);
+        let inputTokens = Number(url.searchParams.get("inputTokens")) || 100_000;
+        let expectedOutputTokens = Number(url.searchParams.get("expectedOutputTokens")) || 4_000;
+        let policy: SelectionCorridorPolicy | undefined;
+        if (request.method === "POST") {
+          const body = JSON.parse((await readRequestBody(request, 64 * 1024)).toString("utf8")) as Record<string, unknown>;
+          inputTokens = Number(body.inputTokens) || inputTokens;
+          expectedOutputTokens = Number(body.expectedOutputTokens) || expectedOutputTokens;
+          policy = {
+            allowedModelIds: Array.isArray(body.allowedModelIds) ? body.allowedModelIds.filter((value): value is string => typeof value === "string") : [],
+            allowedProfileIds: Array.isArray(body.allowedProfileIds) ? body.allowedProfileIds.filter((value): value is string => typeof value === "string") : [],
+            routingPreference: ["economy", "balanced", "quality"].includes(String(body.routingPreference)) ? String(body.routingPreference) as SelectionCorridorPolicy["routingPreference"] : "balanced",
+          };
+        }
+        inputTokens = Math.max(1, Math.min(1_000_000, inputTokens));
+        expectedOutputTokens = Math.max(1, Math.min(100_000, expectedOutputTokens));
+        const result = await options.adminSelectionCorridor.load(inputTokens, expectedOutputTokens, policy);
         response.setHeader("cache-control", "no-store");
         response.setHeader("content-type", "application/json");
         response.end(JSON.stringify(result));

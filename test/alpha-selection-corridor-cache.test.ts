@@ -151,4 +151,16 @@ describe("selection corridor cache", () => {
       estimatedOutputTokens: 38_400, reasoningEffort: "max", expectedOutputTokenMultiplier: 9.6,
     });
   });
+
+  it("recomputes the corridor from the supplied policy and cache key", async () => {
+    const processor = new AlphaRequestProcessor({} as never);
+    const internal = processor as unknown as {
+      effectiveProfiles: () => Promise<{ profiles: AlphaExecutionProfile[]; probeClaims: [] }>;
+      calculateSelectionCorridor: (inputTokens: number, outputTokens: number, policy?: { allowedModelIds?: string[]; allowedProfileIds?: string[]; routingPreference?: "economy" | "balanced" | "quality" }) => Promise<Record<string, unknown>>;
+    };
+    internal.effectiveProfiles = async () => ({ profiles: [lunaProfile, { ...lunaProfile, executionProfileId: "verified:gpt-5.6-sol:responses", modelId: "gpt-5.6-sol" }], probeClaims: [] });
+    const result = await internal.calculateSelectionCorridor(100_000, 4_000, { allowedModelIds: ["gpt-5.6-sol"], routingPreference: "economy" }) as { series: Record<string, Array<{ candidates: Array<{ modelId: string }> }>>; defaultPreference: string };
+    expect(result.defaultPreference).toBe("economy");
+    expect(result.series.economy?.flatMap((point) => point.candidates).every((candidate) => candidate.modelId === "gpt-5.6-sol")).toBe(true);
+  });
 });

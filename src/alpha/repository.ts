@@ -1235,7 +1235,7 @@ export class AlphaRepository {
        http_status=$6,input_tokens=$7,cached_input_tokens=$8,output_tokens=$9,reasoning_tokens=$10,
        usage_source=$11,actual_cost_usd=$12,provider_billed=$13,latency_ms=$14,
        visible_output_bytes=$15,completed_at=now(),metadata_json=metadata_json || $16::jsonb
-         || jsonb_build_object('outcome',$2,'total_latency_ms',$14) WHERE attempt_id=$1`,
+         || jsonb_build_object('outcome',$2::text,'total_latency_ms',$14::integer) WHERE attempt_id=$1`,
       [input.attemptId, input.status, input.actualModel ?? null, input.providerRequestId ?? null,
         input.errorCategory ?? null, input.httpStatus ?? null, input.inputTokens ?? 0n,
         input.cachedInputTokens ?? 0n, input.outputTokens ?? 0n, input.reasoningTokens ?? 0n,

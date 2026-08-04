@@ -313,6 +313,25 @@ run("Alpha PostgreSQL foundation", () => {
       provider: "closeai",
       status: "success",
     });
+    await repository.completeAttempt({
+      attemptId: "att_a_2",
+      status: "success",
+      actualModel: "gpt-5.6-luna",
+      inputTokens: 10n,
+      outputTokens: 2n,
+      latencyMs: 1234,
+      metadata: { complete: true },
+    });
+    const completedAttempt = await database.query<{
+      status: string;
+      latency_ms: number;
+      metadata_json: Record<string, unknown>;
+    }>("SELECT status,latency_ms,metadata_json FROM acu_attempts WHERE attempt_id='att_a_2'");
+    expect(completedAttempt.rows[0]).toMatchObject({
+      status: "success",
+      latency_ms: 1234,
+      metadata_json: { complete: true, outcome: "success", total_latency_ms: 1234 },
+    });
 
     const usage = {
       usageReportId: "usage_a_1",

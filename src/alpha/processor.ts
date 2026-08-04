@@ -882,7 +882,7 @@ export class AlphaRequestProcessor {
             }
           }
           const candidates = [...route.candidateEstimates]
-            .filter((candidate) => utilityPolicy.formulaMode === "legacy" ? candidate.paretoEfficient : true)
+            .filter((candidate) => utilityPolicy.formulaMode === "active" ? true : candidate.paretoEfficient)
             .sort((left, right) => right.valueUtility - left.valueUtility);
           const modelCandidateUtilities = route.v2Counterfactual?.modelCandidates ?? candidates;
           const selectedModelUtility = modelCandidateUtilities.find((candidate) => (
@@ -978,9 +978,9 @@ export class AlphaRequestProcessor {
         baseQualityTarget: 80,
         judgeCostIncluded: false,
         currentHealthApplied: true,
-        candidateDefinition: utilityPolicy.formulaMode === "legacy"
-          ? "pareto_frontier"
-          : "all_eligible_additive_utility",
+        candidateDefinition: utilityPolicy.formulaMode === "active"
+          ? "all_eligible_additive_utility"
+          : "pareto_frontier",
         difficultyDistribution: "continuous_tier_probabilities",
         difficultyDistributionVersion: "acu-curve-thresholds-v1",
         corridorBand: "selected_candidate_uncertainty",

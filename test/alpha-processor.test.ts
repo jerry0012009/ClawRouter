@@ -11,6 +11,10 @@ import { createNativeProviderAdapter } from "../src/alpha/provider.js";
 import { AlphaRequestProcessor } from "../src/alpha/processor.js";
 import { AlphaRepository } from "../src/alpha/repository.js";
 import { evaluateProfiles, type AlphaExecutionProfile } from "../src/alpha/routing.js";
+import {
+  DEFAULT_ROUTING_UTILITY_POLICY,
+  type RoutingUtilityPolicy,
+} from "../src/alpha/routing-utility-v2.js";
 import { bodySha256, trustedIdentityHeaders } from "../src/alpha/trusted-identity.js";
 
 const databaseUrl = process.env.ACU_PROCESSOR_TEST_DATABASE_URL;
@@ -51,6 +55,7 @@ function signedHeaders(
   client: "codex" | "claude-code" = "codex",
   allowedProfileIds: string[] = [],
   routingPreference: "economy" | "balanced" | "quality" = "balanced",
+  utilityPolicy?: RoutingUtilityPolicy,
 ): Record<string, string> {
   const identity = {
     newapiUserId: userId,
@@ -62,6 +67,21 @@ function signedHeaders(
     allowedProfileIds,
     routingPolicyVersion: `acu-user-policy-v2-${createHash("sha256").update(JSON.stringify(allowedProfileIds)).digest("hex").slice(0, 16)}`,
     routingPreference,
+    ...(utilityPolicy ? {
+      qualityBias: utilityPolicy.qualityBias,
+      supplyStrategy: utilityPolicy.supplyStrategy,
+      supplyWeights: utilityPolicy.supplyWeights,
+      acuHighBiasOffset: utilityPolicy.acuHighBiasOffset,
+      modelCostLogScale: utilityPolicy.modelCostLogScale,
+      profileCostLogScale: utilityPolicy.profileCostLogScale,
+      profileSpeedLogScale: utilityPolicy.profileSpeedLogScale,
+      latencyPolicy: utilityPolicy.latency,
+      reliabilityPolicy: utilityPolicy.reliability,
+      workPhaseBiasOffsets: utilityPolicy.workPhaseBiasOffsets,
+      routingUtilityVersion: utilityPolicy.routingUtilityVersion,
+      formulaMode: utilityPolicy.formulaMode,
+      identityVersion: "v3" as const,
+    } : {}),
     timestamp: new Date().toISOString(),
     bodySha256: bodySha256(body),
   };
@@ -569,6 +589,24 @@ run("Alpha PostgreSQL request processor", () => {
     return response.text();
   }
 
+  async function sendWithPolicy(
+    bodyValue: Record<string, unknown>,
+    requestId: string,
+    userId: string,
+    utilityPolicy: RoutingUtilityPolicy,
+    allowedProfileIds: string[] = [],
+  ): Promise<string> {
+    const body = Buffer.from(JSON.stringify(bodyValue));
+    const response = await fetch(`http://127.0.0.1:${gatewayPort}/v1/responses`, {
+      method: "POST",
+      headers: signedHeaders(body, requestId, userId, "codex", allowedProfileIds, "balanced", utilityPolicy),
+      body,
+    });
+    const errorBody = response.status === 200 ? "" : await response.clone().text();
+    expect(response.status, errorBody).toBe(200);
+    return response.text();
+  }
+
   it.each([
     ["inspection", "Read", -4],
     ["implementation", "apply_patch", 0],
@@ -910,6 +948,89 @@ run("Alpha PostgreSQL request processor", () => {
     expect(result.rows[0].channel_reason).toContain("User-selected explicit model");
   });
 
+  it("uses active V2 Profile rank for an explicit model and same-model fallback", async () => {
+    const userId = "user-explicit-v2-fallback";
+    await database.query("DELETE FROM acu_channel_health WHERE channel_id IN ('test-channel','test-recovery-channel')");
+    await database.query(
+      "DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id IN ('test:gpt-5.4-mini:responses','test:gpt-5.4-mini:recovery')",
+    );
+    const beforeJudge = judgeCalls;
+    const policy: RoutingUtilityPolicy = {
+      ...DEFAULT_ROUTING_UTILITY_POLICY,
+      formulaMode: "active",
+      supplyStrategy: "lowest_cost",
+      supplyWeights: { cost: 100, speed: 0, reliability: 0 },
+      routingUtilityVersion: "acu-routing-utility-v1-1111111111111111",
+    };
+    const primaryBillingPrice = primaryProfile.billingPrice;
+    const recoveryBillingPrice = recoveryProfile.billingPrice;
+    primaryProfile.billingPrice = { inputPricePerMillion: 1, outputPricePerMillion: 1 };
+    recoveryProfile.billingPrice = { inputPricePerMillion: 2, outputPricePerMillion: 2 };
+    try {
+      await sendWithPolicy({
+        model: "gpt-5.4-mini",
+        input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "Explicit V2 fallback" }] }],
+        stream: true,
+        test_case: "explicit-v2-fallback",
+        test_failures_before_success: 1,
+        test_failure_status: 502,
+      }, "explicit-v2-fallback", userId, policy, [
+        primaryProfile.executionProfileId,
+        recoveryProfile.executionProfileId,
+      ]);
+    } finally {
+      primaryProfile.billingPrice = primaryBillingPrice;
+      recoveryProfile.billingPrice = recoveryBillingPrice;
+    }
+    expect(judgeCalls).toBe(beforeJudge);
+
+    const result = await database.query<{
+      requested_models: string[];
+      actual_models: string[];
+      profiles: string[];
+      attempts: string;
+      usage_reports: string;
+      formula_mode: string;
+      profile_formula_version: string;
+    }>(
+      `SELECT
+       array_agg(DISTINCT r.requested_model) requested_models,
+       array_agg(a.actual_model ORDER BY a.attempt_index) actual_models,
+       array_agg(a.execution_profile_id ORDER BY a.attempt_index) profiles,
+       count(DISTINCT a.attempt_id)::text attempts,
+       count(DISTINCT u.usage_report_id)::text usage_reports,
+       (SELECT formula_inputs_json->>'formulaMode' FROM acu_route_decisions
+        WHERE newapi_user_id=$1 ORDER BY created_at DESC LIMIT 1) formula_mode,
+       (SELECT formula_inputs_json->>'profileFormulaVersion' FROM acu_route_decisions
+        WHERE newapi_user_id=$1 ORDER BY created_at DESC LIMIT 1) profile_formula_version
+       FROM acu_logical_requests r
+       JOIN acu_attempts a USING (logical_request_id)
+       LEFT JOIN acu_usage_reports u USING (logical_request_id)
+       WHERE r.newapi_user_id=$1
+       GROUP BY r.logical_request_id`,
+      [userId],
+    );
+    expect(result.rows[0]).toMatchObject({
+      requested_models: ["gpt-5.4-mini"],
+      actual_models: ["gpt-5.4-mini", "gpt-5.4-mini"],
+      profiles: [primaryProfile.executionProfileId, recoveryProfile.executionProfileId],
+      attempts: "2",
+      usage_reports: "1",
+      formula_mode: "active",
+      profile_formula_version: "acu-profile-utility-v2",
+    });
+    const decision = await database.query<{ inputs: Record<string, unknown> }>(
+      `SELECT formula_inputs_json inputs FROM acu_route_decisions
+       WHERE newapi_user_id=$1 ORDER BY created_at DESC LIMIT 1`,
+      [userId],
+    );
+    const utilities = decision.rows[0]?.inputs.profileUtilitiesV2 as Array<{ executionProfileId: string; rank: number }>;
+    expect([...utilities].sort((left, right) => left.rank - right.rank).map((utility) => utility.executionProfileId)).toEqual([
+      primaryProfile.executionProfileId,
+      recoveryProfile.executionProfileId,
+    ]);
+  });
+
   it("creates a new judged Segment when the user later explicitly requests current official docs", async () => {
     const userId = "user-web-rejudge";
     const initial = [{ type: "message", role: "user", content: [{ type: "input_text", text: "修改 currentUser 函数" }] }];
@@ -1156,6 +1277,10 @@ run("Alpha PostgreSQL request processor", () => {
   });
 
   it("isolates a 502 to the exact Profile and keeps same-model recovery independent", async () => {
+    await database.query("DELETE FROM acu_channel_health WHERE channel_id IN ('test-channel','test-recovery-channel')");
+    await database.query(
+      "DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id IN ('test:gpt-5.4-mini:responses','test:gpt-5.4-mini:recovery')",
+    );
     const beforeJudge = judgeCalls;
     const body = {
       model: "acu-auto",
@@ -1898,6 +2023,71 @@ run("Alpha PostgreSQL request processor", () => {
       judgeCalls: 0,
       judgeReused: true,
       routeRefreshReason: "profile_policy_changed",
+    });
+  });
+
+  it("reuses Judge but recalculates Route when Routing Utility Version changes", async () => {
+    const userId = "user-routing-utility-refresh";
+    await database.query("DELETE FROM acu_channel_health WHERE channel_id IN ('test-channel','test-recovery-channel')");
+    await database.query(
+      "DELETE FROM acu_provider_model_profile_health WHERE execution_profile_id IN ('test:gpt-5.4-mini:responses','test:gpt-5.4-mini:recovery')",
+    );
+    const policyA: RoutingUtilityPolicy = {
+      ...DEFAULT_ROUTING_UTILITY_POLICY,
+      formulaMode: "active",
+      routingUtilityVersion: "acu-routing-utility-v1-aaaaaaaaaaaaaaaa",
+    };
+    const policyB: RoutingUtilityPolicy = {
+      ...policyA,
+      supplyStrategy: "lowest_cost",
+      supplyWeights: { cost: 100, speed: 0, reliability: 0 },
+      routingUtilityVersion: "acu-routing-utility-v1-bbbbbbbbbbbbbbbb",
+    };
+    const firstInput = [
+      { type: "message", role: "user", content: [{ type: "input_text", text: "Start utility refresh task" }] },
+    ];
+    const beforeJudge = judgeCalls;
+    await sendWithPolicy({ model: "acu-auto", input: firstInput, stream: true },
+      "routing-utility-a", userId, policyA);
+    expect(judgeCalls).toBe(beforeJudge + 1);
+
+    await sendWithPolicy({
+      model: "acu-auto",
+      input: [
+        ...firstInput,
+        { type: "function_call", call_id: "utility-read", name: "read_file", arguments: "{}" },
+        { type: "function_call_output", call_id: "utility-read", output: "continue" },
+      ],
+      stream: true,
+    }, "routing-utility-b", userId, policyB);
+    expect(judgeCalls).toBe(beforeJudge + 1);
+
+    const result = await database.query<{
+      judges: string;
+      routes: string;
+      admission_metadata: Record<string, unknown>;
+      segment_metadata: Record<string, unknown>;
+    }>(
+      `SELECT
+       (SELECT count(*)::text FROM acu_judge_evaluations WHERE newapi_user_id=$1) judges,
+       (SELECT count(*)::text FROM acu_route_decisions WHERE newapi_user_id=$1) routes,
+       (SELECT metadata_json FROM acu_admission_traces WHERE newapi_user_id=$1 ORDER BY created_at DESC LIMIT 1) admission_metadata,
+       (SELECT metadata_json FROM acu_segments WHERE newapi_user_id=$1 AND status='active' LIMIT 1) segment_metadata`,
+      [userId],
+    );
+    expect(result.rows[0]).toMatchObject({ judges: "1", routes: "2" });
+    expect(result.rows[0]?.admission_metadata).toMatchObject({
+      judgeCalls: 0,
+      judgeReused: true,
+      routeRefreshReason: "routing_utility_changed",
+    });
+    expect(result.rows[0]?.segment_metadata).toMatchObject({
+      routingUtilityVersion: "acu-routing-utility-v1-bbbbbbbbbbbbbbbb",
+      formulaMode: "active",
+      supplyStrategy: "lowest_cost",
+      supplyWeights: { cost: 100, speed: 0, reliability: 0 },
+      routingModelVersion: "acu-model-utility-v2",
+      profileFormulaVersion: "acu-profile-utility-v2",
     });
   });
 

@@ -157,6 +157,10 @@ describe("Routing Segment Web Intent", () => {
       trigger: "new_task",
       contextHash: "fixture",
       webIntentFallbackInput: { recentUserInputs: ["查询今天 BTC 价格"] },
+      rawNative: {
+        stateMetadata: {},
+        rawRequest: JSON.stringify({ model: "acu-auto", input: "更新 latestVersion 变量" }),
+      },
     });
     expect(result.webIntentDecision).toEqual({
       intent: "not_required",

@@ -43,23 +43,38 @@ export class AlphaDatabase implements SqlExecutor {
   }
 
   async migrate(path = new URL("../../migrations/acu/0001_alpha_p0.sql", import.meta.url)): Promise<void> {
-    await this.pool.query(await readFile(path, "utf8"));
-    if (path.pathname.endsWith("0001_alpha_p0.sql")) {
-      await this.pool.query(await readFile(new URL("../../migrations/acu/0002_provider_channel_health.sql", import.meta.url), "utf8"));
-      await this.pool.query(await readFile(new URL("../../migrations/acu/0003_web_intent_source.sql", import.meta.url), "utf8"));
-      await this.pool.query(await readFile(new URL("../../migrations/acu/0004_rc2_context_ledger.sql", import.meta.url), "utf8"));
-      await this.pool.query(await readFile(new URL("../../migrations/acu/0005_rc2_judge_reconciliation.sql", import.meta.url), "utf8"));
-      await this.pool.query(await readFile(new URL("../../migrations/acu/0006_rc21_cost_semantics.sql", import.meta.url), "utf8"));
-      await this.pool.query(await readFile(new URL("../../migrations/acu/0007_rc22_judge_cutover.sql", import.meta.url), "utf8"));
-      await this.pool.query(await readFile(new URL("../../migrations/acu/0008_alpha_final_user_loop.sql", import.meta.url), "utf8"));
-      await this.pool.query(await readFile(new URL("../../migrations/acu/0009_raw_judge_context.sql", import.meta.url), "utf8"));
-      await this.pool.query(await readFile(new URL("../../migrations/acu/0010_supply_observability.sql", import.meta.url), "utf8"));
-      await this.pool.query(await readFile(new URL("../../migrations/acu/0011_verified_model_pool_probe.sql", import.meta.url), "utf8"));
-      await this.pool.query(await readFile(new URL("../../migrations/acu/0012_profile_policy_probe_worker.sql", import.meta.url), "utf8"));
-      await this.pool.query(await readFile(new URL("../../migrations/acu/0013_full_pool_probe_runs.sql", import.meta.url), "utf8"));
-      await this.pool.query(await readFile(new URL("../../migrations/acu/0014_judge_same_model_failover.sql", import.meta.url), "utf8"));
-      await this.pool.query(await readFile(new URL("../../migrations/acu/0015_judge_profile_attempt_limit.sql", import.meta.url), "utf8"));
-      await this.pool.query(await readFile(new URL("../../migrations/acu/0016_judge_profile_attempt_limit_5.sql", import.meta.url), "utf8"));
+    if (!path.pathname.endsWith("0001_alpha_p0.sql")) {
+      await this.pool.query(await readFile(path, "utf8"));
+      return;
+    }
+    const foundation = await this.pool.query<{ name: string | null }>(
+      "SELECT to_regclass('public.acu_sessions')::text name",
+    );
+    if (!foundation.rows[0]?.name) {
+      await this.pool.query(await readFile(path, "utf8"));
+    }
+    const migrations = [
+      "0002_provider_channel_health", "0003_web_intent_source", "0004_rc2_context_ledger",
+      "0005_rc2_judge_reconciliation", "0006_rc21_cost_semantics", "0007_rc22_judge_cutover",
+      "0008_alpha_final_user_loop", "0009_raw_judge_context", "0010_supply_observability",
+      "0011_verified_model_pool_probe", "0012_profile_policy_probe_worker", "0013_full_pool_probe_runs",
+      "0014_judge_same_model_failover", "0015_judge_profile_attempt_limit", "0016_judge_profile_attempt_limit_5",
+    ];
+    for (const migration of migrations) {
+      const migrationTable = await this.pool.query<{ name: string | null }>(
+        "SELECT to_regclass('public.acu_schema_migrations')::text name",
+      );
+      if (migrationTable.rows[0]?.name) {
+        const applied = await this.pool.query(
+          "SELECT 1 FROM acu_schema_migrations WHERE migration_version=$1",
+          [migration],
+        );
+        if (applied.rowCount) continue;
+      }
+      await this.pool.query(await readFile(
+        new URL(`../../migrations/acu/${migration}.sql`, import.meta.url),
+        "utf8",
+      ));
     }
   }
 

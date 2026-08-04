@@ -66,21 +66,36 @@ services:
         if [ "$$(psql -h postgres-acu -U acu_alpha -d acu_alpha -tAc "SELECT to_regclass('public.acu_sessions')")" != "acu_sessions" ]; then
           psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0001_alpha_p0.sql
         fi
-        psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0002_provider_channel_health.sql
-        psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0003_web_intent_source.sql
-        psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0004_rc2_context_ledger.sql
-        psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0005_rc2_judge_reconciliation.sql
-        psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0006_rc21_cost_semantics.sql
-        psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0007_rc22_judge_cutover.sql
-        psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0008_alpha_final_user_loop.sql
-        psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0009_raw_judge_context.sql
-        psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0010_supply_observability.sql
-        psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0011_verified_model_pool_probe.sql
-        psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0012_profile_policy_probe_worker.sql
-        psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0013_full_pool_probe_runs.sql
-        psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0014_judge_same_model_failover.sql
-        psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0015_judge_profile_attempt_limit.sql
-        psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f /migration/0016_judge_profile_attempt_limit_5.sql
+        apply_migration() {
+          version="$$1"
+          file="$$2"
+          migration_table="$$(psql -h postgres-acu -U acu_alpha -d acu_alpha -tAc \
+            "SELECT to_regclass('public.acu_schema_migrations')")"
+          if [ "$$migration_table" != "acu_schema_migrations" ]; then
+            psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f "$$file"
+            return
+          fi
+          applied="$$(psql -h postgres-acu -U acu_alpha -d acu_alpha -tAc \
+            "SELECT EXISTS (SELECT 1 FROM acu_schema_migrations WHERE migration_version='$${version}')")"
+          if [ "$$applied" != "t" ]; then
+            psql -v ON_ERROR_STOP=1 -h postgres-acu -U acu_alpha -d acu_alpha -f "$$file"
+          fi
+        }
+        apply_migration 0002_provider_channel_health /migration/0002_provider_channel_health.sql
+        apply_migration 0003_web_intent_source /migration/0003_web_intent_source.sql
+        apply_migration 0004_rc2_context_ledger /migration/0004_rc2_context_ledger.sql
+        apply_migration 0005_rc2_judge_reconciliation /migration/0005_rc2_judge_reconciliation.sql
+        apply_migration 0006_rc21_cost_semantics /migration/0006_rc21_cost_semantics.sql
+        apply_migration 0007_rc22_judge_cutover /migration/0007_rc22_judge_cutover.sql
+        apply_migration 0008_alpha_final_user_loop /migration/0008_alpha_final_user_loop.sql
+        apply_migration 0009_raw_judge_context /migration/0009_raw_judge_context.sql
+        apply_migration 0010_supply_observability /migration/0010_supply_observability.sql
+        apply_migration 0011_verified_model_pool_probe /migration/0011_verified_model_pool_probe.sql
+        apply_migration 0012_profile_policy_probe_worker /migration/0012_profile_policy_probe_worker.sql
+        apply_migration 0013_full_pool_probe_runs /migration/0013_full_pool_probe_runs.sql
+        apply_migration 0014_judge_same_model_failover /migration/0014_judge_same_model_failover.sql
+        apply_migration 0015_judge_profile_attempt_limit /migration/0015_judge_profile_attempt_limit.sql
+        apply_migration 0016_judge_profile_attempt_limit_5 /migration/0016_judge_profile_attempt_limit_5.sql
 
   newapi-codex-pool-sync:
     image: postgres:16-alpine

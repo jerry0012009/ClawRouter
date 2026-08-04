@@ -13,11 +13,13 @@ import {
   compareExecutionProfiles,
   exclusionCategory,
   resolveProfileBillingPrice,
-  resolveExplicitProfile,
+  resolveExplicitProfileCandidates,
+  resolveExplicitProfileDecision,
   routeWithCurrentAcuFormula,
   type AlphaExecutionProfile,
   type AlphaRouteDecision,
   type AlphaRouteRequirements,
+  type ExplicitProfileDecision,
 } from "./routing.js";
 import type { AlphaGatewayTrace, AlphaIngressContext, AlphaExecutionResolution } from "./gateway.js";
 import type { NativeProviderAdapter } from "./provider.js";
@@ -28,6 +30,7 @@ import {
 import { parseProviderUsage, resolveProviderBilling } from "./usage.js";
 import { ACU_CURVE_DIFFICULTIES, buildModelCurve, getAcuModel } from "../acu/catalog.js";
 import { ACU_ROUTING_MODEL_VERSION } from "../acu/config.js";
+import { ACU_MODEL_UTILITY_V2_VERSION } from "../acu/decision.js";
 import { enabledExecutionPresets } from "../acu/execution-presets.js";
 import { continuousTierProbabilities } from "../acu/math.js";
 import { AcuJudgeClientCancelledError, AcuJudgeContextLengthError } from "../acu/judge.js";
@@ -65,6 +68,7 @@ import {
   DEFAULT_RETAIL_MARKUP_MULTIPLIER,
 } from "./retail-charge.js";
 import {
+  ACU_PROFILE_UTILITY_V2_VERSION,
   DEFAULT_ROUTING_UTILITY_POLICY,
   type LatencyPolicy,
   type ReliabilityPolicy,
@@ -76,6 +80,29 @@ import {
 const POLICY_VERSION = "alpha-p0-policy-v1";
 const QUALITY_CURVE_VERSION = "acu-catalog-v0.1";
 const PRICE_VERSION = "acu-price-2026-08-01-lucen-v1";
+
+function modelFormulaVersionForPolicy(policy: RoutingUtilityPolicy): string {
+  return policy.formulaMode === "active" ? ACU_MODEL_UTILITY_V2_VERSION : ACU_ROUTING_MODEL_VERSION;
+}
+
+function profileFormulaVersionForMode(mode: RoutingUtilityPolicy["formulaMode"]): string {
+  return mode === "legacy" ? "legacy-provider-selection-v1" : ACU_PROFILE_UTILITY_V2_VERSION;
+}
+
+export function routingReuseInvalidationReason(input: {
+  profilePolicyChanged: boolean;
+  routingPolicyVersionMatches: boolean;
+  modelFormulaVersionMatches: boolean;
+  routingUtilityVersionMatches: boolean;
+  formulaModeMatches: boolean;
+  fallbackReason?: string;
+}): string | undefined {
+  if (input.profilePolicyChanged) return "profile_policy_changed";
+  if (!input.routingPolicyVersionMatches) return "routing_policy_changed";
+  if (!input.modelFormulaVersionMatches) return "routing_formula_changed";
+  if (!input.routingUtilityVersionMatches || !input.formulaModeMatches) return "routing_utility_changed";
+  return input.fallbackReason;
+}
 
 export function codexSelectionCorridorRequirements(
   inputTokens: number,
@@ -1211,6 +1238,7 @@ export class AlphaRequestProcessor {
     routingJudge?: AcuJudgeResult;
     route?: AlphaRouteDecision;
     recoveryProfiles: AlphaExecutionProfile[];
+    explicitProfileDecision?: ExplicitProfileDecision;
   }> {
     const repository = new AlphaRepository(this.options.database);
     const contextAdmission = estimateContextAdmission(envelope, this.expectedOutputTokens);
@@ -1260,9 +1288,7 @@ export class AlphaRequestProcessor {
       }), state.decision.createSegment ? "heuristic_fallback" : "legacy_heuristic");
       applyWebIntent(envelope, webIntentDecision);
       const admission = await startAdmissionTrace();
-      let profile: AlphaExecutionProfile;
-      try {
-        profile = resolveExplicitProfile(envelope.requestedModel, effectiveProfiles, {
+      const explicitRequirements: AlphaRouteRequirements = {
         protocol: envelope.protocol,
         requireTools: envelope.requiredToolTypes.length > 0,
         requiredToolTypes: envelope.requiredToolTypes,
@@ -1274,6 +1300,16 @@ export class AlphaRequestProcessor {
         clientDeclaredWebTool: envelope.clientDeclaredWebTool,
         hostedWebRequired: envelope.hostedWebRequired,
         webIntent: envelope.webIntent,
+      };
+      let explicitProfileDecision: ExplicitProfileDecision;
+      try {
+        explicitProfileDecision = resolveExplicitProfileDecision({
+          requestedModel: envelope.requestedModel,
+          profiles: effectiveProfiles,
+          requirements: explicitRequirements,
+          inputTokens: contextAdmission.estimatedInputTokens,
+          expectedOutputTokens: this.expectedOutputTokens,
+          utilityPolicy: routingUtilityPolicy,
         });
       } catch (error) {
         const typed = error instanceof AlphaAdmissionError ? error : undefined;
@@ -1287,12 +1323,44 @@ export class AlphaRequestProcessor {
         if (typed) typed.details.admission_trace_id = admission.admissionTraceId;
         throw error;
       }
+      const profile = explicitProfileDecision.selectedProfile;
+      const storedAllowedProfileIds = Array.isArray(storedSegmentMetadata.allowedProfileIds)
+        ? storedSegmentMetadata.allowedProfileIds.filter((value): value is string => typeof value === "string").sort()
+        : [];
+      const profilePolicyChanged = JSON.stringify(storedAllowedProfileIds)
+        !== JSON.stringify([...identity.allowedProfileIds].sort());
+      const routingPolicyVersionMatches = storedSegmentMetadata.userRoutingPolicyVersion === identity.routingPolicyVersion;
+      const modelFormulaVersionMatches = storedSegmentMetadata.routingModelVersion === "explicit-model-v1";
+      const utilityVersionMatches = storedSegmentMetadata.routingUtilityVersion === routingUtilityPolicy.routingUtilityVersion;
+      const formulaModeMatches = storedSegmentMetadata.formulaMode === routingUtilityPolicy.formulaMode;
+      const hasStoredExplicitDecision = Boolean(stringValue(storedSegment?.route_decision_id));
+      const explicitRefreshReason = hasStoredExplicitDecision
+        ? routingReuseInvalidationReason({
+            profilePolicyChanged,
+            routingPolicyVersionMatches,
+            modelFormulaVersionMatches,
+            routingUtilityVersionMatches: utilityVersionMatches,
+            formulaModeMatches,
+          })
+        : undefined;
+      const persistExplicitDecision = state.decision.createSegment
+        || !hasStoredExplicitDecision
+        || explicitRefreshReason !== undefined
+        || stringValue(storedSegment?.selected_execution_profile_id) !== profile.executionProfileId;
       await repository.completeAdmissionTrace({
         admissionTraceId: admission.admissionTraceId, status: "admitted",
         maximumAvailableContextTokens: effectiveContextCeiling(profile),
-        metadata: { selectedProfileId: profile.executionProfileId },
+        exclusionCounts: explicitProfileDecision.exclusionCounts,
+        metadata: {
+          selectedProfileId: profile.executionProfileId,
+          judgeCalls: 0,
+          judgeReused: false,
+          routeRefreshReason: explicitRefreshReason,
+          routingUtilityVersion: routingUtilityPolicy.routingUtilityVersion,
+          formulaMode: routingUtilityPolicy.formulaMode,
+        },
       });
-      if (state.decision.createSegment || !state.segment.segmentId) {
+      if (persistExplicitDecision) {
         const catalogModel = getAcuModel(profile.modelId);
         const nominalCost = catalogModel?.inputPricePerMillion === null || catalogModel?.outputPricePerMillion === null
           ? null
@@ -1301,7 +1369,10 @@ export class AlphaRequestProcessor {
         const effectiveCashCost = nominalCost === null
           ? null
           : nominalCost * (profile.economics ? cashCnyPerNominalUsd(profile.economics) : 1);
-        const explicitSelectionReason = "User-selected explicit model; Judge and ACU model selection skipped.";
+        const explicitSelectionReason = [
+          "User-selected explicit model; Judge and ACU model selection skipped.",
+          explicitProfileDecision.profileSelectionReason,
+        ].join(" ");
         const explicitReasoningDecision = decideReasoning({
           mode: "explicit",
           clientEffort: envelope.reasoningEffort,
@@ -1312,6 +1383,9 @@ export class AlphaRequestProcessor {
           legacySupportedEfforts: profile.supportedReasoningEfforts,
         });
         const routeDecisionId = alphaId("route");
+        const selectedProfileUtility = explicitProfileDecision.profileUtilitiesV2.find((utility) => (
+          utility.executionProfileId === profile.executionProfileId
+        ));
         await repository.saveRouteDecision({
           routeDecisionId,
           newapiUserId: identity.newapiUserId,
@@ -1325,6 +1399,23 @@ export class AlphaRequestProcessor {
           formulaInputs: {
             requestedModel: envelope.requestedModel,
             judgeCalls: 0,
+            routeRefreshReason: explicitRefreshReason,
+            routingModelVersion: "explicit-model-v1",
+            profileFormulaVersion: explicitProfileDecision.profileFormulaVersion,
+            routingUtilityVersion: routingUtilityPolicy.routingUtilityVersion,
+            formulaMode: routingUtilityPolicy.formulaMode,
+            supplyStrategy: routingUtilityPolicy.supplyStrategy,
+            supplyWeights: routingUtilityPolicy.supplyWeights,
+            profileUtilitiesV2: explicitProfileDecision.profileUtilitiesV2,
+            selectedExecutionProfileId: profile.executionProfileId,
+            legacySelectedExecutionProfileId: explicitProfileDecision.legacySelectedProfile.executionProfileId,
+            v2SelectedExecutionProfileId: explicitProfileDecision.v2SelectedProfile?.executionProfileId,
+            differsFromLegacy: explicitProfileDecision.differsFromLegacy,
+            differenceReason: explicitProfileDecision.differenceReason,
+            eligibleProfileIds: explicitProfileDecision.eligibleProfiles.map((candidate) => candidate.executionProfileId),
+            eligibleProfileCount: explicitProfileDecision.eligibleProfiles.length,
+            profileEvaluations: explicitProfileDecision.evaluations,
+            excludedProfiles: explicitProfileDecision.excludedProfiles,
             reasoningEffort: state.effectiveReasoningEffort,
             clientRequestedReasoningEffort: explicitReasoningDecision.clientRequestedReasoningEffort ?? null,
             presetReasoningEffort: explicitReasoningDecision.presetReasoningEffort ?? null,
@@ -1368,6 +1459,8 @@ export class AlphaRequestProcessor {
               selectedChannel: profile.channelId ?? profile.channel,
               modelSelectionReason: explicitSelectionReason,
               channelSelectionReason: explicitSelectionReason,
+              profileFormulaVersion: explicitProfileDecision.profileFormulaVersion,
+              selectedProfileUtility,
               qualityCeilingModel: profile.modelId,
               costReductionVsCeiling: 0,
             },
@@ -1388,6 +1481,13 @@ export class AlphaRequestProcessor {
             selectedProfile: profile,
             userRoutingPolicyVersion: identity.routingPolicyVersion,
             allowedProfileIds: identity.allowedProfileIds,
+            routingModelVersion: "explicit-model-v1",
+            profileFormulaVersion: explicitProfileDecision.profileFormulaVersion,
+            routingUtilityVersion: routingUtilityPolicy.routingUtilityVersion,
+            formulaMode: routingUtilityPolicy.formulaMode,
+            supplyStrategy: routingUtilityPolicy.supplyStrategy,
+            supplyWeights: routingUtilityPolicy.supplyWeights,
+            routeRefreshReason: explicitRefreshReason,
           },
         });
       } else if (!storedWebIntent) {
@@ -1397,14 +1497,17 @@ export class AlphaRequestProcessor {
         });
       }
       await this.releaseUnusedProbeClaims(probeClaims, profile);
-      return { profile, recoveryProfiles };
+      return { profile, recoveryProfiles, explicitProfileDecision };
     }
 
     const originalStoredProfile = selectedProfileFromSegment(storedSegment, this.options.profiles);
     const storedProfile = selectedProfileFromSegment(storedSegment, effectiveProfiles);
     const previousJudge = record(storedSegmentMetadata.judgeRun) as AlphaJudgeRun | undefined;
     const policyVersionMatches = metadata(storedSegment).userRoutingPolicyVersion === identity.routingPolicyVersion;
-    const formulaVersionMatches = storedSegmentMetadata.routingModelVersion === ACU_ROUTING_MODEL_VERSION;
+    const expectedModelFormulaVersion = modelFormulaVersionForPolicy(routingUtilityPolicy);
+    const formulaVersionMatches = storedSegmentMetadata.routingModelVersion === expectedModelFormulaVersion;
+    const utilityVersionMatches = storedSegmentMetadata.routingUtilityVersion === routingUtilityPolicy.routingUtilityVersion;
+    const formulaModeMatches = storedSegmentMetadata.formulaMode === routingUtilityPolicy.formulaMode;
     const storedAllowedProfileIds = Array.isArray(storedSegmentMetadata.allowedProfileIds)
       ? storedSegmentMetadata.allowedProfileIds.filter((value): value is string => typeof value === "string").sort()
       : [];
@@ -1413,6 +1516,8 @@ export class AlphaRequestProcessor {
     const reused = storedProfile
       && policyVersionMatches
       && formulaVersionMatches
+      && utilityVersionMatches
+      && formulaModeMatches
       && identity.routingPolicy !== "explicit_only"
       && (identity.routingPolicy !== "custom_allowlist" || identity.allowedModelIds.includes(storedProfile.modelId))
       && (identity.allowedProfileIds.length === 0 || identity.allowedProfileIds.includes(storedProfile.executionProfileId))
@@ -1424,7 +1529,7 @@ export class AlphaRequestProcessor {
       const admission = await startAdmissionTrace(stringValue(storedSegment?.judge_evaluation_id));
       let compatible: AlphaExecutionProfile | undefined;
       try {
-        compatible = resolveExplicitProfile(reused.modelId, effectiveProfiles, {
+        const candidates = resolveExplicitProfileCandidates(reused.modelId, effectiveProfiles, {
         protocol: envelope.protocol,
         requireTools: envelope.requiredToolTypes.length > 0,
         requiredToolTypes: envelope.requiredToolTypes,
@@ -1438,6 +1543,10 @@ export class AlphaRequestProcessor {
         hostedWebRequired: envelope.hostedWebRequired,
         webIntent: envelope.webIntent,
         });
+        compatible = candidates.eligibleProfiles.find((candidate) => (
+          candidate.executionProfileId === reused.executionProfileId
+        ));
+        if (!compatible) reuseInvalidationReason = "profile_capability_changed";
       } catch (error) {
         const typed = error instanceof AlphaAdmissionError ? error : undefined;
         await repository.completeAdmissionTrace({
@@ -1475,9 +1584,14 @@ export class AlphaRequestProcessor {
     }
 
     const reusedJudgeEvaluationId = stringValue(storedSegment?.judge_evaluation_id);
-    let routeRefreshReason = reuseInvalidationReason ?? (profilePolicyChanged
-      ? "profile_policy_changed"
-      : !formulaVersionMatches ? "routing_formula_changed" : "work_phase_route_refresh");
+    let routeRefreshReason = reuseInvalidationReason ?? routingReuseInvalidationReason({
+      profilePolicyChanged,
+      routingPolicyVersionMatches: policyVersionMatches,
+      modelFormulaVersionMatches: formulaVersionMatches,
+      routingUtilityVersionMatches: utilityVersionMatches,
+      formulaModeMatches,
+      fallbackReason: "work_phase_route_refresh",
+    })!;
     const profileHealthRefresh = !state.decision.runJudge
       && Boolean(reusedJudgeEvaluationId)
       && Boolean(previousJudge)
@@ -1608,6 +1722,9 @@ export class AlphaRequestProcessor {
           formulaMode: route.formulaMode,
           effectiveQualityBias: route.effectiveQualityBias,
           routingUtilityVersion: route.routingUtilityVersion,
+          profileFormulaVersion: profileFormulaVersionForMode(route.formulaMode ?? "legacy"),
+          supplyStrategy: routingUtilityPolicy.supplyStrategy,
+          supplyWeights: routingUtilityPolicy.supplyWeights,
           v2Counterfactual: route.v2Counterfactual,
           legacyCounterfactual: route.legacyCounterfactual,
           excludedProfiles: route.excludedProfiles,
@@ -1636,7 +1753,13 @@ export class AlphaRequestProcessor {
           userRoutingPolicyVersion: identity.routingPolicyVersion,
           allowedProfileIds: identity.allowedProfileIds,
           routingPreference: identity.routingPreference,
-          routingModelVersion: ACU_ROUTING_MODEL_VERSION,
+          routingModelVersion: route.formulaVersion,
+          profileFormulaVersion: profileFormulaVersionForMode(route.formulaMode ?? "legacy"),
+          routingUtilityVersion: route.routingUtilityVersion,
+          formulaMode: route.formulaMode,
+          effectiveQualityBias: route.effectiveQualityBias,
+          supplyStrategy: routingUtilityPolicy.supplyStrategy,
+          supplyWeights: routingUtilityPolicy.supplyWeights,
           routeRefreshReason,
         },
       });
@@ -2178,6 +2301,9 @@ export class AlphaRequestProcessor {
         formulaMode: route.formulaMode,
         effectiveQualityBias: route.effectiveQualityBias,
         routingUtilityVersion: route.routingUtilityVersion,
+        profileFormulaVersion: profileFormulaVersionForMode(route.formulaMode ?? "legacy"),
+        supplyStrategy: routingUtilityPolicy.supplyStrategy,
+        supplyWeights: routingUtilityPolicy.supplyWeights,
         v2Counterfactual: route.v2Counterfactual,
         legacyCounterfactual: route.legacyCounterfactual,
         reasoningEffort: state.effectiveReasoningEffort,
@@ -2215,7 +2341,13 @@ export class AlphaRequestProcessor {
         userRoutingPolicyVersion: identity.routingPolicyVersion,
         allowedProfileIds: identity.allowedProfileIds,
         routingPreference: identity.routingPreference,
-        routingModelVersion: ACU_ROUTING_MODEL_VERSION,
+        routingModelVersion: route.formulaVersion,
+        profileFormulaVersion: profileFormulaVersionForMode(route.formulaMode ?? "legacy"),
+        routingUtilityVersion: route.routingUtilityVersion,
+        formulaMode: route.formulaMode,
+        effectiveQualityBias: route.effectiveQualityBias,
+        supplyStrategy: routingUtilityPolicy.supplyStrategy,
+        supplyWeights: routingUtilityPolicy.supplyWeights,
       },
     });
     await this.releaseUnusedProbeClaims(probeClaims, route.selectedProfile);
@@ -3039,8 +3171,12 @@ export class AlphaRequestProcessor {
       .filter((candidate) => candidate.health === "healthy" && candidate.usageTrusted)
       .map((candidate) => result.recoveryProfiles.find((profile) => profile.executionProfileId === candidate.executionProfileId))
       .filter((profile): profile is AlphaExecutionProfile => Boolean(profile));
+    const explicitEligibleProfileIds = result.explicitProfileDecision
+      ? new Set(result.explicitProfileDecision.eligibleProfiles.map((profile) => profile.executionProfileId))
+      : undefined;
     const recoveryPool = [...routeProfiles, ...result.recoveryProfiles].filter((profile, index, all) => (
       all.findIndex((candidate) => candidate.executionProfileId === profile.executionProfileId) === index
+      && (!explicitEligibleProfileIds || explicitEligibleProfileIds.has(profile.executionProfileId))
       && profile.modelId === result.profile.modelId && profile.enabled && profile.administratorAllowed
       && profile.health === "healthy" && profile.usageTrusted !== false
       && (!profile.economics || (profile.economics.enabled && profile.economics.health === "healthy"))
@@ -3054,7 +3190,13 @@ export class AlphaRequestProcessor {
         > recoveryContextAdmission.requiredTotalContextTokens
       && this.options.adapters.has(profile.executionProfileId)
     ));
-    if (!result.route) {
+    if (result.explicitProfileDecision) {
+      const explicitRank = new Map(result.explicitProfileDecision.orderedExecutionProfileIds.map((id, index) => [id, index]));
+      recoveryPool.sort((left, right) => (
+        (explicitRank.get(left.executionProfileId) ?? Number.MAX_SAFE_INTEGER)
+        - (explicitRank.get(right.executionProfileId) ?? Number.MAX_SAFE_INTEGER)
+      ));
+    } else if (!result.route) {
       recoveryPool.sort((left, right) => compareExecutionProfiles(
         left, right, recoveryContextAdmission.estimatedInputTokens, this.expectedOutputTokens, originalRequirements,
       ));

@@ -1,4 +1,6 @@
 import { readFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AlphaDatabase } from "../src/alpha/database.js";
 import { AdaptiveProbeWorker } from "../src/alpha/adaptive-probe.js";
@@ -139,6 +141,91 @@ run("Alpha PostgreSQL foundation", () => {
       "judge_official_payg_equivalent_cost",
       "judge_cost_status",
     ]));
+  });
+
+  it("keeps migration 0015 safe for fresh, historical, and already widened schemas", async () => {
+    const migration15 = await readFile(
+      new URL("../migrations/acu/0015_judge_profile_attempt_limit.sql", import.meta.url),
+      "utf8",
+    );
+    const migration16 = await readFile(
+      new URL("../migrations/acu/0016_judge_profile_attempt_limit_5.sql", import.meta.url),
+      "utf8",
+    );
+    const client = new Client({ connectionString: databaseUrl! });
+    await client.connect();
+    const schema = `migration_0015_${randomUUID().replaceAll("-", "")}`;
+    try {
+      await client.query(`CREATE SCHEMA ${schema}`);
+      await client.query(`SET search_path TO ${schema}, public`);
+      await client.query(`
+        CREATE TABLE acu_schema_migrations (
+          migration_version text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        );
+        CREATE TABLE acu_judge_attempts (
+          attempt_index integer NOT NULL
+        );
+      `);
+
+      await client.query(migration15);
+      await client.query(migration15);
+      const fresh = await client.query<{ definition: string; validated: boolean }>(`
+        SELECT pg_get_constraintdef(oid) definition, convalidated validated
+        FROM pg_constraint
+        WHERE conrelid='acu_judge_attempts'::regclass
+          AND conname='acu_judge_attempts_attempt_index_check'
+      `);
+      expect(fresh.rows[0]?.definition).toContain("attempt_index <= 3");
+      expect(fresh.rows[0]?.validated).toBe(true);
+
+      await client.query("ALTER TABLE acu_judge_attempts DROP CONSTRAINT acu_judge_attempts_attempt_index_check");
+      await client.query("DELETE FROM acu_schema_migrations WHERE migration_version LIKE '0015%' OR migration_version LIKE '0016%'");
+      await client.query("INSERT INTO acu_judge_attempts(attempt_index) VALUES (5)");
+      await client.query(migration15);
+      await client.query(migration15);
+      const historical = await client.query<{ rows: string; validated: boolean }>(`
+        SELECT
+          (SELECT count(*)::text FROM acu_judge_attempts) rows,
+          convalidated validated
+        FROM pg_constraint
+        WHERE conrelid='acu_judge_attempts'::regclass
+          AND conname='acu_judge_attempts_attempt_index_check'
+      `);
+      expect(historical.rows[0]).toEqual({ rows: "1", validated: false });
+
+      await client.query(migration16);
+      await client.query(migration15);
+      const widened = await client.query<{ definition: string; validated: boolean; rows: string }>(`
+        SELECT pg_get_constraintdef(oid) definition, convalidated validated,
+          (SELECT count(*)::text FROM acu_judge_attempts) rows
+        FROM pg_constraint
+        WHERE conrelid='acu_judge_attempts'::regclass
+          AND conname='acu_judge_attempts_attempt_index_check'
+      `);
+      expect(widened.rows[0]?.definition).toContain("attempt_index <= 5");
+      expect(widened.rows[0]).toMatchObject({ validated: true, rows: "1" });
+    } finally {
+      await client.query("SET search_path TO public");
+      await client.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+      await client.end();
+    }
+  });
+
+  it("reruns the complete migration runner without changing historical row or version counts", async () => {
+    const before = await database.query<{ versions: string; attempts: string }>(`
+      SELECT
+        (SELECT count(*)::text FROM acu_schema_migrations) versions,
+        (SELECT count(*)::text FROM acu_judge_attempts) attempts
+    `);
+    await database.migrate();
+    await database.migrate();
+    const after = await database.query<{ versions: string; attempts: string }>(`
+      SELECT
+        (SELECT count(*)::text FROM acu_schema_migrations) versions,
+        (SELECT count(*)::text FROM acu_judge_attempts) attempts
+    `);
+    expect(after.rows[0]).toEqual(before.rows[0]);
   });
 
   it("enforces one active segment per task and keeps users isolated", async () => {

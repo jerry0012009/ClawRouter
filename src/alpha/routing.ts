@@ -19,6 +19,7 @@ import type { RuntimeHealth } from "./channel-health.js";
 import type { HealthSnapshot } from "./channel-health.js";
 import type { WorkPhaseDecision } from "./work-phase.js";
 import {
+  ACU_PROFILE_UTILITY_V2_VERSION,
   resolveEffectiveQualityBias,
   scoreExecutionProfilesV2,
   type ProfileRuntimeMetric,
@@ -178,6 +179,27 @@ export type AlphaRouteInput = {
 };
 
 export type ExcludedProfile = { executionProfileId: string; reasons: string[] };
+
+export type ExplicitProfileCandidates = {
+  eligibleProfiles: AlphaExecutionProfile[];
+  evaluations: ProfileEvaluation[];
+  excludedProfiles: ExcludedProfile[];
+  exclusionCounts: Record<ExclusionCategory, number>;
+  candidateContextLimits: Record<string, number>;
+};
+
+export type ExplicitProfileDecision = ExplicitProfileCandidates & {
+  selectedProfile: AlphaExecutionProfile;
+  legacySelectedProfile: AlphaExecutionProfile;
+  v2SelectedProfile?: AlphaExecutionProfile;
+  profileUtilitiesV2: ProfileUtilityV2[];
+  orderedExecutionProfileIds: string[];
+  formulaMode: RoutingUtilityPolicy["formulaMode"];
+  profileFormulaVersion: string;
+  differsFromLegacy: boolean;
+  differenceReason: "same_selection" | "profile_selection_changed";
+  profileSelectionReason: string;
+};
 
 export type ProfileEvaluation = {
   executionProfileId: string;
@@ -832,6 +854,26 @@ export function resolveExplicitProfile(
   profiles: AlphaExecutionProfile[],
   requirements: AlphaRouteRequirements,
 ): AlphaExecutionProfile {
+  const candidates = resolveExplicitProfileCandidates(requestedModel, profiles, requirements);
+  assertExplicitProfileCandidates(requestedModel, requirements, candidates);
+  return [...candidates.eligibleProfiles].sort((left, right) => effectiveProviderSelectionScore(
+    left,
+    requirements,
+    requirements.context?.estimatedInputTokens ?? requirements.contextTokens ?? 0,
+    requirements.expectedOutputTokens ?? 0,
+  ) - effectiveProviderSelectionScore(
+    right,
+    requirements,
+    requirements.context?.estimatedInputTokens ?? requirements.contextTokens ?? 0,
+    requirements.expectedOutputTokens ?? 0,
+  ))[0]!;
+}
+
+export function resolveExplicitProfileCandidates(
+  requestedModel: string,
+  profiles: AlphaExecutionProfile[],
+  requirements: AlphaRouteRequirements,
+): ExplicitProfileCandidates {
   const matching = profiles.filter((candidate) => candidate.modelId === requestedModel);
   const evaluated = matching.map((candidate) => ({
     candidate,
@@ -849,27 +891,45 @@ export function resolveExplicitProfile(
     executionProfileId: candidate.executionProfileId,
     reasons,
   })));
-  const profile = evaluated
-    .filter((item) => item.reasons.length === 0)
-    .sort((left, right) => effectiveProviderSelectionScore(
-      left.candidate,
-      requirements,
-      requirements.context?.estimatedInputTokens ?? requirements.contextTokens ?? 0,
-      requirements.expectedOutputTokens ?? 0,
-    ) - effectiveProviderSelectionScore(
-      right.candidate,
-      requirements,
-      requirements.context?.estimatedInputTokens ?? requirements.contextTokens ?? 0,
-      requirements.expectedOutputTokens ?? 0,
-    ))[0]?.candidate;
-  if (profile) return profile;
-  const contextOnly = evaluated.length > 0 && evaluated.every((item) => (
+  return {
+    eligibleProfiles: evaluated.filter((item) => item.reasons.length === 0).map((item) => item.candidate),
+    evaluations: evaluated.map(({ candidate, reasons }) => ({
+      executionProfileId: candidate.executionProfileId,
+      canonicalModelId: candidate.modelId,
+      providerId: candidate.provider,
+      channelId: candidate.channelId ?? candidate.channel,
+      eligible: reasons.length === 0,
+      reasons,
+      excludedAtStage: exclusionStage(reasons),
+      profileState: candidate.runtimeHealth?.profileState ?? candidate.health,
+      channelState: candidate.runtimeHealth?.channelState ?? "unknown",
+      providerState: candidate.runtimeHealth?.providerState ?? candidate.economics?.health ?? "unknown",
+      probeState: candidate.runtimeHealth?.probeState ?? (candidate.requiresFreshProbe ? "stale" : "not_required"),
+      blockingScope: candidate.runtimeHealth?.blockingScope,
+      statusReason: candidate.runtimeHealth?.statusReason,
+    })),
+    excludedProfiles: evaluated.filter((item) => item.reasons.length > 0).map(({ candidate, reasons }) => ({
+      executionProfileId: candidate.executionProfileId,
+      reasons,
+    })),
+    exclusionCounts: normalizedExclusionCounts,
+    candidateContextLimits: Object.fromEntries(matching.map((candidate) => (
+      [candidate.executionProfileId, effectiveContextCeiling(candidate)]
+    ))),
+  };
+}
+
+function assertExplicitProfileCandidates(
+  requestedModel: string,
+  requirements: AlphaRouteRequirements,
+  candidates: ExplicitProfileCandidates,
+): void {
+  if (candidates.eligibleProfiles.length > 0) return;
+  const contextOnly = candidates.evaluations.length > 0 && candidates.evaluations.every((item) => (
     item.reasons.length > 0 && item.reasons.every((reason) => reason === "context_window")
   ));
   if (contextOnly) {
-    const candidateContextLimits = Object.fromEntries(evaluated.map(({ candidate }) => (
-      [candidate.executionProfileId, effectiveContextCeiling(candidate)]
-    )));
+    const candidateContextLimits = candidates.candidateContextLimits;
     throw new AlphaAdmissionError(
       "context_length_exceeded",
       "The request exceeds the maximum context available from eligible execution profiles.",
@@ -879,24 +939,24 @@ export function resolveExplicitProfile(
         required_total_context_tokens: requirements.context?.requiredTotalContextTokens ?? requirements.contextTokens ?? 0,
         maximum_available_context_tokens: Math.max(...Object.values(candidateContextLimits)),
         candidate_context_limits: candidateContextLimits,
-        exclusion_counts: normalizedExclusionCounts,
+        exclusion_counts: candidates.exclusionCounts,
       },
     );
   }
-  if (normalizedExclusionCounts.tool_capability > 0) {
+  if (candidates.exclusionCounts.tool_capability > 0) {
     throw new AlphaAdmissionError(
       "tool_capability_unavailable",
       "No compatible Alpha execution profile supports required tool capabilities.",
       400,
       {
         required_tool_types: requirements.requiredToolTypes ?? [],
-        exclusion_counts: normalizedExclusionCounts,
+        exclusion_counts: candidates.exclusionCounts,
       },
     );
   }
   if (requirements.allowedProfileIds) {
     const allowed = new Set(requirements.allowedProfileIds);
-    const allowedEvaluations = evaluated.filter(({ candidate }) => allowed.has(candidate.executionProfileId));
+    const allowedEvaluations = candidates.evaluations.filter((evaluation) => allowed.has(evaluation.executionProfileId));
     const temporaryReasons = new Set(["provider_cooldown", "usage_untrusted"]);
     if (allowedEvaluations.some(({ reasons }) => reasons.length > 0
       && reasons.every((reason) => reason.startsWith("health_") || temporaryReasons.has(reason)))) {
@@ -904,15 +964,74 @@ export function resolveExplicitProfile(
         "allowed_profiles_temporarily_unavailable",
         "All compatible execution Profiles allowed by this API Token are temporarily unavailable.",
         503,
-        { exclusion_counts: normalizedExclusionCounts },
+        { exclusion_counts: candidates.exclusionCounts },
       );
     }
     throw new AlphaAdmissionError(
       "no_profile_satisfies_token_supply_policy",
       "No execution Profile allowed by this API Token satisfies the explicit model request.",
       400,
-      { exclusion_counts: normalizedExclusionCounts },
+      { exclusion_counts: candidates.exclusionCounts },
     );
   }
   throw new Error(`Explicit model ${requestedModel} has no compatible execution profile`);
+}
+
+export function resolveExplicitProfileDecision(input: {
+  requestedModel: string;
+  profiles: AlphaExecutionProfile[];
+  requirements: AlphaRouteRequirements;
+  inputTokens: number;
+  expectedOutputTokens: number;
+  utilityPolicy: RoutingUtilityPolicy;
+}): ExplicitProfileDecision {
+  const candidates = resolveExplicitProfileCandidates(input.requestedModel, input.profiles, input.requirements);
+  assertExplicitProfileCandidates(input.requestedModel, input.requirements, candidates);
+  const legacyOrdered = [...candidates.eligibleProfiles].sort((left, right) =>
+    effectiveProviderSelectionScore(left, input.requirements, input.inputTokens, input.expectedOutputTokens)
+    - effectiveProviderSelectionScore(right, input.requirements, input.inputTokens, input.expectedOutputTokens));
+  const legacySelectedProfile = legacyOrdered[0]!;
+  const computeV2 = input.utilityPolicy.formulaMode !== "legacy";
+  const v2 = computeV2 ? scoreExecutionProfilesV2(
+    candidates.eligibleProfiles.map((profile) => ({
+      ...profile,
+      utilityEffectivePrices: profileEffectivePrices(profile),
+    })),
+    input.inputTokens,
+    input.expectedOutputTokens,
+    input.utilityPolicy,
+  ) : undefined;
+  const selectedProfile = input.utilityPolicy.formulaMode === "active" && v2
+    ? candidates.eligibleProfiles.find((profile) => profile.executionProfileId === v2.selected.executionProfileId)!
+    : legacySelectedProfile;
+  const v2SelectedProfile = v2
+    ? candidates.eligibleProfiles.find((profile) => profile.executionProfileId === v2.selected.executionProfileId)
+    : undefined;
+  const orderedExecutionProfileIds = input.utilityPolicy.formulaMode === "active" && v2
+    ? v2.utilities.map((utility) => utility.executionProfileId)
+    : legacyOrdered.map((profile) => profile.executionProfileId);
+  const selectedUtility = v2?.utilities.find((utility) => utility.executionProfileId === selectedProfile.executionProfileId);
+  const profileSelectionReason = input.utilityPolicy.formulaMode === "active" && selectedUtility
+    ? [
+        `Selected ${selectedProfile.executionProfileId} with Profile utility ${selectedUtility.profileUtility.toFixed(4)}`,
+        `weights cost=${input.utilityPolicy.supplyWeights.cost}% speed=${input.utilityPolicy.supplyWeights.speed}% reliability=${input.utilityPolicy.supplyWeights.reliability}%`,
+        `utilities cost=${selectedUtility.costUtility.toFixed(4)} speed=${selectedUtility.speedUtility.toFixed(4)} reliability=${selectedUtility.reliabilityUtility.toFixed(4)}`,
+        `latency_source=${selectedUtility.metricSource}`,
+      ].join("; ")
+    : `Selected ${selectedProfile.executionProfileId} with legacy effective Provider selection score.`;
+  const differsFromLegacy = Boolean(v2SelectedProfile
+    && v2SelectedProfile.executionProfileId !== legacySelectedProfile.executionProfileId);
+  return {
+    ...candidates,
+    selectedProfile,
+    legacySelectedProfile,
+    v2SelectedProfile,
+    profileUtilitiesV2: v2?.utilities ?? [],
+    orderedExecutionProfileIds,
+    formulaMode: input.utilityPolicy.formulaMode,
+    profileFormulaVersion: computeV2 ? ACU_PROFILE_UTILITY_V2_VERSION : "legacy-provider-selection-v1",
+    differsFromLegacy,
+    differenceReason: differsFromLegacy ? "profile_selection_changed" : "same_selection",
+    profileSelectionReason,
+  };
 }

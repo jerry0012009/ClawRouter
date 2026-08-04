@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { recommendModelV2 } from "../src/acu/decision.js";
 import { continuousTierProbabilities } from "../src/acu/math.js";
 import type { AlphaExecutionProfile } from "../src/alpha/routing.js";
-import { routeWithCurrentAcuFormula } from "../src/alpha/routing.js";
+import { resolveExplicitProfileDecision, routeWithCurrentAcuFormula } from "../src/alpha/routing.js";
+import { routingReuseInvalidationReason } from "../src/alpha/processor.js";
 import {
   DEFAULT_ROUTING_UTILITY_POLICY,
   resolveEffectiveQualityBias,
@@ -40,6 +41,7 @@ function profile(
     health: "healthy",
     enabled: true,
     administratorAllowed: true,
+    billingPrice: { inputPricePerMillion: cost, outputPricePerMillion: cost },
     utilityEffectivePrices: { inputPricePerMillion: cost, outputPricePerMillion: cost },
     utilityRuntimeMetric: {
       firstEventP50Ms: latency,
@@ -274,5 +276,86 @@ describe("ACU Router V2 Profile utility", () => {
         systemQualityBiasFloor: 70,
       }),
     ).toBe(70);
+  });
+
+  it("applies Supply Strategy to explicit models while preserving legacy and shadow selection", () => {
+    const candidates = [
+      profile("cheap", 1, 900, 0.7),
+      profile("fast", 3, 100, 0.8),
+      profile("reliable", 5, 400, 1),
+    ];
+    const requirements = {
+      protocol: "responses" as const,
+      requireTools: false,
+      requireThinking: false,
+      contextTokens: 1_000,
+    };
+    const decide = (formulaMode: "legacy" | "shadow" | "active", supplyWeights: {
+      cost: number; speed: number; reliability: number;
+    }) => resolveExplicitProfileDecision({
+      requestedModel: "gpt-5.6-luna",
+      profiles: candidates,
+      requirements,
+      inputTokens: 100_000,
+      expectedOutputTokens: 4_000,
+      utilityPolicy: {
+        ...DEFAULT_ROUTING_UTILITY_POLICY,
+        formulaMode,
+        supplyWeights,
+      },
+    });
+
+    const legacy = decide("legacy", { cost: 40, speed: 25, reliability: 35 });
+    const shadow = decide("shadow", { cost: 0, speed: 100, reliability: 0 });
+    expect(shadow.selectedProfile.executionProfileId).toBe(legacy.selectedProfile.executionProfileId);
+    expect(shadow.v2SelectedProfile?.executionProfileId).toBe("fast");
+    expect(shadow.profileUtilitiesV2).toHaveLength(3);
+
+    expect(decide("active", { cost: 100, speed: 0, reliability: 0 }).selectedProfile.executionProfileId).toBe("cheap");
+    expect(decide("active", { cost: 0, speed: 100, reliability: 0 }).selectedProfile.executionProfileId).toBe("fast");
+    expect(decide("active", { cost: 0, speed: 0, reliability: 100 }).selectedProfile.executionProfileId).toBe("reliable");
+    const balanced = decide("active", { cost: 40, speed: 25, reliability: 35 });
+    expect(balanced.selectedProfile.executionProfileId).toBe(
+      [...balanced.profileUtilitiesV2].sort((left, right) => left.rank - right.rank)[0]?.executionProfileId,
+    );
+    expect(balanced.orderedExecutionProfileIds).toEqual(
+      [...balanced.profileUtilitiesV2].sort((left, right) => left.rank - right.rank)
+        .map((utility) => utility.executionProfileId),
+    );
+  });
+});
+
+describe("Segment routing utility invalidation", () => {
+  const same = {
+    profilePolicyChanged: false,
+    routingPolicyVersionMatches: true,
+    modelFormulaVersionMatches: true,
+    routingUtilityVersionMatches: true,
+    formulaModeMatches: true,
+  };
+
+  it.each([
+    ["custom bias", { routingUtilityVersionMatches: false }],
+    ["supply strategy", { routingUtilityVersionMatches: false }],
+    ["administrator supply preset", { routingUtilityVersionMatches: false }],
+    ["shadow to active", { formulaModeMatches: false, modelFormulaVersionMatches: false }],
+  ])("invalidates reuse when %s changes", (_label, changed) => {
+    expect(routingReuseInvalidationReason({ ...same, ...changed })).toBe(
+      changed.modelFormulaVersionMatches === false ? "routing_formula_changed" : "routing_utility_changed",
+    );
+  });
+
+  it("keeps invalidation priority stable and reuses identical configuration", () => {
+    expect(routingReuseInvalidationReason({
+      ...same,
+      profilePolicyChanged: true,
+      routingPolicyVersionMatches: false,
+      modelFormulaVersionMatches: false,
+      routingUtilityVersionMatches: false,
+    })).toBe("profile_policy_changed");
+    expect(routingReuseInvalidationReason({ ...same, fallbackReason: "work_phase_route_refresh" })).toBe(
+      "work_phase_route_refresh",
+    );
+    expect(routingReuseInvalidationReason(same)).toBeUndefined();
   });
 });

@@ -15,6 +15,7 @@ export {
   normalizedEntropy,
   estimatedQuality,
   normalizeProbabilities,
+  normalizeBenefitUtilities,
   solveAbilityParameter,
   tierSufficiency,
   continuousTierProbabilities,

@@ -1,8 +1,13 @@
 import { logarithmicRelativeUtility } from "../acu/decision.js";
+import { normalizeBenefitUtilities } from "../acu/math.js";
 import type { AlphaExecutionProfile, WorkPhaseBiasInput } from "./routing.js";
 
-export const ACU_PROFILE_UTILITY_V2_VERSION = "acu-profile-utility-v2";
+export const ACU_PROFILE_UTILITY_V2_VERSION = "acu-profile-utility-v2.1";
 export const ACU_ROUTING_UTILITY_CONFIG_VERSION = "acu-routing-utility-config-v1";
+export const PROFILE_COST_MINIMUM_MEANINGFUL_RANGE = 0.2;
+export const PROFILE_SPEED_MINIMUM_MEANINGFUL_RANGE = 0.2;
+export const PROFILE_RELIABILITY_MINIMUM_MEANINGFUL_RANGE = 0.1;
+export const ACU_UTILITY_NORMALIZATION_VERSION = "acu-benefit-range-v1";
 
 export type FormulaMode = "legacy" | "shadow" | "active";
 export type SupplyStrategy = "lowest_cost" | "balanced" | "low_latency" | "high_reliability";
@@ -51,7 +56,7 @@ export const DEFAULT_ROUTING_UTILITY_POLICY: RoutingUtilityPolicy = {
   supplyStrategy: "balanced",
   supplyWeights: { cost: 40, speed: 25, reliability: 35 },
   acuHighBiasOffset: 40,
-  modelCostLogScale: 2.5,
+  modelCostLogScale: 0.75,
   profileCostLogScale: 2.5,
   profileSpeedLogScale: 2.5,
   latency: {
@@ -84,6 +89,16 @@ export type ProfileUtilityV2 = {
   reliabilityUtility: number;
   costUtility: number;
   speedUtility: number;
+  rawReliabilityUtility: number;
+  rawCostUtility: number;
+  rawSpeedUtility: number;
+  normalizedReliabilityUtility: number;
+  normalizedCostUtility: number;
+  normalizedSpeedUtility: number;
+  costContribution: number;
+  speedContribution: number;
+  reliabilityContribution: number;
+  normalizationVersion: typeof ACU_UTILITY_NORMALIZATION_VERSION;
   profileUtility: number;
   selected: boolean;
   rank: number;
@@ -222,7 +237,7 @@ export function scoreExecutionProfilesV2(
     row.value && row.value > 0 ? [row.value] : [],
   );
   const minimumLatency = positiveLatencies.length > 0 ? Math.min(...positiveLatencies) : undefined;
-  const utilities = profiles.map((profile, index): ProfileUtilityV2 => {
+  const rawRows = profiles.map((profile, index) => {
     const metric = profile.utilityRuntimeMetric;
     let reliability = policy.reliability.unknownDefault;
     if (metric && metric.consideredAttempts >= policy.reliability.minimumSamples) {
@@ -237,12 +252,12 @@ export function scoreExecutionProfilesV2(
     ) {
       reliability *= policy.reliability.degradedMultiplier;
     }
-    const costUtility = logarithmicRelativeUtility(
+    const rawCostUtility = logarithmicRelativeUtility(
       costs[index],
       minimumCost,
       policy.profileCostLogScale,
     );
-    const speedUtility =
+    const rawSpeedUtility =
       minimumLatency === undefined || latencyRows[index].value === undefined
         ? 1
         : logarithmicRelativeUtility(
@@ -250,22 +265,58 @@ export function scoreExecutionProfilesV2(
             minimumLatency,
             policy.profileSpeedLogScale,
           );
-    const reliabilityUtility = clamp01(reliability);
+    const rawReliabilityUtility = clamp01(reliability);
     return {
-      executionProfileId: profile.executionProfileId,
+      profile,
       profileCost: costs[index],
       profileLatencyMs: latencyRows[index].value,
+      rawReliabilityUtility,
+      rawCostUtility,
+      rawSpeedUtility,
+      metricSource: latencyRows[index].source,
+    };
+  });
+  const normalizedCosts = normalizeBenefitUtilities(
+    rawRows.map((row) => row.rawCostUtility),
+    PROFILE_COST_MINIMUM_MEANINGFUL_RANGE,
+  );
+  const normalizedSpeeds = normalizeBenefitUtilities(
+    rawRows.map((row) => row.rawSpeedUtility),
+    PROFILE_SPEED_MINIMUM_MEANINGFUL_RANGE,
+  );
+  const normalizedReliabilities = normalizeBenefitUtilities(
+    rawRows.map((row) => row.rawReliabilityUtility),
+    PROFILE_RELIABILITY_MINIMUM_MEANINGFUL_RANGE,
+  );
+  const utilities = rawRows.map((row, index): ProfileUtilityV2 => {
+    const costUtility = normalizedCosts[index];
+    const speedUtility = normalizedSpeeds[index];
+    const reliabilityUtility = normalizedReliabilities[index];
+    const costContribution = (weights.cost / 100) * costUtility;
+    const speedContribution = (weights.speed / 100) * speedUtility;
+    const reliabilityContribution = (weights.reliability / 100) * reliabilityUtility;
+    return {
+      executionProfileId: row.profile.executionProfileId,
+      profileCost: row.profileCost,
+      profileLatencyMs: row.profileLatencyMs,
+      rawReliabilityUtility: row.rawReliabilityUtility,
+      rawCostUtility: row.rawCostUtility,
+      rawSpeedUtility: row.rawSpeedUtility,
+      normalizedReliabilityUtility: reliabilityUtility,
+      normalizedCostUtility: costUtility,
+      normalizedSpeedUtility: speedUtility,
       reliabilityUtility,
       costUtility,
       speedUtility,
-      profileUtility:
-        (weights.cost / 100) * costUtility +
-        (weights.speed / 100) * speedUtility +
-        (weights.reliability / 100) * reliabilityUtility,
+      costContribution,
+      speedContribution,
+      reliabilityContribution,
+      normalizationVersion: ACU_UTILITY_NORMALIZATION_VERSION,
+      profileUtility: costContribution + speedContribution + reliabilityContribution,
       selected: false,
       rank: 0,
       formulaVersion: ACU_PROFILE_UTILITY_V2_VERSION,
-      metricSource: latencyRows[index].source,
+      metricSource: row.metricSource,
     };
   });
   const profileById = new Map(profiles.map((profile) => [profile.executionProfileId, profile]));
@@ -273,21 +324,21 @@ export function scoreExecutionProfilesV2(
     if (weights.cost === 100)
       return (
         left.profileCost - right.profileCost ||
-        right.reliabilityUtility - left.reliabilityUtility ||
+        right.rawReliabilityUtility - left.rawReliabilityUtility ||
         left.executionProfileId.localeCompare(right.executionProfileId)
       );
     if (weights.speed === 100)
       return (
         (left.profileLatencyMs ?? Number.POSITIVE_INFINITY) -
           (right.profileLatencyMs ?? Number.POSITIVE_INFINITY) ||
-        right.reliabilityUtility - left.reliabilityUtility ||
+        right.rawReliabilityUtility - left.rawReliabilityUtility ||
         left.executionProfileId.localeCompare(right.executionProfileId)
       );
     if (weights.reliability === 100)
       return (
-        right.reliabilityUtility - left.reliabilityUtility ||
-        right.speedUtility - left.speedUtility ||
-        right.costUtility - left.costUtility ||
+        right.rawReliabilityUtility - left.rawReliabilityUtility ||
+        right.rawSpeedUtility - left.rawSpeedUtility ||
+        right.rawCostUtility - left.rawCostUtility ||
         left.executionProfileId.localeCompare(right.executionProfileId)
       );
     return (

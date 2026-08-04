@@ -1017,7 +1017,7 @@ run("Alpha PostgreSQL request processor", () => {
       attempts: "2",
       usage_reports: "1",
       formula_mode: "active",
-      profile_formula_version: "acu-profile-utility-v2",
+      profile_formula_version: "acu-profile-utility-v2.1",
     });
     const decision = await database.query<{ inputs: Record<string, unknown> }>(
       `SELECT formula_inputs_json inputs FROM acu_route_decisions
@@ -2086,8 +2086,8 @@ run("Alpha PostgreSQL request processor", () => {
       formulaMode: "active",
       supplyStrategy: "lowest_cost",
       supplyWeights: { cost: 100, speed: 0, reliability: 0 },
-      routingModelVersion: "acu-model-utility-v2",
-      profileFormulaVersion: "acu-profile-utility-v2",
+      routingModelVersion: "acu-model-utility-v2.1",
+      profileFormulaVersion: "acu-profile-utility-v2.1",
     });
   });
 

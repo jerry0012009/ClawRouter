@@ -12,6 +12,23 @@ export function clamp(value: number, minimum = 0, maximum = 1): number {
   return Math.min(maximum, Math.max(minimum, value));
 }
 
+/** Normalize benefit-oriented utilities within the current eligible set. */
+export function normalizeBenefitUtilities(
+  values: number[],
+  minimumMeaningfulRange: number,
+): number[] {
+  const finite = values.filter(Number.isFinite);
+  if (finite.length === 0) return values.map(() => 0);
+  const minimum = Math.min(...finite);
+  const maximum = Math.max(...finite);
+  const range = maximum - minimum;
+  if (range <= 0) return values.map((value) => (Number.isFinite(value) ? 0.5 : 0));
+  const denominator = Math.max(range, Math.max(0, minimumMeaningfulRange));
+  return values.map((value) => Number.isFinite(value)
+    ? clamp((value - minimum) / denominator)
+    : 0);
+}
+
 export function sigmoid(value: number): number {
   if (value >= 0) {
     const z = Math.exp(-value);

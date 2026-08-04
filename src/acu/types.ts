@@ -121,6 +121,17 @@ export type AcuModelEstimate = {
   qualityUtility: number;
   costUtility: number;
   valueUtility: number;
+  rawQualityUtility?: number;
+  rawCostUtility?: number;
+  normalizedQualityUtility?: number;
+  normalizedCostUtility?: number;
+  qualityContribution?: number;
+  costContribution?: number;
+  normalizationQualityRange?: number;
+  normalizationCostRange?: number;
+  normalizationQualityDenominator?: number;
+  normalizationCostDenominator?: number;
+  normalizationVersion?: string;
   qualityWeight?: number;
   costWeight?: number;
   rank?: number;

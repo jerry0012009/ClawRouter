@@ -250,18 +250,26 @@ describe("selection corridor cache", () => {
     const result = await internal.calculateSelectionCorridor(10_000, 1_000, {
       formulaMode: "shadow", routingPreference: "economy", qualityBias: -60,
     }) as { effective: Array<{
+      selectedQuality: number; qualityLower: number; qualityUpper: number;
       formulaVersion: string; qualityWeight?: number; costWeight?: number;
       modelCandidateUtilities: Array<{ qualityUtility: number; costUtility: number;
         qualityWeight?: number; costWeight?: number; formulaVersion?: string }>;
-    }> };
+    }>; assumptions: Record<string, unknown> };
     const point = result.effective[50];
 
     expect(point.formulaVersion).not.toBe("acu-model-utility-v2");
     expect(point.qualityWeight).toBeCloseTo(0.2, 12);
     expect(point.costWeight).toBeCloseTo(0.8, 12);
+    expect(point.qualityLower).toBeLessThanOrEqual(point.selectedQuality);
+    expect(point.selectedQuality).toBeLessThanOrEqual(point.qualityUpper);
+    expect(result.assumptions).toMatchObject({
+      corridorBand: "selected_candidate_uncertainty",
+      corridorCenter: "selected_candidate_quality",
+      corridorInterpolation: "client_visual_only",
+    });
     expect(point.modelCandidateUtilities.length).toBeGreaterThan(0);
     for (const candidate of point.modelCandidateUtilities) {
-      expect(candidate.formulaVersion).toBe("acu-model-utility-v2");
+      expect(candidate.formulaVersion).toBe("acu-model-utility-v2.1");
       expect(candidate.qualityUtility).toBeGreaterThanOrEqual(0);
       expect(candidate.qualityUtility).toBeLessThanOrEqual(1);
       expect(candidate.costUtility).toBeGreaterThanOrEqual(0);

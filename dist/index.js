@@ -4305,6 +4305,16 @@ function readAcuRuntimeConfig(overrides = {}) {
 function clamp(value, minimum = 0, maximum = 1) {
   return Math.min(maximum, Math.max(minimum, value));
 }
+function normalizeBenefitUtilities(values, minimumMeaningfulRange) {
+  const finite = values.filter(Number.isFinite);
+  if (finite.length === 0) return values.map(() => 0);
+  const minimum = Math.min(...finite);
+  const maximum = Math.max(...finite);
+  const range = maximum - minimum;
+  if (range <= 0) return values.map((value) => Number.isFinite(value) ? 0.5 : 0);
+  const denominator = Math.max(range, Math.max(0, minimumMeaningfulRange));
+  return values.map((value) => Number.isFinite(value) ? clamp((value - minimum) / denominator) : 0);
+}
 function sigmoid(value) {
   if (value >= 0) {
     const z2 = Math.exp(-value);
@@ -10342,6 +10352,7 @@ export {
   isParetoEfficient,
   isReasoningModel,
   logUsage,
+  normalizeBenefitUtilities,
   normalizeProbabilities,
   normalizedEntropy,
   openAcuRoutingStore,

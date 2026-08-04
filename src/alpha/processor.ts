@@ -764,9 +764,9 @@ export class AlphaRequestProcessor {
 
   selectionCorridor(inputTokens: number, expectedOutputTokens: number, policy?: SelectionCorridorPolicy): Promise<Record<string, unknown>> {
     const qualityPresets = policy?.qualityPresets ?? {
-      economy: -60,
-      balanced: 0,
-      quality: 60,
+      economy: 0,
+      balanced: 40,
+      quality: 70,
     };
     if ([qualityPresets.economy, qualityPresets.balanced, qualityPresets.quality]
       .some((value) => !Number.isInteger(value) || value < -100 || value > 100)) {
@@ -908,8 +908,8 @@ export class AlphaRequestProcessor {
             profileCandidateUtilities: route.v2Counterfactual?.profileCandidates ?? [],
             formulaVersion: route.formulaVersion,
             routingUtilityVersion: route.routingUtilityVersion,
-            qualityLower: Math.min(...candidates.map((candidate) => candidate.qualityLower * 100)),
-            qualityUpper: Math.max(...candidates.map((candidate) => candidate.qualityUpper * 100)),
+            qualityLower: route.candidateEstimates.find((candidate) => candidate.candidateId === route.recommendation.recommended.candidateId)!.qualityLower * 100,
+            qualityUpper: route.candidateEstimates.find((candidate) => candidate.candidateId === route.recommendation.recommended.candidateId)!.qualityUpper * 100,
             candidates: candidates.map((candidate) => ({
               candidateId: candidate.candidateId,
               modelId: candidate.modelId,
@@ -920,8 +920,19 @@ export class AlphaRequestProcessor {
               quality: candidate.estimatedQuality * 100,
               costCny: candidate.estimatedCallCost,
               valueUtility: candidate.valueUtility,
+              rawQualityUtility: candidate.rawQualityUtility,
+              rawCostUtility: candidate.rawCostUtility,
               qualityUtility: candidate.qualityUtility,
               costUtility: candidate.costUtility,
+              normalizedQualityUtility: candidate.normalizedQualityUtility,
+              normalizedCostUtility: candidate.normalizedCostUtility,
+              qualityContribution: candidate.qualityContribution,
+              costContribution: candidate.costContribution,
+              normalizationQualityRange: candidate.normalizationQualityRange,
+              normalizationCostRange: candidate.normalizationCostRange,
+              normalizationQualityDenominator: candidate.normalizationQualityDenominator,
+              normalizationCostDenominator: candidate.normalizationCostDenominator,
+              normalizationVersion: candidate.normalizationVersion,
               qualityWeight: candidate.qualityWeight,
               costWeight: candidate.costWeight,
               rank: candidate.rank,
@@ -934,9 +945,9 @@ export class AlphaRequestProcessor {
       return points;
     };
     const presetBias = policy.qualityPresets ?? {
-      economy: -60,
-      balanced: 0,
-      quality: 60,
+      economy: 0,
+      balanced: 40,
+      quality: 70,
     };
     const series = Object.fromEntries(preferences.map((preference) => [
       preference,
@@ -949,7 +960,7 @@ export class AlphaRequestProcessor {
     );
     return {
       defaultPreference: policy.routingPreference ?? "balanced",
-      formulaVersion: utilityPolicy.formulaMode === "active" ? "acu-model-utility-v2" : ACU_ROUTING_MODEL_VERSION,
+      formulaVersion: utilityPolicy.formulaMode === "active" ? ACU_MODEL_UTILITY_V2_VERSION : ACU_ROUTING_MODEL_VERSION,
       routingUtilityVersion: utilityPolicy.routingUtilityVersion,
       resolvedQualityBias: policy.qualityBias ?? presetBias[policy.routingPreference ?? "balanced"],
       supplyStrategy: utilityPolicy.supplyStrategy,
@@ -972,6 +983,9 @@ export class AlphaRequestProcessor {
           : "all_eligible_additive_utility",
         difficultyDistribution: "continuous_tier_probabilities",
         difficultyDistributionVersion: "acu-curve-thresholds-v1",
+        corridorBand: "selected_candidate_uncertainty",
+        corridorCenter: "selected_candidate_quality",
+        corridorInterpolation: "client_visual_only",
       },
       executionPresetSeries: executionPresets.map((preset) => ({
         candidateId: preset.candidateId,

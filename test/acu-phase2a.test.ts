@@ -14,6 +14,7 @@ import {
   hasSevereTierConflict,
   interpolateModelCurve,
   normalizeProbabilities,
+  normalizeBenefitUtilities,
   parseJudgeResult,
   buildJudgeSystemPrompt,
   recommendModel,
@@ -35,6 +36,16 @@ afterEach(async () => {
 });
 
 describe("Phase 2A constrained tier model", () => {
+  it("soft-normalizes benefit utilities without amplifying noise or invalid values", () => {
+    expect(normalizeBenefitUtilities([0.7], 0.2)).toEqual([0.5]);
+    expect(normalizeBenefitUtilities([0.7, 0.7], 0.2)).toEqual([0.5, 0.5]);
+    expect(normalizeBenefitUtilities([0.2, 0.6, 1], 0.2)[1]).toBeCloseTo(0.5, 12);
+    expect(normalizeBenefitUtilities([0.7, 0.75], 0.2)[0]).toBe(0);
+    expect(normalizeBenefitUtilities([0.7, 0.75], 0.2)[1]).toBeCloseTo(0.25, 12);
+    expect(normalizeBenefitUtilities([0.7, Number.NaN, 0.9], 0.2)).toEqual([0, 0, 1]);
+    expect(normalizeBenefitUtilities([Number.NaN, Number.POSITIVE_INFINITY], 0.2)).toEqual([0, 0]);
+  });
+
   it("applies a bounded logit shift with diminishing gains near saturation", () => {
     expect(applyLogitShift(0.42, 0)).toBeCloseTo(0.42, 15);
     expect(applyLogitShift(0.42, 0.22)).toBeGreaterThan(0.42);

@@ -1,6 +1,12 @@
 import { ACU_DEFAULT_QUALITY_TARGET, ACU_DEFAULT_SWITCH_COST_USD } from "./config.js";
 import { getAcuCatalog, getRoutingEligibleModels, interpolateModelCurve } from "./catalog.js";
-import { applyLogitShift, clamp, normalizeProbabilities, normalizedEntropy } from "./math.js";
+import {
+  applyLogitShift,
+  clamp,
+  normalizeBenefitUtilities,
+  normalizeProbabilities,
+  normalizedEntropy,
+} from "./math.js";
 import { enabledExecutionPresets, type AcuExecutionPreset } from "./execution-presets.js";
 import type {
   AcuModelCatalogEntry,
@@ -11,7 +17,9 @@ import type {
 
 export const ACU_COST_LOG_SCALE = 2.5;
 export const VALUE_UTILITY_NEAR_TIE_RATIO = 0.995;
-export const ACU_MODEL_UTILITY_V2_VERSION = "acu-model-utility-v2";
+export const ACU_MODEL_UTILITY_V2_VERSION = "acu-model-utility-v2.1";
+export const MODEL_QUALITY_MINIMUM_MEANINGFUL_RANGE = 0.2;
+export const MODEL_COST_MINIMUM_MEANINGFUL_RANGE = 0.25;
 
 export type AcuDecisionInput = {
   probabilities: AcuTierProbabilities;
@@ -332,27 +340,57 @@ export function recommendModelV2(
   const minimumCost = Math.min(
     ...selectable.map((estimate) => estimate.estimatedCallCost),
   );
-  const qualityBias = Math.max(-100, Math.min(100, input.qualityBias));
-  const qualityWeight = (qualityBias + 100) / 200;
-  const costWeight = 1 - qualityWeight;
-  for (const estimate of estimates) {
-    const selectableEstimate = selectable.includes(estimate);
-    estimate.qualityUtility = selectableEstimate
-      ? clamp(estimate.conservativeQuality)
-      : 0;
-    estimate.costUtility = selectableEstimate
+  const rawQualityUtilities = estimates.map((estimate) =>
+    selectable.includes(estimate) ? clamp(estimate.conservativeQuality) : Number.NaN);
+  const rawCostUtilities = estimates.map((estimate) =>
+    selectable.includes(estimate)
       ? logarithmicRelativeUtility(
           estimate.estimatedCallCost,
           minimumCost,
           input.modelCostLogScale,
         )
+      : Number.NaN);
+  const normalizedQualityUtilities = normalizeBenefitUtilities(
+    rawQualityUtilities,
+    MODEL_QUALITY_MINIMUM_MEANINGFUL_RANGE,
+  );
+  const normalizedCostUtilities = normalizeBenefitUtilities(
+    rawCostUtilities,
+    MODEL_COST_MINIMUM_MEANINGFUL_RANGE,
+  );
+  const finiteRawQualities = rawQualityUtilities.filter(Number.isFinite);
+  const finiteRawCosts = rawCostUtilities.filter(Number.isFinite);
+  const qualityRange = Math.max(...finiteRawQualities) - Math.min(...finiteRawQualities);
+  const costRange = Math.max(...finiteRawCosts) - Math.min(...finiteRawCosts);
+  const qualityDenominator = Math.max(qualityRange, MODEL_QUALITY_MINIMUM_MEANINGFUL_RANGE);
+  const costDenominator = Math.max(costRange, MODEL_COST_MINIMUM_MEANINGFUL_RANGE);
+  const qualityBias = Math.max(-100, Math.min(100, input.qualityBias));
+  const qualityWeight = (qualityBias + 100) / 200;
+  const costWeight = 1 - qualityWeight;
+  for (const [index, estimate] of estimates.entries()) {
+    const selectableEstimate = selectable.includes(estimate);
+    estimate.rawQualityUtility = Number.isFinite(rawQualityUtilities[index])
+      ? rawQualityUtilities[index]
       : 0;
+    estimate.rawCostUtility = Number.isFinite(rawCostUtilities[index])
+      ? rawCostUtilities[index]
+      : 0;
+    estimate.qualityUtility = normalizedQualityUtilities[index];
+    estimate.costUtility = normalizedCostUtilities[index];
+    estimate.normalizedQualityUtility = estimate.qualityUtility;
+    estimate.normalizedCostUtility = estimate.costUtility;
     estimate.qualityWeight = qualityWeight;
     estimate.costWeight = costWeight;
+    estimate.qualityContribution = qualityWeight * estimate.qualityUtility;
+    estimate.costContribution = costWeight * estimate.costUtility;
     estimate.valueUtility = selectableEstimate
-      ? qualityWeight * estimate.qualityUtility +
-        costWeight * estimate.costUtility
+      ? estimate.qualityContribution + estimate.costContribution
       : Number.NEGATIVE_INFINITY;
+    estimate.normalizationQualityRange = qualityRange;
+    estimate.normalizationCostRange = costRange;
+    estimate.normalizationQualityDenominator = qualityDenominator;
+    estimate.normalizationCostDenominator = costDenominator;
+    estimate.normalizationVersion = "acu-benefit-range-v1";
     estimate.formulaVersion = ACU_MODEL_UTILITY_V2_VERSION;
     estimate.selected = false;
   }

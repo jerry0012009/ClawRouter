@@ -88,6 +88,11 @@ describe("ACU Router V2 model utility", () => {
         0.5 * candidate.qualityUtility + 0.5 * candidate.costUtility,
         12,
       );
+      expect(Number.isFinite(candidate.rawQualityUtility)).toBe(true);
+      expect(Number.isFinite(candidate.rawCostUtility)).toBe(true);
+      expect(candidate.normalizedQualityUtility).toBe(candidate.qualityUtility);
+      expect(candidate.normalizedCostUtility).toBe(candidate.costUtility);
+      expect(candidate.normalizationVersion).toBe("acu-benefit-range-v1");
       expect(Number.isFinite(candidate.valueUtility)).toBe(true);
     }
   });
@@ -153,7 +158,7 @@ describe("ACU Router V2 model utility", () => {
       ...base,
       utilityPolicy: { ...DEFAULT_ROUTING_UTILITY_POLICY, formulaMode: "active" },
     });
-    expect(active.formulaVersion).toBe("acu-model-utility-v2");
+    expect(active.formulaVersion).toBe("acu-model-utility-v2.1");
     expect(active.recommendation.recommended.candidateId).toBe(
       active.v2Counterfactual?.selectedCandidateId,
     );
@@ -186,6 +191,13 @@ describe("ACU Router V2 Profile utility", () => {
     });
     expect(result.selected.executionProfileId).toBe(expected);
     expect(result.utilities).toHaveLength(3);
+    for (const utility of result.utilities) {
+      expect(Number.isFinite(utility.rawCostUtility)).toBe(true);
+      expect(Number.isFinite(utility.rawSpeedUtility)).toBe(true);
+      expect(Number.isFinite(utility.rawReliabilityUtility)).toBe(true);
+      expect(utility.normalizationVersion).toBe("acu-benefit-range-v1");
+      expect(utility.formulaVersion).toBe("acu-profile-utility-v2.1");
+    }
   });
 
   it("does not treat unknown or small-sample data as fastest or perfectly reliable", () => {
@@ -252,7 +264,7 @@ describe("ACU Router V2 Profile utility", () => {
     });
     expect(result.selected.executionProfileId).toBe("healthy");
     expect(
-      result.utilities.find((value) => value.executionProfileId === "degraded")?.reliabilityUtility,
+      result.utilities.find((value) => value.executionProfileId === "degraded")?.rawReliabilityUtility,
     ).toBeCloseTo(0.9 * DEFAULT_ROUTING_UTILITY_POLICY.reliability.degradedMultiplier, 12);
   });
 

@@ -828,7 +828,7 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
                 ? "profile_selection_changed"
                 : "same_selection",
           modelFormulaVersion: ACU_MODEL_UTILITY_V2_VERSION,
-          profileFormulaVersion: "acu-profile-utility-v2",
+          profileFormulaVersion: ACU_PROFILE_UTILITY_V2_VERSION,
           modelCandidates: v2Recommendation.estimates,
           profileCandidates: [...v2ProfileUtilitiesByModel.values()].flat(),
         }

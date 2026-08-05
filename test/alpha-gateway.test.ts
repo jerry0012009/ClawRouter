@@ -9,6 +9,7 @@ import {
 } from "../src/alpha/gateway.js";
 import { createNativeProviderAdapter } from "../src/alpha/provider.js";
 import { bodySha256, trustedIdentityHeaders } from "../src/alpha/trusted-identity.js";
+import { DEFAULT_ROUTING_UTILITY_POLICY } from "../src/alpha/routing-utility-v2.js";
 
 const sharedSecret = "alpha-test-shared-secret-not-production";
 const servers: Server[] = [];
@@ -78,11 +79,14 @@ describe("Alpha native protocol gateway", () => {
   it("protects Channel Monitor and records an authorized manual pause", async () => {
     const pauses: Array<{ channelId: string; durationMinutes: number; actor: string }> = [];
     const monitorQueries: Array<Record<string, unknown>> = [];
+    const monitorPolicies: Array<Record<string, unknown> | undefined> = [];
     const gatewayPort = await listen(createAlphaGatewayServer({
       trustedIdentitySecret: sharedSecret,
       adminChannelMonitor: {
         token: "monitor-token",
-        async load(query) { monitorQueries.push(query); return { ...query, profiles: [] }; },
+        async load(query, utilityPolicy) {
+          monitorQueries.push(query); monitorPolicies.push(utilityPolicy); return { ...query, profiles: [] };
+        },
         async pause(channelId, durationMinutes, actor) {
           pauses.push({ channelId, durationMinutes, actor });
           return { channelId, state: "open", recovery: "half_open_probe" };
@@ -94,10 +98,15 @@ describe("Alpha native protocol gateway", () => {
     expect(unauthorized.status).toBe(401);
     const monitor = await fetch(
       `http://127.0.0.1:${gatewayPort}/internal/admin/channel-monitor?range=6h&supplyStrategy=low_latency&scenario=small`,
-      { headers: { authorization: "Bearer monitor-token" } },
+      { headers: { authorization: "Bearer monitor-token",
+        "x-acu-monitor-routing-utility-policy": JSON.stringify({
+          ...DEFAULT_ROUTING_UTILITY_POLICY, profileCostLogScale: 7,
+        }) } },
     );
     expect(monitor.status).toBe(200);
     expect(monitorQueries).toEqual([{ range: "6h", supplyStrategy: "low_latency", scenario: "small" }]);
+    expect(monitorPolicies).toHaveLength(1);
+    expect(monitorPolicies[0]?.profileCostLogScale).toBe(7);
     const response = await fetch(`http://127.0.0.1:${gatewayPort}/internal/admin/channel-monitor`, {
       method: "POST",
       headers: { authorization: "Bearer monitor-token", "content-type": "application/json" },

@@ -8,6 +8,7 @@ import { relayProviderResponse, type RelayResult } from "./stream-relay.js";
 import { verifyTrustedIdentity, type TrustedNewApiIdentity } from "./trusted-identity.js";
 import { AlphaAdmissionError } from "./routing.js";
 import type { MonitorQuery } from "./channel-monitor.js";
+import type { RoutingUtilityPolicy } from "./routing-utility-v2.js";
 import type { SelectionCorridorPolicy } from "./processor.js";
 
 export type AlphaExecutionResolution = {
@@ -46,7 +47,7 @@ export type AlphaGatewayOptions = {
   };
   adminChannelMonitor?: {
     token: string;
-    load(query: Partial<Record<keyof MonitorQuery, string>>): Promise<Record<string, unknown>>;
+    load(query: Partial<Record<keyof MonitorQuery, string>>, utilityPolicy?: RoutingUtilityPolicy): Promise<Record<string, unknown>>;
     pause(channelId: string, durationMinutes: 30 | 120, actor: string): Promise<Record<string, unknown>>;
   };
   adminSelectionCorridor?: {
@@ -163,11 +164,16 @@ export function createAlphaGatewayServer(options: AlphaGatewayOptions): Server {
       try {
         const result =
           request.method === "GET"
-            ? await options.adminChannelMonitor.load({
+            ? await options.adminChannelMonitor.load(
+              {
                 range: url.searchParams.get("range") ?? undefined,
                 supplyStrategy: url.searchParams.get("supplyStrategy") ?? undefined,
                 scenario: url.searchParams.get("scenario") ?? undefined,
-              })
+              },
+              typeof request.headers["x-acu-monitor-routing-utility-policy"] === "string"
+                ? JSON.parse(request.headers["x-acu-monitor-routing-utility-policy"]) as RoutingUtilityPolicy
+                : undefined,
+            )
             : await (async () => {
                 const body = JSON.parse((await readRequestBody(request, 16 * 1024)).toString("utf8")) as Record<string, unknown>;
                 const durationMinutes = Number(body.durationMinutes);

@@ -9,6 +9,7 @@ import {
   scoreMonitorProfiles,
 } from "../src/alpha/channel-monitor.js";
 import { routingCandidatesForModel, type ConfiguredExecutionProfile } from "../src/alpha/server.js";
+import { DEFAULT_ROUTING_UTILITY_POLICY } from "../src/alpha/routing-utility-v2.js";
 
 function profile(overrides: Partial<ConfiguredExecutionProfile> = {}): ConfiguredExecutionProfile {
   return {
@@ -164,6 +165,29 @@ describe("Supply observability semantics", () => {
     expect(lowLatency.get(fast.executionProfileId)?.rank).toBe(1);
     expect(balanced.get(cheap.executionProfileId)?.costContribution).toBeGreaterThan(0);
     expect(long.get(cheap.executionProfileId)?.profileCost).toBeGreaterThan(balanced.get(cheap.executionProfileId)?.profileCost ?? 0);
+  });
+
+  it("scores Profiles only against the same model and protocol", () => {
+    const responses = profile({ executionProfileId: "responses:gpt-5.6-luna:responses", protocols: ["responses"] });
+    const messages = profile({ executionProfileId: "messages:gpt-5.6-luna:messages", protocols: ["messages"] });
+    const scores = scoreMonitorProfiles(
+      [responses, messages], new Map(), { supplyStrategy: "balanced", scenario: "standard" },
+    );
+    expect(scores.get(responses.executionProfileId)?.rank).toBe(1);
+    expect(scores.get(messages.executionProfileId)?.rank).toBe(1);
+  });
+
+  it("uses the supplied production Utility policy", () => {
+    const candidate = profile();
+    const aggregates = new Map([[candidate.executionProfileId, {
+      requestCount: 20, successCount: 19, firstEventSampleCount: 20, firstEventP50Ms: 250,
+    }]]);
+    const scores = scoreMonitorProfiles(
+      [candidate], aggregates, { supplyStrategy: "balanced", scenario: "standard" },
+      { ...DEFAULT_ROUTING_UTILITY_POLICY,
+        latency: { ...DEFAULT_ROUTING_UTILITY_POLICY.latency, minimumSamples: 50 } },
+    );
+    expect(scores.get(candidate.executionProfileId)?.metricSource).toBe("all_unknown");
   });
 
   it("publishes presets only when an administrator-enabled Profile supports their effort", () => {

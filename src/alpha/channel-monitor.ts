@@ -42,14 +42,23 @@ export function scoreMonitorProfiles(
   policy: RoutingUtilityPolicy = DEFAULT_ROUTING_UTILITY_POLICY,
 ): Map<string, ProfileUtilityV2> {
   const scenario = MONITOR_SCENARIOS[query.scenario];
+  const suppliedPolicy = policy === DEFAULT_ROUTING_UTILITY_POLICY
+    ? { ...policy, supplyWeights: MONITOR_SUPPLY_WEIGHTS[query.supplyStrategy] }
+    : policy;
   const utilityPolicy: RoutingUtilityPolicy = {
-    ...policy,
+    ...suppliedPolicy,
     supplyStrategy: query.supplyStrategy,
-    supplyWeights: MONITOR_SUPPLY_WEIGHTS[query.supplyStrategy],
   };
   const utilities = new Map<string, ProfileUtilityV2>();
-  for (const modelId of [...new Set(profiles.map((profile) => profile.modelId))]) {
-    const modelProfiles = profiles.filter((profile) => profile.modelId === modelId).map((profile) => {
+  const groups = new Map<string, { modelId: string; protocol: AlphaExecutionProfile["protocols"][number] }>();
+  for (const profile of profiles) {
+    const protocol = profile.protocols[0];
+    if (protocol) groups.set(`${profile.modelId}\n${protocol}`, { modelId: profile.modelId, protocol });
+  }
+  for (const { modelId, protocol } of groups.values()) {
+    const modelProfiles = profiles.filter((profile) =>
+      profile.modelId === modelId && profile.protocols[0] === protocol
+    ).map((profile) => {
       const aggregate = aggregateByProfile.get(profile.executionProfileId);
       return {
         ...profile,
@@ -67,7 +76,7 @@ export function scoreMonitorProfiles(
     try {
       const plan = buildCandidateExecutionPlans({
         eligibleProfiles: modelProfiles,
-        requirements: { protocol: "responses", requireTools: false, requireThinking: false },
+        requirements: { protocol, requireTools: false, requireThinking: false },
         inputTokens: scenario.inputTokens,
         expectedOutputTokens: scenario.outputTokens,
         utilityPolicy: { ...utilityPolicy, allowedCandidateIds: [] },

@@ -412,7 +412,7 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
     },
     adminChannelMonitor: {
       token: serviceConfig.adminTraceToken,
-      async load(requestedQuery) {
+      async load(requestedQuery, monitorUtilityPolicy) {
         const { range, supplyStrategy, scenario } = normalizeMonitorQuery(requestedQuery);
         const { interval, bucket } = monitorRangeSpec(range);
         const catalogValues: unknown[] = [];
@@ -608,21 +608,23 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
           profiles.map((item) => item.profile).filter((profile) => routingEligibleIds.has(profile.executionProfileId)),
           monitorAggregates,
           { supplyStrategy, scenario },
+          monitorUtilityPolicy,
         );
-        const scoredCountByModel = new Map<string, number>();
+        const scoredCountByGroup = new Map<string, number>();
         for (const profile of publicProfiles) {
-          if (profileScores.has(profile.executionProfileId)) scoredCountByModel.set(
-            profile.canonicalModel,
-            (scoredCountByModel.get(profile.canonicalModel) ?? 0) + 1,
-          );
+          const group = `${profile.canonicalModel}\n${profile.protocol[0] ?? ""}`;
+          if (profileScores.has(profile.executionProfileId)) {
+            scoredCountByGroup.set(group, (scoredCountByGroup.get(group) ?? 0) + 1);
+          }
         }
         for (const profile of publicProfiles) {
           const score = profileScores.get(profile.executionProfileId);
           if (!score) continue;
+          const group = `${profile.canonicalModel}\n${profile.protocol[0] ?? ""}`;
           Object.assign(profile, {
             profileUtility: score.profileUtility,
             profileRank: score.rank,
-            profileCandidateCount: scoredCountByModel.get(profile.canonicalModel) ?? 0,
+            profileCandidateCount: scoredCountByGroup.get(group) ?? 0,
             profileCost: score.profileCost,
             profileLatencyMs: score.profileLatencyMs ?? null,
             costUtility: score.costUtility,

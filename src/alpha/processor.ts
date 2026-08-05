@@ -1036,7 +1036,7 @@ export class AlphaRequestProcessor {
         expectedOutputTokenMultiplier: preset.expectedOutputTokenMultiplier,
         estimatedOutputTokens: Math.round(expectedOutputTokens * preset.expectedOutputTokenMultiplier),
         points: executionPresetPoints.get(preset.candidateId) ?? [],
-      })),
+      })).filter((preset) => preset.points.length > 0),
       series,
       effective,
     };

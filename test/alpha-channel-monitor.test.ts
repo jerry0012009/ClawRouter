@@ -6,7 +6,7 @@ import {
   monitorReasoningMetadata,
   monitorRoutingStatus,
 } from "../src/alpha/channel-monitor.js";
-import type { ConfiguredExecutionProfile } from "../src/alpha/server.js";
+import { routingCandidatesForModel, type ConfiguredExecutionProfile } from "../src/alpha/server.js";
 
 function profile(overrides: Partial<ConfiguredExecutionProfile> = {}): ConfiguredExecutionProfile {
   return {
@@ -138,5 +138,25 @@ describe("Supply observability semantics", () => {
     expect(monitorRangeSpec("6h")).toEqual({ interval: "6 hours", bucket: "5 minutes" });
     expect(monitorRangeSpec("24h")).toEqual({ interval: "24 hours", bucket: "15 minutes" });
     expect(monitorRangeSpec("7d")).toEqual({ interval: "7 days", bucket: "1 hour" });
+  });
+
+  it("publishes presets only when an administrator-enabled Profile supports their effort", () => {
+    const incompatible = profile({
+      reasoningOverride: { rejectedEfforts: ["max"] },
+      health: "cooldown",
+    });
+    expect(routingCandidatesForModel("gpt-5.6-luna", [incompatible])
+      .map((candidate) => candidate.candidateId)).toEqual(["gpt-5.6-luna"]);
+
+    const compatible = profile({
+      executionProfileId: "compatible:gpt-5.6-luna:responses",
+      supportedReasoningEfforts: ["max"],
+      health: "open",
+    });
+    expect(routingCandidatesForModel("gpt-5.6-luna", [incompatible, compatible])
+      .map((candidate) => candidate.candidateId))
+      .toEqual(["gpt-5.6-luna", "gpt-5.6-luna@max"]);
+    expect(routingCandidatesForModel("gpt-5.6-luna", [compatible])
+      .map((candidate) => candidate.candidateId)).toContain("gpt-5.6-luna@max");
   });
 });

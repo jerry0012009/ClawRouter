@@ -249,7 +249,8 @@ export function recommendModel(input: AcuDecisionInput): AcuRecommendation {
     const model = models.find((candidate) => candidate.modelId === preset.modelId);
     return model ? [estimateOne(
       model, difficulty, entropyPenalty, inputTokens, outputTokens, Math.max(0, input.judgeCost),
-      fallbackCallCost, qualityTarget, switchCost, fallbackRiskScale, input.effectivePrices?.[model.modelId], preset,
+      fallbackCallCost, qualityTarget, switchCost, fallbackRiskScale,
+      input.effectivePrices?.[preset.candidateId] ?? input.effectivePrices?.[model.modelId], preset,
     )] : [];
   });
   const allowedCandidateIds = new Set(input.allowedCandidateIds ?? []);

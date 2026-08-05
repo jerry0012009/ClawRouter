@@ -84,6 +84,7 @@ describe("trusted New API identity v3", () => {
     const value: TrustedNewApiIdentity = {
       ...identity(),
       identityVersion: "v4",
+      formulaMode: "active",
       allowedCandidateIds: ["gpt-5.6-luna@max", "gpt-5.6-sol@high"],
       candidatePreferenceScores: {
         "gpt-5.6-sol@high": 70,
@@ -97,6 +98,7 @@ describe("trusted New API identity v3", () => {
     );
     const verified = verifyTrustedIdentity(headers, body, { sharedSecret: secret });
     expect(verified.candidatePreferenceScores).toEqual(value.candidatePreferenceScores);
+    expect(resolvedRoutingUtilityPolicy(verified).formulaMode).toBe("active");
 
     for (const tampered of [
       { ...headers, "x-acu-candidate-preference-scores": '{"gpt-5.6-luna@max":160,"gpt-5.6-sol@high":70}' },

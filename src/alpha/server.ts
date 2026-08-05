@@ -11,7 +11,7 @@ import { createAcuJudgeRunner } from "./judge-runner.js";
 import { AlphaRequestProcessor, hydrateExecutionProfileRuntime } from "./processor.js";
 import { createNativeProviderAdapter, type NativeProviderConfig } from "./provider.js";
 import { AlphaRepository } from "./repository.js";
-import type { AlphaExecutionProfile } from "./routing.js";
+import { profileSupportsExecutionPreset, type AlphaExecutionProfile } from "./routing.js";
 import { cashCnyPerNominalUsd, readProviderEconomicsCatalog, type ProviderEconomics } from "./provider-economics.js";
 import { UsageOutboxWorker } from "./usage-outbox.js";
 import { canonicalAdvertisedContextWindow } from "./context-admission.js";
@@ -95,6 +95,46 @@ function capabilityTier(modelId: string): "LUNA" | "TERRA" | "SOL" | "FRONTIER" 
   if (modelId.includes("sol")) return "SOL";
   if (modelId.includes("5.5") || modelId.includes("opus")) return "FRONTIER";
   return "LUNA";
+}
+
+export function routingCandidatesForModel(
+  modelId: string,
+  profiles: AlphaExecutionProfile[],
+): Array<{
+  candidateId: string;
+  modelId: string;
+  displayName: string;
+  kind: "base" | "preset";
+  presetId?: string;
+  reasoningEffort?: string;
+  calibrationStatus?: string;
+}> {
+  const catalog = getAcuModel(modelId);
+  const capabilityProfiles = profiles.filter((profile) =>
+    profile.modelId === modelId
+    && profile.enabled
+    && profile.administratorAllowed
+    && profile.autoRouteEnabled !== false
+    && (!profile.verificationStatus
+      || ["verified", "verified_provisional"].includes(profile.verificationStatus))
+  );
+  return [{
+    candidateId: modelId,
+    modelId,
+    displayName: catalog?.displayName ?? modelId,
+    kind: "base",
+  }, ...enabledExecutionPresets()
+    .filter((preset) => preset.modelId === modelId
+      && capabilityProfiles.some((profile) => profileSupportsExecutionPreset(profile, preset)))
+    .map((preset) => ({
+      candidateId: preset.candidateId,
+      modelId,
+      displayName: preset.displayName,
+      kind: "preset" as const,
+      presetId: preset.presetId,
+      reasoningEffort: preset.canonicalReasoningEffort,
+      calibrationStatus: preset.calibrationStatus,
+    }))];
 }
 
 function validateProfile(value: unknown, index: number): ConfiguredExecutionProfile {
@@ -556,25 +596,7 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
               Number(left.multiplier ?? Number.POSITIVE_INFINITY) - Number(right.multiplier ?? Number.POSITIVE_INFINITY));
             const best = ordered[0];
             const backup = ordered.find((profile) => profile.provider !== best?.provider) ?? ordered[1];
-            const routingCandidates = [
-              {
-                candidateId: modelId,
-                modelId,
-                displayName: catalog?.displayName ?? modelId,
-                kind: "base",
-              },
-              ...enabledExecutionPresets()
-                .filter((preset) => preset.modelId === modelId)
-                .map((preset) => ({
-                  candidateId: preset.candidateId,
-                  modelId,
-                  displayName: preset.displayName,
-                  kind: "preset",
-                  presetId: preset.presetId,
-                  reasoningEffort: preset.canonicalReasoningEffort,
-                  calibrationStatus: preset.calibrationStatus,
-                })),
-            ];
+            const routingCandidates = routingCandidatesForModel(modelId, serviceConfig.profiles);
             return {
               modelId,
               vendor: catalog?.provider ?? "Unknown",

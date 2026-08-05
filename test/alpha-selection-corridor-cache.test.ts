@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { AlphaRequestProcessor, codexSelectionCorridorRequirements, selectionCorridorJudge } from "../src/alpha/processor.js";
 import { ACU_CURVE_DIFFICULTIES, getAcuModel, interpolateModelCurve } from "../src/acu/catalog.js";
 import { applyLogitShift, continuousTierProbabilities } from "../src/acu/math.js";
-import type { AlphaExecutionProfile } from "../src/alpha/routing.js";
+import { routeWithCurrentAcuFormula, type AlphaExecutionProfile } from "../src/alpha/routing.js";
+import { DEFAULT_ROUTING_UTILITY_POLICY } from "../src/alpha/routing-utility-v2.js";
 
 const lunaProfile: AlphaExecutionProfile = {
   executionProfileId: "verified:gpt-5.6-luna:responses",
@@ -262,6 +263,62 @@ describe("selection corridor cache", () => {
       .toEqual(["gpt-5.6-luna@max"]);
     },
   );
+
+  it("uses the runtime-selected preset Profile cost in Pricing", async () => {
+    const cheap = {
+      ...lunaProfile,
+      executionProfileId: "cheap:gpt-5.6-luna:responses",
+      billingPrice: { inputPricePerMillion: 1, outputPricePerMillion: 1 } as const,
+      reasoningOverride: { rejectedEfforts: ["max"] },
+    };
+    const compatible = {
+      ...lunaProfile,
+      executionProfileId: "max:gpt-5.6-luna:responses",
+      billingPrice: { inputPricePerMillion: 10, outputPricePerMillion: 10 } as const,
+    };
+    const policy = {
+      ...DEFAULT_ROUTING_UTILITY_POLICY,
+      formulaMode: "active" as const,
+      qualityBias: 0,
+      supplyWeights: { cost: 100, speed: 0, reliability: 0 },
+      allowedCandidateIds: ["gpt-5.6-luna@max"],
+    };
+    const processor = new AlphaRequestProcessor({} as never);
+    const internal = processor as unknown as {
+      effectiveProfiles: () => Promise<{ profiles: AlphaExecutionProfile[]; probeClaims: [] }>;
+      withProfileRuntimeMetrics: (profiles: AlphaExecutionProfile[]) => Promise<AlphaExecutionProfile[]>;
+      calculateSelectionCorridor: (inputTokens: number, outputTokens: number,
+        policy: Record<string, unknown>) => Promise<Record<string, unknown>>;
+    };
+    internal.effectiveProfiles = async () => ({ profiles: [cheap, compatible], probeClaims: [] });
+    internal.withProfileRuntimeMetrics = async (profiles) => profiles;
+    const corridor = await internal.calculateSelectionCorridor(10_000, 1_000, policy) as {
+      effective: Array<{ difficulty: number; selectedExecutionProfileId: string;
+        candidates: Array<{ candidateId: string; estimatedCallCost: number }> }>;
+      executionPresetSeries: Array<{ candidateId: string;
+        points: Array<{ difficulty: number; estimatedCallCost: number }> }>;
+    };
+    const runtime = routeWithCurrentAcuFormula({
+      judge: selectionCorridorJudge(50), judgeCost: 0, inputTokens: 10_000,
+      expectedOutputTokens: 1_000, effectiveQualityTarget: 80,
+      routingPreference: "balanced", profiles: [cheap, compatible],
+      requirements: codexSelectionCorridorRequirements(10_000, 1_000), utilityPolicy: policy,
+    });
+    const pricingPoint = corridor.effective.find((point) => point.difficulty === 50)!;
+    const pricingCandidate = pricingPoint.candidates.find((candidate) =>
+      candidate.candidateId === "gpt-5.6-luna@max")!;
+    const presetPoint = corridor.executionPresetSeries[0]?.points.find((point) =>
+      point.difficulty === 50);
+    expect(runtime.selectedProfile.executionProfileId).toBe("max:gpt-5.6-luna:responses");
+    expect(pricingPoint.selectedExecutionProfileId).toBe(runtime.selectedProfile.executionProfileId);
+    expect(pricingCandidate.estimatedCallCost).toBeCloseTo(
+      runtime.recommendation.recommended.estimatedCallCost, 12,
+    );
+    expect(presetPoint?.estimatedCallCost).toBeCloseTo(
+      runtime.recommendation.recommended.estimatedCallCost, 12,
+    );
+    expect(runtime.recommendation.recommended.estimatedCallCost).toBeCloseTo(0.116, 12);
+  });
 
   it("publishes V2 model utilities while shadow keeps the legacy selection", async () => {
     const processor = new AlphaRequestProcessor({} as never);

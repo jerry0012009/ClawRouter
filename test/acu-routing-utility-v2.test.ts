@@ -360,7 +360,7 @@ describe("ACU Router V2 model utility", () => {
     }
   });
 
-  it("selects a preset-compatible Profile without changing Standard Profile selection", () => {
+  it("prices preset and Standard candidates from their independently selected Profiles", () => {
     const cheap = {
       ...profile("cheap", 1, 100, 0.9),
       contextWindow: 1_000_000,
@@ -412,7 +412,118 @@ describe("ACU Router V2 model utility", () => {
         },
       });
       expect(standard.selectedProfile.executionProfileId).toBe("cheap");
+      if (formulaMode === "active") {
+        expect(preset.recommendation.recommended.estimatedCallCost).toBeCloseTo(0.116, 12);
+        expect(preset.candidateEstimates[0]).toMatchObject({
+          candidateId: "gpt-5.6-luna@max",
+          bestExecutionProfileId: "compatible",
+          executionProfileIds: ["compatible"],
+        });
+        expect(preset.providerCandidateEstimates[0]?.effectiveCashCost).toBeCloseTo(
+          preset.recommendation.recommended.estimatedCallCost, 12,
+        );
+        expect(standard.recommendation.recommended.estimatedCallCost).toBeCloseTo(0.011, 12);
+        expect(standard.candidateEstimates[0]).toMatchObject({
+          candidateId: "gpt-5.6-luna",
+          bestExecutionProfileId: "cheap",
+        });
+      }
     }
+  });
+
+  it("changes the active candidate choice when preset execution requires an expensive Profile", () => {
+    const cheapLuna = {
+      ...profile("cheap-luna", 1, 100, 0.9), contextWindow: 1_000_000, usageTrusted: true,
+      reasoningOverride: { rejectedEfforts: ["max"] },
+    };
+    const maxLuna = {
+      ...profile("max-luna", 10, 100, 0.9), contextWindow: 1_000_000, usageTrusted: true,
+      supportedReasoningEfforts: ["max"],
+    };
+    const sol = {
+      ...profile("standard-sol", 3, 100, 0.9), modelId: "gpt-5.6-sol",
+      contextWindow: 1_000_000, usageTrusted: true,
+    };
+    const judge = {
+      ...continuousTierProbabilities(0.5),
+      difficultyScoreRaw: 50, difficultyIndex: 50, difficultyScore: 50, factorComposite: 50,
+      difficultyMethodVersion: "acu-difficulty-index-v1" as const,
+      factors: { reasoningDepth: 0, taskScope: 0, constraintDensity: 0, toolDependency: 0,
+        verificationBurden: 0, contextBurden: 0 },
+      signals: [], explanation: "fixture",
+    };
+    const incorrectlyCheap = recommendModelV2({
+      probabilities: judge, difficultyScore: 50, inputTokens: 10_000,
+      expectedOutputTokens: 1_000, judgeCost: 0,
+      eligibleModelIds: ["gpt-5.6-luna", "gpt-5.6-sol"], includeExecutionPresets: true,
+      allowedCandidateIds: ["gpt-5.6-luna@max", "gpt-5.6-sol"],
+      effectivePrices: {
+        "gpt-5.6-luna@max": { inputPricePerMillion: 1, outputPricePerMillion: 1 },
+        "gpt-5.6-sol": { inputPricePerMillion: 3, outputPricePerMillion: 3 },
+      },
+      qualityBias: 0, modelCostLogScale: 2.5,
+    });
+    expect(incorrectlyCheap.recommended.candidateId).toBe("gpt-5.6-luna@max");
+    const routeInput = {
+      judge, judgeCost: 0, inputTokens: 10_000, expectedOutputTokens: 1_000,
+      effectiveQualityTarget: 70, profiles: [cheapLuna, maxLuna, sol],
+      requirements: { protocol: "responses" as const, requireTools: true,
+        requireThinking: false, contextTokens: 11_000 },
+      includeExecutionPresets: true,
+    };
+    const route = routeWithCurrentAcuFormula({
+      ...routeInput,
+      utilityPolicy: {
+        ...DEFAULT_ROUTING_UTILITY_POLICY, formulaMode: "active", qualityBias: 0,
+        supplyWeights: { cost: 100, speed: 0, reliability: 0 },
+        allowedCandidateIds: ["gpt-5.6-luna@max", "gpt-5.6-sol"],
+      },
+    });
+    expect(route.recommendation.recommended.candidateId).toBe("gpt-5.6-sol");
+    expect(route.selectedProfile.executionProfileId).toBe("standard-sol");
+    expect(route.candidateEstimates.find((candidate) =>
+      candidate.candidateId === "gpt-5.6-luna@max"))
+      .toMatchObject({ bestExecutionProfileId: "max-luna", estimatedCallCost: 0.116 });
+    const preferred = routeWithCurrentAcuFormula({
+      ...routeInput,
+      utilityPolicy: {
+        ...DEFAULT_ROUTING_UTILITY_POLICY, formulaMode: "active", qualityBias: 0,
+        supplyWeights: { cost: 100, speed: 0, reliability: 0 },
+        allowedCandidateIds: ["gpt-5.6-luna@max", "gpt-5.6-sol"],
+        candidatePreferenceScores: { "gpt-5.6-luna@max": 200, "gpt-5.6-sol": 0 },
+      },
+    });
+    expect(preferred.formulaMode).toBe("active");
+    expect(preferred.recommendation.recommended.candidateId).toBe("gpt-5.6-luna@max");
+    expect(preferred.selectedProfile.executionProfileId).toBe("max-luna");
+  });
+
+  it("rejects an allowed preset before utility calculation when no Profile can execute its effort", () => {
+    const incompatible = {
+      ...profile("incompatible", 1, 100, 0.9), contextWindow: 1_000_000, usageTrusted: true,
+      reasoningOverride: { rejectedEfforts: ["max"] },
+    };
+    expect(() => routeWithCurrentAcuFormula({
+      judge: {
+        ...continuousTierProbabilities(0.5),
+        difficultyScoreRaw: 50, difficultyIndex: 50, difficultyScore: 50, factorComposite: 50,
+        difficultyMethodVersion: "acu-difficulty-index-v1" as const,
+        factors: { reasoningDepth: 0, taskScope: 0, constraintDensity: 0, toolDependency: 0,
+          verificationBurden: 0, contextBurden: 0 },
+        signals: [], explanation: "fixture",
+      },
+      judgeCost: 0, inputTokens: 10_000, expectedOutputTokens: 1_000,
+      effectiveQualityTarget: 70, profiles: [incompatible],
+      requirements: { protocol: "responses", requireTools: true,
+        requireThinking: false, contextTokens: 11_000 },
+      includeExecutionPresets: true,
+      utilityPolicy: {
+        ...DEFAULT_ROUTING_UTILITY_POLICY, formulaMode: "active",
+        allowedCandidateIds: ["gpt-5.6-luna@max"],
+      },
+    })).toThrowError(expect.objectContaining({
+      errorType: "reasoning_effort_unavailable", statusCode: 400,
+    }));
   });
 });
 

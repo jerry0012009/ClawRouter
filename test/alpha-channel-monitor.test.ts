@@ -3,6 +3,7 @@ import {
   combinedMonitorState,
   mergeSupplyInventory,
   monitorRangeSpec,
+  monitorProbeMode,
   monitorReasoningMetadata,
   monitorRoutingStatus,
   normalizeMonitorQuery,
@@ -147,6 +148,12 @@ describe("Supply observability semantics", () => {
     expect(normalizeMonitorQuery({})).toEqual({ range: "24h", supplyStrategy: "balanced", scenario: "standard" });
     expect(normalizeMonitorQuery({ range: "7d", supplyStrategy: "lowest_cost", scenario: "long" }))
       .toEqual({ range: "7d", supplyStrategy: "lowest_cost", scenario: "long" });
+  });
+
+  it("classifies only explicit full-pool metadata as full-pool Probe evidence", () => {
+    expect(monitorProbeMode({ probeMode: "full_pool", trigger: "scheduled_activity" })).toBe("full_pool");
+    expect(monitorProbeMode({ trigger: "recovery_queue" })).toBe("recovery");
+    expect(monitorProbeMode(null)).toBe("recovery");
   });
 
   it("returns production Profile V2 ranks, contributions, metrics, and scenario costs", () => {

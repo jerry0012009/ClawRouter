@@ -18,7 +18,7 @@ import { canonicalAdvertisedContextWindow } from "./context-admission.js";
 import { ACU_ROUTING_MODEL_VERSION } from "../acu/config.js";
 import { getAcuModel } from "../acu/catalog.js";
 import { enabledExecutionPresets } from "../acu/execution-presets.js";
-import { combinedMonitorState, mergeSupplyInventory, monitorRangeSpec, monitorReasoningMetadata, monitorRoutingStatus, normalizeMonitorQuery, scoreMonitorProfiles, type MonitorProfileAggregate } from "./channel-monitor.js";
+import { combinedMonitorState, mergeSupplyInventory, monitorProbeMode, monitorRangeSpec, monitorReasoningMetadata, monitorRoutingStatus, normalizeMonitorQuery, scoreMonitorProfiles, type MonitorProfileAggregate } from "./channel-monitor.js";
 import { AdaptiveProbeWorker } from "./adaptive-probe.js";
 import { deriveRuntimeEligibility } from "./channel-health.js";
 import { recordSharedRuntimeHealthOutcome } from "./runtime-health-outcome.js";
@@ -456,7 +456,7 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
             (bucket,provider,channel,canonical_model),
             (bucket,provider,channel,canonical_model,execution_profile_id)
           ) ORDER BY bucket,scope_type,scope_id`;
-        const [channels, profileHealth, attempts, history, cooldowns, adminPauses, probes, probeHistory] = await Promise.all([
+        const [channels, profileHealth, attempts, judges, history, cooldowns, adminPauses, probes, probeHistory] = await Promise.all([
           database.query<Record<string, unknown>>("SELECT * FROM acu_channel_health ORDER BY provider_id,channel_id"),
           database.query<Record<string, unknown>>("SELECT * FROM acu_provider_model_profile_health ORDER BY canonical_model_id,provider_id,channel_id"),
           database.query<Record<string, unknown>>(
@@ -471,9 +471,22 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
               percentile_cont(.5) WITHIN GROUP (ORDER BY (metadata_json->>'first_model_event_latency_ms')::double precision)
                 FILTER (WHERE metadata_json ? 'first_model_event_latency_ms') p50_first_model_event_ms,
               percentile_cont(.95) WITHIN GROUP (ORDER BY (metadata_json->>'first_model_event_latency_ms')::double precision)
-                FILTER (WHERE metadata_json ? 'first_model_event_latency_ms') p95_first_model_event_ms
+                FILTER (WHERE metadata_json ? 'first_model_event_latency_ms') p95_first_model_event_ms,
+              max(started_at) latest_event_at,
+              (array_agg(CASE WHEN metadata_json ? 'cooldown_until' THEN 'cooldown'
+                WHEN status='success' THEN 'success' ELSE 'failed' END ORDER BY started_at DESC))[1] latest_event_result
              FROM acu_attempts WHERE attempt_kind='provider' AND started_at>=now()-$1::interval
              GROUP BY execution_profile_id`,
+            [interval],
+          ),
+          database.query<Record<string, unknown>>(
+            `SELECT r.selected_profile_id execution_profile_id,count(*)::int judge_attempt_count,
+              count(*) FILTER (WHERE j.status='success')::int judge_success_count,
+              max(j.created_at) latest_event_at,
+              (array_agg(CASE WHEN j.status='success' THEN 'success' ELSE 'failed' END ORDER BY j.created_at DESC))[1] latest_event_result
+             FROM acu_judge_attempts j JOIN acu_logical_requests r USING(logical_request_id)
+             WHERE j.created_at>=now()-$1::interval AND r.selected_profile_id IS NOT NULL
+             GROUP BY r.selected_profile_id`,
             [interval],
           ),
           database.query<Record<string, unknown>>(historySql, [interval, bucket, ...catalogValues]),
@@ -496,15 +509,34 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
           ),
           database.query<Record<string, unknown>>(
             `WITH latest AS (
-               SELECT DISTINCT ON (execution_profile_id) execution_profile_id,started_at,status,latency_ms,cost_cny
+               SELECT DISTINCT ON (execution_profile_id) execution_profile_id,started_at,status,latency_ms,cost_cny,metadata_json
                FROM acu_profile_probe_attempts ORDER BY execution_profile_id,started_at DESC
              ), daily AS (
                SELECT execution_profile_id,sum(cost_cny) daily_spend,
                  count(*)::int probe_count,count(*) FILTER (WHERE status='success')::int probe_success_count
                FROM acu_profile_probe_attempts WHERE started_at>=date_trunc('day',now()) GROUP BY execution_profile_id
+             ), ranged AS (
+               SELECT execution_profile_id,
+                 count(*) FILTER (WHERE metadata_json->>'probeMode'='full_pool')::int full_pool_probe_count,
+                 count(*) FILTER (WHERE metadata_json->>'probeMode'='full_pool' AND status='success')::int full_pool_probe_success_count,
+                 count(*) FILTER (WHERE metadata_json->>'probeMode' IS DISTINCT FROM 'full_pool')::int recovery_probe_count,
+                 count(*) FILTER (WHERE metadata_json->>'probeMode' IS DISTINCT FROM 'full_pool' AND status='success')::int recovery_probe_success_count,
+                 max(started_at) FILTER (WHERE status='success') latest_successful_probe_at,
+                 max(started_at) FILTER (WHERE metadata_json->>'probeMode'='full_pool') latest_full_pool_probe_at,
+                 max(started_at) latest_range_probe_at,
+                 (array_agg(status ORDER BY started_at DESC))[1] latest_range_probe_status,
+                 (array_agg(CASE WHEN metadata_json->>'probeMode'='full_pool' THEN 'full_pool' ELSE 'recovery' END ORDER BY started_at DESC))[1] latest_range_probe_mode
+               FROM acu_profile_probe_attempts WHERE started_at>=now()-$1::interval GROUP BY execution_profile_id
              ) SELECT latest.*,coalesce(daily.daily_spend,0) daily_spend,
-               coalesce(daily.probe_count,0) probe_count,coalesce(daily.probe_success_count,0) probe_success_count
-             FROM latest LEFT JOIN daily USING(execution_profile_id)`,
+               coalesce(daily.probe_count,0) probe_count,coalesce(daily.probe_success_count,0) probe_success_count,
+               coalesce(ranged.full_pool_probe_count,0) full_pool_probe_count,
+               coalesce(ranged.full_pool_probe_success_count,0) full_pool_probe_success_count,
+               coalesce(ranged.recovery_probe_count,0) recovery_probe_count,
+               coalesce(ranged.recovery_probe_success_count,0) recovery_probe_success_count,
+               ranged.latest_successful_probe_at,ranged.latest_full_pool_probe_at,ranged.latest_range_probe_at,
+               ranged.latest_range_probe_status,ranged.latest_range_probe_mode
+             FROM latest LEFT JOIN daily USING(execution_profile_id) LEFT JOIN ranged USING(execution_profile_id)`,
+            [interval],
           ),
           database.query<Record<string, unknown>>(
             `SELECT execution_profile_id,channel_id,provider_id,canonical_model_id,protocol,status,
@@ -519,12 +551,14 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
         const healthByChannel = new Map(channels.rows.map((row) => [String(row.channel_id), row]));
         const healthByProfile = new Map(profileHealth.rows.map((row) => [String(row.execution_profile_id), row]));
         const aggregateByProfile = new Map(attempts.rows.map((row) => [String(row.execution_profile_id), row]));
+        const judgeByProfile = new Map(judges.rows.map((row) => [String(row.execution_profile_id), row]));
         const probeByProfile = new Map(probes.rows.map((row) => [String(row.execution_profile_id), row]));
         const routingEligibleIds = new Set<string>();
         const publicProfiles = serviceConfig.profiles.map((profile) => {
           const channel = healthByChannel.get(profile.channelId ?? profile.channel) ?? {};
           const runtime = healthByProfile.get(profile.executionProfileId) ?? {};
           const aggregate = aggregateByProfile.get(profile.executionProfileId) ?? {};
+          const judge = judgeByProfile.get(profile.executionProfileId) ?? {};
           const probe = probeByProfile.get(profile.executionProfileId) ?? {};
           const routingEligibility = monitorRoutingStatus(profile, channel, runtime);
           if (routingEligibility === "eligible") routingEligibleIds.add(profile.executionProfileId);
@@ -572,6 +606,8 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
             requestCount: Number(aggregate.request_count ?? 0),
             successCount: Number(aggregate.success_count ?? 0),
             errorCount: Number(aggregate.error_count ?? 0),
+            judgeAttemptCount: Number(judge.judge_attempt_count ?? 0),
+            judgeSuccessCount: Number(judge.judge_success_count ?? 0),
             firstEventSampleCount: Number(aggregate.first_event_sample_count ?? 0),
             consecutiveFailures: Number(runtime.consecutive_failures ?? 0),
             p50FirstModelEventLatencyMs: Number(aggregate.p50_first_model_event_ms ?? 0),
@@ -587,6 +623,21 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
             probeDailySpendCny: Number(probe.daily_spend ?? 0),
             probeSuccessRate: Number(probe.probe_count ?? 0) > 0
               ? Number(probe.probe_success_count ?? 0) / Number(probe.probe_count) : null,
+            fullPoolProbeCount: Number(probe.full_pool_probe_count ?? 0),
+            fullPoolProbeSuccessCount: Number(probe.full_pool_probe_success_count ?? 0),
+            recoveryProbeCount: Number(probe.recovery_probe_count ?? 0),
+            recoveryProbeSuccessCount: Number(probe.recovery_probe_success_count ?? 0),
+            latestSuccessfulProbeAt: probe.latest_successful_probe_at ?? null,
+            latestFullPoolProbeAt: probe.latest_full_pool_probe_at ?? null,
+            healthEvents: [
+              aggregate.latest_event_at ? { source: "production", result: aggregate.latest_event_result, at: aggregate.latest_event_at } : null,
+              judge.latest_event_at ? { source: "judge", result: judge.latest_event_result, at: judge.latest_event_at } : null,
+              probe.latest_range_probe_at ? {
+                source: probe.latest_range_probe_mode === "full_pool" ? "full_pool_probe" : "recovery_probe",
+                result: probe.latest_range_probe_status === "success" ? "success" : "failed",
+                at: probe.latest_range_probe_at,
+              } : null,
+            ].filter(Boolean),
             probeFreshness: profile.requiresFreshProbe
               ? probe.started_at && Date.now() - new Date(String(probe.started_at)).getTime() <= 120 * 60_000 ? "fresh" : "stale"
               : "not_required",
@@ -733,7 +784,12 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
           profiles: publicProfiles,
           history: history.rows,
           cooldownIntervals: [...cooldowns.rows, ...adminPauses.rows, ...activeStateIntervals],
-          probeHistory: probeHistory.rows,
+          probeHistory: probeHistory.rows.map((row) => ({
+            ...row,
+            probeMode: monitorProbeMode(row.metadata_json),
+            trigger: row.metadata_json && typeof row.metadata_json === "object"
+              ? String((row.metadata_json as Record<string, unknown>).trigger ?? "") : "",
+          })),
           supplyInventory,
           modelPool,
           generatedAt: new Date().toISOString(),

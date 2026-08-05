@@ -109,6 +109,15 @@ export function monitorRangeSpec(range: MonitorRange): { interval: string; bucke
   return { interval: "1 hour", bucket: "1 minute" };
 }
 
+export type MonitorProbeMode = "full_pool" | "recovery";
+
+export function monitorProbeMode(metadata: unknown): MonitorProbeMode {
+  if (metadata && typeof metadata === "object" && (metadata as Record<string, unknown>).probeMode === "full_pool") {
+    return "full_pool";
+  }
+  return "recovery";
+}
+
 function stateOf(row: MonitorHealthRow): string {
   return String(row.circuit_state ?? "healthy");
 }

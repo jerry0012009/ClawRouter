@@ -18,7 +18,7 @@ import { canonicalAdvertisedContextWindow } from "./context-admission.js";
 import { ACU_ROUTING_MODEL_VERSION } from "../acu/config.js";
 import { getAcuModel } from "../acu/catalog.js";
 import { enabledExecutionPresets } from "../acu/execution-presets.js";
-import { combinedMonitorState, mergeSupplyInventory, monitorRangeSpec, monitorReasoningMetadata, monitorRoutingStatus, type MonitorRange } from "./channel-monitor.js";
+import { combinedMonitorState, mergeSupplyInventory, monitorRangeSpec, monitorReasoningMetadata, monitorRoutingStatus, normalizeMonitorQuery, scoreMonitorProfiles, type MonitorProfileAggregate } from "./channel-monitor.js";
 import { AdaptiveProbeWorker } from "./adaptive-probe.js";
 import { deriveRuntimeEligibility } from "./channel-health.js";
 import { recordSharedRuntimeHealthOutcome } from "./runtime-health-outcome.js";
@@ -412,8 +412,8 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
     },
     adminChannelMonitor: {
       token: serviceConfig.adminTraceToken,
-      async load(requestedRange) {
-        const range: MonitorRange = ["1h", "6h", "24h", "7d"].includes(requestedRange) ? requestedRange : "1h";
+      async load(requestedQuery) {
+        const { range, supplyStrategy, scenario } = normalizeMonitorQuery(requestedQuery);
         const { interval, bucket } = monitorRangeSpec(range);
         const catalogValues: unknown[] = [];
         const catalogRows = serviceConfig.profiles
@@ -462,6 +462,8 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
           database.query<Record<string, unknown>>(
             `SELECT execution_profile_id, count(*)::int request_count,
               count(*) FILTER (WHERE status='success')::int success_count,
+              count(*) FILTER (WHERE status<>'success')::int error_count,
+              count(*) FILTER (WHERE metadata_json ? 'first_model_event_latency_ms')::int first_event_sample_count,
               count(*) FILTER (WHERE http_status=429)::int rate_limited_count,
               count(*) FILTER (WHERE http_status BETWEEN 500 AND 599)::int server_error_count,
               count(*) FILTER (WHERE error_category='slow_first_model_event' OR metadata_json->>'errorClass'='slow_first_model_event')::int watchdog_count,
@@ -518,12 +520,14 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
         const healthByProfile = new Map(profileHealth.rows.map((row) => [String(row.execution_profile_id), row]));
         const aggregateByProfile = new Map(attempts.rows.map((row) => [String(row.execution_profile_id), row]));
         const probeByProfile = new Map(probes.rows.map((row) => [String(row.execution_profile_id), row]));
+        const routingEligibleIds = new Set<string>();
         const publicProfiles = serviceConfig.profiles.map((profile) => {
           const channel = healthByChannel.get(profile.channelId ?? profile.channel) ?? {};
           const runtime = healthByProfile.get(profile.executionProfileId) ?? {};
           const aggregate = aggregateByProfile.get(profile.executionProfileId) ?? {};
           const probe = probeByProfile.get(profile.executionProfileId) ?? {};
           const routingEligibility = monitorRoutingStatus(profile, channel, runtime);
+          if (routingEligibility === "eligible") routingEligibleIds.add(profile.executionProfileId);
           const runtimeHealth = deriveRuntimeEligibility({
             profileState: String(runtime.circuit_state ?? profile.health),
             channelState: String(channel.circuit_state ?? "healthy"),
@@ -565,6 +569,10 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
             profileState: runtime.circuit_state ?? profile.health,
             usageTrusted: runtime.usage_trusted ?? profile.usageTrusted,
             recentSuccessRate: Number(runtime.recent_success_rate ?? 0),
+            requestCount: Number(aggregate.request_count ?? 0),
+            successCount: Number(aggregate.success_count ?? 0),
+            errorCount: Number(aggregate.error_count ?? 0),
+            firstEventSampleCount: Number(aggregate.first_event_sample_count ?? 0),
             consecutiveFailures: Number(runtime.consecutive_failures ?? 0),
             p50FirstModelEventLatencyMs: Number(aggregate.p50_first_model_event_ms ?? 0),
             p95FirstModelEventLatencyMs: Number(aggregate.p95_first_model_event_ms ?? 0),
@@ -583,8 +591,50 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
               ? probe.started_at && Date.now() - new Date(String(probe.started_at)).getTime() <= 120 * 60_000 ? "fresh" : "stale"
               : "not_required",
             nextEligibleProbeAt: runtime.cooldown_until ?? channel.cooldown_until ?? null,
+            profileUtility: null, profileRank: null, profileCandidateCount: null,
+            profileCost: null, profileLatencyMs: null,
+            costUtility: null, speedUtility: null, reliabilityUtility: null,
+            costContribution: null, speedContribution: null, reliabilityContribution: null,
+            metricSource: null, formulaVersion: null,
           };
         });
+        const monitorAggregates = new Map<string, MonitorProfileAggregate>(attempts.rows.map((row) => [String(row.execution_profile_id), {
+          requestCount: Number(row.request_count ?? 0),
+          successCount: Number(row.success_count ?? 0),
+          firstEventSampleCount: Number(row.first_event_sample_count ?? 0),
+          firstEventP50Ms: row.p50_first_model_event_ms == null ? undefined : Number(row.p50_first_model_event_ms),
+        }]));
+        const profileScores = scoreMonitorProfiles(
+          profiles.map((item) => item.profile).filter((profile) => routingEligibleIds.has(profile.executionProfileId)),
+          monitorAggregates,
+          { supplyStrategy, scenario },
+        );
+        const scoredCountByModel = new Map<string, number>();
+        for (const profile of publicProfiles) {
+          if (profileScores.has(profile.executionProfileId)) scoredCountByModel.set(
+            profile.canonicalModel,
+            (scoredCountByModel.get(profile.canonicalModel) ?? 0) + 1,
+          );
+        }
+        for (const profile of publicProfiles) {
+          const score = profileScores.get(profile.executionProfileId);
+          if (!score) continue;
+          Object.assign(profile, {
+            profileUtility: score.profileUtility,
+            profileRank: score.rank,
+            profileCandidateCount: scoredCountByModel.get(profile.canonicalModel) ?? 0,
+            profileCost: score.profileCost,
+            profileLatencyMs: score.profileLatencyMs ?? null,
+            costUtility: score.costUtility,
+            speedUtility: score.speedUtility,
+            reliabilityUtility: score.reliabilityUtility,
+            costContribution: score.costContribution,
+            speedContribution: score.speedContribution,
+            reliabilityContribution: score.reliabilityContribution,
+            metricSource: score.metricSource,
+            formulaVersion: score.formulaVersion,
+          });
+        }
         const activeModelPool = [...new Set(serviceConfig.profiles.map((profile) => profile.modelId))]
           .map((modelId) => {
             const catalog = getAcuModel(modelId);
@@ -676,6 +726,8 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
         });
         return {
           range,
+          supplyStrategy,
+          scenario,
           profiles: publicProfiles,
           history: history.rows,
           cooldownIntervals: [...cooldowns.rows, ...adminPauses.rows, ...activeStateIntervals],

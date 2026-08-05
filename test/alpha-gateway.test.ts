@@ -77,11 +77,12 @@ describe("Alpha native protocol gateway", () => {
 
   it("protects Channel Monitor and records an authorized manual pause", async () => {
     const pauses: Array<{ channelId: string; durationMinutes: number; actor: string }> = [];
+    const monitorQueries: Array<Record<string, unknown>> = [];
     const gatewayPort = await listen(createAlphaGatewayServer({
       trustedIdentitySecret: sharedSecret,
       adminChannelMonitor: {
         token: "monitor-token",
-        async load(range) { return { range, profiles: [] }; },
+        async load(query) { monitorQueries.push(query); return { ...query, profiles: [] }; },
         async pause(channelId, durationMinutes, actor) {
           pauses.push({ channelId, durationMinutes, actor });
           return { channelId, state: "open", recovery: "half_open_probe" };
@@ -91,6 +92,12 @@ describe("Alpha native protocol gateway", () => {
     }));
     const unauthorized = await fetch(`http://127.0.0.1:${gatewayPort}/internal/admin/channel-monitor`);
     expect(unauthorized.status).toBe(401);
+    const monitor = await fetch(
+      `http://127.0.0.1:${gatewayPort}/internal/admin/channel-monitor?range=6h&supplyStrategy=low_latency&scenario=small`,
+      { headers: { authorization: "Bearer monitor-token" } },
+    );
+    expect(monitor.status).toBe(200);
+    expect(monitorQueries).toEqual([{ range: "6h", supplyStrategy: "low_latency", scenario: "small" }]);
     const response = await fetch(`http://127.0.0.1:${gatewayPort}/internal/admin/channel-monitor`, {
       method: "POST",
       headers: { authorization: "Bearer monitor-token", "content-type": "application/json" },

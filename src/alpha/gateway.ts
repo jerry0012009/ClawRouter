@@ -7,7 +7,7 @@ import type { NativeProviderAdapter } from "./provider.js";
 import { relayProviderResponse, type RelayResult } from "./stream-relay.js";
 import { verifyTrustedIdentity, type TrustedNewApiIdentity } from "./trusted-identity.js";
 import { AlphaAdmissionError } from "./routing.js";
-import type { MonitorRange } from "./channel-monitor.js";
+import type { MonitorQuery } from "./channel-monitor.js";
 import type { SelectionCorridorPolicy } from "./processor.js";
 
 export type AlphaExecutionResolution = {
@@ -46,7 +46,7 @@ export type AlphaGatewayOptions = {
   };
   adminChannelMonitor?: {
     token: string;
-    load(range: MonitorRange): Promise<Record<string, unknown>>;
+    load(query: Partial<Record<keyof MonitorQuery, string>>): Promise<Record<string, unknown>>;
     pause(channelId: string, durationMinutes: 30 | 120, actor: string): Promise<Record<string, unknown>>;
   };
   adminSelectionCorridor?: {
@@ -163,7 +163,11 @@ export function createAlphaGatewayServer(options: AlphaGatewayOptions): Server {
       try {
         const result =
           request.method === "GET"
-            ? await options.adminChannelMonitor.load((url.searchParams.get("range") as MonitorRange) || "1h")
+            ? await options.adminChannelMonitor.load({
+                range: url.searchParams.get("range") ?? undefined,
+                supplyStrategy: url.searchParams.get("supplyStrategy") ?? undefined,
+                scenario: url.searchParams.get("scenario") ?? undefined,
+              })
             : await (async () => {
                 const body = JSON.parse((await readRequestBody(request, 16 * 1024)).toString("utf8")) as Record<string, unknown>;
                 const durationMinutes = Number(body.durationMinutes);

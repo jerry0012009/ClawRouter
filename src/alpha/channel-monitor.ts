@@ -1,7 +1,85 @@
 import type { ConfiguredExecutionProfile } from "./server.js";
 import { deriveRuntimeEligibility } from "./channel-health.js";
+import { DEFAULT_ROUTING_UTILITY_POLICY, type ProfileUtilityV2, type RoutingUtilityPolicy, type SupplyStrategy, type SupplyWeights } from "./routing-utility-v2.js";
+import { buildCandidateExecutionPlans, type AlphaExecutionProfile } from "./routing.js";
 
 export type MonitorRange = "1h" | "6h" | "24h" | "7d";
+export type MonitorScenario = "small" | "standard" | "long";
+export type MonitorQuery = { range: MonitorRange; supplyStrategy: SupplyStrategy; scenario: MonitorScenario };
+
+const MONITOR_SCENARIOS: Record<MonitorScenario, { inputTokens: number; outputTokens: number }> = {
+  small: { inputTokens: 2_000, outputTokens: 500 },
+  standard: { inputTokens: 20_000, outputTokens: 2_000 },
+  long: { inputTokens: 100_000, outputTokens: 4_000 },
+};
+const MONITOR_SUPPLY_WEIGHTS: Record<SupplyStrategy, SupplyWeights> = {
+  lowest_cost: { cost: 100, speed: 0, reliability: 0 },
+  balanced: DEFAULT_ROUTING_UTILITY_POLICY.supplyWeights,
+  low_latency: { cost: 10, speed: 80, reliability: 10 },
+  high_reliability: { cost: 10, speed: 10, reliability: 80 },
+};
+
+export function normalizeMonitorQuery(input: Partial<Record<keyof MonitorQuery, string>>): MonitorQuery {
+  return {
+    range: ["1h", "6h", "24h", "7d"].includes(input.range ?? "") ? input.range as MonitorRange : "24h",
+    supplyStrategy: ["balanced", "lowest_cost", "low_latency", "high_reliability"].includes(input.supplyStrategy ?? "")
+      ? input.supplyStrategy as SupplyStrategy : "balanced",
+    scenario: ["small", "standard", "long"].includes(input.scenario ?? "") ? input.scenario as MonitorScenario : "standard",
+  };
+}
+
+export type MonitorProfileAggregate = {
+  requestCount: number;
+  successCount: number;
+  firstEventSampleCount: number;
+  firstEventP50Ms?: number;
+};
+
+export function scoreMonitorProfiles(
+  profiles: AlphaExecutionProfile[],
+  aggregateByProfile: ReadonlyMap<string, MonitorProfileAggregate>,
+  query: Pick<MonitorQuery, "supplyStrategy" | "scenario">,
+  policy: RoutingUtilityPolicy = DEFAULT_ROUTING_UTILITY_POLICY,
+): Map<string, ProfileUtilityV2> {
+  const scenario = MONITOR_SCENARIOS[query.scenario];
+  const utilityPolicy: RoutingUtilityPolicy = {
+    ...policy,
+    supplyStrategy: query.supplyStrategy,
+    supplyWeights: MONITOR_SUPPLY_WEIGHTS[query.supplyStrategy],
+  };
+  const utilities = new Map<string, ProfileUtilityV2>();
+  for (const modelId of [...new Set(profiles.map((profile) => profile.modelId))]) {
+    const modelProfiles = profiles.filter((profile) => profile.modelId === modelId).map((profile) => {
+      const aggregate = aggregateByProfile.get(profile.executionProfileId);
+      return {
+        ...profile,
+        recentSuccessRate: aggregate && aggregate.requestCount > 0
+          ? aggregate.successCount / aggregate.requestCount : profile.recentSuccessRate,
+        utilityRuntimeMetric: {
+          firstEventP50Ms: aggregate?.firstEventP50Ms,
+          firstEventSamples: aggregate?.firstEventSampleCount ?? 0,
+          totalLatencySamples: 0,
+          consideredAttempts: aggregate?.requestCount ?? 0,
+          successfulAttempts: aggregate?.successCount ?? 0,
+        },
+      };
+    });
+    try {
+      const plan = buildCandidateExecutionPlans({
+        eligibleProfiles: modelProfiles,
+        requirements: { protocol: "responses", requireTools: false, requireThinking: false },
+        inputTokens: scenario.inputTokens,
+        expectedOutputTokens: scenario.outputTokens,
+        utilityPolicy: { ...utilityPolicy, allowedCandidateIds: [] },
+        includeExecutionPresets: false,
+      }).get(modelId);
+      for (const utility of plan?.profileUtilities ?? []) utilities.set(utility.executionProfileId, utility);
+    } catch {
+      // Health evidence remains visible when a model group cannot be priced or scored.
+    }
+  }
+  return utilities;
+}
 
 export type MonitorHealthRow = Record<string, unknown>;
 

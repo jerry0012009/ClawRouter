@@ -5,6 +5,8 @@ import {
   monitorRangeSpec,
   monitorReasoningMetadata,
   monitorRoutingStatus,
+  normalizeMonitorQuery,
+  scoreMonitorProfiles,
 } from "../src/alpha/channel-monitor.js";
 import { routingCandidatesForModel, type ConfiguredExecutionProfile } from "../src/alpha/server.js";
 
@@ -138,6 +140,30 @@ describe("Supply observability semantics", () => {
     expect(monitorRangeSpec("6h")).toEqual({ interval: "6 hours", bucket: "5 minutes" });
     expect(monitorRangeSpec("24h")).toEqual({ interval: "24 hours", bucket: "15 minutes" });
     expect(monitorRangeSpec("7d")).toEqual({ interval: "7 days", bucket: "1 hour" });
+  });
+
+  it("defaults Monitor scoring to balanced and standard", () => {
+    expect(normalizeMonitorQuery({})).toEqual({ range: "24h", supplyStrategy: "balanced", scenario: "standard" });
+    expect(normalizeMonitorQuery({ range: "7d", supplyStrategy: "lowest_cost", scenario: "long" }))
+      .toEqual({ range: "7d", supplyStrategy: "lowest_cost", scenario: "long" });
+  });
+
+  it("returns production Profile V2 ranks, contributions, metrics, and scenario costs", () => {
+    const cheap = profile({ executionProfileId: "cheap:gpt-5.6-luna:responses", billingPrice: { inputPricePerMillion: 1, outputPricePerMillion: 2 } });
+    const fast = profile({ executionProfileId: "fast:gpt-5.6-luna:responses", billingPrice: { inputPricePerMillion: 3, outputPricePerMillion: 6 } });
+    const aggregates = new Map([
+      [cheap.executionProfileId, { requestCount: 20, successCount: 19, firstEventSampleCount: 20, firstEventP50Ms: 900 }],
+      [fast.executionProfileId, { requestCount: 10, successCount: 10, firstEventSampleCount: 10, firstEventP50Ms: 100 }],
+    ]);
+    const balanced = scoreMonitorProfiles([cheap, fast], aggregates, { supplyStrategy: "balanced", scenario: "standard" });
+    const lowLatency = scoreMonitorProfiles([cheap, fast], aggregates, { supplyStrategy: "low_latency", scenario: "standard" });
+    const long = scoreMonitorProfiles([cheap, fast], aggregates, { supplyStrategy: "balanced", scenario: "long" });
+
+    expect(balanced.size).toBe(2);
+    expect(balanced.get(cheap.executionProfileId)).toMatchObject({ formulaVersion: "acu-profile-utility-v2.1", metricSource: "first_event_p50" });
+    expect(lowLatency.get(fast.executionProfileId)?.rank).toBe(1);
+    expect(balanced.get(cheap.executionProfileId)?.costContribution).toBeGreaterThan(0);
+    expect(long.get(cheap.executionProfileId)?.profileCost).toBeGreaterThan(balanced.get(cheap.executionProfileId)?.profileCost ?? 0);
   });
 
   it("publishes presets only when an administrator-enabled Profile supports their effort", () => {

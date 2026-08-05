@@ -793,7 +793,8 @@ export class AlphaRequestProcessor {
       || candidatePreferenceEntries.some(([candidateId, score]) =>
         candidateId.length < 1
         || candidateId.length > 160
-        || !Number.isInteger(score)
+        || typeof score !== "number"
+        || !Number.isFinite(score)
         || score < 0
         || score > 200
         || (allowedCandidateIds.length > 0 && !allowedCandidateIds.includes(candidateId)))) {

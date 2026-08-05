@@ -136,6 +136,29 @@ describe("selection corridor cache", () => {
     expect(calculate).toHaveBeenCalledTimes(4);
   });
 
+  it("accepts fractional candidate preference scores", async () => {
+    const processor = new AlphaRequestProcessor({} as never);
+    const calculate = vi.fn(async (
+      _input: number,
+      _output: number,
+      policy?: Record<string, unknown>,
+    ) => policy ?? {});
+    const internal = processor as unknown as {
+      calculateSelectionCorridor: typeof calculate;
+    };
+    internal.calculateSelectionCorridor = calculate;
+
+    const result = await processor.selectionCorridor(10_000, 1_000, {
+      allowedCandidateIds: ["gpt-5.6-sol@xhigh"],
+      candidatePreferenceScores: { "gpt-5.6-sol@xhigh": 97.5 },
+    });
+
+    expect(result).toMatchObject({
+      allowedCandidateIds: ["gpt-5.6-sol@xhigh"],
+      candidatePreferenceScores: { "gpt-5.6-sol@xhigh": 97.5 },
+    });
+  });
+
   it("rejects malformed utility weights and presets before calculation", () => {
     const processor = new AlphaRequestProcessor({} as never);
     expect(() =>

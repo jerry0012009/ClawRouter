@@ -31,6 +31,10 @@ function sanitizeString(value: string): string {
     .replace(COMMON_KEY_PATTERN, (match) => placeholder(match));
 }
 
+export function sanitizeTextForPersistence(value: string): string {
+  return sanitizeString(value);
+}
+
 export function sanitizeHeadersForPersistence(
   headers: Record<string, string | string[] | undefined>,
 ): Record<string, string | string[]> {

@@ -1,7 +1,11 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { QueryResultRow } from "pg";
 import type { SqlExecutor } from "./database.js";
-import { sanitizeHeadersForPersistence, sanitizePayloadForPersistence } from "./secrets.js";
+import {
+  sanitizeHeadersForPersistence,
+  sanitizePayloadForPersistence,
+  sanitizeTextForPersistence,
+} from "./secrets.js";
 import type { CircuitState, HealthSnapshot, ProviderErrorClass } from "./channel-health.js";
 
 export type AlphaProtocol = "responses" | "messages" | "chat_completions";
@@ -360,6 +364,10 @@ function json(value: unknown): string {
   return JSON.stringify(sanitizePayloadForPersistence(value ?? {}));
 }
 
+function persistedText(value: string | null | undefined): string | null {
+  return value == null ? null : sanitizeTextForPersistence(value);
+}
+
 function dateValue(value: unknown): Date | undefined {
   return value instanceof Date ? value : typeof value === "string" ? new Date(value) : undefined;
 }
@@ -464,7 +472,7 @@ export class AlphaRepository {
        (task_id,session_id,newapi_user_id,root_goal_text,root_goal_hash,phase,base_quality_target,
         capability_escalation_floor,status,created_at,updated_at,metadata_json)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$10,$11)`,
-      [input.taskId, input.sessionId, input.newapiUserId, input.rootGoalText ?? null,
+      [input.taskId, input.sessionId, input.newapiUserId, persistedText(input.rootGoalText),
         input.rootGoalHash ?? null, input.phase, input.baseQualityTarget,
         input.capabilityEscalationFloor ?? 0, input.status, now, json(input.metadata)],
     );
@@ -546,7 +554,7 @@ export class AlphaRepository {
       [input.eventId, input.sessionId, input.taskId, input.segmentId ?? null,
         input.logicalRequestId ?? null, input.eventType, input.eventHash, input.evidenceStrength,
         input.sourceProtocol, input.sourceClient, input.sourceClientVersion ?? null,
-        input.sourcePayloadId ?? null, input.toolCallId ?? null, input.failureSignature ?? null,
+        input.sourcePayloadId ?? null, input.toolCallId ?? null, persistedText(input.failureSignature),
         input.failureSignatureVersion ?? null, input.occurredAt ?? new Date(), json(input.metadata)],
     );
     if (result.rowCount === 1) return { eventId: input.eventId, inserted: true };
@@ -795,9 +803,9 @@ export class AlphaRepository {
         input.difficultyScoreRaw ?? null,
         input.difficultyIndex ?? null, json(input.factors), json(input.probabilities),
         input.confidence ?? null, input.judgeEntropy ?? null, json(input.evidenceTags),
-        input.explanation ?? null, input.explanationNormalized ?? false, input.originalExplanationLength ?? null,
+        persistedText(input.explanation), input.explanationNormalized ?? false, input.originalExplanationLength ?? null,
         input.originalExplanationType ?? "missing",
-        input.webIntent ?? null, input.webIntentConfidence ?? null, input.webIntentReason ?? null,
+        input.webIntent ?? null, input.webIntentConfidence ?? null, persistedText(input.webIntentReason),
         json(input.webIntentEvidence ?? []), input.webIntentSource ?? null,
         input.promptTokens ?? null, input.completionTokens ?? null, input.latencyMs ?? null,
         input.actualCostUsd ?? "0", input.officialPaygEquivalentCost ?? "0", input.costCurrency ?? "CNY",
@@ -916,7 +924,7 @@ export class AlphaRepository {
         input.mode, input.policyVersion, input.routingModelVersion, input.qualityCurveVersion,
         input.priceVersion, input.effectiveQualityTarget, json(input.formulaInputs),
         json(input.candidateEstimates), json(input.paretoFrontier), json(input.selectedProfile),
-        input.routeExplanation ?? null, input.fallbackSource ?? null],
+        persistedText(input.routeExplanation), input.fallbackSource ?? null],
     );
   }
 

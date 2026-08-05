@@ -239,10 +239,13 @@ run("Alpha PostgreSQL foundation", () => {
       taskId: "task_user_a",
       sessionId: "ses_user_a",
       newapiUserId: "user_a",
+      rootGoalText: "before\u0000after",
       phase: "execution",
       baseQualityTarget: 80,
       status: "active",
     });
+    const task = await repository.getTask("task_user_a", "user_a");
+    expect(task?.root_goal_text).toBe("before�after");
     await repository.createSegment({
       segmentId: "seg_user_a_1",
       taskId: "task_user_a",

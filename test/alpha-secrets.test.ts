@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { sanitizeHeadersForPersistence, sanitizePayloadForPersistence } from "../src/alpha/secrets.js";
+import {
+  sanitizeHeadersForPersistence,
+  sanitizePayloadForPersistence,
+  sanitizeTextForPersistence,
+} from "../src/alpha/secrets.js";
 
 describe("Alpha persistence secret boundary", () => {
   it("drops credential headers case-insensitively", () => {
@@ -33,5 +37,6 @@ describe("Alpha persistence secret boundary", () => {
       nested: ["\uFFFD"],
     });
     expect(JSON.stringify(sanitized)).not.toContain("\\u0000");
+    expect(sanitizeTextForPersistence("before\u0000after")).toBe("before\uFFFDafter");
   });
 });

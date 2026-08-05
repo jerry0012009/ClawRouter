@@ -24,6 +24,7 @@ function placeholder(value: string): string {
 
 function sanitizeString(value: string): string {
   return value
+    .replaceAll("\u0000", "\uFFFD")
     .replace(PRIVATE_KEY_PATTERN, (match) => placeholder(match))
     .replace(CREDENTIAL_GIT_URL_PATTERN, (_match, scheme: string) => `${scheme}<REDACTED_CREDENTIALS>@`)
     .replace(BEARER_PATTERN, (match) => placeholder(match))

@@ -21,4 +21,17 @@ describe("Alpha persistence secret boundary", () => {
     expect(first.token).toBe(first.nested.api_key);
     expect(first.token).toMatch(/^<REDACTED_SECRET_[a-f0-9]{16}>$/);
   });
+
+  it("removes NUL characters that PostgreSQL jsonb cannot store", () => {
+    const sanitized = sanitizePayloadForPersistence({
+      input: "before\u0000after",
+      nested: ["\u0000"],
+    });
+
+    expect(sanitized).toEqual({
+      input: "before\uFFFDafter",
+      nested: ["\uFFFD"],
+    });
+    expect(JSON.stringify(sanitized)).not.toContain("\\u0000");
+  });
 });

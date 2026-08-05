@@ -353,7 +353,7 @@ run("Alpha PostgreSQL foundation", () => {
       body: {
         model: "acu-auto",
         api_key: "sk-example-super-secret-value",
-        input: "Clone https://user:password@example.test/repo and use Bearer local-secret-token",
+        input: "Clone https://user:password@example.test/repo, use Bearer local-secret-token, then read before\u0000after",
       },
       isComplete: true,
     });
@@ -367,6 +367,8 @@ run("Alpha PostgreSQL foundation", () => {
     expect(serialized).not.toContain("super-secret");
     expect(serialized).not.toContain("user:password");
     expect(serialized).not.toContain("local-secret-token");
+    expect(serialized).not.toContain("\\u0000");
+    expect(serialized).toContain("before�after");
     expect(result.rows[0].body_sha256).toMatch(/^[a-f0-9]{64}$/);
   });
 

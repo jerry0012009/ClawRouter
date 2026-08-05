@@ -118,6 +118,14 @@ export function monitorProbeMode(metadata: unknown): MonitorProbeMode {
   return "recovery";
 }
 
+export const MONITOR_JUDGE_AGGREGATION_SQL = `SELECT execution_profile_id,count(*)::int judge_attempt_count,
+  count(*) FILTER (WHERE status='success')::int judge_success_count,
+  max(created_at) latest_event_at,
+  (array_agg(CASE WHEN status='success' THEN 'success' ELSE 'failed' END ORDER BY created_at DESC))[1] latest_event_result
+ FROM acu_judge_attempts
+ WHERE created_at>=now()-$1::interval AND execution_profile_id IS NOT NULL
+ GROUP BY execution_profile_id`;
+
 function stateOf(row: MonitorHealthRow): string {
   return String(row.circuit_state ?? "healthy");
 }

@@ -1994,6 +1994,8 @@ export class AlphaRequestProcessor {
           judgeAttemptId,
           judgeEvaluationId: storedJudge.judgeEvaluationId,
           logicalRequestId,
+          executionProfileId: attempt.executionProfileId,
+          channelId: attempt.channel,
           attemptIndex: attempt.attemptIndex,
           attemptRole: attempt.role,
           provider: attempt.provider,

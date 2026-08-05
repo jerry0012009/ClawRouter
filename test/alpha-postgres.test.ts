@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AlphaDatabase } from "../src/alpha/database.js";
+import { MONITOR_JUDGE_AGGREGATION_SQL } from "../src/alpha/channel-monitor.js";
 import { AdaptiveProbeWorker } from "../src/alpha/adaptive-probe.js";
 import { AlphaRepository } from "../src/alpha/repository.js";
 import type { NativeProviderAdapter } from "../src/alpha/provider.js";
@@ -124,6 +125,7 @@ run("Alpha PostgreSQL foundation", () => {
     expect(versions.rows.map((row) => row.migration_version)).toContain("0008_alpha_final_user_loop");
     expect(versions.rows.map((row) => row.migration_version)).toContain("0015_judge_profile_attempt_limit");
     expect(versions.rows.map((row) => row.migration_version)).toContain("0016_judge_profile_attempt_limit_5");
+    expect(versions.rows.map((row) => row.migration_version)).toContain("0017_judge_execution_profile_evidence");
     const judgeAttemptConstraint = await database.query<{ definition: string }>(
       `SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint
        WHERE conrelid='acu_judge_attempts'::regclass
@@ -140,6 +142,13 @@ run("Alpha PostgreSQL foundation", () => {
       "actual_total_cash_cost_cny",
       "judge_official_payg_equivalent_cost",
       "judge_cost_status",
+    ]));
+    const judgeColumns = await database.query<{ column_name: string }>(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_schema='public' AND table_name='acu_judge_attempts'`,
+    );
+    expect(judgeColumns.rows.map((row) => row.column_name)).toEqual(expect.arrayContaining([
+      "execution_profile_id", "channel_id",
     ]));
   });
 
@@ -1138,6 +1147,8 @@ run("Alpha PostgreSQL foundation", () => {
       judgeAttemptId: "judge_attempt_a_1",
       judgeEvaluationId: "judge_a_1",
       logicalRequestId: "req_a_1",
+      executionProfileId: "judge-profile-A",
+      channelId: "channel-A",
       attemptIndex: 1 as const,
       attemptRole: "primary" as const,
       provider: "xiaomi_mimo",
@@ -1159,6 +1170,37 @@ run("Alpha PostgreSQL foundation", () => {
     };
     await repository.saveJudgeAttempt(judgeAttempt);
     await repository.saveJudgeAttempt({ ...judgeAttempt, judgeAttemptId: "judge_attempt_a_replay" });
+    await database.query(
+      "UPDATE acu_logical_requests SET selected_profile_id='execution-profile-B' WHERE logical_request_id='req_a_1'",
+    );
+    await repository.saveJudgeAttempt({
+      ...judgeAttempt,
+      judgeAttemptId: "judge_attempt_a_legacy",
+      attemptIndex: 2,
+      attemptRole: "backup",
+      executionProfileId: undefined,
+      channelId: undefined,
+    });
+    const persistedJudge = await database.query<{
+      execution_profile_id: string | null;
+      channel_id: string | null;
+    }>(
+      `SELECT execution_profile_id,channel_id FROM acu_judge_attempts
+       WHERE judge_attempt_id=$1`,
+      [judgeAttempt.judgeAttemptId],
+    );
+    expect(persistedJudge.rows[0]).toEqual({
+      execution_profile_id: "judge-profile-A",
+      channel_id: "channel-A",
+    });
+    const monitorJudges = await database.query<{
+      execution_profile_id: string;
+      judge_attempt_count: number;
+    }>(MONITOR_JUDGE_AGGREGATION_SQL, ["24 hours"]);
+    expect(monitorJudges.rows).toEqual(expect.arrayContaining([
+      expect.objectContaining({ execution_profile_id: "judge-profile-A", judge_attempt_count: 1 }),
+    ]));
+    expect(monitorJudges.rows.some((row) => row.execution_profile_id === "execution-profile-B")).toBe(false);
     await repository.saveRouteDecision({
       routeDecisionId: "route_a_1",
       newapiUserId: "user_a",
@@ -1192,13 +1234,20 @@ run("Alpha PostgreSQL foundation", () => {
     expect(trace?.judge_evaluations).toEqual(expect.arrayContaining([
       expect.objectContaining({ judge_evaluation_id: "judge_a_1" }),
     ]));
-    expect(trace?.judge_attempts).toEqual([
+    expect(trace?.judge_attempts).toEqual(expect.arrayContaining([
       expect.objectContaining({
         judge_attempt_id: "judge_attempt_a_1",
         model: "mimo-v2.5-pro",
         cost_status: "estimated_blended",
+        execution_profile_id: "judge-profile-A",
+        channel_id: "channel-A",
       }),
-    ]);
+      expect.objectContaining({
+        judge_attempt_id: "judge_attempt_a_legacy",
+        execution_profile_id: null,
+        channel_id: null,
+      }),
+    ]));
     expect(trace?.route_decisions).toEqual(expect.arrayContaining([
       expect.objectContaining({ route_decision_id: "route_a_1" }),
     ]));

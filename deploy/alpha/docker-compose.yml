@@ -58,6 +58,7 @@ services:
       - ../../migrations/acu/0014_judge_same_model_failover.sql:/migration/0014_judge_same_model_failover.sql:ro
       - ../../migrations/acu/0015_judge_profile_attempt_limit.sql:/migration/0015_judge_profile_attempt_limit.sql:ro
       - ../../migrations/acu/0016_judge_profile_attempt_limit_5.sql:/migration/0016_judge_profile_attempt_limit_5.sql:ro
+      - ../../migrations/acu/0017_judge_execution_profile_evidence.sql:/migration/0017_judge_execution_profile_evidence.sql:ro
     networks: [alpha-backend]
     command:
       - /bin/sh
@@ -96,6 +97,7 @@ services:
         apply_migration 0014_judge_same_model_failover /migration/0014_judge_same_model_failover.sql
         apply_migration 0015_judge_profile_attempt_limit /migration/0015_judge_profile_attempt_limit.sql
         apply_migration 0016_judge_profile_attempt_limit_5 /migration/0016_judge_profile_attempt_limit_5.sql
+        apply_migration 0017_judge_execution_profile_evidence /migration/0017_judge_execution_profile_evidence.sql
 
   newapi-codex-pool-sync:
     image: postgres:16-alpine

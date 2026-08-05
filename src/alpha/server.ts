@@ -18,7 +18,7 @@ import { canonicalAdvertisedContextWindow } from "./context-admission.js";
 import { ACU_ROUTING_MODEL_VERSION } from "../acu/config.js";
 import { getAcuModel } from "../acu/catalog.js";
 import { enabledExecutionPresets } from "../acu/execution-presets.js";
-import { combinedMonitorState, mergeSupplyInventory, monitorProbeMode, monitorRangeSpec, monitorReasoningMetadata, monitorRoutingStatus, normalizeMonitorQuery, scoreMonitorProfiles, type MonitorProfileAggregate } from "./channel-monitor.js";
+import { combinedMonitorState, mergeSupplyInventory, MONITOR_JUDGE_AGGREGATION_SQL, monitorProbeMode, monitorRangeSpec, monitorReasoningMetadata, monitorRoutingStatus, normalizeMonitorQuery, scoreMonitorProfiles, type MonitorProfileAggregate } from "./channel-monitor.js";
 import { AdaptiveProbeWorker } from "./adaptive-probe.js";
 import { deriveRuntimeEligibility } from "./channel-health.js";
 import { recordSharedRuntimeHealthOutcome } from "./runtime-health-outcome.js";
@@ -480,13 +480,7 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
             [interval],
           ),
           database.query<Record<string, unknown>>(
-            `SELECT r.selected_profile_id execution_profile_id,count(*)::int judge_attempt_count,
-              count(*) FILTER (WHERE j.status='success')::int judge_success_count,
-              max(j.created_at) latest_event_at,
-              (array_agg(CASE WHEN j.status='success' THEN 'success' ELSE 'failed' END ORDER BY j.created_at DESC))[1] latest_event_result
-             FROM acu_judge_attempts j JOIN acu_logical_requests r USING(logical_request_id)
-             WHERE j.created_at>=now()-$1::interval AND r.selected_profile_id IS NOT NULL
-             GROUP BY r.selected_profile_id`,
+            MONITOR_JUDGE_AGGREGATION_SQL,
             [interval],
           ),
           database.query<Record<string, unknown>>(historySql, [interval, bucket, ...catalogValues]),

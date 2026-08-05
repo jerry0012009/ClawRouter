@@ -319,6 +319,8 @@ export type JudgeAttemptRecord = {
   judgeAttemptId: string;
   judgeEvaluationId: string;
   logicalRequestId?: string;
+  executionProfileId?: string;
+  channelId?: string;
   attemptIndex: number;
   attemptRole: "primary" | "same_model_failover" | "backup";
   provider: string;
@@ -876,13 +878,14 @@ export class AlphaRepository {
     await this.database.query(
       `INSERT INTO acu_judge_attempts
        (judge_attempt_id,judge_evaluation_id,logical_request_id,attempt_index,attempt_role,provider,model,
-        endpoint_host,upstream_request_id,status,error_category,http_status,input_tokens,cached_input_tokens,
+        execution_profile_id,channel_id,endpoint_host,upstream_request_id,status,error_category,http_status,input_tokens,cached_input_tokens,
         output_tokens,latency_ms,nominal_cost_usd,official_payg_equivalent_cost,effective_cost_cny,
         currency,cost_status,cost_source,usage_status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
        ON CONFLICT (judge_evaluation_id,attempt_index) DO NOTHING`,
       [input.judgeAttemptId, input.judgeEvaluationId, input.logicalRequestId ?? null,
-        input.attemptIndex, input.attemptRole, input.provider, input.model, input.endpointHost,
+        input.attemptIndex, input.attemptRole, input.provider, input.model,
+        input.executionProfileId ?? null, input.channelId ?? null, input.endpointHost,
         input.upstreamRequestId ?? null, input.status, input.errorCategory ?? null, input.httpStatus ?? null,
         input.inputTokens, input.cachedInputTokens, input.outputTokens, input.latencyMs,
         input.nominalCostUsd, input.officialPaygEquivalentCost, input.effectiveCostCny,

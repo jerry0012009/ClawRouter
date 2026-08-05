@@ -59,6 +59,7 @@ export class AlphaDatabase implements SqlExecutor {
       "0008_alpha_final_user_loop", "0009_raw_judge_context", "0010_supply_observability",
       "0011_verified_model_pool_probe", "0012_profile_policy_probe_worker", "0013_full_pool_probe_runs",
       "0014_judge_same_model_failover", "0015_judge_profile_attempt_limit", "0016_judge_profile_attempt_limit_5",
+      "0017_judge_execution_profile_evidence",
     ];
     for (const migration of migrations) {
       const migrationTable = await this.pool.query<{ name: string | null }>(

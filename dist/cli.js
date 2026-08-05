@@ -6451,16 +6451,18 @@ function recommendModel(input) {
       qualityTarget,
       switchCost,
       fallbackRiskScale,
-      input.effectivePrices?.[model.modelId],
+      input.effectivePrices?.[preset.candidateId] ?? input.effectivePrices?.[model.modelId],
       preset
     )] : [];
   });
-  const allEstimates = [...baseEstimates, ...presetEstimates];
-  const allowedCandidates = input.allowedCandidateIds?.length ? new Set(input.allowedCandidateIds) : void 0;
-  const estimates = allowedCandidates ? allEstimates.filter((estimate) => allowedCandidates.has(estimate.candidateId)) : allEstimates;
-  if (estimates.length === 0) throw new Error("No ACU candidate is allowed by the routing policy");
-  const flagshipEstimate = estimates.reduce((best, estimate) => estimate.conservativeQuality > best.conservativeQuality ? estimate : best);
-  if (!flagshipEstimate) throw new Error("ACU flagship model estimate is missing");
+  const allowedCandidateIds = new Set(input.allowedCandidateIds ?? []);
+  const estimates = [...baseEstimates, ...presetEstimates].filter(
+    (estimate) => allowedCandidateIds.size === 0 || allowedCandidateIds.has(estimate.candidateId)
+  );
+  if (estimates.length === 0) throw new Error("No ACU routing candidate is allowed");
+  const flagshipEstimate = estimates.reduce(
+    (best, estimate) => estimate.conservativeQuality > best.conservativeQuality ? estimate : best
+  );
   for (const estimate of estimates) {
     estimate.savingsVsFlagship = flagshipEstimate.selectionCost - estimate.selectionCost;
     estimate.savingsPercentVsFlagship = flagshipEstimate.selectionCost > 0 ? estimate.savingsVsFlagship / flagshipEstimate.selectionCost : 0;

@@ -245,7 +245,6 @@ type AcuDecisionInput = {
     judgeCost: number;
     qualityTarget?: number;
     eligibleModelIds?: string[];
-    allowedCandidateIds?: string[];
     requireToolCallSupport?: boolean;
     requireVisionSupport?: boolean;
     switchCost?: number;
@@ -259,6 +258,7 @@ type AcuDecisionInput = {
         outputPricePerMillion: number;
     }>;
     includeExecutionPresets?: boolean;
+    allowedCandidateIds?: string[];
 };
 declare function estimateCallCost(model: Pick<AcuModelCatalogEntry, "inputPricePerMillion" | "outputPricePerMillion">, inputTokens: number, outputTokens: number): number;
 type ValueCandidate = Pick<AcuModelEstimate, "modelId" | "displayName" | "predictedScore" | "riskAdjustedCost"> & {

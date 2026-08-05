@@ -214,7 +214,9 @@ export function createAlphaGatewayServer(options: AlphaGatewayOptions): Server {
             latencyPolicy: body.latencyPolicy as SelectionCorridorPolicy["latencyPolicy"],
             reliabilityPolicy: body.reliabilityPolicy as SelectionCorridorPolicy["reliabilityPolicy"],
             workPhaseBiasOffsets: body.workPhaseBiasOffsets as SelectionCorridorPolicy["workPhaseBiasOffsets"],
-            allowedCandidateIds: Array.isArray(body.allowedCandidateIds) ? body.allowedCandidateIds.filter((value): value is string => typeof value === "string") : [],
+            allowedCandidateIds: Array.isArray(body.allowedCandidateIds)
+              ? body.allowedCandidateIds.filter((value): value is string => typeof value === "string")
+              : [],
             candidatePreferenceScores: body.candidatePreferenceScores as SelectionCorridorPolicy["candidatePreferenceScores"],
             routeMode: body.routeMode === "acu-high" ? "acu-high" : "acu-auto",
             routingUtilityVersion: typeof body.routingUtilityVersion === "string" ? body.routingUtilityVersion : undefined,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   bodySha256,
+  resolvedRoutingUtilityPolicy,
   trustedIdentityHeaders,
   verifyTrustedIdentity,
   type TrustedNewApiIdentity,
@@ -72,6 +73,68 @@ describe("trusted New API identity v3", () => {
       verifyTrustedIdentity(trustedIdentityHeaders(legacy, secret), body, { sharedSecret: secret })
         .identityVersion,
     ).toBe("v2");
+    expect(resolvedRoutingUtilityPolicy(verified).candidatePreferenceScores).toEqual({});
+    expect(resolvedRoutingUtilityPolicy(verified).allowedCandidateIds).toEqual([]);
+    expect(resolvedRoutingUtilityPolicy(
+      verifyTrustedIdentity(trustedIdentityHeaders(legacy, secret), body, { sharedSecret: secret }),
+    ).candidatePreferenceScores).toEqual({});
+  });
+
+  it("accepts canonical v4 candidate policy and rejects tampering or duplicate JSON keys", () => {
+    const value: TrustedNewApiIdentity = {
+      ...identity(),
+      identityVersion: "v4",
+      allowedCandidateIds: ["gpt-5.6-luna@max", "gpt-5.6-sol@high"],
+      candidatePreferenceScores: {
+        "gpt-5.6-sol@high": 70,
+        "gpt-5.6-luna@max": 150,
+      },
+    };
+    const headers = trustedIdentityHeaders(value, secret);
+    expect(headers["x-acu-allowed-candidate-ids"]).toBe('["gpt-5.6-luna@max","gpt-5.6-sol@high"]');
+    expect(headers["x-acu-candidate-preference-scores"]).toBe(
+      '{"gpt-5.6-luna@max":150,"gpt-5.6-sol@high":70}',
+    );
+    const verified = verifyTrustedIdentity(headers, body, { sharedSecret: secret });
+    expect(verified.candidatePreferenceScores).toEqual(value.candidatePreferenceScores);
+
+    for (const tampered of [
+      { ...headers, "x-acu-candidate-preference-scores": '{"gpt-5.6-luna@max":160,"gpt-5.6-sol@high":70}' },
+      { ...headers, "x-acu-allowed-candidate-ids": '["gpt-5.6-luna@max","gpt-5.6-sol@high","gpt-5.6-terra@max"]' },
+    ]) {
+      expect(() => verifyTrustedIdentity(tampered, body, { sharedSecret: secret })).toThrow("signature mismatch");
+    }
+    const duplicate = {
+      ...headers,
+      "x-acu-candidate-preference-scores": '{"gpt-5.6-luna@max":150,"gpt-5.6-luna@max":150}',
+    };
+    expect(() => verifyTrustedIdentity(duplicate, body, { sharedSecret: secret })).toThrow("not canonical");
+  });
+
+  it("rejects invalid v4 preference shape, IDs, scores, and counts", () => {
+    for (const candidatePreferenceScores of [
+      { "": 150 },
+      { "gpt-5.6-luna@max": -1 },
+      { "gpt-5.6-luna@max": 1.5 },
+      { "gpt-5.6-luna@max": 201 },
+      Object.fromEntries(Array.from({ length: 65 }, (_, index) => [`model-${index}`, 150])),
+    ]) {
+      const value: TrustedNewApiIdentity = {
+        ...identity(), identityVersion: "v4",
+        allowedCandidateIds: Object.keys(candidatePreferenceScores).filter(Boolean).sort(),
+        candidatePreferenceScores,
+      };
+      expect(() => verifyTrustedIdentity(trustedIdentityHeaders(value, secret), body, { sharedSecret: secret }))
+        .toThrow("candidate");
+    }
+
+    const malformed = {
+      ...trustedIdentityHeaders({
+        ...identity(), identityVersion: "v4", allowedCandidateIds: [], candidatePreferenceScores: {},
+      }, secret),
+      "x-acu-candidate-preference-scores": "{",
+    };
+    expect(() => verifyTrustedIdentity(malformed, body, { sharedSecret: secret })).toThrow();
   });
 
   it.each([

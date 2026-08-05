@@ -783,6 +783,25 @@ export class AlphaRequestProcessor {
       || supplyWeights.cost + supplyWeights.speed + supplyWeights.reliability !== 100) {
       throw new Error("Selection Corridor supply weights must sum to 100");
     }
+    const allowedCandidateIds = [...new Set(policy?.allowedCandidateIds ?? [])].sort();
+    if (allowedCandidateIds.length > 64
+      || allowedCandidateIds.some((candidateId) => candidateId.length < 1 || candidateId.length > 160)) {
+      throw new Error("Selection Corridor routing candidate allowlist is invalid");
+    }
+    const candidatePreferenceEntries = Object.entries(policy?.candidatePreferenceScores ?? {});
+    if (candidatePreferenceEntries.length > 64
+      || candidatePreferenceEntries.some(([candidateId, score]) =>
+        candidateId.length < 1
+        || candidateId.length > 160
+        || !Number.isInteger(score)
+        || score < 0
+        || score > 200
+        || (allowedCandidateIds.length > 0 && !allowedCandidateIds.includes(candidateId)))) {
+      throw new Error("Selection Corridor candidate preference scores are invalid");
+    }
+    const candidatePreferenceScores = Object.fromEntries(
+      candidatePreferenceEntries.sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0),
+    );
     const normalizedPolicy = {
       allowedModelIds: [...new Set(policy?.allowedModelIds ?? [])].sort(),
       allowedProfileIds: [...new Set(policy?.allowedProfileIds ?? [])].sort(),
@@ -798,11 +817,11 @@ export class AlphaRequestProcessor {
       latencyPolicy: policy?.latencyPolicy ?? DEFAULT_ROUTING_UTILITY_POLICY.latency,
       reliabilityPolicy: policy?.reliabilityPolicy ?? DEFAULT_ROUTING_UTILITY_POLICY.reliability,
       workPhaseBiasOffsets: policy?.workPhaseBiasOffsets ?? DEFAULT_ROUTING_UTILITY_POLICY.workPhaseBiasOffsets,
+      allowedCandidateIds,
+      candidatePreferenceScores,
       routeMode: policy?.routeMode ?? "acu-auto",
       routingUtilityVersion: policy?.routingUtilityVersion ?? DEFAULT_ROUTING_UTILITY_POLICY.routingUtilityVersion,
       formulaMode: policy?.formulaMode ?? "legacy",
-      allowedCandidateIds: [...new Set(policy?.allowedCandidateIds ?? [])].sort(),
-      candidatePreferenceScores: policy?.candidatePreferenceScores ?? {},
     };
     const key = `${inputTokens}:${expectedOutputTokens}:${JSON.stringify(normalizedPolicy)}`;
     const now = Date.now();
@@ -847,12 +866,15 @@ export class AlphaRequestProcessor {
       reliability: policy.reliabilityPolicy ?? DEFAULT_ROUTING_UTILITY_POLICY.reliability,
       workPhaseBiasOffsets: policy.workPhaseBiasOffsets ?? DEFAULT_ROUTING_UTILITY_POLICY.workPhaseBiasOffsets,
       routingUtilityVersion: policy.routingUtilityVersion ?? DEFAULT_ROUTING_UTILITY_POLICY.routingUtilityVersion,
-      allowedCandidateIds: policy.allowedCandidateIds ?? DEFAULT_ROUTING_UTILITY_POLICY.allowedCandidateIds,
-      candidatePreferenceScores: policy.candidatePreferenceScores ?? DEFAULT_ROUTING_UTILITY_POLICY.candidatePreferenceScores,
+      allowedCandidateIds: policy.allowedCandidateIds ?? [],
+      candidatePreferenceScores: policy.candidatePreferenceScores ?? {},
     };
     const profiles = await this.withProfileRuntimeMetrics(filteredProfiles, inputTokens, utilityPolicy);
     const preferences = ["economy", "balanced", "quality"] as const;
-    const executionPresets = enabledExecutionPresets();
+    const allowedCandidateIds = new Set(policy.allowedCandidateIds ?? []);
+    const executionPresets = enabledExecutionPresets().filter(
+      (preset) => allowedCandidateIds.size === 0 || allowedCandidateIds.has(preset.candidateId),
+    );
     const corridorDifficulties = ACU_CURVE_DIFFICULTIES;
     const executionPresetPoints = new Map(executionPresets.map((preset) => [preset.candidateId, [] as Array<{
       difficulty: number;
@@ -933,6 +955,7 @@ export class AlphaRequestProcessor {
               candidatePreferenceScore: candidate.candidatePreferenceScore,
               candidatePreferenceMultiplier: candidate.candidatePreferenceMultiplier,
               adjustedValueUtility: candidate.adjustedValueUtility,
+              selected: candidate.selected,
               rawQualityUtility: candidate.rawQualityUtility,
               rawCostUtility: candidate.rawCostUtility,
               qualitySatisfactionUtility: candidate.qualitySatisfactionUtility,
@@ -2232,6 +2255,10 @@ export class AlphaRequestProcessor {
           nominalCost,
           effectiveCashCost: candidate.estimatedCallCost,
           valueScore: candidate.valueUtility,
+          baseValueUtility: candidate.baseValueUtility,
+          candidatePreferenceScore: candidate.candidatePreferenceScore,
+          candidatePreferenceMultiplier: candidate.candidatePreferenceMultiplier,
+          adjustedValueUtility: candidate.adjustedValueUtility,
           pareto: candidate.paretoEfficient,
           exclusionReason: null,
         };

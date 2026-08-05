@@ -90,6 +90,12 @@ export function bodySha256(body: Uint8Array): string {
   return createHash("sha256").update(body).digest("hex");
 }
 
+export function stableCandidatePreferenceScoresJson(scores: Record<string, number>): string {
+  return JSON.stringify(Object.fromEntries(
+    Object.entries(scores).sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0),
+  ));
+}
+
 export function trustedIdentitySigningPayload(identity: TrustedNewApiIdentity): string {
   const legacyFields = [
     identity.newapiUserId,
@@ -123,10 +129,12 @@ export function trustedIdentitySigningPayload(identity: TrustedNewApiIdentity): 
   ];
   return [
     ...utilityFields,
-    ...(identity.identityVersion === "v4" ? [
-      JSON.stringify(identity.allowedCandidateIds),
-      JSON.stringify(identity.candidatePreferenceScores),
-    ] : []),
+    ...(identity.identityVersion === "v4"
+      ? [
+          JSON.stringify(identity.allowedCandidateIds ?? []),
+          stableCandidatePreferenceScoresJson(identity.candidatePreferenceScores ?? {}),
+        ]
+      : []),
     identity.routingUtilityVersion,
     identity.formulaMode,
     identity.identityVersion,
@@ -178,8 +186,10 @@ export function trustedIdentityHeaders(
       identity.workPhaseBiasOffsets,
     );
     if (identity.identityVersion === "v4") {
-      headers["x-acu-allowed-candidate-ids"] = JSON.stringify(identity.allowedCandidateIds);
-      headers["x-acu-candidate-preference-scores"] = JSON.stringify(identity.candidatePreferenceScores);
+      headers["x-acu-allowed-candidate-ids"] = JSON.stringify(identity.allowedCandidateIds ?? []);
+      headers["x-acu-candidate-preference-scores"] = stableCandidatePreferenceScoresJson(
+        identity.candidatePreferenceScores ?? {},
+      );
     }
     headers["x-acu-routing-utility-version"] = String(
       identity.routingUtilityVersion,
@@ -214,6 +224,8 @@ export function resolvedRoutingUtilityPolicy(
             ? 60
             : 0,
       formulaMode: "legacy",
+      allowedCandidateIds: [],
+      candidatePreferenceScores: {},
     };
   return {
     formulaMode: identity.formulaMode!,
@@ -227,9 +239,9 @@ export function resolvedRoutingUtilityPolicy(
     latency: identity.latencyPolicy!,
     reliability: identity.reliabilityPolicy!,
     workPhaseBiasOffsets: identity.workPhaseBiasOffsets!,
+    routingUtilityVersion: identity.routingUtilityVersion!,
     allowedCandidateIds: identity.allowedCandidateIds ?? [],
     candidatePreferenceScores: identity.candidatePreferenceScores ?? {},
-    routingUtilityVersion: identity.routingUtilityVersion!,
   };
 }
 
@@ -260,6 +272,8 @@ export function verifyTrustedIdentity(
     timestamp: singleHeader(headers, "x-acu-timestamp"),
     bodySha256: singleHeader(headers, "x-acu-body-sha256"),
   };
+  identity.allowedCandidateIds = [];
+  identity.candidatePreferenceScores = {};
   if (identityVersion === "v3" || identityVersion === "v4") {
     identity.qualityBias = finiteHeader(headers, "x-acu-quality-bias");
     identity.supplyStrategy = singleHeader(
@@ -306,11 +320,22 @@ export function verifyTrustedIdentity(
       "x-acu-formula-mode",
     ) as FormulaMode;
     if (identityVersion === "v4") {
-      identity.allowedCandidateIds = parseJsonHeader<string[]>(headers, "x-acu-allowed-candidate-ids");
-      identity.candidatePreferenceScores = parseJsonHeader<Record<string, number>>(
-        headers,
-        "x-acu-candidate-preference-scores",
-      );
+      const rawCandidateIDs = singleHeader(headers, "x-acu-allowed-candidate-ids");
+      const candidateIDs = JSON.parse(rawCandidateIDs) as unknown;
+      if (!Array.isArray(candidateIDs)) throw new Error("Trusted routing candidate allowlist is invalid");
+      identity.allowedCandidateIds = candidateIDs as string[];
+      if (rawCandidateIDs !== JSON.stringify(identity.allowedCandidateIds)) {
+        throw new Error("Trusted routing candidate allowlist JSON is not canonical");
+      }
+      const rawScores = singleHeader(headers, "x-acu-candidate-preference-scores");
+      const scores = JSON.parse(rawScores) as unknown;
+      if (!scores || Array.isArray(scores) || typeof scores !== "object") {
+        throw new Error("Trusted candidate preference scores are invalid");
+      }
+      identity.candidatePreferenceScores = scores as Record<string, number>;
+      if (rawScores !== stableCandidatePreferenceScoresJson(identity.candidatePreferenceScores)) {
+        throw new Error("Trusted candidate preference scores JSON is not canonical");
+      }
     }
   }
   const signature = singleHeader(headers, "x-acu-signature");
@@ -385,19 +410,24 @@ export function verifyTrustedIdentity(
       || !["legacy", "shadow", "active"].includes(identity.formulaMode!)) {
       throw new Error("Trusted routing utility policy is invalid");
     }
-    if (identityVersion === "v4") {
-      const candidateIds = identity.allowedCandidateIds!;
-      const scores = identity.candidatePreferenceScores!;
-      const candidatePattern = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}(?:@[A-Za-z0-9][A-Za-z0-9._:/-]{0,127})?$/;
-      if (!Array.isArray(candidateIds)
-        || candidateIds.some((candidateId) => typeof candidateId !== "string" || !candidatePattern.test(candidateId))
-        || new Set(candidateIds).size !== candidateIds.length
-        || !scores || typeof scores !== "object" || Array.isArray(scores)
-        || Object.entries(scores).some(([candidateId, score]) => !candidatePattern.test(candidateId)
-          || !Number.isInteger(score) || score < 0 || score > 200)
-        || (candidateIds.length > 0 && Object.keys(scores).some((candidateId) => !candidateIds.includes(candidateId)))) {
-        throw new Error("Trusted candidate routing policy is invalid");
-      }
+    const candidatePattern = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}(?:@[A-Za-z0-9][A-Za-z0-9._:/-]{0,127})?$/;
+    const allowedCandidateIDs = identity.allowedCandidateIds ?? [];
+    if (allowedCandidateIDs.length > 64
+      || allowedCandidateIDs.some((candidateID) =>
+        typeof candidateID !== "string"
+        || candidateID.length > 160
+        || !candidatePattern.test(candidateID))
+      || new Set(allowedCandidateIDs).size !== allowedCandidateIDs.length
+      || JSON.stringify([...allowedCandidateIDs].sort()) !== JSON.stringify(allowedCandidateIDs)) {
+      throw new Error("Trusted routing candidate allowlist is invalid");
+    }
+    const candidatePreferenceEntries = Object.entries(identity.candidatePreferenceScores ?? {});
+    if (candidatePreferenceEntries.length > 64
+      || candidatePreferenceEntries.some(([candidateID, score]) =>
+        candidateID.length > 160 || !candidatePattern.test(candidateID) || !Number.isInteger(score)
+        || score < 0 || score > 200
+        || (allowedCandidateIDs.length > 0 && !allowedCandidateIDs.includes(candidateID)))) {
+      throw new Error("Trusted candidate preference scores are invalid");
     }
   }
   if (!/^acu-user-policy-v2-[a-f0-9]{16}$/.test(identity.routingPolicyVersion)) {

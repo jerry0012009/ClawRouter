@@ -13,6 +13,7 @@ const lunaProfile: AlphaExecutionProfile = {
   toolCallSupport: true,
   supportedToolTypes: ["function", "custom", "local_tool"],
   thinkingSupport: true,
+  supportedReasoningEfforts: ["max", "high", "xhigh"],
   contextWindow: 1_048_576,
   health: "healthy",
   enabled: true,
@@ -126,7 +127,12 @@ describe("selection corridor cache", () => {
       ...base,
       supplyWeights: { cost: 100, speed: 0, reliability: 0 },
     });
-    expect(calculate).toHaveBeenCalledTimes(3);
+    await processor.selectionCorridor(10_000, 1_000, {
+      ...base,
+      allowedCandidateIds: ["gpt-5.6-luna", "gpt-5.6-luna@max"],
+      candidatePreferenceScores: { "gpt-5.6-luna@max": 150 },
+    });
+    expect(calculate).toHaveBeenCalledTimes(4);
   });
 
   it("rejects malformed utility weights and presets before calculation", () => {
@@ -232,6 +238,31 @@ describe("selection corridor cache", () => {
     expect(result.series.economy?.flatMap((point) => point.candidates).every((candidate) => candidate.modelId === "gpt-5.6-sol")).toBe(true);
   });
 
+  it.each(["legacy", "shadow", "active"] as const)(
+    "keeps Pricing candidates equal to the candidate allowlist in %s mode",
+    async (formulaMode) => {
+    const processor = new AlphaRequestProcessor({} as never);
+    const internal = processor as unknown as {
+      effectiveProfiles: () => Promise<{ profiles: AlphaExecutionProfile[]; probeClaims: [] }>;
+      withProfileRuntimeMetrics: (profiles: AlphaExecutionProfile[]) => Promise<AlphaExecutionProfile[]>;
+      calculateSelectionCorridor: (inputTokens: number, outputTokens: number, policy: Record<string, unknown>) => Promise<Record<string, unknown>>;
+    };
+    internal.effectiveProfiles = async () => ({ profiles: [lunaProfile], probeClaims: [] });
+    internal.withProfileRuntimeMetrics = async (profiles) => profiles;
+    const result = await internal.calculateSelectionCorridor(10_000, 1_000, {
+      formulaMode,
+      allowedCandidateIds: ["gpt-5.6-luna@max"],
+    }) as {
+      effective: Array<{ candidates: Array<{ candidateId: string }> }>;
+      executionPresetSeries: Array<{ candidateId: string }>;
+    };
+    expect(result.effective.flatMap((point) => point.candidates)
+      .every((candidate) => candidate.candidateId === "gpt-5.6-luna@max")).toBe(true);
+    expect(result.executionPresetSeries.map((preset) => preset.candidateId))
+      .toEqual(["gpt-5.6-luna@max"]);
+    },
+  );
+
   it("publishes V2 model utilities while shadow keeps the legacy selection", async () => {
     const processor = new AlphaRequestProcessor({} as never);
     const profiles = [
@@ -249,11 +280,15 @@ describe("selection corridor cache", () => {
 
     const result = await internal.calculateSelectionCorridor(10_000, 1_000, {
       formulaMode: "shadow", routingPreference: "economy", qualityBias: -60,
+      allowedCandidateIds: ["gpt-5.6-luna", "gpt-5.6-luna@max", "gpt-5.6-sol", "gpt-5.6-terra"],
+      candidatePreferenceScores: { "gpt-5.6-luna@max": 150 },
     }) as { effective: Array<{
       selectedQuality: number; qualityLower: number; qualityUpper: number;
       formulaVersion: string; qualityWeight?: number; costWeight?: number;
-      modelCandidateUtilities: Array<{ qualityUtility: number; costUtility: number;
-        qualityWeight?: number; costWeight?: number; formulaVersion?: string }>;
+      modelCandidateUtilities: Array<{ candidateId: string; qualityUtility: number; costUtility: number;
+        qualityWeight?: number; costWeight?: number; formulaVersion?: string;
+        baseValueUtility?: number; candidatePreferenceScore?: number;
+        candidatePreferenceMultiplier?: number; adjustedValueUtility?: number }>;
     }>; assumptions: Record<string, unknown> };
     const point = result.effective[50];
 
@@ -279,6 +314,11 @@ describe("selection corridor cache", () => {
       expect(candidate.costUtility).toBeLessThanOrEqual(1);
       expect(candidate.qualityWeight).toBeCloseTo(0.2, 12);
       expect(candidate.costWeight).toBeCloseTo(0.8, 12);
+      expect(candidate.candidatePreferenceScore).toBe(candidate.candidateId === "gpt-5.6-luna@max" ? 150 : 100);
+      expect(candidate.candidatePreferenceMultiplier).toBe(candidate.candidateId === "gpt-5.6-luna@max" ? 1.25 : 1);
+      expect(candidate.adjustedValueUtility).toBeCloseTo(
+        candidate.baseValueUtility! * candidate.candidatePreferenceMultiplier!, 12,
+      );
     }
   });
 });

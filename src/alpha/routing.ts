@@ -5,6 +5,7 @@ import {
   recommendModel,
   recommendModelV2,
 } from "../acu/decision.js";
+import { enabledExecutionPresets } from "../acu/execution-presets.js";
 import type { AcuEvaluation, AcuJudgeResult, AcuModelEstimate } from "../acu/types.js";
 import type { AlphaProtocol } from "./repository.js";
 import type { WebIntent } from "./protocol/types.js";
@@ -26,7 +27,12 @@ import {
   type ProfileUtilityV2,
   type RoutingUtilityPolicy,
 } from "./routing-utility-v2.js";
-import type { ProfileReasoningOverride, ReasoningControlMode } from "./reasoning-capability.js";
+import {
+  canonicalReasoningEffort,
+  decideReasoning,
+  type ProfileReasoningOverride,
+  type ReasoningControlMode,
+} from "./reasoning-capability.js";
 
 export type ProfileHealth = "healthy" | "degraded" | "cooldown" | "open" | "half_open" | "disabled" | "unknown";
 export type RoutingPreference = "economy" | "balanced" | "quality";
@@ -611,6 +617,7 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
     ?? eligibleProfiles.find((profile) => profile.economics)?.economics;
   const effectiveSwitchCost = ACU_DEFAULT_SWITCH_COST_USD
     * (referenceEconomics ? cashCnyPerNominalUsd(referenceEconomics) : 1);
+  const utilityPolicy = input.utilityPolicy;
   const legacyRecommendation = recommendModel({
     probabilities: input.judge,
     difficultyScore: input.judge.difficultyIndex,
@@ -625,9 +632,8 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
     effectivePrices: legacyEffectivePrices,
     switchCost: effectiveSwitchCost,
     includeExecutionPresets: input.includeExecutionPresets,
-    allowedCandidateIds: input.utilityPolicy?.allowedCandidateIds,
+    allowedCandidateIds: utilityPolicy?.allowedCandidateIds,
   });
-  const utilityPolicy = input.utilityPolicy;
   const shouldComputeV2 =
     utilityPolicy?.formulaMode === "shadow" ||
     utilityPolicy?.formulaMode === "active";
@@ -681,11 +687,64 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
       effectivePrices: v2EffectivePrices,
       switchCost: effectiveSwitchCost,
       includeExecutionPresets: input.includeExecutionPresets,
+      allowedCandidateIds: utilityPolicy.allowedCandidateIds,
       qualityBias: effectiveQualityBias,
       modelCostLogScale: utilityPolicy.modelCostLogScale,
-      allowedCandidateIds: utilityPolicy.allowedCandidateIds,
       candidatePreferenceScores: utilityPolicy.candidatePreferenceScores,
     });
+  }
+  const profilesForCandidate = (candidate: AcuModelEstimate): AlphaExecutionProfile[] => {
+    const modelProfiles = eligibleProfiles.filter((profile) => profile.modelId === candidate.modelId);
+    const requiredReasoningEffort = candidate.reasoningEffort;
+    if (!requiredReasoningEffort) return modelProfiles;
+    const presetEffort = canonicalReasoningEffort(requiredReasoningEffort);
+    const compatible = presetEffort ? modelProfiles.filter((profile) => {
+      const decision = decideReasoning({
+        mode: "acu-auto",
+        presetEffort,
+        modelId: profile.modelId,
+        protocol: input.requirements.protocol,
+        profileOverride: profile.reasoningOverride,
+        legacyControlMode: profile.reasoningControlMode,
+        legacySupportedEfforts: profile.supportedReasoningEfforts,
+      });
+      return decision.mappingStatus === "exact" || decision.mappingStatus === "upgraded_alias";
+    }) : [];
+    if (compatible.length === 0) {
+      throw new AlphaAdmissionError(
+        "reasoning_effort_unavailable",
+        `No execution Profile for ${candidate.candidateId} supports reasoning effort ${candidate.reasoningEffort}.`,
+        400,
+        { candidate_id: candidate.candidateId, reasoning_effort: candidate.reasoningEffort },
+      );
+    }
+    return compatible;
+  };
+  const refineLegacyProfileForCandidate = (candidate: AcuModelEstimate): void => {
+    const compatible = profilesForCandidate(candidate);
+    const selected = compatible.reduce((best, profile) => {
+      const webPreference = compareWebPreference(profile, best, input.requirements);
+      return webPreference < 0 || (webPreference === 0
+        && effectiveProviderSelectionScore(profile, input.requirements, input.inputTokens, input.expectedOutputTokens)
+        < effectiveProviderSelectionScore(best, input.requirements, input.inputTokens, input.expectedOutputTokens))
+        ? profile : best;
+    });
+    legacyBestProfileByModel.set(candidate.modelId, selected);
+  };
+  refineLegacyProfileForCandidate(legacyRecommendation.recommended);
+  if (v2Recommendation && utilityPolicy) {
+    const compatible = profilesForCandidate(v2Recommendation.recommended).map((profile) => ({
+      ...profile,
+      utilityEffectivePrices: profileEffectivePrices(profile),
+    }));
+    const scored = scoreExecutionProfilesV2(
+      compatible,
+      input.inputTokens,
+      input.expectedOutputTokens,
+      utilityPolicy,
+    );
+    v2BestProfileByModel.set(v2Recommendation.recommended.modelId, scored.selected);
+    v2ProfileUtilitiesByModel.set(v2Recommendation.recommended.modelId, scored.utilities);
   }
   const activeV2 =
     utilityPolicy?.formulaMode === "active" && v2Recommendation !== undefined;
@@ -696,12 +755,18 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
   const expectedCandidateModelIds = eligibleModelIds
     .filter((modelId) => getAcuModel(modelId)?.routingEligible === true)
     .sort();
-  const expectedCandidateIds = [
-    ...expectedCandidateModelIds.filter((modelId) => !utilityPolicy?.allowedCandidateIds?.length
-      || utilityPolicy.allowedCandidateIds.includes(modelId)),
-    ...recommendation.estimates.filter((estimate) => estimate.executionPresetId).map((estimate) => estimate.candidateId),
-  ].filter((candidateId) => !utilityPolicy?.allowedCandidateIds?.length
-    || utilityPolicy.allowedCandidateIds.includes(candidateId)).sort();
+  const unfilteredExpectedCandidateIds = [
+    ...expectedCandidateModelIds,
+    ...(input.includeExecutionPresets === false
+      ? []
+      : enabledExecutionPresets()
+          .filter((preset) => expectedCandidateModelIds.includes(preset.modelId))
+          .map((preset) => preset.candidateId)),
+  ];
+  const allowedCandidateIds = new Set(utilityPolicy?.allowedCandidateIds ?? []);
+  const expectedCandidateIds = unfilteredExpectedCandidateIds
+    .filter((candidateId) => allowedCandidateIds.size === 0 || allowedCandidateIds.has(candidateId))
+    .sort();
   const actualCandidateIds = recommendation.estimates.map((estimate) => estimate.candidateId).sort();
   if (expectedCandidateIds.length !== actualCandidateIds.length
     || expectedCandidateIds.some((candidateId, index) => candidateId !== actualCandidateIds[index])) {
@@ -711,10 +776,10 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
   }
   const selectedProfile = bestProfileByModel.get(recommendation.recommended.modelId);
   if (!selectedProfile) throw new Error("Selected model has no compatible execution profile");
+  const selectedCandidateProfiles = profilesForCandidate(recommendation.recommended);
   const selectedModelV2Utilities =
     v2ProfileUtilitiesByModel.get(recommendation.recommended.modelId) ?? [];
-  const providerCandidateEstimates = eligibleProfiles
-    .filter((profile) => profile.modelId === selectedProfile.modelId)
+  const providerCandidateEstimates = selectedCandidateProfiles
     .map((profile) => ({
       executionProfileId: profile.executionProfileId,
       provider: profile.provider,

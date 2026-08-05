@@ -35,7 +35,6 @@ export type AcuDecisionInput = {
   judgeCost: number;
   qualityTarget?: number;
   eligibleModelIds?: string[];
-  allowedCandidateIds?: string[];
   requireToolCallSupport?: boolean;
   requireVisionSupport?: boolean;
   switchCost?: number;
@@ -49,6 +48,7 @@ export type AcuDecisionInput = {
     outputPricePerMillion: number;
   }>;
   includeExecutionPresets?: boolean;
+  allowedCandidateIds?: string[];
 };
 
 export function estimateCallCost(
@@ -252,18 +252,14 @@ export function recommendModel(input: AcuDecisionInput): AcuRecommendation {
       fallbackCallCost, qualityTarget, switchCost, fallbackRiskScale, input.effectivePrices?.[model.modelId], preset,
     )] : [];
   });
-  const allEstimates = [...baseEstimates, ...presetEstimates];
-  const allowedCandidates = input.allowedCandidateIds?.length
-    ? new Set(input.allowedCandidateIds)
-    : undefined;
-  const estimates = allowedCandidates
-    ? allEstimates.filter((estimate) => allowedCandidates.has(estimate.candidateId))
-    : allEstimates;
-  if (estimates.length === 0) throw new Error("No ACU candidate is allowed by the routing policy");
-  const flagshipEstimate = estimates.reduce((best, estimate) => (
-    estimate.conservativeQuality > best.conservativeQuality ? estimate : best
-  ));
-  if (!flagshipEstimate) throw new Error("ACU flagship model estimate is missing");
+  const allowedCandidateIds = new Set(input.allowedCandidateIds ?? []);
+  const estimates = [...baseEstimates, ...presetEstimates].filter(
+    (estimate) => allowedCandidateIds.size === 0 || allowedCandidateIds.has(estimate.candidateId),
+  );
+  if (estimates.length === 0) throw new Error("No ACU routing candidate is allowed");
+  const flagshipEstimate = estimates.reduce((best, estimate) =>
+    estimate.conservativeQuality > best.conservativeQuality ? estimate : best,
+  );
   for (const estimate of estimates) {
     estimate.savingsVsFlagship = flagshipEstimate.selectionCost - estimate.selectionCost;
     estimate.savingsPercentVsFlagship = flagshipEstimate.selectionCost > 0
@@ -391,17 +387,12 @@ export function recommendModelV2(
     estimate.costWeight = costWeight;
     estimate.qualityContribution = qualityWeight * estimate.qualityUtility;
     estimate.costContribution = costWeight * estimate.costUtility;
-    estimate.valueUtility = selectableEstimate
+    estimate.baseValueUtility = selectableEstimate
       ? estimate.qualityContribution + estimate.costContribution
       : Number.NEGATIVE_INFINITY;
-    const preferenceScore = input.candidatePreferenceScores?.[estimate.candidateId] ?? 100;
-    const preferenceMultiplier = Math.max(0, Math.min(2, preferenceScore / 100));
-    estimate.baseValueUtility = estimate.valueUtility;
-    estimate.candidatePreferenceScore = preferenceScore;
-    estimate.candidatePreferenceMultiplier = preferenceMultiplier;
-    estimate.adjustedValueUtility = selectableEstimate
-      ? estimate.baseValueUtility * preferenceMultiplier
-      : Number.NEGATIVE_INFINITY;
+    estimate.candidatePreferenceScore = input.candidatePreferenceScores?.[estimate.candidateId] ?? 100;
+    estimate.candidatePreferenceMultiplier = 0.5 + estimate.candidatePreferenceScore / 200;
+    estimate.adjustedValueUtility = estimate.baseValueUtility * estimate.candidatePreferenceMultiplier;
     estimate.valueUtility = estimate.adjustedValueUtility;
     estimate.normalizationQualityRange = undefined;
     estimate.normalizationCostRange = undefined;
@@ -412,20 +403,6 @@ export function recommendModelV2(
     estimate.selected = false;
   }
   const ordered = [...selectable].sort((left, right) => {
-    if (qualityBias === -100) {
-      return (
-        left.estimatedCallCost - right.estimatedCallCost ||
-        right.conservativeQuality - left.conservativeQuality ||
-        left.candidateId.localeCompare(right.candidateId)
-      );
-    }
-    if (qualityBias === 100) {
-      return (
-        right.conservativeQuality - left.conservativeQuality ||
-        left.estimatedCallCost - right.estimatedCallCost ||
-        left.candidateId.localeCompare(right.candidateId)
-      );
-    }
     return (
       right.valueUtility - left.valueUtility ||
       right.conservativeQuality - left.conservativeQuality ||

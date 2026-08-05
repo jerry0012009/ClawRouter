@@ -17,6 +17,7 @@ import { UsageOutboxWorker } from "./usage-outbox.js";
 import { canonicalAdvertisedContextWindow } from "./context-admission.js";
 import { ACU_ROUTING_MODEL_VERSION } from "../acu/config.js";
 import { getAcuModel } from "../acu/catalog.js";
+import { enabledExecutionPresets } from "../acu/execution-presets.js";
 import { combinedMonitorState, mergeSupplyInventory, monitorRangeSpec, monitorReasoningMetadata, monitorRoutingStatus, type MonitorRange } from "./channel-monitor.js";
 import { AdaptiveProbeWorker } from "./adaptive-probe.js";
 import { deriveRuntimeEligibility } from "./channel-health.js";
@@ -555,6 +556,25 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
               Number(left.multiplier ?? Number.POSITIVE_INFINITY) - Number(right.multiplier ?? Number.POSITIVE_INFINITY));
             const best = ordered[0];
             const backup = ordered.find((profile) => profile.provider !== best?.provider) ?? ordered[1];
+            const routingCandidates = [
+              {
+                candidateId: modelId,
+                modelId,
+                displayName: catalog?.displayName ?? modelId,
+                kind: "base",
+              },
+              ...enabledExecutionPresets()
+                .filter((preset) => preset.modelId === modelId)
+                .map((preset) => ({
+                  candidateId: preset.candidateId,
+                  modelId,
+                  displayName: preset.displayName,
+                  kind: "preset",
+                  presetId: preset.presetId,
+                  reasoningEffort: preset.canonicalReasoningEffort,
+                  calibrationStatus: preset.calibrationStatus,
+                })),
+            ];
             return {
               modelId,
               vendor: catalog?.provider ?? "Unknown",
@@ -572,6 +592,7 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
               exclusionReason: healthyProfiles.length > 0
                 ? null : [...new Set(activeProfiles.map((profile) => profile.routingEligibility))].join(",") || "no_active_profile",
               profiles: modelProfiles,
+              routingCandidates,
             };
           });
         let supplyInventory: Array<Record<string, unknown>> = [];
@@ -609,6 +630,7 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
               autoRouteEnabled: false,
               exclusionReason: "minimum_validation_not_passed",
               profiles: [],
+              routingCandidates: [],
             };
           }),
         ];

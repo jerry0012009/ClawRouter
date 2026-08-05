@@ -93,6 +93,10 @@ describe("ACU Router V2 model utility", () => {
         0.5 * candidate.qualityUtility + 0.5 * candidate.costUtility,
         12,
       );
+      expect(candidate.baseValueUtility).toBe(candidate.valueUtility);
+      expect(candidate.candidatePreferenceScore).toBe(100);
+      expect(candidate.candidatePreferenceMultiplier).toBe(1);
+      expect(candidate.adjustedValueUtility).toBe(candidate.valueUtility);
       expect(Number.isFinite(candidate.rawQualityUtility)).toBe(true);
       expect(Number.isFinite(candidate.rawCostUtility)).toBe(true);
       expect(candidate.qualitySatisfactionUtility).toBeCloseTo(
@@ -108,6 +112,94 @@ describe("ACU Router V2 model utility", () => {
       expect(candidate.formulaVersion).toBe(ACU_MODEL_UTILITY_V2_VERSION);
       expect(Number.isFinite(candidate.valueUtility)).toBe(true);
     }
+  });
+
+  it("applies sparse candidate preferences without changing objective candidate metrics", () => {
+    const neutral = recommendModelV2({ ...modelInput, qualityBias: 0, modelCostLogScale: 2.5 });
+    const adjusted = recommendModelV2({
+      ...modelInput,
+      qualityBias: 0,
+      modelCostLogScale: 2.5,
+      candidatePreferenceScores: { "gpt-5.6-luna": 0, "gpt-5.6-sol": 200 },
+    });
+    const byId = new Map(neutral.estimates.map((candidate) => [candidate.candidateId, candidate]));
+    for (const candidate of adjusted.estimates) {
+      const baseline = byId.get(candidate.candidateId)!;
+      expect(candidate.candidatePreferenceMultiplier).toBe(candidate.modelId === "gpt-5.6-sol" ? 1.5 : 0.5);
+      expect(candidate.adjustedValueUtility).toBeCloseTo(
+        candidate.baseValueUtility! * candidate.candidatePreferenceMultiplier!, 12,
+      );
+      expect({
+        quality: candidate.estimatedQuality,
+        conservative: candidate.conservativeQuality,
+        cost: candidate.estimatedCallCost,
+        costUtility: candidate.costUtility,
+        qualityUtility: candidate.qualitySatisfactionUtility,
+        pareto: candidate.paretoEfficient,
+      }).toEqual({
+        quality: baseline.estimatedQuality,
+        conservative: baseline.conservativeQuality,
+        cost: baseline.estimatedCallCost,
+        costUtility: baseline.costUtility,
+        qualityUtility: baseline.qualitySatisfactionUtility,
+        pareto: baseline.paretoEfficient,
+      });
+    }
+  });
+
+  it("changes nearby selection and honors preferences at both quality-bias endpoints", () => {
+    const closePrices = {
+      "gpt-5.6-luna": { inputPricePerMillion: 1, outputPricePerMillion: 1 },
+      "gpt-5.6-sol": { inputPricePerMillion: 1, outputPricePerMillion: 1 },
+    };
+    const neutral = recommendModelV2({ ...modelInput, effectivePrices: closePrices, qualityBias: 0, modelCostLogScale: 2.5 });
+    const preferred = recommendModelV2({
+      ...modelInput, effectivePrices: closePrices, qualityBias: 0, modelCostLogScale: 2.5,
+      candidatePreferenceScores: { "gpt-5.6-luna": 200, "gpt-5.6-sol": 0 },
+    });
+    expect(neutral.recommended.modelId).toBe("gpt-5.6-sol");
+    expect(preferred.recommended.modelId).toBe("gpt-5.6-luna");
+    for (const qualityBias of [-100, 100]) {
+      const result = recommendModelV2({
+        ...modelInput, qualityBias, modelCostLogScale: 2.5,
+        candidatePreferenceScores: { "gpt-5.6-luna": 0, "gpt-5.6-sol": 200 },
+      });
+      const ordered = [...result.estimates].sort((left, right) =>
+        right.adjustedValueUtility! - left.adjustedValueUtility!
+        || right.conservativeQuality - left.conservativeQuality
+        || left.estimatedCallCost - right.estimatedCallCost
+        || left.candidateId.localeCompare(right.candidateId));
+      expect(result.recommended.candidateId).toBe(ordered[0]?.candidateId);
+    }
+  });
+
+  it("allows base and preset candidates to have independent scope and preferences", () => {
+    const result = recommendModelV2({
+      ...modelInput,
+      eligibleModelIds: ["gpt-5.6-luna"],
+      qualityBias: 0,
+      modelCostLogScale: 2.5,
+      includeExecutionPresets: true,
+      allowedCandidateIds: ["gpt-5.6-luna@max"],
+      candidatePreferenceScores: { "gpt-5.6-luna": 80, "gpt-5.6-luna@max": 150 },
+    });
+    expect(result.estimates.map((candidate) => candidate.candidateId)).toEqual(["gpt-5.6-luna@max"]);
+    expect(result.recommended).toMatchObject({
+      candidateId: "gpt-5.6-luna@max",
+      modelId: "gpt-5.6-luna",
+      executionPresetId: "gpt-5.6-luna:max",
+      candidatePreferenceScore: 150,
+      candidatePreferenceMultiplier: 1.25,
+    });
+  });
+
+  it("filters forbidden presets before cost, Pareto, and utility calculations", () => {
+    const withoutPresets = recommendModelV2({ ...modelInput, qualityBias: 0, modelCostLogScale: 2.5, includeExecutionPresets: false });
+    const filtered = recommendModelV2({
+      ...modelInput, qualityBias: 0, modelCostLogScale: 2.5, includeExecutionPresets: true,
+      allowedCandidateIds: ["gpt-5.6-luna", "gpt-5.6-sol"],
+    });
+    expect(filtered.estimates).toEqual(withoutPresets.estimates);
   });
 
   it("values the same quality gain more at low quality than above 95 percent", () => {
@@ -206,6 +298,122 @@ describe("ACU Router V2 model utility", () => {
     );
     expect(active.providerSelectionReason).toContain("weights cost=");
   });
+
+  it("treats the candidate allowlist as a hard constraint in legacy, shadow, and active modes", () => {
+    const routeProfiles = ["luna", "sol", "terra"].map((tier): AlphaExecutionProfile => ({
+      ...profile(`provider-${tier}`, 1, 100, 0.9),
+      executionProfileId: `provider:gpt-5.6-${tier}:responses`,
+      modelId: `gpt-5.6-${tier}`,
+      providerModelId: `gpt-5.6-${tier}`,
+      contextWindow: 1_000_000,
+      usageTrusted: true,
+      supportedReasoningEfforts: ["max", "high", "xhigh"],
+    }));
+    const base = {
+      judge: {
+        ...continuousTierProbabilities(0.5),
+        difficultyScoreRaw: 50, difficultyIndex: 50, difficultyScore: 50, factorComposite: 50,
+        difficultyMethodVersion: "acu-difficulty-index-v1" as const,
+        factors: { reasoningDepth: 0, taskScope: 0, constraintDensity: 0, toolDependency: 0,
+          verificationBurden: 0, contextBurden: 0 },
+        signals: [], explanation: "fixture",
+      },
+      judgeCost: 0.01, inputTokens: 10_000, expectedOutputTokens: 1_000,
+      effectiveQualityTarget: 70, profiles: routeProfiles,
+      requirements: { protocol: "responses" as const, requireTools: true, requireThinking: false, contextTokens: 11_000 },
+      includeExecutionPresets: true,
+    };
+
+    for (const formulaMode of ["legacy", "shadow", "active"] as const) {
+      const result = routeWithCurrentAcuFormula({
+        ...base,
+        utilityPolicy: {
+          ...DEFAULT_ROUTING_UTILITY_POLICY,
+          formulaMode,
+          allowedCandidateIds: ["gpt-5.6-luna@max"],
+          candidatePreferenceScores: { "gpt-5.6-luna@max": 200 },
+        },
+      });
+      expect(result.candidateEstimates.map((candidate) => candidate.candidateId))
+        .toEqual(["gpt-5.6-luna@max"]);
+      expect(result.paretoFrontier).toEqual(["gpt-5.6-luna@max"]);
+      expect(result.recommendation.recommended.candidateId).toBe("gpt-5.6-luna@max");
+      if (formulaMode === "active") {
+        expect(result.recommendation.estimates[0]).toMatchObject({
+          rank: 1,
+          candidatePreferenceScore: 200,
+          candidatePreferenceMultiplier: 1.5,
+        });
+      } else {
+        expect(result.recommendation.estimates[0]?.rank).toBeUndefined();
+        expect(result.recommendation.estimates[0]?.candidatePreferenceScore).toBeUndefined();
+      }
+      if (formulaMode === "shadow") {
+        expect(result.v2Counterfactual?.modelCandidates).toHaveLength(1);
+        expect(result.v2Counterfactual?.modelCandidates[0]).toMatchObject({
+          candidateId: "gpt-5.6-luna@max",
+          rank: 1,
+          candidatePreferenceScore: 200,
+          candidatePreferenceMultiplier: 1.5,
+        });
+      }
+    }
+  });
+
+  it("selects a preset-compatible Profile without changing Standard Profile selection", () => {
+    const cheap = {
+      ...profile("cheap", 1, 100, 0.9),
+      contextWindow: 1_000_000,
+      usageTrusted: true,
+      supportedReasoningEfforts: ["high"],
+      reasoningOverride: { rejectedEfforts: ["max"] },
+    };
+    const compatible = {
+      ...profile("compatible", 10, 100, 0.9),
+      contextWindow: 1_000_000,
+      usageTrusted: true,
+      supportedReasoningEfforts: ["max"],
+    };
+    const base = {
+      judge: {
+        ...continuousTierProbabilities(0.5),
+        difficultyScoreRaw: 50, difficultyIndex: 50, difficultyScore: 50, factorComposite: 50,
+        difficultyMethodVersion: "acu-difficulty-index-v1" as const,
+        factors: { reasoningDepth: 0, taskScope: 0, constraintDensity: 0, toolDependency: 0,
+          verificationBurden: 0, contextBurden: 0 },
+        signals: [], explanation: "fixture",
+      },
+      judgeCost: 0, inputTokens: 10_000, expectedOutputTokens: 1_000,
+      effectiveQualityTarget: 70, profiles: [cheap, compatible],
+      requirements: { protocol: "responses" as const, requireTools: true, requireThinking: false, contextTokens: 11_000 },
+      includeExecutionPresets: true,
+    };
+    for (const formulaMode of ["legacy", "shadow", "active"] as const) {
+      const preset = routeWithCurrentAcuFormula({
+        ...base,
+        utilityPolicy: {
+          ...DEFAULT_ROUTING_UTILITY_POLICY,
+          formulaMode,
+          supplyWeights: { cost: 100, speed: 0, reliability: 0 },
+          allowedCandidateIds: ["gpt-5.6-luna@max"],
+        },
+      });
+      expect(preset.selectedProfile.executionProfileId).toBe("compatible");
+      expect(preset.providerCandidateEstimates.map((candidate) => candidate.executionProfileId))
+        .toEqual(["compatible"]);
+
+      const standard = routeWithCurrentAcuFormula({
+        ...base,
+        utilityPolicy: {
+          ...DEFAULT_ROUTING_UTILITY_POLICY,
+          formulaMode,
+          supplyWeights: { cost: 100, speed: 0, reliability: 0 },
+          allowedCandidateIds: ["gpt-5.6-luna"],
+        },
+      });
+      expect(standard.selectedProfile.executionProfileId).toBe("cheap");
+    }
+  });
 });
 
 describe("ACU Router V2 Profile utility", () => {
@@ -234,6 +442,20 @@ describe("ACU Router V2 Profile utility", () => {
       expect(utility.normalizationVersion).toBe("acu-benefit-range-v1");
       expect(utility.formulaVersion).toBe("acu-profile-utility-v2.1");
     }
+  });
+
+  it("does not apply candidate preferences to Profile ranking", () => {
+    const neutral = scoreExecutionProfilesV2(profiles, 100_000, 4_000, {
+      ...DEFAULT_ROUTING_UTILITY_POLICY,
+      formulaMode: "active",
+      candidatePreferenceScores: {},
+    });
+    const preferred = scoreExecutionProfilesV2(profiles, 100_000, 4_000, {
+      ...DEFAULT_ROUTING_UTILITY_POLICY,
+      formulaMode: "active",
+      candidatePreferenceScores: { "gpt-5.6-luna": 200 },
+    });
+    expect(preferred).toEqual(neutral);
   });
 
   it("does not treat unknown or small-sample data as fastest or perfectly reliable", () => {

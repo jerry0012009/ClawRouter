@@ -88,13 +88,13 @@ describe("trusted New API identity v3", () => {
       allowedCandidateIds: ["gpt-5.6-luna@max", "gpt-5.6-sol@high"],
       candidatePreferenceScores: {
         "gpt-5.6-sol@high": 70,
-        "gpt-5.6-luna@max": 150,
+        "gpt-5.6-luna@max": 150.5,
       },
     };
     const headers = trustedIdentityHeaders(value, secret);
     expect(headers["x-acu-allowed-candidate-ids"]).toBe('["gpt-5.6-luna@max","gpt-5.6-sol@high"]');
     expect(headers["x-acu-candidate-preference-scores"]).toBe(
-      '{"gpt-5.6-luna@max":150,"gpt-5.6-sol@high":70}',
+      '{"gpt-5.6-luna@max":150.5,"gpt-5.6-sol@high":70}',
     );
     const verified = verifyTrustedIdentity(headers, body, { sharedSecret: secret });
     expect(verified.candidatePreferenceScores).toEqual(value.candidatePreferenceScores);
@@ -117,7 +117,7 @@ describe("trusted New API identity v3", () => {
     for (const candidatePreferenceScores of [
       { "": 150 },
       { "gpt-5.6-luna@max": -1 },
-      { "gpt-5.6-luna@max": 1.5 },
+      { "gpt-5.6-luna@max": "150" },
       { "gpt-5.6-luna@max": 201 },
       Object.fromEntries(Array.from({ length: 65 }, (_, index) => [`model-${index}`, 150])),
     ]) {

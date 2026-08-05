@@ -34,7 +34,7 @@ function verify(request: ContractRequest, secret: string) {
 const input = JSON.parse(readFileSync(0, "utf8")) as ContractInput;
 const scoped = verify(input.scoped, input.secret);
 assert.deepEqual(scoped.allowedCandidateIds, ["gpt-5.6-luna", "gpt-5.6-luna@max"]);
-assert.deepEqual(scoped.candidatePreferenceScores, { "gpt-5.6-luna@max": 150 });
+assert.deepEqual(scoped.candidatePreferenceScores, { "gpt-5.6-luna@max": 150.5 });
 
 const allowedTampered = structuredClone(input.scoped);
 allowedTampered.headers["X-Acu-Allowed-Candidate-Ids"] = '["gpt-5.6-luna-2","gpt-5.6-luna@max"]';

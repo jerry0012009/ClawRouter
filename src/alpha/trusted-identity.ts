@@ -424,7 +424,8 @@ export function verifyTrustedIdentity(
     const candidatePreferenceEntries = Object.entries(identity.candidatePreferenceScores ?? {});
     if (candidatePreferenceEntries.length > 64
       || candidatePreferenceEntries.some(([candidateID, score]) =>
-        candidateID.length > 160 || !candidatePattern.test(candidateID) || !Number.isInteger(score)
+        candidateID.length > 160 || !candidatePattern.test(candidateID)
+        || typeof score !== "number" || !Number.isFinite(score)
         || score < 0 || score > 200
         || (allowedCandidateIDs.length > 0 && !allowedCandidateIDs.includes(candidateID)))) {
       throw new Error("Trusted candidate preference scores are invalid");

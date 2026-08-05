@@ -25,8 +25,8 @@ describe("codex-acu isolated launcher", () => {
     expect(install.status).toBe(0);
     const config = await readFile(join(acuHome, "config.toml"), "utf8");
     expect(config).toContain('model = "acu-auto"');
-    expect(config).toContain("model_context_window = 1050000");
-    expect(config).toContain("model_auto_compact_token_limit = 800000");
+    expect(config).toContain("model_context_window = 272000");
+    expect(config).toContain("model_auto_compact_token_limit = 258400");
     expect(config).toContain('model_auto_compact_token_limit_scope = "total"');
     expect(config).toContain(`model_catalog_json = "${acuHome}/model-catalog.json"`);
     expect(await readFile(join(acuHome, "model-catalog.json"), "utf8")).toContain('"slug": "acu-auto"');

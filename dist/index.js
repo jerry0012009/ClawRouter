@@ -4199,7 +4199,8 @@ import { createHash as createHash5, randomUUID } from "crypto";
 var ACU_PROMPT_VERSION = "acu-tier-requirement-v4";
 var ACU_DIFFICULTY_METHOD_VERSION = "acu-difficulty-index-v1";
 var ACU_ROUTING_MODEL_VERSION = "acu-routing-model-v0.5";
-var ACU_DEFAULT_JUDGE_MODEL = "gpt-5.6-luna";
+var ACU_DEFAULT_JUDGE_MODEL = "gpt-5.6-sol";
+var ACU_DEFAULT_JUDGE_REASONING_EFFORT = "default";
 var ACU_DEFAULT_JUDGE_BASE_URL = "https://lucen.cc/v1";
 var ACU_DEFAULT_JUDGE_MODE = "non-thinking";
 var ACU_DEFAULT_JUDGE_FIRST_BYTE_TIMEOUT_MS = 0;
@@ -4245,6 +4246,9 @@ function readAcuRuntimeConfig(overrides = {}) {
   const config = {
     enabled,
     judgeModel: process.env.ACU_JUDGE_MODEL?.trim() || ACU_DEFAULT_JUDGE_MODEL,
+    judgeReasoningEffort: ["low", "medium", "high", "max"].find(
+      (effort) => effort === process.env.ACU_JUDGE_REASONING_EFFORT?.trim()
+    ) ?? ACU_DEFAULT_JUDGE_REASONING_EFFORT,
     judgeBaseUrl: process.env.ACU_JUDGE_BASE_URL?.trim() || ACU_DEFAULT_JUDGE_BASE_URL,
     judgeMode: ACU_DEFAULT_JUDGE_MODE,
     promptVersion: process.env.ACU_JUDGE_PROMPT_VERSION?.trim() || ACU_PROMPT_VERSION,
@@ -6549,8 +6553,11 @@ function recommendModel(input) {
       preset
     )] : [];
   });
-  const estimates = [...baseEstimates, ...presetEstimates];
-  const flagshipEstimate = baseEstimates.find((estimate) => estimate.modelId === flagship.modelId);
+  const allEstimates = [...baseEstimates, ...presetEstimates];
+  const allowedCandidates = input.allowedCandidateIds?.length ? new Set(input.allowedCandidateIds) : void 0;
+  const estimates = allowedCandidates ? allEstimates.filter((estimate) => allowedCandidates.has(estimate.candidateId)) : allEstimates;
+  if (estimates.length === 0) throw new Error("No ACU candidate is allowed by the routing policy");
+  const flagshipEstimate = estimates.reduce((best, estimate) => estimate.conservativeQuality > best.conservativeQuality ? estimate : best);
   if (!flagshipEstimate) throw new Error("ACU flagship model estimate is missing");
   for (const estimate of estimates) {
     estimate.savingsVsFlagship = flagshipEstimate.selectionCost - estimate.selectionCost;
@@ -7094,6 +7101,8 @@ ${rawNative.rawRequest}` : serializeVisibleContext(messages, tools);
     const truncated = { text: visible, tokenEstimate: contextTokenEstimate, truncated: false };
     const key = createHash4("sha256").update(`${this.config.promptVersion}
 ${this.config.judgeModel}
+${this.config.judgeReasoningEffort}
+${this.config.judgeProtocol}
 ${contextSha256}`).digest("hex");
     const path = cachePath(this.config);
     const cache = readCache(path);
@@ -7149,6 +7158,9 @@ ${truncated.text}`;
             model: this.config.judgeModel,
             instructions: systemPrompt,
             input: [{ role: "user", content: [{ type: "input_text", text: userPrompt }] }],
+            ...this.config.judgeReasoningEffort === "default" ? {} : {
+              reasoning: { effort: this.config.judgeReasoningEffort, summary: "auto" }
+            },
             max_output_tokens: Math.min(300, this.config.maxOutputTokens),
             stream: false
           } : {
@@ -7412,6 +7424,8 @@ var AcuDemoStrategy = class {
       judgeErrorCategory = error instanceof Error ? error.message.slice(0, 160) : "unknown_live_error";
       cacheKeySha256 = createHash5("sha256").update(`${this.config.promptVersion}
 ${this.config.judgeModel}
+${this.config.judgeReasoningEffort}
+${this.config.judgeProtocol}
 ${contextSha256}`).digest("hex");
     }
     const entropy = normalizedEntropy(judge);
@@ -7431,6 +7445,7 @@ ${contextSha256}`).digest("hex");
       estimateLabel: "public-benchmark constrained estimate",
       promptVersion: this.config.promptVersion,
       judgeModel: this.config.judgeModel,
+      judgeReasoningEffort: this.config.judgeReasoningEffort,
       judgeMode: "non-thinking",
       judge,
       judgeStatus,

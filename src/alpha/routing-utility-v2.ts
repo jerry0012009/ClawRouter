@@ -43,6 +43,8 @@ export type RoutingUtilityPolicy = {
   profileSpeedLogScale: number;
   latency: LatencyPolicy;
   reliability: ReliabilityPolicy;
+  allowedCandidateIds: string[];
+  candidatePreferenceScores: Record<string, number>;
   routingUtilityVersion: string;
   workPhaseBiasOffsets: Record<
     "inspection" | "general" | "implementation" | "verification" | "planning" | "recovery",
@@ -71,6 +73,8 @@ export const DEFAULT_ROUTING_UTILITY_POLICY: RoutingUtilityPolicy = {
     unknownDefault: 0.75,
     degradedMultiplier: 0.85,
   },
+  allowedCandidateIds: [],
+  candidatePreferenceScores: {},
   routingUtilityVersion: ACU_ROUTING_UTILITY_CONFIG_VERSION,
   workPhaseBiasOffsets: {
     inspection: -10,

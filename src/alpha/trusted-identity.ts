@@ -32,6 +32,8 @@ const INTERNAL_HEADER_NAMES = [
   "x-acu-latency-policy",
   "x-acu-reliability-policy",
   "x-acu-work-phase-bias-offsets",
+  "x-acu-allowed-candidate-ids",
+  "x-acu-candidate-preference-scores",
   "x-acu-routing-utility-version",
   "x-acu-formula-mode",
   "x-acu-identity-version",
@@ -61,9 +63,11 @@ export type TrustedNewApiIdentity = {
   latencyPolicy?: LatencyPolicy;
   reliabilityPolicy?: ReliabilityPolicy;
   workPhaseBiasOffsets?: RoutingUtilityPolicy["workPhaseBiasOffsets"];
+  allowedCandidateIds?: string[];
+  candidatePreferenceScores?: Record<string, number>;
   routingUtilityVersion?: string;
   formulaMode?: FormulaMode;
-  identityVersion?: "v2" | "v3";
+  identityVersion?: "v2" | "v3" | "v4";
   timestamp: string;
   bodySha256: string;
 };
@@ -99,12 +103,12 @@ export function trustedIdentitySigningPayload(identity: TrustedNewApiIdentity): 
     identity.routingPolicyVersion,
     identity.routingPreference,
   ];
-  if (identity.identityVersion !== "v3") {
+  if (identity.identityVersion !== "v3" && identity.identityVersion !== "v4") {
     return [...legacyFields, identity.timestamp, identity.bodySha256].join(
       "\n",
     );
   }
-  return [
+  const utilityFields = [
     ...legacyFields,
     String(identity.qualityBias),
     identity.supplyStrategy,
@@ -116,6 +120,13 @@ export function trustedIdentitySigningPayload(identity: TrustedNewApiIdentity): 
     JSON.stringify(identity.latencyPolicy),
     JSON.stringify(identity.reliabilityPolicy),
     JSON.stringify(identity.workPhaseBiasOffsets),
+  ];
+  return [
+    ...utilityFields,
+    ...(identity.identityVersion === "v4" ? [
+      JSON.stringify(identity.allowedCandidateIds),
+      JSON.stringify(identity.candidatePreferenceScores),
+    ] : []),
     identity.routingUtilityVersion,
     identity.formulaMode,
     identity.identityVersion,
@@ -147,7 +158,7 @@ export function trustedIdentityHeaders(
     "x-acu-body-sha256": identity.bodySha256,
     "x-acu-signature": signTrustedIdentity(identity, sharedSecret),
   };
-  if (identity.identityVersion === "v3") {
+  if (identity.identityVersion === "v3" || identity.identityVersion === "v4") {
     headers["x-acu-quality-bias"] = String(identity.qualityBias);
     headers["x-acu-supply-strategy"] = String(identity.supplyStrategy);
     headers["x-acu-supply-weights"] = JSON.stringify(identity.supplyWeights);
@@ -166,11 +177,15 @@ export function trustedIdentityHeaders(
     headers["x-acu-work-phase-bias-offsets"] = JSON.stringify(
       identity.workPhaseBiasOffsets,
     );
+    if (identity.identityVersion === "v4") {
+      headers["x-acu-allowed-candidate-ids"] = JSON.stringify(identity.allowedCandidateIds);
+      headers["x-acu-candidate-preference-scores"] = JSON.stringify(identity.candidatePreferenceScores);
+    }
     headers["x-acu-routing-utility-version"] = String(
       identity.routingUtilityVersion,
     );
     headers["x-acu-formula-mode"] = String(identity.formulaMode);
-    headers["x-acu-identity-version"] = "v3";
+    headers["x-acu-identity-version"] = identity.identityVersion;
   }
   return headers;
 }
@@ -189,7 +204,7 @@ function finiteHeader(headers: IncomingHttpHeaders, name: string): number {
 export function resolvedRoutingUtilityPolicy(
   identity: TrustedNewApiIdentity,
 ): RoutingUtilityPolicy {
-  if (identity.identityVersion !== "v3")
+  if (identity.identityVersion !== "v3" && identity.identityVersion !== "v4")
     return {
       ...DEFAULT_ROUTING_UTILITY_POLICY,
       qualityBias:
@@ -212,6 +227,8 @@ export function resolvedRoutingUtilityPolicy(
     latency: identity.latencyPolicy!,
     reliability: identity.reliabilityPolicy!,
     workPhaseBiasOffsets: identity.workPhaseBiasOffsets!,
+    allowedCandidateIds: identity.allowedCandidateIds ?? [],
+    candidatePreferenceScores: identity.candidatePreferenceScores ?? {},
     routingUtilityVersion: identity.routingUtilityVersion!,
   };
 }
@@ -226,7 +243,7 @@ export function verifyTrustedIdentity(
     headers["x-acu-identity-version"] === undefined
       ? "v2"
       : singleHeader(headers, "x-acu-identity-version");
-  if (identityVersion !== "v2" && identityVersion !== "v3")
+  if (identityVersion !== "v2" && identityVersion !== "v3" && identityVersion !== "v4")
     throw new Error("Trusted identity version is invalid");
   const identity: TrustedNewApiIdentity = {
     newapiUserId: singleHeader(headers, INTERNAL_HEADER_NAMES[0]),
@@ -243,7 +260,7 @@ export function verifyTrustedIdentity(
     timestamp: singleHeader(headers, "x-acu-timestamp"),
     bodySha256: singleHeader(headers, "x-acu-body-sha256"),
   };
-  if (identityVersion === "v3") {
+  if (identityVersion === "v3" || identityVersion === "v4") {
     identity.qualityBias = finiteHeader(headers, "x-acu-quality-bias");
     identity.supplyStrategy = singleHeader(
       headers,
@@ -288,6 +305,13 @@ export function verifyTrustedIdentity(
       headers,
       "x-acu-formula-mode",
     ) as FormulaMode;
+    if (identityVersion === "v4") {
+      identity.allowedCandidateIds = parseJsonHeader<string[]>(headers, "x-acu-allowed-candidate-ids");
+      identity.candidatePreferenceScores = parseJsonHeader<Record<string, number>>(
+        headers,
+        "x-acu-candidate-preference-scores",
+      );
+    }
   }
   const signature = singleHeader(headers, "x-acu-signature");
   if (!["all_routing_eligible", "custom_allowlist", "explicit_only"].includes(identity.routingPolicy)) {
@@ -311,7 +335,7 @@ export function verifyTrustedIdentity(
   if (!["economy", "balanced", "quality"].includes(identity.routingPreference)) {
     throw new Error("Trusted routing preference is invalid");
   }
-  if (identityVersion === "v3") {
+  if (identityVersion === "v3" || identityVersion === "v4") {
     if (!Number.isInteger(identity.qualityBias) || identity.qualityBias! < -100 || identity.qualityBias! > 100) {
       throw new Error("Trusted quality bias is invalid");
     }
@@ -360,6 +384,20 @@ export function verifyTrustedIdentity(
       || !/^acu-routing-utility-v1-[a-f0-9]{16}$/.test(identity.routingUtilityVersion!)
       || !["legacy", "shadow", "active"].includes(identity.formulaMode!)) {
       throw new Error("Trusted routing utility policy is invalid");
+    }
+    if (identityVersion === "v4") {
+      const candidateIds = identity.allowedCandidateIds!;
+      const scores = identity.candidatePreferenceScores!;
+      const candidatePattern = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}(?:@[A-Za-z0-9][A-Za-z0-9._:/-]{0,127})?$/;
+      if (!Array.isArray(candidateIds)
+        || candidateIds.some((candidateId) => typeof candidateId !== "string" || !candidatePattern.test(candidateId))
+        || new Set(candidateIds).size !== candidateIds.length
+        || !scores || typeof scores !== "object" || Array.isArray(scores)
+        || Object.entries(scores).some(([candidateId, score]) => !candidatePattern.test(candidateId)
+          || !Number.isInteger(score) || score < 0 || score > 200)
+        || (candidateIds.length > 0 && Object.keys(scores).some((candidateId) => !candidateIds.includes(candidateId)))) {
+        throw new Error("Trusted candidate routing policy is invalid");
+      }
     }
   }
   if (!/^acu-user-policy-v2-[a-f0-9]{16}$/.test(identity.routingPolicyVersion)) {

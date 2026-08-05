@@ -163,6 +163,8 @@ export type SelectionCorridorPolicy = {
   latencyPolicy?: LatencyPolicy;
   reliabilityPolicy?: ReliabilityPolicy;
   workPhaseBiasOffsets?: RoutingUtilityPolicy["workPhaseBiasOffsets"];
+  allowedCandidateIds?: string[];
+  candidatePreferenceScores?: Record<string, number>;
   routeMode?: "acu-auto" | "acu-high";
   routingUtilityVersion?: string;
   formulaMode?: "legacy" | "shadow" | "active";
@@ -799,6 +801,8 @@ export class AlphaRequestProcessor {
       routeMode: policy?.routeMode ?? "acu-auto",
       routingUtilityVersion: policy?.routingUtilityVersion ?? DEFAULT_ROUTING_UTILITY_POLICY.routingUtilityVersion,
       formulaMode: policy?.formulaMode ?? "legacy",
+      allowedCandidateIds: [...new Set(policy?.allowedCandidateIds ?? [])].sort(),
+      candidatePreferenceScores: policy?.candidatePreferenceScores ?? {},
     };
     const key = `${inputTokens}:${expectedOutputTokens}:${JSON.stringify(normalizedPolicy)}`;
     const now = Date.now();
@@ -843,6 +847,8 @@ export class AlphaRequestProcessor {
       reliability: policy.reliabilityPolicy ?? DEFAULT_ROUTING_UTILITY_POLICY.reliability,
       workPhaseBiasOffsets: policy.workPhaseBiasOffsets ?? DEFAULT_ROUTING_UTILITY_POLICY.workPhaseBiasOffsets,
       routingUtilityVersion: policy.routingUtilityVersion ?? DEFAULT_ROUTING_UTILITY_POLICY.routingUtilityVersion,
+      allowedCandidateIds: policy.allowedCandidateIds ?? DEFAULT_ROUTING_UTILITY_POLICY.allowedCandidateIds,
+      candidatePreferenceScores: policy.candidatePreferenceScores ?? DEFAULT_ROUTING_UTILITY_POLICY.candidatePreferenceScores,
     };
     const profiles = await this.withProfileRuntimeMetrics(filteredProfiles, inputTokens, utilityPolicy);
     const preferences = ["economy", "balanced", "quality"] as const;
@@ -923,6 +929,10 @@ export class AlphaRequestProcessor {
               quality: candidate.estimatedQuality * 100,
               costCny: candidate.estimatedCallCost,
               valueUtility: candidate.valueUtility,
+              baseValueUtility: candidate.baseValueUtility,
+              candidatePreferenceScore: candidate.candidatePreferenceScore,
+              candidatePreferenceMultiplier: candidate.candidatePreferenceMultiplier,
+              adjustedValueUtility: candidate.adjustedValueUtility,
               rawQualityUtility: candidate.rawQualityUtility,
               rawCostUtility: candidate.rawCostUtility,
               qualitySatisfactionUtility: candidate.qualitySatisfactionUtility,

@@ -35,6 +35,7 @@ export type AcuDecisionInput = {
   judgeCost: number;
   qualityTarget?: number;
   eligibleModelIds?: string[];
+  allowedCandidateIds?: string[];
   requireToolCallSupport?: boolean;
   requireVisionSupport?: boolean;
   switchCost?: number;
@@ -251,8 +252,17 @@ export function recommendModel(input: AcuDecisionInput): AcuRecommendation {
       fallbackCallCost, qualityTarget, switchCost, fallbackRiskScale, input.effectivePrices?.[model.modelId], preset,
     )] : [];
   });
-  const estimates = [...baseEstimates, ...presetEstimates];
-  const flagshipEstimate = baseEstimates.find((estimate) => estimate.modelId === flagship.modelId);
+  const allEstimates = [...baseEstimates, ...presetEstimates];
+  const allowedCandidates = input.allowedCandidateIds?.length
+    ? new Set(input.allowedCandidateIds)
+    : undefined;
+  const estimates = allowedCandidates
+    ? allEstimates.filter((estimate) => allowedCandidates.has(estimate.candidateId))
+    : allEstimates;
+  if (estimates.length === 0) throw new Error("No ACU candidate is allowed by the routing policy");
+  const flagshipEstimate = estimates.reduce((best, estimate) => (
+    estimate.conservativeQuality > best.conservativeQuality ? estimate : best
+  ));
   if (!flagshipEstimate) throw new Error("ACU flagship model estimate is missing");
   for (const estimate of estimates) {
     estimate.savingsVsFlagship = flagshipEstimate.selectionCost - estimate.selectionCost;
@@ -295,6 +305,7 @@ export function recommendModel(input: AcuDecisionInput): AcuRecommendation {
 export type AcuModelUtilityV2Input = AcuDecisionInput & {
   qualityBias: number;
   modelCostLogScale: number;
+  candidatePreferenceScores?: Record<string, number>;
 };
 
 export function logarithmicRelativeUtility(
@@ -383,6 +394,15 @@ export function recommendModelV2(
     estimate.valueUtility = selectableEstimate
       ? estimate.qualityContribution + estimate.costContribution
       : Number.NEGATIVE_INFINITY;
+    const preferenceScore = input.candidatePreferenceScores?.[estimate.candidateId] ?? 100;
+    const preferenceMultiplier = Math.max(0, Math.min(2, preferenceScore / 100));
+    estimate.baseValueUtility = estimate.valueUtility;
+    estimate.candidatePreferenceScore = preferenceScore;
+    estimate.candidatePreferenceMultiplier = preferenceMultiplier;
+    estimate.adjustedValueUtility = selectableEstimate
+      ? estimate.baseValueUtility * preferenceMultiplier
+      : Number.NEGATIVE_INFINITY;
+    estimate.valueUtility = estimate.adjustedValueUtility;
     estimate.normalizationQualityRange = undefined;
     estimate.normalizationCostRange = undefined;
     estimate.normalizationQualityDenominator = undefined;

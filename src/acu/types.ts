@@ -121,6 +121,10 @@ export type AcuModelEstimate = {
   qualityUtility: number;
   costUtility: number;
   valueUtility: number;
+  baseValueUtility?: number;
+  candidatePreferenceScore?: number;
+  candidatePreferenceMultiplier?: number;
+  adjustedValueUtility?: number;
   rawQualityUtility?: number;
   rawCostUtility?: number;
   qualitySatisfactionUtility?: number;

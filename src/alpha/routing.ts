@@ -625,6 +625,7 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
     effectivePrices: legacyEffectivePrices,
     switchCost: effectiveSwitchCost,
     includeExecutionPresets: input.includeExecutionPresets,
+    allowedCandidateIds: input.utilityPolicy?.allowedCandidateIds,
   });
   const utilityPolicy = input.utilityPolicy;
   const shouldComputeV2 =
@@ -682,6 +683,8 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
       includeExecutionPresets: input.includeExecutionPresets,
       qualityBias: effectiveQualityBias,
       modelCostLogScale: utilityPolicy.modelCostLogScale,
+      allowedCandidateIds: utilityPolicy.allowedCandidateIds,
+      candidatePreferenceScores: utilityPolicy.candidatePreferenceScores,
     });
   }
   const activeV2 =
@@ -694,9 +697,11 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
     .filter((modelId) => getAcuModel(modelId)?.routingEligible === true)
     .sort();
   const expectedCandidateIds = [
-    ...expectedCandidateModelIds,
+    ...expectedCandidateModelIds.filter((modelId) => !utilityPolicy?.allowedCandidateIds?.length
+      || utilityPolicy.allowedCandidateIds.includes(modelId)),
     ...recommendation.estimates.filter((estimate) => estimate.executionPresetId).map((estimate) => estimate.candidateId),
-  ].sort();
+  ].filter((candidateId) => !utilityPolicy?.allowedCandidateIds?.length
+    || utilityPolicy.allowedCandidateIds.includes(candidateId)).sort();
   const actualCandidateIds = recommendation.estimates.map((estimate) => estimate.candidateId).sort();
   if (expectedCandidateIds.length !== actualCandidateIds.length
     || expectedCandidateIds.some((candidateId, index) => candidateId !== actualCandidateIds[index])) {

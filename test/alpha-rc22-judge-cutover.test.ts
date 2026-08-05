@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
-import { AcuJudgeClient, parseJudgeResult } from "../src/acu/judge.js";
+import {
+  AcuJudgeClient,
+  estimateJudgeContextTokens,
+  estimateVisibleTokens,
+  parseJudgeResult,
+  serializeRawNativeJudgeContext,
+} from "../src/acu/judge.js";
 import { readAcuRuntimeConfig } from "../src/acu/config.js";
 import { createAcuJudgeRunner } from "../src/alpha/judge-runner.js";
 import type { AlphaExecutionProfile } from "../src/alpha/routing.js";
@@ -162,6 +168,30 @@ describe("RC2.2 Judge cutover", () => {
     expect(result.difficultyIndex).toBeGreaterThan(0);
   });
 
+  it("serializes the raw native request before ACU state metadata", () => {
+    const serialized = serializeRawNativeJudgeContext(runInput.rawNative);
+    expect(serialized.indexOf("[RAW_NATIVE_API_REQUEST]")).toBeLessThan(
+      serialized.indexOf("[ACU_STATE_METADATA]"),
+    );
+  });
+
+  it("keeps the raw request prefix stable when metadata changes", () => {
+    const first = serializeRawNativeJudgeContext(runInput.rawNative);
+    const second = serializeRawNativeJudgeContext({
+      ...runInput.rawNative,
+      stateMetadata: { ...runInput.rawNative.stateMetadata, phase: "verification" },
+    });
+    const metadataMarker = "\n\n[ACU_STATE_METADATA]\n";
+    expect(first.split(metadataMarker)[0]).toBe(second.split(metadataMarker)[0]);
+    expect(first.split(metadataMarker)[1]).not.toBe(second.split(metadataMarker)[1]);
+  });
+
+  it("estimates the serialized raw native Judge context", () => {
+    expect(estimateJudgeContextTokens(runInput.rawNative)).toBe(
+      estimateVisibleTokens(serializeRawNativeJudgeContext(runInput.rawNative)),
+    );
+  });
+
   it("sends a complete roughly 200k-token native request without rewriting or truncation", async () => {
     const early = "EARLY_GOAL";
     const plan = "PLAN_STATE";
@@ -184,7 +214,9 @@ describe("RC2.2 Judge cutover", () => {
       rawRequest,
     });
     const messages = postedBody?.messages as Array<{ role: string; content: string }>;
-    const rawSection = messages[1].content.split("[RAW_NATIVE_API_REQUEST]\n")[1];
+    const rawSection = messages[1].content
+      .split("[RAW_NATIVE_API_REQUEST]\n")[1]
+      .split("\n\n[ACU_STATE_METADATA]\n")[0];
     expect(rawSection).toBe(rawRequest);
     expect(rawSection).toContain(early);
     expect(rawSection).toContain(plan);
@@ -195,6 +227,11 @@ describe("RC2.2 Judge cutover", () => {
     expect(result.rawRequestTokenEstimate).toBeGreaterThan(190_000);
     expect(result.contextTruncated).toBe(false);
     expect(result.judgeContextSource).toBe("raw_native_request_v1");
+    expect(postedBody).toMatchObject({
+      model: "gpt-5.6-luna",
+      max_tokens: 300,
+      thinking: { type: "disabled" },
+    });
   });
 
   it("observes but does not locally reject a roughly 700k-token native request", async () => {
@@ -209,7 +246,11 @@ describe("RC2.2 Judge cutover", () => {
       rawRequest,
     });
     const messages = (JSON.parse(posted) as { messages: Array<{ content: string }> }).messages;
-    expect(messages[1].content.split("[RAW_NATIVE_API_REQUEST]\n")[1]).toBe(rawRequest);
+    expect(
+      messages[1].content
+        .split("[RAW_NATIVE_API_REQUEST]\n")[1]
+        .split("\n\n[ACU_STATE_METADATA]\n")[0],
+    ).toBe(rawRequest);
     expect(result.rawRequestTokenEstimate).toBeGreaterThanOrEqual(700_000);
     expect(result.contextTruncated).toBe(false);
     expect(fetchMock).toHaveBeenCalledTimes(1);

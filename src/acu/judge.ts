@@ -245,10 +245,18 @@ export function estimateVisibleTokens(text: string): number {
   return Math.ceil(ascii / 4) + nonAscii;
 }
 
+export function serializeRawNativeJudgeContext(rawNative: RawNativeJudgeContext): string {
+  return [
+    "[RAW_NATIVE_API_REQUEST]",
+    rawNative.rawRequest,
+    "",
+    "[ACU_STATE_METADATA]",
+    stableJson(rawNative.stateMetadata),
+  ].join("\n");
+}
+
 export function estimateJudgeContextTokens(rawNative: RawNativeJudgeContext): number {
-  return estimateVisibleTokens(
-    `[ACU_STATE_METADATA]\n${stableJson(rawNative.stateMetadata)}\n[RAW_NATIVE_API_REQUEST]\n${rawNative.rawRequest}`,
-  );
+  return estimateVisibleTokens(serializeRawNativeJudgeContext(rawNative));
 }
 
 export function buildJudgeSystemPrompt(): string {
@@ -551,7 +559,7 @@ export class AcuJudgeClient {
     const rawRequestBytes = rawNative ? Buffer.byteLength(rawNative.rawRequest, "utf8") : 0;
     const rawRequestTokenEstimate = rawNative ? estimateVisibleTokens(rawNative.rawRequest) : 0;
     const visible = rawNative
-      ? `[ACU_STATE_METADATA]\n${stableJson(rawNative.stateMetadata)}\n[RAW_NATIVE_API_REQUEST]\n${rawNative.rawRequest}`
+      ? serializeRawNativeJudgeContext(rawNative)
       : serializeVisibleContext(messages, tools);
     const contextSha256 = createHash("sha256").update(visible).digest("hex");
     const judgeContextLimit = this.config.maxContextTokens;

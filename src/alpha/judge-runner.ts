@@ -7,8 +7,9 @@ import type { RoutingDecision } from "../router/types.js";
 import type { WebIntentDecision } from "./protocol/types.js";
 import type { TriggerReason } from "./state-machine.js";
 import { classifyWebIntentFallback, type WebIntentFallbackInput, withWebIntentSource } from "./web-intent.js";
-import { getEligibleJudgeProfiles } from "./judge-profile-selector.js";
+import { getEligibleJudgeProfiles, type JudgeProfileSelection } from "./judge-profile-selector.js";
 import type { AlphaExecutionProfile } from "./routing.js";
+import { DEFAULT_ROUTING_UTILITY_POLICY, type RoutingUtilityPolicy } from "./routing-utility-v2.js";
 import { cashCnyPerNominalUsd } from "./provider-economics.js";
 import type { AttemptOutcome } from "./channel-health.js";
 import type { RuntimeHealthOutcomeResult } from "./runtime-health-outcome.js";
@@ -63,6 +64,9 @@ export type AlphaJudgeRun = {
   profileAttemptCount: number;
   sameModelFailoverUsed: boolean;
   sameModelFailoverChain: string[];
+  successfulJudgeCashCostCny: string;
+  failedJudgeAttemptCashCostCny: string;
+  profileSelection: JudgeProfileSelection["summary"];
 };
 
 export type AlphaJudgeAttempt = {
@@ -115,6 +119,7 @@ export type AlphaJudgeInput = {
   recentEvaluation?: AlphaJudgeRun;
   webIntentFallbackInput: WebIntentFallbackInput;
   rawNative: RawNativeJudgeContext;
+  utilityPolicy?: RoutingUtilityPolicy;
   signal?: AbortSignal;
 };
 
@@ -130,7 +135,7 @@ export type AcuJudgeRunnerOptions = {
   backupClient?: AcuJudgeClient;
   backupCashCnyPerNominalUsd?: number;
   profiles?: AlphaExecutionProfile[];
-  loadProfiles?: () => Promise<AlphaExecutionProfile[]>;
+  loadProfiles?: (input?: { inputTokens: number; utilityPolicy: RoutingUtilityPolicy }) => Promise<AlphaExecutionProfile[]>;
   profileClients?: Map<string, AcuJudgeClient>;
   recordHealthOutcome?: (
     profile: AlphaExecutionProfile,
@@ -237,16 +242,30 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
     attempt: AlphaJudgeAttempt,
     profile: AlphaExecutionProfile | undefined,
     outcome: AttemptOutcome,
-  ): Promise<void> => {
-    if (!profile || !options.recordHealthOutcome) return;
+  ): Promise<RuntimeHealthOutcomeResult> => {
+    if (!profile || !options.recordHealthOutcome) return { errorClass: "none", scope: "none" };
     if (attempt.failureLayer === "judge_semantic_parse_failure") {
       attempt.healthOutcomeApplied = false;
       attempt.healthOutcomeScope = "none";
-      return;
+      return { errorClass: attempt.errorCategory ?? "judge_semantic_parse_failure", scope: "none" };
     }
     const result = await options.recordHealthOutcome(profile, outcome);
     attempt.healthOutcomeApplied = true;
     attempt.healthOutcomeScope = result.scope;
+    return result;
+  };
+
+  const cashCosts = (attempts: AlphaJudgeAttempt[]) => {
+    const trusted = (attempt: AlphaJudgeAttempt) => attempt.usageStatus === "reported"
+      && attempt.costStatus !== "unavailable" && Number(attempt.effectiveCostCny) > 0;
+    const successful = attempts.filter((attempt) => attempt.status === "success" && trusted(attempt))
+      .reduce((sum, attempt) => sum + Number(attempt.effectiveCostCny), 0);
+    const failed = attempts.filter((attempt) => attempt.status === "error" && trusted(attempt))
+      .reduce((sum, attempt) => sum + Number(attempt.effectiveCostCny), 0);
+    return {
+      successfulJudgeCashCostCny: successful.toFixed(10),
+      failedJudgeAttemptCashCostCny: failed.toFixed(10),
+    };
   };
 
   const aggregateCostStatus = (attempts: AlphaJudgeAttempt[]): AlphaJudgeRun["costStatus"] => {
@@ -258,7 +277,7 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
       : "mixed";
   };
 
-  const completeRun = (result: JudgeRequestResult, attempts: AlphaJudgeAttempt[], status: "live" | "backup_live" | "cache_hit"): AlphaJudgeRun => {
+  const completeRun = (result: JudgeRequestResult, attempts: AlphaJudgeAttempt[], status: "live" | "backup_live" | "cache_hit", profileSelection: JudgeProfileSelection["summary"]): AlphaJudgeRun => {
     const nominalCostUsd = attempts.reduce((sum, attempt) => sum + Number(attempt.nominalCostUsd), 0);
     const costCny = attempts.reduce((sum, attempt) => sum + Number(attempt.effectiveCostCny), 0);
     const officialPaygEquivalentCostCny = attempts
@@ -288,6 +307,8 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
       costStatus: aggregateCostStatus(attempts),
       costSource: [...new Set(attempts.map((attempt) => attempt.costSource))].join("+"),
       attempts,
+      ...cashCosts(attempts),
+      profileSelection,
       preferredProfileId: options.config.primaryProfileId,
       selectedProfileId: [...attempts].reverse().find((attempt) => attempt.status === "success")?.executionProfileId,
       profileAttemptCount: attempts.length,
@@ -302,28 +323,61 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
   };
   return {
     async run(input) {
+      const utilityPolicy = input.utilityPolicy ?? DEFAULT_ROUTING_UTILITY_POLICY;
       const attempts: AlphaJudgeAttempt[] = [];
+      let profileSelection: JudgeProfileSelection["summary"] = {
+        formulaVersion: "acu-profile-utility-v2.1",
+        supplyStrategy: (input.utilityPolicy ?? DEFAULT_ROUTING_UTILITY_POLICY).supplyStrategy,
+        candidateCount: 0,
+      };
+      let profileUtilities: JudgeProfileSelection["utilities"] = [];
+      const completedProfileSelection = (): JudgeProfileSelection["summary"] => {
+        const selectedExecutionProfileId = [...attempts].reverse()
+          .find((attempt) => attempt.status === "success")?.executionProfileId;
+        const selected = profileUtilities.find((utility) => (
+          utility.executionProfileId === selectedExecutionProfileId
+        ));
+        return selected ? {
+          ...profileSelection,
+          selectedExecutionProfileId,
+          selectedProfileRank: selected.rank,
+          selectedProfileUtility: selected.profileUtility,
+        } : profileSelection;
+      };
       const requiredContextTokens = input.rawNative
         ? estimateJudgeContextTokens(input.rawNative)
         : 0;
-      const deadlineAt = options.config.timeoutMs > 0 ? Date.now() + options.config.timeoutMs : undefined;
       try {
         if (input.signal?.aborted) throw new AcuJudgeClientCancelledError();
         const estimatedInputTokens = estimateVisibleTokens(input.rawNative.rawRequest);
         const poolDeadlineAt = Date.now() + recoveryBudgetMs(estimatedInputTokens);
-        const availableProfiles = options.loadProfiles ? await options.loadProfiles() : options.profiles;
+        const availableProfiles = options.loadProfiles
+          ? await options.loadProfiles({ inputTokens: requiredContextTokens, utilityPolicy })
+          : options.profiles;
         if (input.signal?.aborted) throw new AcuJudgeClientCancelledError();
-        const profiles = availableProfiles?.length
-          ? getEligibleJudgeProfiles({ profiles: availableProfiles, judgeModel: options.config.judgeModel, judgeReasoningEffort: options.config.judgeReasoningEffort, requiredContextTokens, preferredProfileId: options.config.primaryProfileId, maxProfiles: options.config.sameModelFailoverEnabled ? options.config.maxProfileAttempts : 1 })
-          : [];
+        const selection = availableProfiles?.length
+          ? getEligibleJudgeProfiles({ profiles: availableProfiles, judgeModel: options.config.judgeModel, judgeReasoningEffort: options.config.judgeReasoningEffort, requiredContextTokens, preferredProfileId: options.config.primaryProfileId, maxProfiles: options.config.sameModelFailoverEnabled ? options.config.maxProfileAttempts : 1, utilityPolicy })
+          : undefined;
+        const profiles = selection?.profiles ?? [];
+        if (selection) {
+          profileSelection = selection.summary;
+          profileUtilities = selection.utilities;
+        }
         const candidates: Array<{ profile?: AlphaExecutionProfile; client: AcuJudgeClient }> = profiles.length
           ? profiles.map((profile) => ({ profile, client: profileClients.get(profile.executionProfileId)! })).filter((candidate) => candidate.client)
           : [{ profile: undefined, client }];
         let lastError: unknown;
+        const attemptedProfileIds = new Set<string>();
+        const blockedProfileIds = new Set<string>();
+        const blockedChannelIds = new Set<string>();
         for (let index = 0; index < candidates.length; index += 1) {
           if (input.signal?.aborted) throw new AcuJudgeClientCancelledError();
           if (!hasRecoveryAttemptBudget(poolDeadlineAt, Date.now())) break;
           const candidate = candidates[index];
+          if (candidate.profile && (attemptedProfileIds.has(candidate.profile.executionProfileId)
+            || blockedProfileIds.has(candidate.profile.executionProfileId)
+            || blockedChannelIds.has(candidate.profile.channelId ?? candidate.profile.channel))) continue;
+          if (candidate.profile) attemptedProfileIds.add(candidate.profile.executionProfileId);
           const candidateClient = candidate.profile ? profileClients.get(candidate.profile.executionProfileId) : candidate.client;
           if (!candidateClient) continue;
           try {
@@ -352,7 +406,7 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
               }
               attempts.push(attempt);
             }
-            return completeRun(result, attempts, result.status);
+            return completeRun(result, attempts, result.status, completedProfileSelection());
           } catch (error) {
             lastError = error;
             if (error instanceof AcuJudgeClientCancelledError) throw error;
@@ -365,7 +419,7 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
                     ?? requiredContextTokens,
                 });
               } else {
-                await recordHealth(attempt, candidate.profile, {
+                const health = await recordHealth(attempt, candidate.profile, {
                   success: false,
                   httpStatus: error.attempt.httpStatus,
                   errorCode: error.attempt.failureLayer === "provider_protocol_failure"
@@ -373,6 +427,8 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
                   errorMessage: error.message,
                   totalLatencyMs: error.attempt.latencyMs,
                 });
+                if (candidate.profile && health.scope === "channel") blockedChannelIds.add(candidate.profile.channelId ?? candidate.profile.channel);
+                if (candidate.profile && health.scope !== "channel") blockedProfileIds.add(candidate.profile.executionProfileId);
               }
               attempts.push(attempt);
             }
@@ -391,7 +447,7 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
           try {
             const backup = await backupClient.judge(input.messages, [], false, input.rawNative, input.signal);
             if (backup.status === "live") attempts.push(successfulAttempt(backup, attempts.length + 1, "backup"));
-            return completeRun(backup, attempts, backup.status === "cache_hit" ? "cache_hit" : "backup_live");
+            return completeRun(backup, attempts, backup.status === "cache_hit" ? "cache_hit" : "backup_live", completedProfileSelection());
           } catch (backupError) {
             if (backupError instanceof AcuJudgeAttemptError) {
               attempts.push(failedAttempt(backupError, attempts.length + 1, "backup"));
@@ -419,6 +475,8 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
             costStatus: aggregateCostStatus(attempts),
             costSource: [...new Set(attempts.map((attempt) => attempt.costSource))].join("+") || "not_applicable",
             attempts,
+            ...cashCosts(attempts),
+            profileSelection: completedProfileSelection(),
             latencyMs: 0,
             errorCategory: error instanceof Error ? error.message.slice(0, 160) : "judge_error",
             webIntentDecision: fallback,
@@ -450,6 +508,8 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
           costStatus: aggregateCostStatus(attempts),
           costSource: [...new Set(attempts.map((attempt) => attempt.costSource))].join("+") || "not_applicable",
           attempts,
+          ...cashCosts(attempts),
+          profileSelection: completedProfileSelection(),
           preferredProfileId: options.config.primaryProfileId,
           profileAttemptCount: attempts.length,
           sameModelFailoverUsed: attempts.some((attempt) => attempt.role === "same_model_failover"),
@@ -497,6 +557,12 @@ export function createAcuJudgeRunner(options: AcuJudgeRunnerOptions): AlphaJudge
       costStatus: aggregateCostStatus(attempts),
       costSource: [...new Set(attempts.map((attempt) => attempt.costSource))].join("+") || "not_applicable",
       attempts,
+      ...cashCosts(attempts),
+      profileSelection: {
+        formulaVersion: "acu-profile-utility-v2.1",
+        supplyStrategy: (input.utilityPolicy ?? DEFAULT_ROUTING_UTILITY_POLICY).supplyStrategy,
+        candidateCount: 0,
+      },
       preferredProfileId: options.config.primaryProfileId,
       profileAttemptCount: attempts.length,
       sameModelFailoverUsed: attempts.some((attempt) => attempt.role === "same_model_failover"),

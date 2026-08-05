@@ -5,8 +5,9 @@ describe("Alpha retail charge", () => {
   it("charges successful provider and Judge cost at the retail markup", () => {
     expect(calculateRetailCharge({
       successfulProviderCashCostCny: 1,
-      judgeCashCostCny: 0.1,
+      successfulJudgeCashCostCny: 0.1,
       failedAttemptCashCostCny: 0,
+      failedJudgeAttemptCashCostCny: 0,
       retailMarkupMultiplier: 1.25,
     })).toMatchObject({
       actualTotalCashCostCny: 1.1,
@@ -18,8 +19,9 @@ describe("Alpha retail charge", () => {
   it("keeps failed attempt cost internal", () => {
     const result = calculateRetailCharge({
       successfulProviderCashCostCny: 1,
-      judgeCashCostCny: 0.1,
+      successfulJudgeCashCostCny: 0.1,
       failedAttemptCashCostCny: 0.2,
+      failedJudgeAttemptCashCostCny: 0,
       retailMarkupMultiplier: 1.25,
     });
     expect(result.actualTotalCashCostCny).toBeCloseTo(1.3);
@@ -28,11 +30,26 @@ describe("Alpha retail charge", () => {
     expect(result.grossProfitCny).toBeCloseTo(0.075);
   });
 
+  it("charges only the successful Judge attempt and keeps confirmed failed Judge cost internal", () => {
+    const result = calculateRetailCharge({
+      successfulProviderCashCostCny: 1,
+      successfulJudgeCashCostCny: 0.1,
+      failedAttemptCashCostCny: 0.2,
+      failedJudgeAttemptCashCostCny: 0.05,
+      retailMarkupMultiplier: 1.25,
+    });
+    expect(result.providerUserChargeCny).toBe(1.25);
+    expect(result.judgeUserChargeCny).toBe(0.125);
+    expect(result.userChargeCny).toBe(1.375);
+    expect(result.actualTotalCashCostCny).toBeCloseTo(1.35);
+  });
+
   it("uses the same rule for a Judge-only admission failure", () => {
     expect(calculateRetailCharge({
       successfulProviderCashCostCny: 0,
-      judgeCashCostCny: 0.1,
+      successfulJudgeCashCostCny: 0.1,
       failedAttemptCashCostCny: 0,
+      failedJudgeAttemptCashCostCny: 0,
       retailMarkupMultiplier: 1.25,
     })).toMatchObject({
       actualTotalCashCostCny: 0.1,

@@ -3,19 +3,23 @@ export const DEFAULT_BILLING_POLICY_VERSION = "acu-retail-v1";
 
 export type RetailChargeInput = {
   successfulProviderCashCostCny: number;
-  judgeCashCostCny: number;
+  successfulJudgeCashCostCny: number;
   failedAttemptCashCostCny: number;
+  failedJudgeAttemptCashCostCny: number;
   retailMarkupMultiplier: number;
 };
 
 export type RetailCharge = {
   retailMarkupMultiplier: number;
   successfulProviderCashCostCny: number;
-  judgeCashCostCny: number;
+  successfulJudgeCashCostCny: number;
   failedAttemptCashCostCny: number;
+  failedJudgeAttemptCashCostCny: number;
   billableBaseCostCny: number;
   actualTotalCashCostCny: number;
   userChargeCny: number;
+  providerUserChargeCny: number;
+  judgeUserChargeCny: number;
   grossProfitCny: number;
   grossMarginRate: number;
 };
@@ -32,8 +36,9 @@ export function parseRetailMarkupMultiplier(value: string | undefined): number {
 export function calculateRetailCharge(input: RetailChargeInput): RetailCharge {
   const values = [
     input.successfulProviderCashCostCny,
-    input.judgeCashCostCny,
+    input.successfulJudgeCashCostCny,
     input.failedAttemptCashCostCny,
+    input.failedJudgeAttemptCashCostCny,
   ];
   if (values.some((value) => !Number.isFinite(value) || value < 0)) {
     throw new Error("Retail charge cost components must be finite non-negative numbers");
@@ -42,15 +47,20 @@ export function calculateRetailCharge(input: RetailChargeInput): RetailCharge {
     throw new Error("Retail markup multiplier must be a finite number greater than or equal to 1");
   }
 
-  const billableBaseCostCny = input.successfulProviderCashCostCny + input.judgeCashCostCny;
-  const actualTotalCashCostCny = billableBaseCostCny + input.failedAttemptCashCostCny;
+  const billableBaseCostCny = input.successfulProviderCashCostCny + input.successfulJudgeCashCostCny;
+  const actualTotalCashCostCny = billableBaseCostCny + input.failedAttemptCashCostCny
+    + input.failedJudgeAttemptCashCostCny;
   const userChargeCny = billableBaseCostCny * input.retailMarkupMultiplier;
+  const providerUserChargeCny = input.successfulProviderCashCostCny * input.retailMarkupMultiplier;
+  const judgeUserChargeCny = input.successfulJudgeCashCostCny * input.retailMarkupMultiplier;
   const grossProfitCny = userChargeCny - actualTotalCashCostCny;
   return {
     ...input,
     billableBaseCostCny,
     actualTotalCashCostCny,
     userChargeCny,
+    providerUserChargeCny,
+    judgeUserChargeCny,
     grossProfitCny,
     grossMarginRate: userChargeCny === 0 ? 0 : grossProfitCny / userChargeCny,
   };

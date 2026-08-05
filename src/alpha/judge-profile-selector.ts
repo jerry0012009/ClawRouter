@@ -1,43 +1,31 @@
 import { effectiveContextCeiling } from "./context-admission.js";
-import { effectiveProviderSelectionScore, type AlphaExecutionProfile } from "./routing.js";
-
-const JUDGE_SUCCESS_RATE_EXPONENT_BONUS = 0.25;
-const JUDGE_MAX_EXTRA_LATENCY_PENALTY = 0.08;
-
-function judgeProfileScore(
-  profile: AlphaExecutionProfile,
-  inputTokens: number,
-  outputTokens: number,
-): number {
-  const sharedScore = effectiveProviderSelectionScore(profile, {
-    protocol: "responses", requireTools: false, requireThinking: false,
-  }, inputTokens, outputTokens);
-  const successRate = Math.max(0.5, Math.min(1, profile.recentSuccessRate ?? 1));
-  const reliabilityPenalty = 1 / (successRate ** JUDGE_SUCCESS_RATE_EXPONENT_BONUS);
-  const latencyPenalty = 1 + Math.min(
-    JUDGE_MAX_EXTRA_LATENCY_PENALTY,
-    Math.max(0, profile.observedLatencyMs ?? 0) / 1_000_000,
-  );
-  return sharedScore * reliabilityPenalty * latencyPenalty;
-}
-
-function diversifyJudgeProviders(
-  ranked: AlphaExecutionProfile[],
-  limit: number,
-): AlphaExecutionProfile[] {
-  const selected = ranked.slice(0, limit);
-  if (selected.length < 3 || new Set(selected.map((profile) => profile.provider)).size > 1) return selected;
-  const alternative = ranked.slice(limit).find((profile) => (
-    profile.provider !== selected[0]!.provider && profile.health === "healthy"
-  ));
-  if (alternative) selected[selected.length - 1] = alternative;
-  return selected;
-}
+import { resolveProfileBillingPrice, type AlphaExecutionProfile } from "./routing.js";
+import { cashCnyPerNominalUsd } from "./provider-economics.js";
+import {
+  ACU_PROFILE_UTILITY_V2_VERSION,
+  DEFAULT_ROUTING_UTILITY_POLICY,
+  scoreExecutionProfilesV2,
+  type ProfileUtilityV2,
+  type RoutingUtilityPolicy,
+} from "./routing-utility-v2.js";
 
 function observedJudgeFailureThreshold(profile: AlphaExecutionProfile): number {
   const value = Number(profile.observedJudgeContextFailureThresholdTokens);
   return Number.isFinite(value) ? value : Number.POSITIVE_INFINITY;
 }
+
+export type JudgeProfileSelection = {
+  profiles: AlphaExecutionProfile[];
+  utilities: ProfileUtilityV2[];
+  summary: {
+    formulaVersion: typeof ACU_PROFILE_UTILITY_V2_VERSION;
+    supplyStrategy: RoutingUtilityPolicy["supplyStrategy"];
+    candidateCount: number;
+    selectedExecutionProfileId?: string;
+    selectedProfileRank?: number;
+    selectedProfileUtility?: number;
+  };
+};
 
 export function getEligibleJudgeProfiles(input: {
   profiles: AlphaExecutionProfile[];
@@ -47,7 +35,9 @@ export function getEligibleJudgeProfiles(input: {
   preferredProfileId?: string;
   maxProfiles?: number;
   expectedOutputTokens?: number;
-}): AlphaExecutionProfile[] {
+  utilityPolicy?: RoutingUtilityPolicy;
+}): JudgeProfileSelection {
+  const utilityPolicy = input.utilityPolicy ?? DEFAULT_ROUTING_UTILITY_POLICY;
   const eligible = input.profiles.filter((profile) =>
     profile.modelId === input.judgeModel
     && profile.providerModelId === input.judgeModel
@@ -63,27 +53,68 @@ export function getEligibleJudgeProfiles(input: {
     && profile.health !== "disabled"
     && profile.health !== "open"
     && profile.health !== "half_open"
+    && profile.health !== "cooldown"
     && profile.runtimeHealth?.effectiveState !== "disabled"
     && profile.runtimeHealth?.effectiveState !== "temporarily_unavailable"
     && effectiveContextCeiling(profile) >= input.requiredContextTokens
     && observedJudgeFailureThreshold(profile) > input.requiredContextTokens,
   );
-  const outputTokens = input.expectedOutputTokens ?? 300;
-  const scores = new Map(eligible.map((profile) => [
-    profile.executionProfileId,
-    judgeProfileScore(profile, input.requiredContextTokens, outputTokens),
-  ]));
-  const ranked = eligible.sort((left, right) => {
-    const scoreDifference = scores.get(left.executionProfileId)! - scores.get(right.executionProfileId)!;
-    if (scoreDifference !== 0) return scoreDifference;
+  if (eligible.length === 0) return {
+    profiles: [],
+    utilities: [],
+    summary: {
+      formulaVersion: ACU_PROFILE_UTILITY_V2_VERSION,
+      supplyStrategy: utilityPolicy.supplyStrategy,
+      candidateCount: 0,
+    },
+  };
+  const priced = eligible.map((profile) => {
+    const price = resolveProfileBillingPrice(profile);
+    const cashMultiplier = profile.economics ? cashCnyPerNominalUsd(profile.economics) : 1;
+    return {
+      ...profile,
+      utilityEffectivePrices: {
+        inputPricePerMillion: price.inputPricePerMillion * cashMultiplier,
+        outputPricePerMillion: price.outputPricePerMillion * cashMultiplier,
+      },
+    };
+  });
+  const scored = scoreExecutionProfilesV2(
+    priced,
+    input.requiredContextTokens,
+    input.expectedOutputTokens ?? 300,
+    utilityPolicy,
+  );
+  const utilities = [...scored.utilities].sort((left, right) => {
+    const difference = right.profileUtility - left.profileUtility;
+    if (difference !== 0) return difference;
     const leftPreferred = left.executionProfileId === input.preferredProfileId;
     const rightPreferred = right.executionProfileId === input.preferredProfileId;
     if (leftPreferred !== rightPreferred) return leftPreferred ? -1 : 1;
     return left.executionProfileId.localeCompare(right.executionProfileId);
   });
-  return diversifyJudgeProviders(ranked, input.maxProfiles ?? 3);
+  utilities.forEach((utility, index) => {
+    utility.rank = index + 1;
+    utility.selected = index === 0;
+  });
+  const byId = new Map(eligible.map((profile) => [profile.executionProfileId, profile]));
+  const profiles = utilities.slice(0, input.maxProfiles ?? 3)
+    .map((utility) => byId.get(utility.executionProfileId)!);
+  const selected = utilities[0];
+  return {
+    profiles,
+    utilities,
+    summary: {
+      formulaVersion: ACU_PROFILE_UTILITY_V2_VERSION,
+      supplyStrategy: utilityPolicy.supplyStrategy,
+      candidateCount: eligible.length,
+      selectedExecutionProfileId: selected?.executionProfileId,
+      selectedProfileRank: selected?.rank,
+      selectedProfileUtility: selected?.profileUtility,
+    },
+  };
 }
 
-export function getEligibleLunaJudgeProfiles(input: Omit<Parameters<typeof getEligibleJudgeProfiles>[0], "judgeModel">): AlphaExecutionProfile[] {
+export function getEligibleLunaJudgeProfiles(input: Omit<Parameters<typeof getEligibleJudgeProfiles>[0], "judgeModel">): JudgeProfileSelection {
   return getEligibleJudgeProfiles({ ...input, judgeModel: "gpt-5.6-luna", judgeReasoningEffort: input.judgeReasoningEffort ?? "max" });
 }

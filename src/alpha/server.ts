@@ -315,16 +315,27 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
     rulesDecision: rulesFallbackDecision(),
     backupCashCnyPerNominalUsd: judgeEconomics ? cashCnyPerNominalUsd(judgeEconomics) : undefined,
     profiles: profiles.map((item) => item.profile),
-    loadProfiles: async () => {
+    loadProfiles: async (selection) => {
       const baseProfiles = profiles.map((item) => item.profile);
-      const [channels, runtimes] = await Promise.all([
+      const contextBucket = selection && selection.inputTokens >= selection.utilityPolicy.latency.longContextThresholdTokens
+        ? "long" : "standard";
+      const [channels, runtimes, metrics] = await Promise.all([
         runtimeRepository.batchChannelHealth(baseProfiles.map((profile) => profile.channelId ?? profile.channel)),
         runtimeRepository.batchProfileHealth(baseProfiles.map((profile) => profile.executionProfileId)),
+        selection ? runtimeRepository.batchProfileRuntimeMetrics(
+          baseProfiles.map((profile) => profile.executionProfileId),
+          contextBucket,
+          selection.utilityPolicy.latency,
+          selection.utilityPolicy.reliability,
+        ) : Promise.resolve(new Map()),
       ]);
       return baseProfiles.map((profile) => {
         const runtime = runtimes.get(profile.executionProfileId);
         const channel = channels.get(profile.channelId ?? profile.channel);
-        return hydrateExecutionProfileRuntime(profile, runtime, channel);
+        return {
+          ...hydrateExecutionProfileRuntime(profile, runtime, channel),
+          utilityRuntimeMetric: metrics.get(profile.executionProfileId),
+        };
       });
     },
     profileClients: new Map(profiles.map((item) => {

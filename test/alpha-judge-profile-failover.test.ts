@@ -40,7 +40,7 @@ describe("Luna Judge Profile selector", () => {
       judgeModel: "gpt-5.6-sol",
       judgeReasoningEffort: "default",
       requiredContextTokens: 100,
-    }).map((item) => item.executionProfileId)).toEqual(["sol-default"]);
+    }).profiles.map((item) => item.executionProfileId)).toEqual(["sol-default"]);
   });
 
   it("uses Router context defaults, recovery budgets and minimum attempt budget", () => {
@@ -78,10 +78,10 @@ describe("Luna Judge Profile selector", () => {
       requiredContextTokens: 100,
       maxProfiles: 3,
     });
-    expect(selected.map((item) => item.executionProfileId)).toEqual([
-      "sol:gpt-5.6-luna:responses",
+    expect(selected.profiles.map((item) => item.executionProfileId)).toEqual([
       "blackai:gpt-5.6-luna:responses",
       "lucen-cx006-value-dynamic:gpt-5.6-luna:responses",
+      "sol:gpt-5.6-luna:responses",
     ]);
   });
 
@@ -91,7 +91,7 @@ describe("Luna Judge Profile selector", () => {
       preferredProfileId: "b",
       requiredContextTokens: 100,
     });
-    expect(selected.map((item) => item.executionProfileId)).toEqual(["b", "a"]);
+    expect(selected.profiles.map((item) => item.executionProfileId)).toEqual(["b", "a"]);
   });
 
   it("slightly increases Judge reliability and latency weight without making it health-first", () => {
@@ -113,8 +113,8 @@ describe("Luna Judge Profile selector", () => {
       requiredContextTokens: 100,
       maxProfiles: 3,
     });
-    expect(selected.map((item) => item.executionProfileId)).toEqual([
-      "meaningfully-cheaper", "reliable-faster", "cheap-slower",
+    expect(selected.profiles.map((item) => item.executionProfileId)).toEqual([
+      "reliable-faster", "meaningfully-cheaper", "cheap-slower",
     ]);
   });
 
@@ -131,7 +131,7 @@ describe("Luna Judge Profile selector", () => {
       requiredContextTokens: 100,
       maxProfiles: 3,
     });
-    expect(selected.map((item) => item.executionProfileId)).toEqual(["lucen-a", "lucen-b", "closeai"]);
+    expect(selected.profiles.map((item) => item.executionProfileId)).toEqual(["lucen-a", "lucen-b", "lucen-c"]);
   });
 
   it("hydrates shared runtime health before filtering and ranking Judge Profiles", () => {
@@ -157,7 +157,7 @@ describe("Luna Judge Profile selector", () => {
     expect(degraded).toMatchObject({ health: "degraded", recentSuccessRate: 0.65, observedLatencyMs: 4_000 });
     expect(getEligibleLunaJudgeProfiles({
       profiles: [open, degraded, slow, fast], preferredProfileId: "slow", requiredContextTokens: 100,
-    }).map((item) => item.executionProfileId)).toEqual(["fast", "slow", "degraded"]);
+    }).profiles.map((item) => item.executionProfileId)).toEqual(["fast", "slow", "degraded"]);
   });
 
   it("fails over from preferred Lucen to another Luna without cross-model backup", async () => {
@@ -206,6 +206,52 @@ describe("Luna Judge Profile selector", () => {
     expect(result.sameModelFailoverUsed).toBe(true);
     expect(result.sameModelFailoverChain).toEqual([preferred.executionProfileId, alternate.executionProfileId]);
     expect(result.attempts.map((attempt) => attempt.model)).toEqual(["gpt-5.6-luna", "gpt-5.6-luna"]);
+  });
+
+  it("skips the rest of a failed Channel during the same Judge run", async () => {
+    const first = profile("a-first", { channel: "shared-channel" });
+    const skipped = profile("b-skipped", { channel: "shared-channel" });
+    const fallback = profile("c-fallback", { channel: "other-channel" });
+    const config = readAcuRuntimeConfig({
+      allowMock: true, apiKey: "fixture", judgeModel: "gpt-5.6-luna", judgeProtocol: "responses",
+      maxProfileAttempts: 5, sameModelFailoverEnabled: true, syncBackupEnabled: false,
+      cachePath: `/tmp/judge-channel-scope-${randomUUID()}.json`,
+    });
+    const valid = {
+      difficulty_score_raw: 42,
+      factors: { reasoning_depth: 4, task_scope: 4, constraint_density: 4, tool_dependency: 4, verification_burden: 4, context_burden: 4 },
+      p_low: 0.1, p_mid: 0.7, p_mid_high: 0.15, p_high: 0.05, confidence: 0.9,
+      signals: [], explanation: "fixture", webIntent: "not_required", webIntentConfidence: 1,
+      webIntentReason: "local", webIntentEvidence: [],
+    };
+    let skippedCalls = 0;
+    const clients = new Map([
+      [first.executionProfileId, new AcuJudgeClient(config, async () => new Response("unauthorized", { status: 401 }))],
+      [skipped.executionProfileId, new AcuJudgeClient(config, async () => { skippedCalls += 1; return new Response("should not run", { status: 500 }); })],
+      [fallback.executionProfileId, new AcuJudgeClient(config, async () => new Response(JSON.stringify({
+        model: "gpt-5.6-luna", output: [{ content: [{ type: "output_text", text: JSON.stringify(valid) }] }],
+        usage: { input_tokens: 100, output_tokens: 20 },
+      }), { status: 200, headers: { "content-type": "application/json" } }))],
+    ]);
+    const healthProfiles: string[] = [];
+    const result = await createAcuJudgeRunner({
+      config, profiles: [first, skipped, fallback], profileClients: clients,
+      recordHealthOutcome: async (selected, outcome) => {
+        healthProfiles.push(selected.executionProfileId);
+        return { errorClass: outcome.success ? "none" : "authentication", scope: outcome.success ? "none" : "channel" };
+      },
+      rulesDecision: { model: "rules", tier: "MEDIUM", confidence: 1, method: "rules", reasoning: "fixture", costEstimate: 0, baselineCost: 0, savings: 0 },
+    }).run({
+      messages: [], tools: [], trigger: "new_task", contextHash: "fixture",
+      webIntentFallbackInput: { recentUserInputs: ["fixture"] },
+      rawNative: { stateMetadata: {}, rawRequest: JSON.stringify({ model: "acu-auto", input: "fixture" }) },
+    });
+    expect(result.attempts.map((attempt) => attempt.executionProfileId)).toEqual([
+      first.executionProfileId, fallback.executionProfileId,
+    ]);
+    expect(skippedCalls).toBe(0);
+    expect(healthProfiles).toEqual([first.executionProfileId, fallback.executionProfileId]);
+    expect(result.attempts[0].healthOutcomeScope).toBe("channel");
   });
 
   it("records Judge context evidence and retries another Luna Profile", async () => {
@@ -399,7 +445,7 @@ describe("Luna Judge Profile selector", () => {
       ],
       requiredContextTokens: 66_000,
     });
-    expect(selected.map((item) => item.executionProfileId)).toEqual(["healthy"]);
+    expect(selected.profiles.map((item) => item.executionProfileId)).toEqual(["healthy"]);
   });
 
   it("writes a successful Judge attempt to shared health", async () => {

@@ -6,7 +6,7 @@ import { applyFailureEvidence, decideTrigger, type AlphaMode, type SegmentState,
 import { extractIncrementalEvents, type AlphaDomainEvent } from "./events.js";
 import { matchSession, type SessionContinuityRecord } from "./identity.js";
 import { buildAlphaJudgeContext } from "./judge-context.js";
-import type { AlphaJudgeRun, AlphaJudgeRunner } from "./judge-runner.js";
+import type { AlphaJudgeAttempt, AlphaJudgeRun, AlphaJudgeRunner } from "./judge-runner.js";
 import { AlphaRepository, alphaId, sha256, type AlphaProtocol } from "./repository.js";
 import {
   AlphaAdmissionError,
@@ -208,6 +208,10 @@ export type AlphaResolutionContext = {
   networkEndpoint?: string;
   judgeCostUsd: string;
   judgeCashCostCny: string;
+  successfulJudgeCashCostCny: string;
+  failedJudgeAttemptCashCostCny: string;
+  judgeAttempts: AlphaJudgeAttempt[];
+  judgeProfileSelection?: AlphaJudgeRun["profileSelection"];
   judgeInputTokens: number;
   judgeOutputTokens: number;
   judgeOfficialPaygEquivalentCost: string;
@@ -1874,6 +1878,7 @@ export class AlphaRequestProcessor {
         recentEvaluation: previousJudge,
         webIntentFallbackInput,
         rawNative,
+        utilityPolicy: routingUtilityPolicy,
         signal: ingress.signal,
       });
     } catch (error) {
@@ -2198,6 +2203,8 @@ export class AlphaRequestProcessor {
         admission.details.judge_evaluation_id = persisted.storedJudge.judgeEvaluationId;
         admission.details.judge_cost_usd = judge.costUsd;
         admission.details.judge_cash_cost_cny = effectiveJudgeCostCny.toFixed(10);
+        admission.details.successful_judge_cash_cost_cny = judge.successfulJudgeCashCostCny;
+        admission.details.failed_judge_attempt_cash_cost_cny = judge.failedJudgeAttemptCashCostCny;
         admission.details.judge_provider = judge.provider;
         admission.details.judge_model = judge.model;
       }
@@ -2901,6 +2908,9 @@ export class AlphaRequestProcessor {
             selectedProfile: replayProfile,
             judgeCostUsd: "0.0000000000",
             judgeCashCostCny: "0.0000000000",
+            successfulJudgeCashCostCny: "0.0000000000",
+            failedJudgeAttemptCashCostCny: "0.0000000000",
+            judgeAttempts: [],
             judgeInputTokens: 0,
             judgeOutputTokens: 0,
             judgeOfficialPaygEquivalentCost: "0.0000000000",
@@ -3114,6 +3124,10 @@ export class AlphaRequestProcessor {
       networkEndpoint: initialAttempt.networkEndpoint,
       judgeCostUsd: result.judge?.costUsd ?? "0.0000000000",
       judgeCashCostCny,
+      successfulJudgeCashCostCny: result.judge?.successfulJudgeCashCostCny ?? "0.0000000000",
+      failedJudgeAttemptCashCostCny: result.judge?.failedJudgeAttemptCashCostCny ?? "0.0000000000",
+      judgeAttempts: result.judge?.attempts ?? [],
+      judgeProfileSelection: result.judge?.profileSelection,
       judgeInputTokens: result.judge?.promptTokens ?? 0,
       judgeOutputTokens: result.judge?.completionTokens ?? 0,
       judgeOfficialPaygEquivalentCost: result.judge?.officialPaygEquivalentCostCny ?? "0.0000000000",
@@ -3746,10 +3760,13 @@ export class AlphaRequestProcessor {
         : Number(attempt.actual_cost_usd));
     }, 0);
     const judgeCashCostCny = Number(input.context.judgeCashCostCny);
+    const successfulJudgeCashCostCny = Number(input.context.successfulJudgeCashCostCny);
+    const failedJudgeAttemptCashCostCny = Number(input.context.failedJudgeAttemptCashCostCny);
     const retailCharge = calculateRetailCharge({
       successfulProviderCashCostCny: providerCash.effectiveCashCostCny,
-      judgeCashCostCny,
+      successfulJudgeCashCostCny,
       failedAttemptCashCostCny,
+      failedJudgeAttemptCashCostCny,
       retailMarkupMultiplier: this.options.retailMarkupMultiplier ?? DEFAULT_RETAIL_MARKUP_MULTIPLIER,
     });
     const billingPolicyVersion = this.options.billingPolicyVersion ?? DEFAULT_BILLING_POLICY_VERSION;
@@ -3816,6 +3833,10 @@ export class AlphaRequestProcessor {
         effective_provider_cash_cost_cny: providerCash.effectiveCashCostCny,
         successful_provider_cash_cost_cny: retailCharge.successfulProviderCashCostCny.toFixed(10),
         judge_cash_cost_cny: judgeCashCostCny,
+        successful_judge_cash_cost_cny: successfulJudgeCashCostCny.toFixed(10),
+        failed_judge_attempt_cash_cost_cny: failedJudgeAttemptCashCostCny.toFixed(10),
+        provider_user_charge_cny: retailCharge.providerUserChargeCny.toFixed(10),
+        judge_user_charge_cny: retailCharge.judgeUserChargeCny.toFixed(10),
         judge_input_tokens: input.context.judgeInputTokens,
         judge_output_tokens: input.context.judgeOutputTokens,
         judge_official_payg_equivalent_cost: input.context.judgeOfficialPaygEquivalentCost,
@@ -3824,6 +3845,27 @@ export class AlphaRequestProcessor {
         judge_cost_source: input.context.judgeCostSource,
         judge_provider: input.context.judgeProvider,
         judge_model: input.context.judgeModel,
+        judge_protocol: "responses",
+        judge_reasoning_effort: "default",
+        judge_profile_selection: input.context.judgeProfileSelection,
+        judge_attempts: input.context.judgeAttempts.map((attempt) => ({
+          attempt_index: attempt.attemptIndex,
+          attempt_role: attempt.role,
+          model: attempt.model,
+          provider: attempt.provider,
+          execution_profile_id: attempt.executionProfileId,
+          channel_id: attempt.channel,
+          status: attempt.status,
+          error_category: attempt.errorCategory,
+          http_status: attempt.httpStatus,
+          input_tokens: attempt.promptTokens,
+          cached_input_tokens: attempt.cachedPromptTokens,
+          output_tokens: attempt.completionTokens,
+          latency_ms: attempt.latencyMs,
+          effective_cost_cny: attempt.effectiveCostCny,
+          cost_status: attempt.costStatus,
+          usage_status: attempt.usageStatus,
+        })),
         failed_attempt_cash_cost_cny: failedAttemptCashCostCny.toFixed(10),
         failed_attempt_nominal_cost_usd: failedBilledCostUsd,
         billable_base_cost_cny: retailCharge.billableBaseCostCny.toFixed(10),
@@ -3975,10 +4017,13 @@ export class AlphaRequestProcessor {
   }): Promise<void> {
     const judgeCostUsd = String(input.error.details.judge_cost_usd ?? "0.0000000000");
     const judgeCashCostCny = Number(input.error.details.judge_cash_cost_cny ?? 0);
+    const successfulJudgeCashCostCny = Number(input.error.details.successful_judge_cash_cost_cny ?? 0);
+    const failedJudgeAttemptCashCostCny = Number(input.error.details.failed_judge_attempt_cash_cost_cny ?? 0);
     const retailCharge = calculateRetailCharge({
       successfulProviderCashCostCny: 0,
-      judgeCashCostCny,
+      successfulJudgeCashCostCny,
       failedAttemptCashCostCny: 0,
+      failedJudgeAttemptCashCostCny,
       retailMarkupMultiplier: this.options.retailMarkupMultiplier ?? DEFAULT_RETAIL_MARKUP_MULTIPLIER,
     });
     const billingPolicyVersion = this.options.billingPolicyVersion ?? DEFAULT_BILLING_POLICY_VERSION;
@@ -4015,7 +4060,11 @@ export class AlphaRequestProcessor {
         judge_model: input.error.details.judge_model,
         judge_nominal_cost_usd: judgeCostUsd,
         successful_provider_cash_cost_cny: "0.0000000000",
-        judge_cash_cost_cny: retailCharge.judgeCashCostCny.toFixed(10),
+        judge_cash_cost_cny: judgeCashCostCny.toFixed(10),
+        successful_judge_cash_cost_cny: retailCharge.successfulJudgeCashCostCny.toFixed(10),
+        failed_judge_attempt_cash_cost_cny: retailCharge.failedJudgeAttemptCashCostCny.toFixed(10),
+        provider_user_charge_cny: retailCharge.providerUserChargeCny.toFixed(10),
+        judge_user_charge_cny: retailCharge.judgeUserChargeCny.toFixed(10),
         failed_attempt_cash_cost_cny: "0.0000000000",
         billable_base_cost_cny: retailCharge.billableBaseCostCny.toFixed(10),
         actual_total_cash_cost_cny: retailCharge.actualTotalCashCostCny.toFixed(10),

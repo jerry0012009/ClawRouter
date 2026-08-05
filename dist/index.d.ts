@@ -120,6 +120,10 @@ type AcuModelEstimate = {
     qualityUtility: number;
     costUtility: number;
     valueUtility: number;
+    baseValueUtility?: number;
+    candidatePreferenceScore?: number;
+    candidatePreferenceMultiplier?: number;
+    adjustedValueUtility?: number;
     rawQualityUtility?: number;
     rawCostUtility?: number;
     qualitySatisfactionUtility?: number;
@@ -178,6 +182,8 @@ type AcuEvaluation = {
     estimateLabel: "public-benchmark constrained estimate";
     promptVersion: string;
     judgeModel: string;
+    /** The reasoning preset used by the live Judge request. */
+    judgeReasoningEffort?: "default" | "low" | "medium" | "high" | "max";
     judgeMode: "non-thinking";
     judge: AcuJudgeResult;
     judgeStatus: AcuJudgeStatus;
@@ -239,6 +245,7 @@ type AcuDecisionInput = {
     judgeCost: number;
     qualityTarget?: number;
     eligibleModelIds?: string[];
+    allowedCandidateIds?: string[];
     requireToolCallSupport?: boolean;
     requireVisionSupport?: boolean;
     switchCost?: number;
@@ -1032,6 +1039,7 @@ declare function hashRequestContent(lastUserContent: string, toolCallNames?: str
 type AcuRuntimeConfig = {
     enabled: boolean;
     judgeModel: string;
+    judgeReasoningEffort: "default" | "low" | "medium" | "high" | "max";
     judgeBaseUrl: string;
     judgeMode: "non-thinking";
     promptVersion: string;

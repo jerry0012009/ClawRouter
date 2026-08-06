@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { validateProviderChannelRegistry, validateProviderModelProfiles } from "../src/alpha/channel-registry.js";
 import { economicsForExecutionProfile } from "../src/alpha/server.js";
@@ -27,6 +28,14 @@ describe("Provider Channel Registry", () => {
   it("does not advertise auto-route Profiles outside the canonical routing catalog", () => {
     for (const profile of executionProfiles.filter((item) => item.autoRouteEnabled !== false)) {
       expect(getAcuModel(profile.modelId)?.routingEligible, profile.executionProfileId).toBe(true);
+    }
+  });
+
+  it("publishes verified Messages models through the New API Messages ingress", () => {
+    const syncSql = readFileSync(new URL("../deploy/alpha/sync-newapi-codex-pool.sql", import.meta.url), "utf8");
+    expect(syncSql).toContain("WHERE id = 2 AND name = 'ACU Messages Alpha'");
+    for (const model of ["claude-fable-5", "claude-opus-4-8", "claude-sonnet-5"]) {
+      expect(syncSql).toContain(model);
     }
   });
 

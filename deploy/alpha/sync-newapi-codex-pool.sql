@@ -3,9 +3,19 @@ SET models = 'acu-auto,claude-fable-5,claude-opus-4-8,claude-sonnet-5,deepseek-v
     header_override = '{"*":""}'
 WHERE id = 1 AND name = 'ACU Responses Alpha';
 
+UPDATE channels
+SET models = 'acu-auto,claude-fable-5,claude-opus-4-8,claude-sonnet-5',
+    header_override = '{"*":""}'
+WHERE id = 2 AND name = 'ACU Messages Alpha';
+
 INSERT INTO abilities ("group", model, channel_id, enabled, priority, weight, tag)
 SELECT 'default', model_id, 1, true, 0, 0, 'acu-router'
 FROM unnest(ARRAY['acu-auto','claude-fable-5','claude-opus-4-8','claude-sonnet-5','deepseek-v4-flash','gemini-2.5-flash','glm-5.1','glm-5.2','gpt-5.4-mini','gpt-5.5','gpt-5.6-luna','gpt-5.6-sol','gpt-5.6-terra','kimi-k2.6','kimi-k2.7-code','kimi-k3']) AS model_id
+ON CONFLICT ("group", model, channel_id) DO UPDATE SET enabled = true, tag = 'acu-router';
+
+INSERT INTO abilities ("group", model, channel_id, enabled, priority, weight, tag)
+SELECT 'default', model_id, 2, true, 0, 0, 'acu-router'
+FROM unnest(ARRAY['acu-auto','claude-fable-5','claude-opus-4-8','claude-sonnet-5']) AS model_id
 ON CONFLICT ("group", model, channel_id) DO UPDATE SET enabled = true, tag = 'acu-router';
 
 INSERT INTO models

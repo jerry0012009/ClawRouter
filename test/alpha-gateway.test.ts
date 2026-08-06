@@ -52,13 +52,13 @@ afterEach(async () => {
 
 describe("Alpha native protocol gateway", () => {
   it("serves an authenticated zero-call selection corridor projection", async () => {
-    const calls: Array<{ inputTokens: number; expectedOutputTokens: number }> = [];
+    const calls: Array<{ inputTokens: number; expectedOutputTokens: number; protocol?: string }> = [];
     const gatewayPort = await listen(createAlphaGatewayServer({
       trustedIdentitySecret: sharedSecret,
       adminSelectionCorridor: {
         token: "corridor-token",
-        async load(inputTokens, expectedOutputTokens) {
-          calls.push({ inputTokens, expectedOutputTokens });
+        async load(inputTokens, expectedOutputTokens, policy) {
+          calls.push({ inputTokens, expectedOutputTokens, protocol: policy?.protocol });
           return { formulaVersion: "acu-routing-model-v0.5", series: { balanced: [] } };
         },
       },
@@ -67,13 +67,13 @@ describe("Alpha native protocol gateway", () => {
     const unauthorized = await fetch(`http://127.0.0.1:${gatewayPort}/internal/admin/selection-corridor`);
     expect(unauthorized.status).toBe(401);
     const response = await fetch(
-      `http://127.0.0.1:${gatewayPort}/internal/admin/selection-corridor?inputTokens=24000&expectedOutputTokens=1200`,
+      `http://127.0.0.1:${gatewayPort}/internal/admin/selection-corridor?inputTokens=24000&expectedOutputTokens=1200&protocol=messages`,
       { headers: { authorization: "Bearer corridor-token" } },
     );
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(await response.json()).toMatchObject({ formulaVersion: "acu-routing-model-v0.5" });
-    expect(calls).toEqual([{ inputTokens: 24000, expectedOutputTokens: 1200 }]);
+    expect(calls).toEqual([{ inputTokens: 24000, expectedOutputTokens: 1200, protocol: "messages" }]);
   });
 
   it("protects Channel Monitor and records an authorized manual pause", async () => {
@@ -470,8 +470,12 @@ describe("Alpha native protocol gateway", () => {
     const expected = "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"content_block\":{\"type\":\"thinking\",\"signature\":\"sig-1\"}}\n\n"
       + "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"content_block\":{\"type\":\"tool_use\",\"id\":\"tool-1\"}}\n\n";
     let path = "";
-    const upstreamPort = await listen(createServer((request, response) => {
+    let upstreamBody = "";
+    let upstreamHeaders: Record<string, string | string[] | undefined> = {};
+    const upstreamPort = await listen(createServer(async (request, response) => {
       path = request.url ?? "";
+      upstreamHeaders = request.headers;
+      for await (const chunk of request) upstreamBody += chunk.toString();
       response.setHeader("content-type", "text/event-stream");
       response.end(expected);
     }));
@@ -489,14 +493,51 @@ describe("Alpha native protocol gateway", () => {
         return { adapter, requestedModel: envelope.requestedModel, actualModel: envelope.requestedModel, provider: "closeai", channel: "closeai-anthropic" };
       },
     }));
-    const body = Buffer.from('{"model":"claude-test","messages":[{"role":"user","content":"hello"}],"stream":true}');
+    const rawBody = { model: "claude-test",
+      system: [{ type: "text", text: "first", cache_control: { type: "ephemeral" } },
+        { type: "text", text: "second", vendor_system_field: "kept" }],
+      messages: [{ role: "assistant", content: [{ type: "thinking", thinking: "private", signature: "signed" }] }],
+      tools: [{ name: "future_tool", input_schema: { type: "object", future_schema_keyword: true } }],
+      thinking: { type: "enabled", budget_tokens: 1024, signature: "request-signature" },
+      output_config: { effort: "high", future_output_field: true },
+      context_management: { edits: [{ type: "clear_tool_uses_20250919" }] },
+      future_top_level: { preserved: true }, stream: true };
+    const body = Buffer.from(JSON.stringify(rawBody));
+    const headers = signedHeaders(body);
+    headers["anthropic-test-capability"] = "future-beta";
+    headers["x-claude-code-test-id"] = "audit-only";
+    headers.authorization = "Bearer customer-secret";
+    headers["x-api-key"] = "customer-secret";
     const response = await fetch(`http://127.0.0.1:${gatewayPort}/v1/messages?beta=true`, {
       method: "POST",
-      headers: signedHeaders(body),
+      headers,
       body,
     });
     expect(await response.text()).toBe(expected);
     expect(path).toBe("/anthropic/v1/messages?beta=true");
+    expect(JSON.parse(upstreamBody)).toEqual(rawBody);
+    expect(upstreamHeaders["anthropic-test-capability"]).toBe("future-beta");
+    expect(upstreamHeaders["x-claude-code-test-id"]).toBe("audit-only");
+    expect(upstreamHeaders.authorization).toBeUndefined();
+    expect(upstreamHeaders["x-api-key"]).toBe("test-key");
+    expect(Object.keys(upstreamHeaders).some((name) => name.startsWith("x-acu-"))).toBe(false);
+  });
+
+  it.each([[400, "thinking is not supported"], [400, "prompt is too long"],
+    [429, "rate limit exceeded"], [503, "provider capacity unavailable"]])
+  ("preserves native Messages Provider error %s", async (status, message) => {
+    const errorBody = JSON.stringify({ type: "error", error: { type: "api_error", message } });
+    const gatewayPort = await listen(createAlphaGatewayServer({ trustedIdentitySecret: sharedSecret,
+      async resolveExecution(envelope) { return { adapter: { async execute() {
+        return new Response(errorBody, { status, headers: { "content-type": "application/json" } });
+      } }, requestedModel: envelope.requestedModel, actualModel: envelope.requestedModel,
+      provider: "fixture", channel: "fixture" }; } }));
+    const body = Buffer.from('{"model":"acu-auto","messages":[{"role":"user","content":"hello"}]}');
+    const response = await fetch(`http://127.0.0.1:${gatewayPort}/v1/messages`, {
+      method: "POST", headers: signedHeaders(body), body,
+    });
+    expect(response.status).toBe(status);
+    expect(await response.text()).toBe(errorBody);
   });
 
   it("fails closed on a forged identity before reaching Provider", async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { AlphaRequestProcessor, codexSelectionCorridorRequirements, selectionCorridorJudge } from "../src/alpha/processor.js";
+import { AlphaRequestProcessor, codexSelectionCorridorRequirements, selectionCorridorJudge, selectionCorridorRequirements } from "../src/alpha/processor.js";
 import { ACU_CURVE_DIFFICULTIES, getAcuModel, interpolateModelCurve } from "../src/acu/catalog.js";
 import { applyLogitShift, continuousTierProbabilities } from "../src/acu/math.js";
 import { routeWithCurrentAcuFormula, type AlphaExecutionProfile } from "../src/alpha/routing.js";
@@ -58,6 +58,13 @@ describe("selection corridor cache", () => {
     });
   });
 
+  it("uses native Messages requirements for Claude Code", () => {
+    expect(selectionCorridorRequirements("messages", 10_000, 1_000)).toEqual({
+      protocol: "messages", requireTools: true, requiredToolTypes: ["function"], requireThinking: false,
+      contextTokens: 11_000, expectedOutputTokens: 1_000, webIntent: "not_required",
+    });
+  });
+
   it("coalesces identical work and keeps token assumptions as part of the key", async () => {
     const processor = new AlphaRequestProcessor({} as never);
     const calculate = vi.fn(async (inputTokens: number, expectedOutputTokens: number) => ({
@@ -75,11 +82,13 @@ describe("selection corridor cache", () => {
     ]);
     const repeated = await processor.selectionCorridor(10_000, 1_000);
     const different = await processor.selectionCorridor(10_001, 1_000);
+    const messages = await processor.selectionCorridor(10_000, 1_000, { protocol: "messages" });
 
     expect(first).toEqual(second);
     expect(repeated).toEqual(first);
     expect(different).not.toEqual(first);
-    expect(calculate).toHaveBeenCalledTimes(2);
+    expect(messages).toEqual({ inputTokens: 10_000, expectedOutputTokens: 1_000 });
+    expect(calculate).toHaveBeenCalledTimes(3);
   });
 
   it("does not retain a failed calculation", async () => {

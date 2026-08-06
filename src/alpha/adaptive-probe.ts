@@ -97,6 +97,28 @@ export function adaptiveProbePayload(protocol: string, providerModel: string): J
     : { model: providerModel, input: "只输出 OK", max_output_tokens: 16, stream: true };
 }
 
+export function validNativeProbeStream(protocol: string, body: Buffer): boolean {
+  let terminal = false;
+  let modelEvent = false;
+  for (const line of body.toString("utf8").split(/\r?\n/)) {
+    if (!line.startsWith("data:")) continue;
+    const data = line.slice(5).trim();
+    if (!data || data === "[DONE]") continue;
+    try {
+      const event = JSON.parse(data) as Json;
+      if (protocol === "messages") {
+        terminal ||= event.type === "message_stop";
+        modelEvent ||= event.type === "content_block_start" || event.type === "content_block_delta";
+      } else {
+        terminal ||= event.type === "response.completed";
+      }
+    } catch {
+      return false;
+    }
+  }
+  return terminal && (protocol !== "messages" || modelEvent);
+}
+
 export type AdaptiveProbeWorkerOptions = {
   database: AlphaDatabase;
   profiles: AlphaExecutionProfile[];
@@ -394,17 +416,7 @@ export class AdaptiveProbeWorker {
       usageTrusted = usage.usageSource === "provider_usage";
       const acceptedModels = new Set([profile.modelId, providerModel, ...(profile.actualModelAliases ?? [])]);
       const validStream = (response.headers.get("content-type") ?? "").toLowerCase().includes("text/event-stream")
-        && responseBody.toString("utf8").split(/\r?\n/).some((line) => {
-          if (!line.startsWith("data:")) return false;
-          const data = line.slice(5).trim();
-          if (!data || data === "[DONE]") return false;
-          try {
-            const event = JSON.parse(data) as Json;
-            return protocol === "messages" ? event.type === "message_stop" : event.type === "response.completed";
-          } catch {
-            return false;
-          }
-        });
+        && validNativeProbeStream(protocol, responseBody);
       const probeValidation = deriveProbeValidation({
         responseOk: response.ok,
         validStream,

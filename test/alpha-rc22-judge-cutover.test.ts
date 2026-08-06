@@ -36,7 +36,7 @@ const validJudgePayload = {
 
 function profileFixture(): AlphaExecutionProfile {
   return {
-    executionProfileId: "judge-profile", modelId: "gpt-5.6-luna", providerModelId: "gpt-5.6-luna",
+    executionProfileId: "judge-profile", modelId: "gpt-5.6-sol", providerModelId: "gpt-5.6-sol",
     provider: "fixture", channel: "fixture", protocols: ["responses"], toolCallSupport: true,
     thinkingSupport: true, reasoningControlMode: "standard_effort", health: "healthy", enabled: true, administratorAllowed: true,
     autoRouteEnabled: true, usageTrusted: true,
@@ -46,7 +46,7 @@ function profileFixture(): AlphaExecutionProfile {
 function judgeResponse(overrides: Record<string, unknown> = {}): Response {
   return new Response(JSON.stringify({
     id: "judge-fixture",
-    model: "gpt-5.6-luna",
+    model: "gpt-5.6-sol",
     choices: [{ message: { content: JSON.stringify(validJudgePayload) } }],
     usage: { prompt_tokens: 1_000, completion_tokens: 100 },
     ...overrides,
@@ -59,7 +59,7 @@ function config() {
     enabled: true,
     apiKey: "primary-fixture",
     allowMock: true,
-    judgeModel: "gpt-5.6-luna",
+    judgeModel: "gpt-5.6-sol",
     judgeProvider: "lucen",
     judgeBaseUrl: "https://lucen.invalid/v1",
     backupJudgeModel: "mimo-v2.5-pro",
@@ -71,10 +71,10 @@ function config() {
   });
 }
 
-it("defaults Luna Judge to 270 seconds with synchronous cross-model backup disabled", () => {
+it("defaults Sol Judge to 270 seconds with synchronous cross-model backup disabled", () => {
   const runtime = readAcuRuntimeConfig({});
   expect(runtime).toMatchObject({
-    judgeModel: "gpt-5.6-luna",
+    judgeModel: "gpt-5.6-sol",
     judgeReasoningEffort: "default",
     judgeProvider: "lucen",
     judgeBaseUrl: "https://lucen.cc/v1",
@@ -83,14 +83,14 @@ it("defaults Luna Judge to 270 seconds with synchronous cross-model backup disab
   });
 });
 
-it("reads an explicit Luna Judge model without changing default reasoning", () => {
+it("reads an explicit Sol Judge model without changing default reasoning", () => {
   const previousModel = process.env.ACU_JUDGE_MODEL;
   const previousEffort = process.env.ACU_JUDGE_REASONING_EFFORT;
-  process.env.ACU_JUDGE_MODEL = "gpt-5.6-luna";
+  process.env.ACU_JUDGE_MODEL = "gpt-5.6-sol";
   delete process.env.ACU_JUDGE_REASONING_EFFORT;
   try {
     expect(readAcuRuntimeConfig({})).toMatchObject({
-      judgeModel: "gpt-5.6-luna",
+      judgeModel: "gpt-5.6-sol",
       judgeReasoningEffort: "default",
     });
   } finally {
@@ -247,7 +247,7 @@ describe("RC2.2 Judge cutover", () => {
     expect(result.contextTruncated).toBe(false);
     expect(result.judgeContextSource).toBe("raw_native_request_v1");
     expect(postedBody).toMatchObject({
-      model: "gpt-5.6-luna",
+      model: "gpt-5.6-sol",
       max_tokens: 300,
       thinking: { type: "disabled" },
     });
@@ -326,7 +326,7 @@ describe("RC2.2 Judge cutover", () => {
       requestedUrl = String(url);
       posted = JSON.parse(String(init?.body)) as Record<string, unknown>;
       return new Response(JSON.stringify({
-        id: "response-fixture", model: "gpt-5.6-luna",
+        id: "response-fixture", model: "gpt-5.6-sol",
         output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(validJudgePayload) }] }],
         usage: { input_tokens: 100, output_tokens: 20, input_tokens_details: { cached_tokens: 5 } },
       }), { status: 200, headers: { "content-type": "application/json" } });
@@ -352,7 +352,7 @@ describe("RC2.2 Judge cutover", () => {
     const configValue = { ...config(), judgeProtocol: "responses" as const };
     const health = vi.fn();
     const client = new AcuJudgeClient(configValue, async () => new Response(JSON.stringify({
-      model: "gpt-5.6-luna", output: [{ content: [{ type: "output_text", text: "not judge json" }] }],
+      model: "gpt-5.6-sol", output: [{ content: [{ type: "output_text", text: "not judge json" }] }],
       usage: { input_tokens: 10, output_tokens: 4 },
     }), { status: 200, headers: { "content-type": "application/json" } }));
     const result = await createAcuJudgeRunner({

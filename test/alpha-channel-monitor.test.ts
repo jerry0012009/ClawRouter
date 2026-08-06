@@ -231,5 +231,17 @@ describe("Supply observability semantics", () => {
       .toEqual(["gpt-5.6-luna", "gpt-5.6-luna@max"]);
     expect(routingCandidatesForModel("gpt-5.6-luna", [compatible])
       .map((candidate) => candidate.candidateId)).toContain("gpt-5.6-luna@max");
+    expect(routingCandidatesForModel("gpt-5.6-luna", [compatible])[0]).toMatchObject({
+      protocols: ["responses"], responsesProfileCount: 1, messagesProfileCount: 0,
+    });
+    const messages = profile({ executionProfileId: "compatible:gpt-5.6-luna:messages",
+      protocols: ["messages"], supportedReasoningEfforts: ["max"] });
+    expect(routingCandidatesForModel("gpt-5.6-luna", [compatible, messages])[0]).toMatchObject({
+      protocols: ["responses", "messages"], responsesProfileCount: 1, messagesProfileCount: 1,
+    });
+    expect(routingCandidatesForModel("gpt-5.6-luna", [compatible, messages])
+      .find((candidate) => candidate.candidateId === "gpt-5.6-luna@max")).toMatchObject({
+        responsesProfileCount: 1, messagesProfileCount: 1,
+      });
   });
 });

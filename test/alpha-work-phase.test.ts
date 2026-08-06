@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { detectWorkPhase } from "../src/alpha/work-phase.js";
-import type { AlphaDomainEvent } from "../src/alpha/events.js";
+import { extractIncrementalEvents, type AlphaDomainEvent } from "../src/alpha/events.js";
+import { normalizeMessagesRequest } from "../src/alpha/protocol/messages.js";
 import type { CanonicalEnvelope } from "../src/alpha/protocol/types.js";
 import { decideTrigger, type FailureCounter } from "../src/alpha/state-machine.js";
 
@@ -24,6 +25,17 @@ function phase(name = "unknown", options: { events?: AlphaDomainEvent[]; plannin
   const events = options.events ?? [event("tool_result", { toolCallId: "call-new", sourceIndex: 11, metadata: { isError: false } })];
   return detectWorkPhase({ envelope: envelope(name, options.command), events, planningActive: options.planning ?? false,
     failureCounters: options.failures ?? {}, trigger: options.trigger ?? decideTrigger({ mode: "acu-auto", isNewTask: false, events }) });
+}
+
+function messagesPhase(toolName: string, command = "ok") {
+  const messagesEnvelope = normalizeMessagesRequest({ model: "acu-auto", messages: [
+    { role: "assistant", content: [{ type: "tool_use", id: "messages-tool", name: toolName,
+      input: toolName === "Bash" ? { command } : {} }] },
+    { role: "user", content: [{ type: "tool_result", tool_use_id: "messages-tool", content: "ok" }] },
+  ], tools: [{ name: toolName, input_schema: { type: "object" } }] });
+  const events = extractIncrementalEvents(messagesEnvelope, { previousHistoryLength: 0, planningActive: false });
+  return detectWorkPhase({ envelope: messagesEnvelope, events, planningActive: false, failureCounters: {},
+    trigger: decideTrigger({ mode: "acu-auto", isNewTask: false, events }) });
 }
 
 describe("deterministic Work Phase detector", () => {
@@ -73,5 +85,50 @@ describe("deterministic Work Phase detector", () => {
     expect(phase("exec_command", { command: "git status" }).phase).toBe("inspection");
     expect(phase("exec_command", { command: "npm run test" }).phase).toBe("verification");
     expect(phase("exec_command", { command: "some-custom-command" }).phase).toBe("general");
+  });
+
+  it.each([["Read", "inspection"], ["Grep", "inspection"], ["Glob", "inspection"],
+    ["Edit", "implementation"], ["Write", "implementation"], ["apply_patch", "implementation"]])
+  ("classifies native Messages %s results as %s without Claude headers", (tool, expected) => {
+    expect(messagesPhase(tool).phase).toBe(expected);
+  });
+
+  it.each(["npm test", "npm run build", "npm run lint", "npm run typecheck"])
+  ("classifies native Messages shell result '%s' as verification", (command) => {
+    expect(messagesPhase("Bash", command).phase).toBe("verification");
+  });
+
+  it("recognizes Messages planning, plan exit and user-requested recovery structurally", () => {
+    const reminder = `<system-reminder>Plan mode is active.\n## Plan File Info:\nPlan file.\n## Plan Workflow\nInspect.</system-reminder>`;
+    const planEnvelope = normalizeMessagesRequest({ system: "You are a coding agent.",
+      messages: [{ role: "user", content: reminder }],
+      tools: ["Read", "TaskCreate", "TaskUpdate", "Write", "Edit"].map((name) => ({ name })) });
+    const planEvents = extractIncrementalEvents(planEnvelope, { previousHistoryLength: 0, planningActive: false });
+    expect(detectWorkPhase({ envelope: planEnvelope, events: planEvents, planningActive: false,
+      failureCounters: {}, trigger: decideTrigger({ mode: "acu-auto", isNewTask: false, events: planEvents }) }).phase).toBe("planning");
+    const exitEnvelope = normalizeMessagesRequest({ messages: [{ role: "assistant", content: [
+      { type: "tool_use", id: "exit", name: "ExitPlanMode", input: {} }] }] });
+    expect(extractIncrementalEvents(exitEnvelope, { previousHistoryLength: 0, planningActive: true })
+      .some((item) => item.type === "plan_finished")).toBe(true);
+    const rejectedEnvelope = normalizeMessagesRequest({ messages: [{ role: "user", content: "还是不对，请重做" }] });
+    const rejectedEvents = extractIncrementalEvents(rejectedEnvelope, { previousHistoryLength: 0, planningActive: false });
+    expect(detectWorkPhase({ envelope: rejectedEnvelope, events: rejectedEvents, planningActive: false,
+      failureCounters: {}, trigger: decideTrigger({ mode: "acu-auto", isNewTask: false, events: rejectedEvents }) }).phase).toBe("recovery");
+  });
+
+  it("promotes repeated native Messages failures without progress to recovery", () => {
+    const repeatedEnvelope = normalizeMessagesRequest({ messages: [
+      { role: "assistant", content: [{ type: "tool_use", id: "test-1", name: "Bash", input: { command: "npm test" } }] },
+      { role: "user", content: [{ type: "tool_result", tool_use_id: "test-1", content: "Assertion failed", is_error: true }] },
+      { role: "assistant", content: [{ type: "tool_use", id: "test-2", name: "Bash", input: { command: "npm test" } }] },
+      { role: "user", content: [{ type: "tool_result", tool_use_id: "test-2", content: "Assertion failed", is_error: true }] },
+    ] });
+    const events = extractIncrementalEvents(repeatedEnvelope, { previousHistoryLength: 0, planningActive: false });
+    const signature = events.find((item) => item.type === "execution_failure")?.failureSignature;
+    expect(signature).toBeTruthy();
+    const failureCounters = { [signature!]: { signature: signature!, category: "execution_or_verification_failure" as const,
+      count: 2, progressSinceLast: false } };
+    expect(detectWorkPhase({ envelope: repeatedEnvelope, events, planningActive: false, failureCounters,
+      trigger: decideTrigger({ mode: "acu-auto", isNewTask: false, events }) }).phase).toBe("recovery");
   });
 });

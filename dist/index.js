@@ -6836,13 +6836,17 @@ function estimateVisibleTokens(text) {
   }
   return Math.ceil(ascii / 4) + nonAscii;
 }
+function serializeRawNativeJudgeContext(rawNative) {
+  return [
+    "[RAW_NATIVE_API_REQUEST]",
+    rawNative.rawRequest,
+    "",
+    "[ACU_STATE_METADATA]",
+    stableJson(rawNative.stateMetadata)
+  ].join("\n");
+}
 function estimateJudgeContextTokens(rawNative) {
-  return estimateVisibleTokens(
-    `[ACU_STATE_METADATA]
-${stableJson(rawNative.stateMetadata)}
-[RAW_NATIVE_API_REQUEST]
-${rawNative.rawRequest}`
-  );
+  return estimateVisibleTokens(serializeRawNativeJudgeContext(rawNative));
 }
 function buildJudgeSystemPrompt() {
   const examples = twin_few_shots_default.examples.map((example) => [
@@ -7093,10 +7097,7 @@ var AcuJudgeClient = class {
     if (this.config.promptVersion !== twin_few_shots_default.promptVersion) throw new Error("ACU Judge prompt version does not match frozen few-shot data");
     const rawRequestBytes = rawNative ? Buffer.byteLength(rawNative.rawRequest, "utf8") : 0;
     const rawRequestTokenEstimate = rawNative ? estimateVisibleTokens(rawNative.rawRequest) : 0;
-    const visible = rawNative ? `[ACU_STATE_METADATA]
-${stableJson(rawNative.stateMetadata)}
-[RAW_NATIVE_API_REQUEST]
-${rawNative.rawRequest}` : serializeVisibleContext(messages, tools);
+    const visible = rawNative ? serializeRawNativeJudgeContext(rawNative) : serializeVisibleContext(messages, tools);
     const contextSha256 = createHash4("sha256").update(visible).digest("hex");
     const judgeContextLimit = this.config.maxContextTokens;
     const contextTokenEstimate = rawNative ? estimateJudgeContextTokens(rawNative) : estimateVisibleTokens(visible);

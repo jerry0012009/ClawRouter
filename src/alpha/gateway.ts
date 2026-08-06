@@ -201,12 +201,14 @@ export function createAlphaGatewayServer(options: AlphaGatewayOptions): Server {
       try {
         let inputTokens = Number(url.searchParams.get("inputTokens")) || 100_000;
         let expectedOutputTokens = Number(url.searchParams.get("expectedOutputTokens")) || 4_000;
-        let policy: SelectionCorridorPolicy | undefined;
+        let policy: SelectionCorridorPolicy | undefined =
+          url.searchParams.get("protocol") === "messages" ? { protocol: "messages" } : undefined;
         if (request.method === "POST") {
           const body = JSON.parse((await readRequestBody(request, 64 * 1024)).toString("utf8")) as Record<string, unknown>;
           inputTokens = Number(body.inputTokens) || inputTokens;
           expectedOutputTokens = Number(body.expectedOutputTokens) || expectedOutputTokens;
           policy = {
+            protocol: body.protocol === "messages" ? "messages" : "responses",
             allowedModelIds: Array.isArray(body.allowedModelIds) ? body.allowedModelIds.filter((value): value is string => typeof value === "string") : [],
             allowedProfileIds: Array.isArray(body.allowedProfileIds) ? body.allowedProfileIds.filter((value): value is string => typeof value === "string") : [],
             routingPreference: ["economy", "balanced", "quality"].includes(String(body.routingPreference)) ? String(body.routingPreference) as SelectionCorridorPolicy["routingPreference"] : "balanced",

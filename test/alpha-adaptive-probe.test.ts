@@ -9,6 +9,7 @@ import {
   fullPoolProbeDue,
   fullPoolBudgetLimit,
   recoveredAfterLastFailure,
+  validNativeProbeStream,
 } from "../src/alpha/adaptive-probe.js";
 
 describe("adaptive Probe scheduling", () => {
@@ -88,5 +89,17 @@ describe("adaptive probe payload", () => {
       max_tokens: 4,
       stream: true,
     });
+  });
+
+  it("requires a visible Messages model event and a valid terminal event", () => {
+    const valid = Buffer.from([
+      'data: {"type":"content_block_start","content_block":{"type":"text","text":""}}',
+      'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"OK"}}',
+      'data: {"type":"message_stop"}', "",
+    ].join("\n"));
+    expect(validNativeProbeStream("messages", valid)).toBe(true);
+    expect(validNativeProbeStream("messages", Buffer.from('data: {"type":"message_stop"}\n'))).toBe(false);
+    expect(validNativeProbeStream("messages", Buffer.from('data: {invalid}\n'))).toBe(false);
+    expect(validNativeProbeStream("responses", Buffer.from('data: {"type":"response.completed"}\n'))).toBe(true);
   });
 });

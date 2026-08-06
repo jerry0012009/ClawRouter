@@ -127,10 +127,9 @@ export function normalizeMessagesRequest(
     && planControlText.includes("## Plan Workflow");
   const exitedPlanReminder = planControlText.includes("## Exited Plan Mode");
   const planToolFamilyPresent = PLAN_TOOL_FAMILY.every((name) => toolNames.includes(name));
-  const versionSupported = clientVersion !== undefined && /^2\.1\./.test(clientVersion);
   const legacyPlanOnly = exitPlanDeclared && writeToolsAbsent && planSystem;
   const nativePlanOnly = activePlanReminder && !exitedPlanReminder && planToolFamilyPresent;
-  const planOnly = versionSupported && (legacyPlanOnly || nativePlanOnly);
+  const planOnly = legacyPlanOnly || nativePlanOnly;
   const exitPlanCalls = toolCalls.filter((call) => call.name === "ExitPlanMode");
 
   return {
@@ -158,12 +157,13 @@ export function normalizeMessagesRequest(
       signalFamily: exitPlanCalls.length ? "claude_exit_plan_mode" : planOnly ? "claude_plan_only_fingerprint" : undefined,
       fingerprintVersion: planOnly || exitPlanCalls.length ? CLAUDE_PLAN_FINGERPRINT_VERSION : undefined,
       evidence: [
-        ...(legacyPlanOnly && versionSupported
-          ? ["version_supported", "exit_plan_declared", "write_tools_absent", "plan_system"]
+        ...(legacyPlanOnly
+          ? ["exit_plan_declared", "write_tools_absent", "plan_system"]
           : []),
-        ...(nativePlanOnly && versionSupported
-          ? ["version_supported", "active_plan_reminder", "plan_file_reminder", "plan_workflow_reminder", "plan_tool_family"]
+        ...(nativePlanOnly
+          ? ["active_plan_reminder", "plan_file_reminder", "plan_workflow_reminder", "plan_tool_family"]
           : []),
+        ...(clientVersion ? [`client_version:${clientVersion}`] : []),
         ...exitPlanCalls.map((call) => `tool_use:ExitPlanMode:${call.id}`),
       ],
     },

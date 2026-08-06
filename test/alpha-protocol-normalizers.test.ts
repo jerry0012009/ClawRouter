@@ -184,7 +184,7 @@ describe("Messages canonical envelope", () => {
     expect(envelope.planning).toMatchObject({ finished: true, signalFamily: "claude_exit_plan_mode" });
   });
 
-  it("requires the full versioned Plan-only fingerprint", () => {
+  it("uses the structural Plan fingerprint without gating on client version", () => {
     const plan = normalizeMessagesRequest({
       system: "You are in plan mode and must remain read-only.",
       messages: [{ role: "user", content: "Plan this change" }],
@@ -192,9 +192,12 @@ describe("Messages canonical envelope", () => {
     }, {}, "2.1.220");
     expect(plan.planning).toMatchObject({ started: true, fingerprintVersion: "claude-code-2.1-plan-v2" });
 
-    const unsupportedVersion = normalizeMessagesRequest(plan.raw, {}, "2.2.0");
+    const futureVersion = normalizeMessagesRequest(plan.raw, {}, "2.2.0");
+    const unknownClient = normalizeMessagesRequest(plan.raw);
     const hasWriteTool = normalizeMessagesRequest({ ...plan.raw, tools: [{ name: "ExitPlanMode" }, { name: "Edit" }] }, {}, "2.1.220");
-    expect(unsupportedVersion.planning.started).toBe(false);
+    expect(futureVersion.planning).toMatchObject({ started: true });
+    expect(futureVersion.planning.evidence).toContain("client_version:2.2.0");
+    expect(unknownClient.planning.started).toBe(true);
     expect(hasWriteTool.planning.started).toBe(false);
   });
 

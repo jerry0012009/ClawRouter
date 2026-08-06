@@ -95,7 +95,7 @@ function parseMessages(payloads: unknown[]): Omit<AlphaUsage, "providerCostUsd">
     inputTokens = integer(usage.input_tokens) || inputTokens;
     const cacheRead = integer(usage.cache_read_input_tokens);
     const cacheCreation = integer(usage.cache_creation_input_tokens);
-    cachedInputTokens = cacheRead + cacheCreation || cachedInputTokens;
+    cachedInputTokens = cacheRead || cachedInputTokens;
     cacheCreationInputTokens = cacheCreation || cacheCreationInputTokens;
     outputTokens = integer(usage.output_tokens) || outputTokens;
     const outputDetails = object(usage.output_tokens_details);
@@ -178,7 +178,7 @@ export function parseProviderUsage(input: {
       input.billingPrice,
       {
         cacheCreationInputTokens: usage.cacheCreationInputTokens ?? 0n,
-        cachedInputTokensIncludesCreation: input.protocol === "messages",
+        cachedInputTokensIncludesCreation: false,
         inputIncludesCachedTokens: input.protocol !== "messages",
         cacheWritePricePerMillion: input.billingPrice?.cacheWritePricePerMillion,
       },

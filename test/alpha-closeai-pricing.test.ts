@@ -89,12 +89,25 @@ describe("CloseAI public pricing reconciliation", () => {
     });
     expect(usage).toMatchObject({
       inputTokens: 1_000_000n,
-      cachedInputTokens: 5_000_000n,
+      cachedInputTokens: 2_000_000n,
       cacheCreationInputTokens: 3_000_000n,
       outputTokens: 1_000_000n,
       providerCostUsd: "33.0000000000",
     });
     expect(usage.providerCostUsd).not.toBe("25.9000000000");
+  });
+
+  it("prices Messages cache reads and creations exactly once at their own rates", () => {
+    const usage = parseProviderUsage({ protocol: "messages", requestedModel: "claude-sonnet-5", requestBytes: 0,
+      contentType: "application/json", body: Buffer.from(JSON.stringify({ model: "claude-sonnet-5", usage: {
+        input_tokens: 1_000_000, cache_read_input_tokens: 2_000_000,
+        cache_creation_input_tokens: 3_000_000, output_tokens: 1_000_000,
+      } })), billingPrice: { inputPricePerMillion: 1, cachedInputPricePerMillion: 0.1,
+        cacheWritePricePerMillion: 1.25, outputPricePerMillion: 2, currency: "USD_CREDIT",
+        source: "fixture", observedAt: "2026-08-06", status: "verified" } });
+    expect(usage.cachedInputTokens).toBe(2_000_000n);
+    expect(usage.cacheCreationInputTokens).toBe(3_000_000n);
+    expect(usage.providerCostUsd).toBe("6.9500000000");
   });
 
   it("falls back to the official catalog before applying 1.5 and 7.2", () => {

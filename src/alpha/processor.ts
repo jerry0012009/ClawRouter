@@ -107,19 +107,27 @@ export function routingReuseInvalidationReason(input: {
   return input.fallbackReason;
 }
 
-export function codexSelectionCorridorRequirements(
+export function selectionCorridorRequirements(
+  protocol: "responses" | "messages",
   inputTokens: number,
   expectedOutputTokens: number,
 ): AlphaRouteRequirements {
   return {
-    protocol: "responses" as const,
+    protocol,
     requireTools: true,
-    requiredToolTypes: ["function", "custom", "local_tool"],
+    requiredToolTypes: protocol === "messages" ? ["function"] : ["function", "custom", "local_tool"],
     requireThinking: false,
     contextTokens: inputTokens + expectedOutputTokens,
     expectedOutputTokens,
     webIntent: "not_required" as const,
   };
+}
+
+export function codexSelectionCorridorRequirements(
+  inputTokens: number,
+  expectedOutputTokens: number,
+): AlphaRouteRequirements {
+  return selectionCorridorRequirements("responses", inputTokens, expectedOutputTokens);
 }
 
 const SELECTION_CORRIDOR_ZERO_FACTORS = {
@@ -149,6 +157,7 @@ export function selectionCorridorJudge(difficulty: number): AcuJudgeResult {
 }
 
 export type SelectionCorridorPolicy = {
+  protocol?: "responses" | "messages";
   allowedModelIds?: string[];
   allowedProfileIds?: string[];
   routingPreference?: "economy" | "balanced" | "quality";
@@ -808,6 +817,7 @@ export class AlphaRequestProcessor {
       candidatePreferenceEntries.sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0),
     );
     const normalizedPolicy = {
+      protocol: policy?.protocol === "messages" ? "messages" as const : "responses" as const,
       allowedModelIds: [...new Set(policy?.allowedModelIds ?? [])].sort(),
       allowedProfileIds: [...new Set(policy?.allowedProfileIds ?? [])].sort(),
       routingPreference: policy?.routingPreference ?? "balanced",
@@ -901,7 +911,11 @@ export class AlphaRequestProcessor {
             effectiveQualityTarget: 80,
             routingPreference: preference,
             profiles,
-            requirements: codexSelectionCorridorRequirements(inputTokens, expectedOutputTokens),
+            requirements: selectionCorridorRequirements(
+              policy.protocol === "messages" ? "messages" : "responses",
+              inputTokens,
+              expectedOutputTokens,
+            ),
             routeMode: policy.routeMode ?? "acu-auto",
             utilityPolicy: { ...utilityPolicy, qualityBias },
           });
@@ -1012,10 +1026,10 @@ export class AlphaRequestProcessor {
       inputTokens,
       expectedOutputTokens,
       assumptions: {
-        workload: "Codex Agent",
-        protocol: "responses",
+        workload: policy.protocol === "messages" ? "Claude Code" : "Codex Agent",
+        protocol: policy.protocol === "messages" ? "messages" : "responses",
         tools: true,
-        requiredToolTypes: ["function", "custom", "local_tool"],
+        requiredToolTypes: policy.protocol === "messages" ? ["function"] : ["function", "custom", "local_tool"],
         hostedWebRequired: false,
         webIntent: "not_required",
         baseQualityTarget: 80,

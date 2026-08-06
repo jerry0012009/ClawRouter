@@ -7,12 +7,14 @@ import {
   selectValueRoute,
 } from "../src/acu/decision.js";
 import type { AcuJudgeResult } from "../src/acu/types.js";
+import { continuousTierProbabilities } from "../src/acu/math.js";
 import {
   resolveExplicitProfile,
   routeWithCurrentAcuFormula,
   type AlphaExecutionProfile,
   type AlphaRouteRequirements,
 } from "../src/alpha/routing.js";
+import { DEFAULT_ROUTING_UTILITY_POLICY } from "../src/alpha/routing-utility-v2.js";
 
 const judge: AcuJudgeResult = {
   pLow: 0.1,
@@ -299,6 +301,30 @@ describe("Alpha current-formula routing", () => {
     expect(inspection.recommendation.estimates.some((candidate) => candidate.modelId === "gpt-5.6-luna"
       && candidate.executionPresetId === "gpt-5.6-luna:max")).toBe(false);
     expect(judge.difficultyIndex).toBe(67.2);
+  });
+
+  it("lets a Messages Work Phase change the active V2 bias and a borderline candidate", () => {
+    const messagesProfiles = ["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"].map((modelId) => ({
+      ...profiles[0], executionProfileId: `${modelId}:messages`, modelId, protocols: ["messages" as const],
+      supportedToolTypes: ["function" as const],
+    }));
+    const phaseJudge: AcuJudgeResult = { ...judge, ...continuousTierProbabilities(0.66),
+      difficultyScoreRaw: 66, factorComposite: 66, difficultyIndex: 66, difficultyScore: 66 };
+    const route = (phase: "inspection" | "recovery") => routeWithCurrentAcuFormula({
+      judge: phaseJudge, judgeCost: 0, inputTokens: 20_000, expectedOutputTokens: 2_000,
+      effectiveQualityTarget: 80, profiles: messagesProfiles,
+      requirements: { protocol: "messages", requireTools: true, requiredToolTypes: ["function"],
+        requireThinking: false, contextTokens: 30_000 },
+      workPhase: { phase, confidence: "high", signals: [`messages:${phase}`],
+        qualityTargetOffset: phase === "inspection" ? -4 : 6, policyVersion: "acu-work-phase-policy-v1" },
+      utilityPolicy: { ...DEFAULT_ROUTING_UTILITY_POLICY, formulaMode: "active" },
+    });
+    const inspection = route("inspection");
+    const recovery = route("recovery");
+    expect(inspection.effectiveQualityBias).toBe(-10);
+    expect(recovery.effectiveQualityBias).toBe(20);
+    expect(inspection.recommendation.recommended.candidateId).toBe("gpt-5.6-luna");
+    expect(recovery.recommendation.recommended.candidateId).toBe("gpt-5.6-sol");
   });
 
   it("does not hard-filter ordinary Coding because the client declared Web Search", () => {

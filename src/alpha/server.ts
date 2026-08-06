@@ -108,6 +108,9 @@ export function routingCandidatesForModel(
   presetId?: string;
   reasoningEffort?: string;
   calibrationStatus?: string;
+  protocols: Array<"responses" | "messages">;
+  responsesProfileCount: number;
+  messagesProfileCount: number;
 }> {
   const catalog = getAcuModel(modelId);
   const capabilityProfiles = profiles.filter((profile) =>
@@ -118,23 +121,42 @@ export function routingCandidatesForModel(
     && (!profile.verificationStatus
       || ["verified", "verified_provisional"].includes(profile.verificationStatus))
   );
+  const protocolSummary = (matching: AlphaExecutionProfile[]) => {
+    const responsesProfileCount = matching.filter((profile) => profile.protocols.includes("responses")).length;
+    const messagesProfileCount = matching.filter((profile) => profile.protocols.includes("messages")).length;
+    return {
+      protocols: [
+        ...(responsesProfileCount > 0 ? ["responses" as const] : []),
+        ...(messagesProfileCount > 0 ? ["messages" as const] : []),
+      ],
+      responsesProfileCount,
+      messagesProfileCount,
+    };
+  };
   return [{
     candidateId: modelId,
     modelId,
     displayName: catalog?.displayName ?? modelId,
     kind: "base",
+    ...protocolSummary(capabilityProfiles),
   }, ...enabledExecutionPresets()
     .filter((preset) => preset.modelId === modelId
       && capabilityProfiles.some((profile) => profileSupportsExecutionPreset(profile, preset)))
-    .map((preset) => ({
-      candidateId: preset.candidateId,
-      modelId,
-      displayName: preset.displayName,
-      kind: "preset" as const,
-      presetId: preset.presetId,
-      reasoningEffort: preset.canonicalReasoningEffort,
-      calibrationStatus: preset.calibrationStatus,
-    }))];
+    .map((preset) => {
+      const matching = capabilityProfiles.filter((profile) =>
+        profile.protocols.some((protocol) => profileSupportsExecutionPreset(profile, preset, protocol))
+      );
+      return {
+        candidateId: preset.candidateId,
+        modelId,
+        displayName: preset.displayName,
+        kind: "preset" as const,
+        presetId: preset.presetId,
+        reasoningEffort: preset.canonicalReasoningEffort,
+        calibrationStatus: preset.calibrationStatus,
+        ...protocolSummary(matching),
+      };
+    })];
 }
 
 function validateProfile(value: unknown, index: number): ConfiguredExecutionProfile {

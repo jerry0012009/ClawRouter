@@ -58,6 +58,25 @@
       "effectiveCostStatus": "verified",
       "effectiveCostSource": "2026-08-02 saved CloseAI pricing page: displayed USD base price times explicit 1.5 service multiplier times 7.2 CNY/USD; account settles against CNY balance and user-supplied bill sample agrees; per-request cache amounts remain unverified",
       "effectiveCostVersion": "closeai-public-price-cny-settlement-20260802-v1"
+    },
+    {
+      "providerId": "wawazz",
+      "displayName": "WAWA ZZ",
+      "protocol": "openai_responses",
+      "baseUrlEnv": "ACU_CHANNEL_WAWAZZ_007_BASE_URL",
+      "apiKeyEnv": "ACU_CHANNEL_WAWAZZ_007_API_KEY",
+      "balanceCurrency": "USD-denominated credits",
+      "rechargeCashCny": 1,
+      "creditsReceivedUsd": 1,
+      "observedBillingMultiplier": 1,
+      "priceSource": "Founder-supplied WAWA ZZ channel multiplier and authenticated /v1/usage balance",
+      "priceObservedAt": "2026-08-06T00:00:00Z",
+      "health": "healthy",
+      "priority": 40,
+      "enabled": true,
+      "effectiveCostStatus": "verified",
+      "effectiveCostSource": "WAWA ZZ supplied 1 CNY per USD credit; per-channel 0.07/0.12/0.22 multipliers are applied on execution profiles",
+      "effectiveCostVersion": "wawazz-founder-channel-multipliers-20260806-v1"
     }
   ]
 }

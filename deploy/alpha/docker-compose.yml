@@ -230,7 +230,7 @@ services:
       ACU_ROUTING_FORMULA_VERSION: acu-routing-model-v0.5
     volumes:
       - newapi-logs:/app/logs
-      - ./newapi-acu-catalog.json:/app/acu-catalog/newapi-acu-catalog.json:ro
+      - ./:/app/acu-catalog:ro
     ports:
       - "${NEW_API_BIND_ADDRESS:-127.0.0.1}:${NEW_API_PORT:-3200}:3000"
     networks: [alpha-backend]

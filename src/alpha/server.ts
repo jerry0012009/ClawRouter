@@ -521,7 +521,11 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
                  count(*)::int probe_count,count(*) FILTER (WHERE status='success')::int probe_success_count
                FROM acu_profile_probe_attempts WHERE started_at>=date_trunc('day',now()) GROUP BY execution_profile_id
              ), ranged AS (
-               SELECT execution_profile_id,
+             SELECT execution_profile_id,
+                 count(*)::int probe_count,
+                 count(*) FILTER (WHERE status='success')::int probe_success_count,
+                 percentile_cont(.5) WITHIN GROUP (ORDER BY latency_ms)
+                   FILTER (WHERE latency_ms IS NOT NULL) probe_latency_p50_ms,
                  count(*) FILTER (WHERE metadata_json->>'probeMode'='full_pool')::int full_pool_probe_count,
                  count(*) FILTER (WHERE metadata_json->>'probeMode'='full_pool' AND status='success')::int full_pool_probe_success_count,
                  count(*) FILTER (WHERE metadata_json->>'probeMode' IS DISTINCT FROM 'full_pool')::int recovery_probe_count,
@@ -535,6 +539,9 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
              ) SELECT latest.*,coalesce(daily.daily_spend,0) daily_spend,
                coalesce(daily.probe_count,0) probe_count,coalesce(daily.probe_success_count,0) probe_success_count,
                coalesce(ranged.full_pool_probe_count,0) full_pool_probe_count,
+               coalesce(ranged.probe_count,0) ranged_probe_count,
+               coalesce(ranged.probe_success_count,0) ranged_probe_success_count,
+               ranged.probe_latency_p50_ms ranged_probe_latency_p50_ms,
                coalesce(ranged.full_pool_probe_success_count,0) full_pool_probe_success_count,
                coalesce(ranged.recovery_probe_count,0) recovery_probe_count,
                coalesce(ranged.recovery_probe_success_count,0) recovery_probe_success_count,
@@ -654,12 +661,20 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
             metricSource: null, formulaVersion: null,
           };
         });
-        const monitorAggregates = new Map<string, MonitorProfileAggregate>(attempts.rows.map((row) => [String(row.execution_profile_id), {
-          requestCount: Number(row.request_count ?? 0),
-          successCount: Number(row.success_count ?? 0),
-          firstEventSampleCount: Number(row.first_event_sample_count ?? 0),
-          firstEventP50Ms: row.p50_first_model_event_ms == null ? undefined : Number(row.p50_first_model_event_ms),
-        }]));
+        const monitorAggregates = new Map<string, MonitorProfileAggregate>();
+        for (const profile of serviceConfig.profiles) {
+          const production = aggregateByProfile.get(profile.executionProfileId) ?? {};
+          const probe = probeByProfile.get(profile.executionProfileId) ?? {};
+          monitorAggregates.set(profile.executionProfileId, {
+            requestCount: Number(production.request_count ?? 0),
+            successCount: Number(production.success_count ?? 0),
+            firstEventSampleCount: Number(production.first_event_sample_count ?? 0),
+            firstEventP50Ms: production.p50_first_model_event_ms == null ? undefined : Number(production.p50_first_model_event_ms),
+            probeCount: Number(probe.ranged_probe_count ?? 0),
+            probeSuccessCount: Number(probe.ranged_probe_success_count ?? 0),
+            probeLatencyP50Ms: probe.ranged_probe_latency_p50_ms == null ? undefined : Number(probe.ranged_probe_latency_p50_ms),
+          });
+        }
         const profileScores = scoreMonitorProfiles(
           profiles.map((item) => item.profile).filter((profile) => routingEligibleIds.has(profile.executionProfileId)),
           monitorAggregates,

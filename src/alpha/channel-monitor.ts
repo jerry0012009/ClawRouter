@@ -33,6 +33,9 @@ export type MonitorProfileAggregate = {
   successCount: number;
   firstEventSampleCount: number;
   firstEventP50Ms?: number;
+  probeCount?: number;
+  probeSuccessCount?: number;
+  probeLatencyP50Ms?: number;
 };
 
 export function scoreMonitorProfiles(
@@ -60,16 +63,24 @@ export function scoreMonitorProfiles(
       profile.modelId === modelId && profile.protocols[0] === protocol
     ).map((profile) => {
       const aggregate = aggregateByProfile.get(profile.executionProfileId);
+      const productionCount = aggregate?.requestCount ?? 0;
+      const probeCount = aggregate?.probeCount ?? 0;
+      const useProbeEvidence = productionCount === 0 && probeCount > 0;
+      const consideredAttempts = useProbeEvidence ? probeCount : productionCount;
+      const successfulAttempts = useProbeEvidence
+        ? aggregate?.probeSuccessCount ?? 0
+        : aggregate?.successCount ?? 0;
       return {
         ...profile,
-        recentSuccessRate: aggregate && aggregate.requestCount > 0
-          ? aggregate.successCount / aggregate.requestCount : profile.recentSuccessRate,
+        recentSuccessRate: consideredAttempts > 0
+          ? successfulAttempts / consideredAttempts : profile.recentSuccessRate,
         utilityRuntimeMetric: {
-          firstEventP50Ms: aggregate?.firstEventP50Ms,
-          firstEventSamples: aggregate?.firstEventSampleCount ?? 0,
-          totalLatencySamples: 0,
-          consideredAttempts: aggregate?.requestCount ?? 0,
-          successfulAttempts: aggregate?.successCount ?? 0,
+          firstEventP50Ms: useProbeEvidence ? undefined : aggregate?.firstEventP50Ms,
+          firstEventSamples: useProbeEvidence ? 0 : aggregate?.firstEventSampleCount ?? 0,
+          totalLatencyP50Ms: useProbeEvidence ? aggregate?.probeLatencyP50Ms : undefined,
+          totalLatencySamples: useProbeEvidence ? probeCount : 0,
+          consideredAttempts,
+          successfulAttempts,
         },
       };
     });

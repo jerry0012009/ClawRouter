@@ -197,6 +197,22 @@ describe("Supply observability semantics", () => {
     expect(scores.get(candidate.executionProfileId)?.metricSource).toBe("all_unknown");
   });
 
+  it("uses current-range Probe evidence when production samples are absent", () => {
+    const candidate = profile({ executionProfileId: "probe:gpt-5.6-luna:responses" });
+    const scores = scoreMonitorProfiles([candidate], new Map([[candidate.executionProfileId, {
+      requestCount: 0,
+      successCount: 0,
+      firstEventSampleCount: 0,
+      probeCount: 10,
+      probeSuccessCount: 10,
+      probeLatencyP50Ms: 420,
+    }]]), { supplyStrategy: "balanced", scenario: "standard" });
+    expect(scores.get(candidate.executionProfileId)).toMatchObject({
+      metricSource: "total_latency_p50",
+      profileLatencyMs: 420,
+    });
+  });
+
   it("publishes presets only when an administrator-enabled Profile supports their effort", () => {
     const incompatible = profile({
       reasoningOverride: { rejectedEfforts: ["max"] },

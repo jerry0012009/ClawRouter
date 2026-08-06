@@ -16,6 +16,8 @@ docker run --rm \
   --volume "$repo_dir:/repo" \
   --workdir /repo \
   --env POSTGRES_ACU_PASSWORD \
+  --env ACU_ADMIN_TRACE_TOKEN \
+  --env ACU_ROUTER_INTERNAL_URL=http://acu-router:8403 \
   --env "ACU_RETAIL_MARKUP_MULTIPLIER=${ACU_RETAIL_MARKUP_MULTIPLIER:-1.25}" \
   --env "ACU_BILLING_POLICY_VERSION=${ACU_BILLING_POLICY_VERSION:-acu-retail-v1}" \
   node:22-bookworm \

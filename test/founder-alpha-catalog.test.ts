@@ -51,8 +51,8 @@ describe("Founder Alpha New API catalog export", () => {
     const luna = exported.responses.find((item: { modelId: string }) => item.modelId === "gpt-5.6-luna");
     expect(luna).toMatchObject({
       costCurrency: "CNY",
-      effectiveInputPriceCnyPerMillion: 0.025,
-      effectiveOutputPriceCnyPerMillion: 0.15,
+      effectiveInputPriceCnyPerMillion: 2.7,
+      effectiveOutputPriceCnyPerMillion: 16.2,
       reference: {
         outputCnyPerMillion: 8.64,
         sourceType: "official",

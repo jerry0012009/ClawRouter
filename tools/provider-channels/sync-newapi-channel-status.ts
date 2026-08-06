@@ -18,8 +18,6 @@ import {
 } from "../../src/alpha/retail-charge.js";
 import { monitorRoutingStatus, type MonitorHealthRow } from "../../src/alpha/channel-monitor.js";
 import type { ConfiguredExecutionProfile } from "../../src/alpha/server.js";
-import { effectiveProviderSelectionScore, type AlphaExecutionProfile } from "../../src/alpha/routing.js";
-import { hydrateExecutionProfileRuntime } from "../../src/alpha/processor.js";
 
 const catalogPath = resolve("deploy/alpha/newapi-acu-catalog.json");
 const sourceCatalogPath = resolve("src/acu/catalog/model-catalog.json");
@@ -144,37 +142,26 @@ function profileTokenPrices(profile: Record<string, unknown>, model: {
   return { input, output, cacheRead };
 }
 
-function referenceProfile(items: Array<Record<string, unknown>>, model: {
-  inputPricePerMillion: number;
-  outputPricePerMillion: number;
-  cachedInputPricePerMillion: number | null;
-}): Record<string, unknown> | undefined {
-  return selectPayableProfile(items, (profile) => {
-    const economics = economicsByProvider.get(String(profile.economicsProviderId ?? profile.provider));
-    const runtime = runtimeHealth.get(String(profile.executionProfileId));
-    const channel = channelHealth.get(String(profile.channelId ?? profile.channel));
-    const routed = hydrateExecutionProfileRuntime({
-      ...profile,
-      economics: economics ? {
-        ...economics,
-        observedBillingMultiplier: profile.observedBillingMultiplier ?? economics.observedBillingMultiplier,
-      } : undefined,
-    } as AlphaExecutionProfile, runtime ? {
-      state: String(runtime.circuit_state ?? "healthy") as "healthy",
-      recentSuccessRate: runtime.recent_success_rate,
-      totalLatencyMs: runtime.total_latency_ms,
-      usageTrusted: runtime.usage_trusted,
-      cooldownUntil: runtime.cooldown_until ? new Date(runtime.cooldown_until) : undefined,
-    } : undefined, channel ? {
-      state: String(channel.circuit_state ?? "healthy") as "healthy",
-      cooldownUntil: channel.cooldown_until ? new Date(String(channel.cooldown_until)) : undefined,
-    } : undefined);
-    return effectiveProviderSelectionScore(routed, {
-      protocol: routed.protocols[0] ?? "responses",
-      requireTools: false,
-      requireThinking: false,
-    }, 20_000, 2_000);
+type CorridorProfileUtility = { executionProfileId?: string; selected?: boolean };
+const corridorProfiles = new Map<string, string>();
+const routerUrl = process.env.ACU_ROUTER_INTERNAL_URL?.trim();
+const routerToken = process.env.ACU_ADMIN_TRACE_TOKEN?.trim();
+if (!routerUrl || !routerToken) throw new Error("ACU_ROUTER_INTERNAL_URL and ACU_ADMIN_TRACE_TOKEN are required");
+for (const protocol of ["responses", "messages"]) {
+  const response = await fetch(`${routerUrl}/internal/admin/selection-corridor`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${routerToken}`, "content-type": "application/json" },
+    body: JSON.stringify({ protocol, inputTokens: 20_000, expectedOutputTokens: 2_000, routingPreference: "balanced", formulaMode: "active" }),
   });
+  if (!response.ok) throw new Error(`Router selection corridor failed for ${protocol}: ${response.status}`);
+  const body = await response.json() as { effective?: Array<{ profileCandidateUtilities?: CorridorProfileUtility[] }> };
+  for (const point of body.effective ?? []) {
+    for (const utility of point.profileCandidateUtilities ?? []) {
+      if (!utility.selected || !utility.executionProfileId) continue;
+      const profile = profiles.find((item) => item.executionProfileId === utility.executionProfileId);
+      if (profile?.modelId) corridorProfiles.set(`${protocol}:${profile.modelId}`, utility.executionProfileId);
+    }
+  }
 }
 
 const active = runtimeProfiles.filter((profile) => profile.enabled === true
@@ -203,13 +190,40 @@ catalog.responses = activeModelIds.map((modelId) => {
   const channels = new Set(modelProfiles.map((profile) => String(profile.channelId ?? profile.channel)));
   const existing = existingResponses.get(modelId);
   const healthyProfiles = activeProfiles(modelId, false);
-  const costProfile = referenceProfile(healthyProfiles, model);
-  const cashMultiplier = costProfile ? profileCashCnyPerNominalUsd(costProfile) : Number.NaN;
-  if (!costProfile || !Number.isFinite(cashMultiplier)) {
-    throw new Error(`Routing-active model ${modelId} has no healthy Profile with usable CNY economics`);
-  }
+  const selectedProfiles = protocols.flatMap((protocol) => {
+    const selectedProfileId = corridorProfiles.get(`${protocol}:${modelId}`);
+    const profile = selectedProfileId
+      ? healthyProfiles.find((item) => String(item.executionProfileId) === selectedProfileId)
+      : undefined;
+    if (selectedProfileId && !profile) throw new Error(`Router selected ${modelId}/${protocol} but Profile ${selectedProfileId} is unavailable`);
+    return profile ? [{ protocol, profile }] : [];
+  });
+  if (selectedProfiles.length === 0) throw new Error(`Router has no selected Profile for ${modelId}`);
+  // A single New API model card may serve both native protocols. Use the
+  // higher Router-selected payable price so neither protocol is understated.
+  const pricedProfiles = selectedProfiles.map(({ profile }) => {
+    const cashMultiplier = profileCashCnyPerNominalUsd(profile);
+    if (!Number.isFinite(cashMultiplier)) throw new Error(`Selected Profile ${profile.executionProfileId} has no usable CNY economics`);
+    const profilePrices = profileTokenPrices(profile, model);
+    const billing = profile.billingPrice && typeof profile.billingPrice === "object"
+      ? profile.billingPrice as Record<string, unknown> : undefined;
+    return {
+      profile,
+      prices: {
+        input: profilePrices.input * cashMultiplier * retailMarkupMultiplier,
+        output: profilePrices.output * cashMultiplier * retailMarkupMultiplier,
+        cacheRead: profilePrices.cacheRead * cashMultiplier * retailMarkupMultiplier,
+      },
+      effectiveCostStatus: profile.effectiveCostStatus === "verified" ? "verified" : "estimated",
+      billingStatus: billing?.status === "verified" ? "verified" : "estimated",
+    };
+  });
+  const representative = pricedProfiles.reduce((left, right) =>
+    left.prices.input + left.prices.output >= right.prices.input + right.prices.output ? left : right);
+  const costProfile = representative.profile;
   const profilePrices = profileTokenPrices(costProfile, model);
-  const effectiveCostStatus = costProfile?.effectiveCostStatus === "verified" ? "verified" : "estimated";
+  const cashMultiplier = profileCashCnyPerNominalUsd(costProfile);
+  const effectiveCostStatus = pricedProfiles.every((item) => item.effectiveCostStatus === "verified") ? "verified" : "estimated";
   const billing = costProfile.billingPrice && typeof costProfile.billingPrice === "object"
     ? costProfile.billingPrice as Record<string, unknown> : undefined;
   const payable = buildPayablePricing({

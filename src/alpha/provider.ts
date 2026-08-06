@@ -43,27 +43,37 @@ function targetUrl(config: NativeProviderConfig, path: string, query: string): U
   const base = config.baseUrl.endsWith("/") ? config.baseUrl : `${config.baseUrl}/`;
   const baseUrl = new URL(base);
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  const relative = (config.stripV1Path || baseUrl.pathname.endsWith("/v1/")) && normalizedPath.startsWith("/v1/")
-    ? normalizedPath.slice("/v1/".length)
-    : normalizedPath.slice(1);
+  const relative =
+    (config.stripV1Path || baseUrl.pathname.endsWith("/v1/")) && normalizedPath.startsWith("/v1/")
+      ? normalizedPath.slice("/v1/".length)
+      : normalizedPath.slice(1);
   const url = new URL(relative, base);
   url.search = query;
   return url;
 }
 
-function providerHeaders(config: NativeProviderConfig, headers: IncomingHttpHeaders): Headers {
+function providerHeaders(
+  config: NativeProviderConfig,
+  protocol: AlphaProtocol,
+  headers: IncomingHttpHeaders,
+): Headers {
   const result = new Headers();
   for (const [name, value] of Object.entries(headers)) {
     const normalized = name.toLowerCase();
-    if (value === undefined || HOP_BY_HOP_HEADERS.has(normalized)
-      || CREDENTIAL_HEADERS.has(normalized) || isInternalIdentityHeader(normalized)) continue;
+    if (
+      value === undefined ||
+      HOP_BY_HOP_HEADERS.has(normalized) ||
+      CREDENTIAL_HEADERS.has(normalized) ||
+      isInternalIdentityHeader(normalized)
+    )
+      continue;
     if (Array.isArray(value)) value.forEach((item) => result.append(name, item));
     else result.set(name, value);
   }
   if (config.authMode === "bearer") result.set("authorization", `Bearer ${config.apiKey}`);
   else result.set("x-api-key", config.apiKey);
-  if (config.anthropicVersion && !result.has("anthropic-version")) {
-    result.set("anthropic-version", config.anthropicVersion);
+  if (protocol === "messages" && !result.has("anthropic-version")) {
+    result.set("anthropic-version", config.anthropicVersion ?? "2023-06-01");
   }
   return result;
 }
@@ -73,7 +83,7 @@ export function createNativeProviderAdapter(config: NativeProviderConfig): Nativ
     execute(request) {
       return fetch(targetUrl(config, request.path, request.query), {
         method: "POST",
-        headers: providerHeaders(config, request.headers),
+        headers: providerHeaders(config, request.protocol, request.headers),
         body: Buffer.from(request.body),
         signal: request.signal,
         redirect: "manual",

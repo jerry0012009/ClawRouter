@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, rename, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import pg from "pg";
 import { buildModelCurve, getAcuCatalog, getAcuModel } from "../../src/acu/catalog.js";
 import {
   buildPayablePricing,
@@ -15,6 +16,10 @@ import {
   DEFAULT_BILLING_POLICY_VERSION,
   parseRetailMarkupMultiplier,
 } from "../../src/alpha/retail-charge.js";
+import { monitorRoutingStatus, type MonitorHealthRow } from "../../src/alpha/channel-monitor.js";
+import type { ConfiguredExecutionProfile } from "../../src/alpha/server.js";
+import { effectiveProviderSelectionScore, type AlphaExecutionProfile } from "../../src/alpha/routing.js";
+import { hydrateExecutionProfileRuntime } from "../../src/alpha/processor.js";
 
 const catalogPath = resolve("deploy/alpha/newapi-acu-catalog.json");
 const sourceCatalogPath = resolve("src/acu/catalog/model-catalog.json");
@@ -51,10 +56,62 @@ catalog.referenceFxCnyPerUsd = parseReferenceUsdCny(process.env.ACU_PRICING_REFE
 const retailMarkupMultiplier = parseRetailMarkupMultiplier(process.env.ACU_RETAIL_MARKUP_MULTIPLIER);
 const pricingPolicyVersion = process.env.ACU_BILLING_POLICY_VERSION?.trim() || DEFAULT_BILLING_POLICY_VERSION;
 const economicsByProvider = new Map(economicsCatalog.providers.map((provider) => [String(provider.providerId), provider]));
+
+type RuntimeHealth = {
+  execution_profile_id?: string;
+  circuit_state?: string;
+  recent_success_rate?: number;
+  total_latency_ms?: number;
+  usage_trusted?: boolean;
+  actual_model_verified?: boolean;
+  cooldown_until?: string | Date | null;
+};
+
+const runtimeHealth = new Map<string, RuntimeHealth>();
+const channelHealth = new Map<string, MonitorHealthRow>();
+const runtimeDatabaseUrl = process.env.ACU_PRICING_RUNTIME_DATABASE_URL?.trim();
+if (!runtimeDatabaseUrl) {
+  throw new Error("ACU_PRICING_RUNTIME_DATABASE_URL is required to publish routing-aware pricing");
+}
+{
+  const pool = new pg.Pool({ connectionString: runtimeDatabaseUrl, max: 1, application_name: "newapi-pricing-sync" });
+  try {
+    const result = await pool.query<RuntimeHealth & { execution_profile_id: string }>(
+      `SELECT execution_profile_id, circuit_state, recent_success_rate, total_latency_ms,
+              usage_trusted, actual_model_verified, cooldown_until
+         FROM acu_provider_model_profile_health`,
+    );
+    for (const row of result.rows) runtimeHealth.set(row.execution_profile_id, row);
+    const channels = await pool.query<MonitorHealthRow>(
+      "SELECT channel_id, circuit_state, cooldown_until FROM acu_channel_health",
+    );
+    for (const row of channels.rows) channelHealth.set(String(row.channel_id), row);
+  } finally {
+    await pool.end();
+  }
+}
+
+const eligibleProfileIds = new Set(profiles.filter((profile) =>
+  monitorRoutingStatus(
+    profile as ConfiguredExecutionProfile,
+    channelHealth.get(String(profile.channelId ?? profile.channel)) ?? {},
+    runtimeHealth.get(String(profile.executionProfileId)) as MonitorHealthRow ?? {},
+  ) === "eligible",
+).map((profile) => String(profile.executionProfileId)));
+const runtimeProfiles = profiles.map((profile) => ({
+  ...profile,
+  recentSuccessRate: runtimeHealth.get(String(profile.executionProfileId))?.recent_success_rate
+    ?? profile.recentSuccessRate,
+  observedLatencyMs: runtimeHealth.get(String(profile.executionProfileId))?.total_latency_ms
+    ?? profile.observedLatencyMs,
+  usageTrusted: runtimeHealth.get(String(profile.executionProfileId))?.usage_trusted
+    ?? profile.usageTrusted,
+}));
+
 function activeProfiles(modelId: string, responsesOnly: boolean): Array<Record<string, unknown>> {
-  return profiles.filter((profile) => profile.modelId === modelId
+  return runtimeProfiles.filter((profile) => profile.modelId === modelId
     && (!responsesOnly || (profile.protocols instanceof Array && profile.protocols.includes("responses")))
-    && profile.enabled === true && profile.health === "healthy");
+    && profile.enabled === true && eligibleProfileIds.has(String(profile.executionProfileId)));
 }
 
 function effectiveCostStatuses(items: Array<Record<string, unknown>>): string[] {
@@ -87,39 +144,54 @@ function profileTokenPrices(profile: Record<string, unknown>, model: {
   return { input, output, cacheRead };
 }
 
-function profileReferenceScore(profile: Record<string, unknown>, model: {
-  inputPricePerMillion: number;
-  outputPricePerMillion: number;
-  cachedInputPricePerMillion: number | null;
-}): number {
-  const cashMultiplier = profileCashCnyPerNominalUsd(profile);
-  const prices = profileTokenPrices(profile, model);
-  const healthFactor = profile.health === "degraded" ? 1.2 : profile.health === "unknown" ? 1.1 : 1;
-  const successRate = Math.max(0.5, Math.min(1, Number(profile.recentSuccessRate ?? 1)));
-  const latencyFactor = 1 + Math.min(0.05, Math.max(0, Number(profile.observedLatencyMs ?? 0)) / 1_200_000);
-  return (prices.input + prices.output) * cashMultiplier * healthFactor * latencyFactor / successRate;
-}
-
 function referenceProfile(items: Array<Record<string, unknown>>, model: {
   inputPricePerMillion: number;
   outputPricePerMillion: number;
   cachedInputPricePerMillion: number | null;
 }): Record<string, unknown> | undefined {
-  return selectPayableProfile(items, (profile) => profileReferenceScore(profile, model));
+  return selectPayableProfile(items, (profile) => {
+    const economics = economicsByProvider.get(String(profile.economicsProviderId ?? profile.provider));
+    const runtime = runtimeHealth.get(String(profile.executionProfileId));
+    const channel = channelHealth.get(String(profile.channelId ?? profile.channel));
+    const routed = hydrateExecutionProfileRuntime({
+      ...profile,
+      economics: economics ? {
+        ...economics,
+        observedBillingMultiplier: profile.observedBillingMultiplier ?? economics.observedBillingMultiplier,
+      } : undefined,
+    } as AlphaExecutionProfile, runtime ? {
+      state: String(runtime.circuit_state ?? "healthy") as "healthy",
+      recentSuccessRate: runtime.recent_success_rate,
+      totalLatencyMs: runtime.total_latency_ms,
+      usageTrusted: runtime.usage_trusted,
+      cooldownUntil: runtime.cooldown_until ? new Date(runtime.cooldown_until) : undefined,
+    } : undefined, channel ? {
+      state: String(channel.circuit_state ?? "healthy") as "healthy",
+      cooldownUntil: channel.cooldown_until ? new Date(String(channel.cooldown_until)) : undefined,
+    } : undefined);
+    return effectiveProviderSelectionScore(routed, {
+      protocol: routed.protocols[0] ?? "responses",
+      requireTools: false,
+      requireThinking: false,
+    }, 20_000, 2_000);
+  });
 }
 
-const active = profiles.filter((profile) => profile.enabled === true
-  && profile.administratorAllowed === true && profile.autoRouteEnabled !== false);
+const active = runtimeProfiles.filter((profile) => profile.enabled === true
+  && profile.administratorAllowed === true && profile.autoRouteEnabled !== false
+  && eligibleProfileIds.has(String(profile.executionProfileId)));
 const activeModelIds = [...new Set(active.map((profile) => String(profile.modelId)))].sort();
 const existingResponses = new Map(catalog.responses.map((item) => [String(item.modelId), item]));
 const existingStatuses = new Map(catalog.curveModelStatuses.map((item) => [String(item.modelId), item]));
-catalog.curveModelStatuses = getAcuCatalog().models.map((model) => existingStatuses.get(model.modelId) ?? {
+catalog.curveModelStatuses = getAcuCatalog().models
+  .filter((model) => activeModelIds.includes(model.modelId))
+  .map((model) => existingStatuses.get(model.modelId) ?? {
   modelId: model.modelId,
   statuses: [],
   healthyChannelCount: 0,
   temporarilyUnavailableReason: "No active verified Channel",
   effectiveCostStatuses: [],
-});
+  });
 catalog.responses = activeModelIds.map((modelId) => {
   const model = getAcuModel(modelId);
   if (!model || model.inputPricePerMillion === null || model.outputPricePerMillion === null) {
@@ -212,6 +284,8 @@ for (const item of catalog.curveModelStatuses) {
   item.temporarilyUnavailableReason = healthyChannels.size === 0
     ? `No active verified Channel (${(item.statuses as string[]).join(", ")})` : null;
 }
-await writeFile(catalogPath, `${JSON.stringify(catalog, null, 2)}\n`);
+const temporaryCatalogPath = `${catalogPath}.tmp`;
+await writeFile(temporaryCatalogPath, `${JSON.stringify(catalog, null, 2)}\n`);
+await rename(temporaryCatalogPath, catalogPath);
 console.log(JSON.stringify({ curveModels: catalog.curveModelStatuses.length,
   modelsWithHealthyChannel: catalog.curveModelStatuses.filter((item) => Number(item.healthyChannelCount) > 0).length }));

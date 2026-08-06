@@ -291,6 +291,9 @@ export type AlphaRouteDecision = {
     executionProfileIds: string[];
     bestExecutionProfileId: string;
     costUnit: "CNY" | "USD";
+    effectiveInputPriceCnyPerMillion: number;
+    effectiveOutputPriceCnyPerMillion: number;
+    effectiveCostStatus: "verified" | "estimated" | "missing";
   }>;
   paretoFrontier: string[];
   excludedProfiles: ExcludedProfile[];
@@ -999,6 +1002,9 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
         ...estimate,
         bestExecutionProfileId: bestProfile.executionProfileId,
         costUnit: referenceEconomics ? "CNY" as const : "USD" as const,
+        effectiveInputPriceCnyPerMillion: profileEffectivePrices(bestProfile).inputPricePerMillion,
+        effectiveOutputPriceCnyPerMillion: profileEffectivePrices(bestProfile).outputPricePerMillion,
+        effectiveCostStatus: bestProfile.effectiveCostStatus ?? "verified",
         executionProfileIds: (plan?.compatibleProfiles
           ?? eligibleProfiles.filter((profile) => profile.modelId === estimate.modelId))
           .map((profile) => profile.executionProfileId),

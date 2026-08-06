@@ -963,10 +963,14 @@ export class AlphaRequestProcessor {
             candidates: candidates.map((candidate) => ({
               candidateId: candidate.candidateId,
               modelId: candidate.modelId,
+              executionProfileId: candidate.bestExecutionProfileId,
               executionPresetId: candidate.executionPresetId,
               reasoningEffort: candidate.reasoningEffort,
               estimatedQuality: candidate.estimatedQuality * 100,
               estimatedCallCost: candidate.estimatedCallCost,
+              effectiveInputPriceCnyPerMillion: candidate.effectiveInputPriceCnyPerMillion,
+              effectiveOutputPriceCnyPerMillion: candidate.effectiveOutputPriceCnyPerMillion,
+              effectiveCostStatus: candidate.effectiveCostStatus,
               quality: candidate.estimatedQuality * 100,
               costCny: candidate.estimatedCallCost,
               valueUtility: candidate.valueUtility,
@@ -1015,6 +1019,19 @@ export class AlphaRequestProcessor {
       policy.qualityBias ?? presetBias[policy.routingPreference ?? "balanced"],
       false,
     );
+    const pricingPoint = effective.find((point) => point.difficulty === 50);
+    const pricing = Object.fromEntries((pricingPoint?.candidates ?? [])
+      .filter((candidate) => !candidate.executionPresetId)
+      .map((candidate) => [candidate.modelId, {
+      modelId: candidate.modelId,
+      candidateId: candidate.candidateId,
+      executionPresetId: candidate.executionPresetId,
+      executionProfileId: candidate.executionProfileId,
+      inputPriceCnyPerMillion: candidate.effectiveInputPriceCnyPerMillion,
+      outputPriceCnyPerMillion: candidate.effectiveOutputPriceCnyPerMillion,
+      effectiveCostStatus: candidate.effectiveCostStatus,
+      estimatedCallCost: candidate.estimatedCallCost,
+      }]));
     return {
       defaultPreference: policy.routingPreference ?? "balanced",
       formulaVersion: utilityPolicy.formulaMode === "active" ? ACU_MODEL_UTILITY_V2_VERSION : ACU_ROUTING_MODEL_VERSION,
@@ -1056,6 +1073,7 @@ export class AlphaRequestProcessor {
         estimatedOutputTokens: Math.round(expectedOutputTokens * preset.expectedOutputTokenMultiplier),
         points: executionPresetPoints.get(preset.candidateId) ?? [],
       })).filter((preset) => preset.points.length > 0),
+      pricing,
       series,
       effective,
     };

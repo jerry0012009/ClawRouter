@@ -5,17 +5,11 @@ import { resolve } from "node:path";
 import pg from "pg";
 import { buildModelCurve, getAcuCatalog, getAcuModel } from "../../src/acu/catalog.js";
 import {
-  buildPayablePricing,
   buildReferencePricing,
   parsePricingDisplayMode,
   parseReferenceUsdCny,
-  selectPayableProfile,
   selectPublicReferenceSource,
 } from "../../src/alpha/pricing-view.js";
-import {
-  DEFAULT_BILLING_POLICY_VERSION,
-  parseRetailMarkupMultiplier,
-} from "../../src/alpha/retail-charge.js";
 import { monitorRoutingStatus, type MonitorHealthRow } from "../../src/alpha/channel-monitor.js";
 import type { ConfiguredExecutionProfile } from "../../src/alpha/server.js";
 
@@ -32,9 +26,6 @@ const referenceSources = JSON.parse(await readFile(resolve("deploy/alpha/officia
   sources: Array<{ vendor: string; models: string[]; nativeUnit?: "CNY per 1M tokens"; status?: string }>;
 };
 const profiles = JSON.parse(await readFile(resolve("deploy/alpha/execution-profiles.json"), "utf8")) as Array<Record<string, unknown>>;
-const economicsCatalog = JSON.parse(await readFile(resolve("deploy/alpha/provider-economics.json"), "utf8")) as {
-  providers: Array<Record<string, unknown>>;
-};
 const catalog = JSON.parse(await readFile(catalogPath, "utf8")) as {
   sourceCatalogVersion: string;
   sourceCatalogContentSha256?: string;
@@ -51,9 +42,6 @@ catalog.pricingVersion = sourceCatalog.priceVersion;
 catalog.generatedAt = sourceCatalog.generatedAt;
 catalog.displayMode = parsePricingDisplayMode(process.env.ACU_PRICING_DISPLAY_MODE);
 catalog.referenceFxCnyPerUsd = parseReferenceUsdCny(process.env.ACU_PRICING_REFERENCE_USD_CNY);
-const retailMarkupMultiplier = parseRetailMarkupMultiplier(process.env.ACU_RETAIL_MARKUP_MULTIPLIER);
-const pricingPolicyVersion = process.env.ACU_BILLING_POLICY_VERSION?.trim() || DEFAULT_BILLING_POLICY_VERSION;
-const economicsByProvider = new Map(economicsCatalog.providers.map((provider) => [String(provider.providerId), provider]));
 
 type RuntimeHealth = {
   execution_profile_id?: string;
@@ -118,49 +106,20 @@ function effectiveCostStatuses(items: Array<Record<string, unknown>>): string[] 
     .sort();
 }
 
-function profileCashCnyPerNominalUsd(profile: Record<string, unknown>): number {
-  const economics = economicsByProvider.get(String(profile.economicsProviderId ?? profile.provider));
-  const rechargeCashCny = Number(economics?.rechargeCashCny);
-  const creditsReceivedUsd = Number(economics?.creditsReceivedUsd);
-  const multiplier = Number(profile.observedBillingMultiplier ?? economics?.observedBillingMultiplier);
-  if (![rechargeCashCny, creditsReceivedUsd, multiplier].every((value) => Number.isFinite(value) && value > 0)) {
-    return Number.POSITIVE_INFINITY;
-  }
-  return multiplier * rechargeCashCny / creditsReceivedUsd;
-}
-
-function profileTokenPrices(profile: Record<string, unknown>, model: {
-  inputPricePerMillion: number;
-  outputPricePerMillion: number;
-  cachedInputPricePerMillion: number | null;
-}): { input: number; output: number; cacheRead: number } {
-  const billing = profile.billingPrice && typeof profile.billingPrice === "object"
-    ? profile.billingPrice as Record<string, unknown> : undefined;
-  const input = Number(billing?.inputPricePerMillion ?? model.inputPricePerMillion);
-  const output = Number(billing?.outputPricePerMillion ?? model.outputPricePerMillion);
-  const cacheRead = Number(billing?.cachedInputPricePerMillion ?? model.cachedInputPricePerMillion ?? input);
-  return { input, output, cacheRead };
-}
-
-type CorridorProfileUtility = { executionProfileId?: string; selected?: boolean };
-const corridorProfiles = new Map<string, string>();
 const routerUrl = process.env.ACU_ROUTER_INTERNAL_URL?.trim();
 const routerToken = process.env.ACU_ADMIN_TRACE_TOKEN?.trim();
 if (!routerUrl || !routerToken) throw new Error("ACU_ROUTER_INTERNAL_URL and ACU_ADMIN_TRACE_TOKEN are required");
-for (const protocol of ["responses", "messages"]) {
+const routerPricing = new Map<string, Record<string, any>>();
+for (const protocol of ["responses", "messages"] as const) {
   const response = await fetch(`${routerUrl}/internal/admin/selection-corridor`, {
     method: "POST",
     headers: { authorization: `Bearer ${routerToken}`, "content-type": "application/json" },
     body: JSON.stringify({ protocol, inputTokens: 20_000, expectedOutputTokens: 2_000, routingPreference: "balanced", formulaMode: "active" }),
   });
   if (!response.ok) throw new Error(`Router selection corridor failed for ${protocol}: ${response.status}`);
-  const body = await response.json() as { effective?: Array<{ profileCandidateUtilities?: CorridorProfileUtility[] }> };
-  for (const point of body.effective ?? []) {
-    for (const utility of point.profileCandidateUtilities ?? []) {
-      if (!utility.selected || !utility.executionProfileId) continue;
-      const profile = profiles.find((item) => item.executionProfileId === utility.executionProfileId);
-      if (profile?.modelId) corridorProfiles.set(`${protocol}:${profile.modelId}`, utility.executionProfileId);
-    }
+  const body = await response.json() as { pricing?: Record<string, Record<string, unknown>> };
+  for (const [modelId, pricing] of Object.entries(body.pricing ?? {})) {
+    routerPricing.set(`${protocol}:${modelId}`, pricing);
   }
 }
 
@@ -189,55 +148,26 @@ catalog.responses = activeModelIds.map((modelId) => {
     ? profile.protocols.map(String) : []))].sort();
   const channels = new Set(modelProfiles.map((profile) => String(profile.channelId ?? profile.channel)));
   const existing = existingResponses.get(modelId);
-  const healthyProfiles = activeProfiles(modelId, false);
-  const selectedProfiles = protocols.flatMap((protocol) => {
-    const selectedProfileId = corridorProfiles.get(`${protocol}:${modelId}`);
-    const profile = selectedProfileId
-      ? healthyProfiles.find((item) => String(item.executionProfileId) === selectedProfileId)
-      : undefined;
-    if (selectedProfileId && !profile) throw new Error(`Router selected ${modelId}/${protocol} but Profile ${selectedProfileId} is unavailable`);
-    return profile ? [{ protocol, profile }] : [];
-  });
-  if (selectedProfiles.length === 0) throw new Error(`Router has no selected Profile for ${modelId}`);
-  // A single New API model card may serve both native protocols. Use the
-  // higher Router-selected payable price so neither protocol is understated.
-  const pricedProfiles = selectedProfiles.map(({ profile }) => {
-    const cashMultiplier = profileCashCnyPerNominalUsd(profile);
-    if (!Number.isFinite(cashMultiplier)) throw new Error(`Selected Profile ${profile.executionProfileId} has no usable CNY economics`);
-    const profilePrices = profileTokenPrices(profile, model);
-    const billing = profile.billingPrice && typeof profile.billingPrice === "object"
-      ? profile.billingPrice as Record<string, unknown> : undefined;
-    return {
-      profile,
-      prices: {
-        input: profilePrices.input * cashMultiplier * retailMarkupMultiplier,
-        output: profilePrices.output * cashMultiplier * retailMarkupMultiplier,
-        cacheRead: profilePrices.cacheRead * cashMultiplier * retailMarkupMultiplier,
-      },
-      effectiveCostStatus: profile.effectiveCostStatus === "verified" ? "verified" : "estimated",
-      billingStatus: billing?.status === "verified" ? "verified" : "estimated",
-    };
-  });
-  const representative = pricedProfiles.reduce((left, right) =>
-    left.prices.input + left.prices.output >= right.prices.input + right.prices.output ? left : right);
-  const costProfile = representative.profile;
-  const profilePrices = profileTokenPrices(costProfile, model);
-  const cashMultiplier = profileCashCnyPerNominalUsd(costProfile);
-  const effectiveCostStatus = pricedProfiles.every((item) => item.effectiveCostStatus === "verified") ? "verified" : "estimated";
-  const billing = costProfile.billingPrice && typeof costProfile.billingPrice === "object"
-    ? costProfile.billingPrice as Record<string, unknown> : undefined;
-  const payable = buildPayablePricing({
-    billingPrice: {
-      inputPricePerMillion: profilePrices.input,
-      outputPricePerMillion: profilePrices.output,
-      cachedInputPricePerMillion: profilePrices.cacheRead,
-      status: billing?.status === "verified" ? "verified" : "estimated",
-    },
-    cashCnyPerNominalUsd: cashMultiplier,
-    retailMarkupMultiplier,
-    effectiveCostStatus,
-    pricingPolicyVersion,
-  });
+  const protocolPrices = protocols
+    .map((protocol) => routerPricing.get(`${protocol}:${modelId}`))
+    .filter((value): value is Record<string, any> => Boolean(value));
+  if (protocolPrices.length === 0) throw new Error(`Router has no pricing result for ${modelId}`);
+  // Router owns Profile V2.2 selection and effective-cost calculation. New API
+  // only publishes the exact values returned by Router; it does not recompute
+  // provider economics, channel multipliers, or select a Profile itself.
+  const representative = protocolPrices.reduce((left, right) =>
+    Number(left.inputPriceCnyPerMillion) + Number(left.outputPriceCnyPerMillion)
+      <= Number(right.inputPriceCnyPerMillion) + Number(right.outputPriceCnyPerMillion) ? left : right);
+  const effectiveInput = Number(representative.inputPriceCnyPerMillion);
+  const effectiveOutput = Number(representative.outputPriceCnyPerMillion);
+  const effectiveCostStatus = protocolPrices.every((item) => item.effectiveCostStatus === "verified")
+    ? "verified" : "estimated";
+  const payable = {
+    inputCnyPerMillion: effectiveInput,
+    outputCnyPerMillion: effectiveOutput,
+    status: effectiveCostStatus,
+    pricingPolicyVersion: "router_profile_v2.2",
+  };
   const referenceSource = selectPublicReferenceSource(modelId, referenceSources.sources);
   const reference = buildReferencePricing({
     price: {
@@ -259,9 +189,9 @@ catalog.responses = activeModelIds.map((modelId) => {
     inputPricePerMillion: model.inputPricePerMillion,
     outputPricePerMillion: model.outputPricePerMillion,
     cachedInputPricePerMillion: model.cachedInputPricePerMillion ?? model.inputPricePerMillion,
-    effectiveInputPriceCnyPerMillion: payable.inputCnyPerMillion,
-    effectiveOutputPriceCnyPerMillion: payable.outputCnyPerMillion,
-    effectiveCachedInputPriceCnyPerMillion: payable.cachedInputCnyPerMillion,
+    effectiveInputPriceCnyPerMillion: effectiveInput,
+    effectiveOutputPriceCnyPerMillion: effectiveOutput,
+    effectiveCachedInputPriceCnyPerMillion: effectiveInput,
     costCurrency: "CNY",
     costSemantics: "estimated_user_payable_price",
     payable,

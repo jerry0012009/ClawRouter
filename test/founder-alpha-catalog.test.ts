@@ -51,8 +51,6 @@ describe("Founder Alpha New API catalog export", () => {
     const luna = exported.responses.find((item: { modelId: string }) => item.modelId === "gpt-5.6-luna");
     expect(luna).toMatchObject({
       costCurrency: "CNY",
-      effectiveInputPriceCnyPerMillion: 2.7,
-      effectiveOutputPriceCnyPerMillion: 16.2,
       reference: {
         outputCnyPerMillion: 8.64,
         sourceType: "official",
@@ -61,6 +59,25 @@ describe("Founder Alpha New API catalog export", () => {
         fxCnyPerUsd: 7.2,
       },
     });
+    expect(luna.effectiveInputPriceCnyPerMillion).toBeCloseTo(0.055, 10);
+    expect(luna.effectiveOutputPriceCnyPerMillion).toBeCloseTo(0.33, 10);
+    expect(luna.payable.status).toBe("estimated");
+    const pricedSol = exported.responses.find((item: { modelId: string }) => item.modelId === "gpt-5.6-sol");
+    expect(pricedSol.effectiveInputPriceCnyPerMillion).toBeCloseTo(0.5, 10);
+    expect(pricedSol.effectiveOutputPriceCnyPerMillion).toBeCloseTo(3, 10);
+    expect(pricedSol.payable.status).toBe("estimated");
+    const profileModels = new Map(source.models.map((item: { modelId: string; inputPricePerMillion: number;
+      outputPricePerMillion: number }) => [item.modelId, item]));
+    for (const profile of profiles.filter((item: { provider: string; billingPrice?: unknown }) =>
+      ["code28", "wawazz"].includes(item.provider) && item.billingPrice)) {
+      const base = profileModels.get(profile.modelId)!;
+      expect(profile.billingPrice).toMatchObject({
+        inputPricePerMillion: base.inputPricePerMillion,
+        outputPricePerMillion: base.outputPricePerMillion,
+        status: "estimated",
+      });
+      expect(profile.effectiveCostStatus).toBe("estimated");
+    }
     expect(luna.reference.inputCnyPerMillion).toBeCloseTo(1.44);
     const fable = exported.responses.find((item: { modelId: string }) => item.modelId === "claude-fable-5");
     expect(fable).toMatchObject({

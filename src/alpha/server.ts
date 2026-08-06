@@ -525,7 +525,7 @@ export async function startAlphaService(config?: AlphaServiceConfig): Promise<vo
                  count(*)::int probe_count,
                  count(*) FILTER (WHERE status='success')::int probe_success_count,
                  percentile_cont(.5) WITHIN GROUP (ORDER BY latency_ms)
-                   FILTER (WHERE latency_ms IS NOT NULL) probe_latency_p50_ms,
+                   FILTER (WHERE status='success' AND latency_ms IS NOT NULL) probe_latency_p50_ms,
                  count(*) FILTER (WHERE metadata_json->>'probeMode'='full_pool')::int full_pool_probe_count,
                  count(*) FILTER (WHERE metadata_json->>'probeMode'='full_pool' AND status='success')::int full_pool_probe_success_count,
                  count(*) FILTER (WHERE metadata_json->>'probeMode' IS DISTINCT FROM 'full_pool')::int recovery_probe_count,

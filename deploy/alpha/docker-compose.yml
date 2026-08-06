@@ -179,7 +179,7 @@ services:
       CLOSEAI_ANTHROPIC_BASE_URL: ${CLOSEAI_ANTHROPIC_BASE_URL:-https://api.openai-proxy.org/anthropic}
       CLOSEAI_API_KEY: ${CLOSEAI_API_KEY:?set CLOSEAI_API_KEY}
     env_file:
-      - ../../.env
+      - ../../../new-api/.env
     volumes:
       - ./execution-profiles.json:/app/config/execution-profiles.json:ro
       - ./provider-channel-model-discovery.json:/app/config/provider-channel-model-discovery.json:ro

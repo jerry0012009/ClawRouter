@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { validateProviderChannelRegistry, validateProviderModelProfiles } from "../src/alpha/channel-registry.js";
 import { economicsForExecutionProfile } from "../src/alpha/server.js";
+import { getAcuModel } from "../src/acu/catalog.js";
 import channels from "../deploy/alpha/provider-channels.json";
+import executionProfiles from "../deploy/alpha/execution-profiles.json";
 
 describe("Provider Channel Registry", () => {
   it("contains one non-secret environment reference per Channel", () => {
@@ -9,6 +11,23 @@ describe("Provider Channel Registry", () => {
     expect(registry.channels).toHaveLength(56);
     expect(new Set(registry.channels.map((item) => item.apiKeyEnv)).size).toBe(56);
     expect(JSON.stringify(registry)).not.toMatch(/sk-[A-Za-z0-9]/);
+  });
+
+  it("profiles every verified canonical Messages model on the new Channels", () => {
+    const expectedModels = ["claude-fable-5", "claude-opus-4-8", "claude-sonnet-5"];
+    for (const channel of ["code28-claude", "code28-claude-deal", "wawazz-claude-max", "wawazz-kiro"]) {
+      const models = executionProfiles
+        .filter((profile) => profile.channel === channel && profile.protocols.includes("messages"))
+        .map((profile) => profile.modelId)
+        .sort();
+      expect(models).toEqual(expectedModels);
+    }
+  });
+
+  it("does not advertise auto-route Profiles outside the canonical routing catalog", () => {
+    for (const profile of executionProfiles.filter((item) => item.autoRouteEnabled !== false)) {
+      expect(getAcuModel(profile.modelId)?.routingEligible, profile.executionProfileId).toBe(true);
+    }
   });
 
   it("rejects active profiles without verified billing evidence", () => {

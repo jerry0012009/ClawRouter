@@ -71,15 +71,34 @@ function config() {
   });
 }
 
-it("defaults Sol Judge to 270 seconds with synchronous cross-model backup disabled", () => {
+it("defaults Luna Judge to 270 seconds with synchronous cross-model backup disabled", () => {
   const runtime = readAcuRuntimeConfig({});
   expect(runtime).toMatchObject({
-    judgeModel: "gpt-5.6-sol",
+    judgeModel: "gpt-5.6-luna",
+    judgeReasoningEffort: "default",
     judgeProvider: "lucen",
     judgeBaseUrl: "https://lucen.cc/v1",
     syncBackupEnabled: false,
     timeoutMs: 270_000,
   });
+});
+
+it("reads an explicit Luna Judge model without changing default reasoning", () => {
+  const previousModel = process.env.ACU_JUDGE_MODEL;
+  const previousEffort = process.env.ACU_JUDGE_REASONING_EFFORT;
+  process.env.ACU_JUDGE_MODEL = "gpt-5.6-luna";
+  delete process.env.ACU_JUDGE_REASONING_EFFORT;
+  try {
+    expect(readAcuRuntimeConfig({})).toMatchObject({
+      judgeModel: "gpt-5.6-luna",
+      judgeReasoningEffort: "default",
+    });
+  } finally {
+    if (previousModel === undefined) delete process.env.ACU_JUDGE_MODEL;
+    else process.env.ACU_JUDGE_MODEL = previousModel;
+    if (previousEffort === undefined) delete process.env.ACU_JUDGE_REASONING_EFFORT;
+    else process.env.ACU_JUDGE_REASONING_EFFORT = previousEffort;
+  }
 });
 
 function runner(primaryFetch: typeof fetch, backupFetch: typeof fetch) {

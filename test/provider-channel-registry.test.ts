@@ -6,8 +6,8 @@ import channels from "../deploy/alpha/provider-channels.json";
 describe("Provider Channel Registry", () => {
   it("contains one non-secret environment reference per Channel", () => {
     const registry = validateProviderChannelRegistry(channels);
-    expect(registry.channels).toHaveLength(49);
-    expect(new Set(registry.channels.map((item) => item.apiKeyEnv)).size).toBe(49);
+    expect(registry.channels).toHaveLength(56);
+    expect(new Set(registry.channels.map((item) => item.apiKeyEnv)).size).toBe(56);
     expect(JSON.stringify(registry)).not.toMatch(/sk-[A-Za-z0-9]/);
   });
 

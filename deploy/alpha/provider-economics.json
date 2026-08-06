@@ -77,6 +77,25 @@
       "effectiveCostStatus": "verified",
       "effectiveCostSource": "WAWA ZZ supplied 1 CNY per USD credit; per-channel 0.07/0.12/0.22 multipliers are applied on execution profiles",
       "effectiveCostVersion": "wawazz-founder-channel-multipliers-20260806-v1"
+    },
+    {
+      "providerId": "code28",
+      "displayName": "code28",
+      "protocol": "openai_responses_and_anthropic_messages",
+      "baseUrlEnv": "ACU_CHANNEL_CODE28_CODEX_STABLE_BASE_URL",
+      "apiKeyEnv": "ACU_CHANNEL_CODE28_CODEX_STABLE_API_KEY",
+      "balanceCurrency": "USD-denominated credits",
+      "rechargeCashCny": 1,
+      "creditsReceivedUsd": 1,
+      "observedBillingMultiplier": 1,
+      "priceSource": "Founder-supplied code28 channel multipliers; 1 CNY per USD credit",
+      "priceObservedAt": "2026-08-07T00:00:00Z",
+      "health": "healthy",
+      "priority": 50,
+      "enabled": true,
+      "effectiveCostStatus": "verified",
+      "effectiveCostSource": "Founder-supplied code28 1 CNY per USD credit; per-channel multipliers applied on execution profiles",
+      "effectiveCostVersion": "code28-founder-channel-multipliers-20260807-v1"
     }
   ]
 }

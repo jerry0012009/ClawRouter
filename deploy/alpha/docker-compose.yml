@@ -221,7 +221,9 @@ services:
       ERROR_LOG_ENABLED: "true"
       GIN_MODE: release
       TZ: UTC
-      ACU_PRICING_CATALOG_FILE: /app/acu-catalog/newapi-acu-catalog.json
+      ACU_PRICING_CATALOG_FILE: /var/lib/acu/pricing/newapi-acu-catalog.json
+      ACU_PRICING_RUNTIME_CATALOG_FILE: /var/lib/acu/pricing/newapi-acu-catalog.json
+      ACU_PRICING_FALLBACK_CATALOG_FILE: /app/acu-catalog/newapi-acu-catalog.json
       ACU_PRICING_DISPLAY_MODE: ${ACU_PRICING_DISPLAY_MODE:-comparison}
       ACU_PRICING_REFERENCE_USD_CNY: ${ACU_PRICING_REFERENCE_USD_CNY:-7.2}
       ACU_SCHEMA_VERSION: 0008_alpha_final_user_loop
@@ -231,6 +233,7 @@ services:
     volumes:
       - newapi-logs:/app/logs
       - ./:/app/acu-catalog:ro
+      - acu-pricing-runtime:/var/lib/acu/pricing
     ports:
       - "${NEW_API_BIND_ADDRESS:-127.0.0.1}:${NEW_API_PORT:-3200}:3000"
     networks: [alpha-backend]
@@ -249,3 +252,4 @@ volumes:
   postgres-acu-data:
   newapi-logs:
   acu-runtime-data:
+  acu-pricing-runtime:

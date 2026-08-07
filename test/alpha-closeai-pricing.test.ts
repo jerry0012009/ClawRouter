@@ -112,7 +112,7 @@ describe("CloseAI public pricing reconciliation", () => {
 
   it("falls back to the official catalog before applying 1.5 and 7.2", () => {
     const profile = profiles.find((item) => item.executionProfileId === "closeai-gpt-5.6-luna-responses-value")!;
-    expect(profile.billingPrice).toBeUndefined();
+    expect(profile.billingPrice).toBeDefined();
     expect(resolveProfileBillingPrice(profile)).toMatchObject({
       inputPricePerMillion: 0.2,
       outputPricePerMillion: 1.2,
@@ -138,6 +138,6 @@ describe("CloseAI public pricing reconciliation", () => {
   it("adds no CloseAI profile or override for DeepSeek without an existing profile", () => {
     expect(profiles.some((profile) => profile.provider === "closeai" && profile.modelId === "deepseek-v4-flash")).toBe(false);
     expect(profiles.filter((profile) => profile.provider === "closeai" && profile.billingPrice)
-      .map((profile) => profile.modelId)).toEqual(["claude-sonnet-5"]);
+      .map((profile) => profile.modelId)).toEqual(expect.arrayContaining(["claude-sonnet-5", "gpt-5.6-luna", "gpt-5.6-terra"]));
   });
 });

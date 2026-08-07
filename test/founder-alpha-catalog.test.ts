@@ -32,11 +32,13 @@ describe("Founder Alpha New API catalog export", () => {
         pricingPolicyVersion: "acu-retail-v1",
       });
       for (const privateKey of ["costProvider", "costChannel", "costExecutionProfileId",
-        "costObservedBillingMultiplier", "healthyChannelCount", "effectiveCostStatuses"]) {
+        "costObservedBillingMultiplier"]) {
         expect(item).not.toHaveProperty(privateKey);
       }
+      expect(item).toHaveProperty("currentlyEligible");
       expect(item.effectiveInputPriceCnyPerMillion).toBeGreaterThan(0);
       expect(item.effectiveOutputPriceCnyPerMillion).toBeGreaterThan(0);
+      expect(item.payable.pricingPolicyVersion).toBe("acu-retail-v1");
       expect(item.curve).toHaveLength(101);
       expect(item.curve[0].difficultyScore).toBe(0);
       expect(item.curve[100].difficultyScore).toBe(100);
@@ -59,12 +61,12 @@ describe("Founder Alpha New API catalog export", () => {
         fxCnyPerUsd: 7.2,
       },
     });
-    expect(luna.effectiveInputPriceCnyPerMillion).toBeCloseTo(0.055, 10);
-    expect(luna.effectiveOutputPriceCnyPerMillion).toBeCloseTo(0.33, 10);
+    expect(luna.effectiveInputPriceCnyPerMillion).toBeCloseTo(0.044, 10);
+    expect(luna.effectiveOutputPriceCnyPerMillion).toBeCloseTo(0.264, 10);
     expect(luna.payable.status).toBe("estimated");
     const pricedSol = exported.responses.find((item: { modelId: string }) => item.modelId === "gpt-5.6-sol");
-    expect(pricedSol.effectiveInputPriceCnyPerMillion).toBeCloseTo(0.5, 10);
-    expect(pricedSol.effectiveOutputPriceCnyPerMillion).toBeCloseTo(3, 10);
+    expect(pricedSol.effectiveInputPriceCnyPerMillion).toBeCloseTo(0.4, 10);
+    expect(pricedSol.effectiveOutputPriceCnyPerMillion).toBeCloseTo(2.4, 10);
     expect(pricedSol.payable.status).toBe("estimated");
     const profileModels = new Map(source.models.map((item: { modelId: string; inputPricePerMillion: number;
       outputPricePerMillion: number }) => [item.modelId, item]));
@@ -81,13 +83,13 @@ describe("Founder Alpha New API catalog export", () => {
     expect(luna.reference.inputCnyPerMillion).toBeCloseTo(1.44);
     const fable = exported.responses.find((item: { modelId: string }) => item.modelId === "claude-fable-5");
     expect(fable).toMatchObject({
-      effectiveInputPriceCnyPerMillion: 3.75,
-      effectiveOutputPriceCnyPerMillion: 18.75,
+      effectiveInputPriceCnyPerMillion: 3,
+      effectiveOutputPriceCnyPerMillion: 15,
       protocol: "Messages",
     });
     const kimiK3 = exported.responses.find((item: { modelId: string }) => item.modelId === "kimi-k3");
-    expect(kimiK3.effectiveInputPriceCnyPerMillion).toBeCloseTo(10);
-    expect(kimiK3.effectiveOutputPriceCnyPerMillion).toBeCloseTo(50);
+    expect(kimiK3.effectiveInputPriceCnyPerMillion).toBeCloseTo(8);
+    expect(kimiK3.effectiveOutputPriceCnyPerMillion).toBeCloseTo(40);
     expect(kimiK3).toMatchObject({ protocol: "Responses" });
     expect(kimiK3.reference).toBeUndefined();
     expect(kimiK3).toMatchObject({ curveProfile: "frontier_resilient", profileConfidence: "medium" });

@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { calculateRetailCharge, parseRetailMarkupMultiplier } from "../src/alpha/retail-charge.js";
+import { applyRetailMarkup, calculateRetailCharge, parseRetailMarkupMultiplier } from "../src/alpha/retail-charge.js";
 
 describe("Alpha retail charge", () => {
+  it("applies the retail markup exactly once to provider cash cost", () => {
+    expect(applyRetailMarkup(2, 1.25)).toBe(2.5);
+    expect(calculateRetailCharge({
+      successfulProviderCashCostCny: 2,
+      successfulJudgeCashCostCny: 0,
+      failedAttemptCashCostCny: 0,
+      failedJudgeAttemptCashCostCny: 0,
+      retailMarkupMultiplier: 1.25,
+    }).userChargeCny).toBe(2.5);
+  });
   it("charges successful provider and Judge cost at the retail markup", () => {
     expect(calculateRetailCharge({
       successfulProviderCashCostCny: 1,

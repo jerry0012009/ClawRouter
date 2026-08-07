@@ -1,6 +1,16 @@
 export const DEFAULT_RETAIL_MARKUP_MULTIPLIER = 1;
 export const DEFAULT_BILLING_POLICY_VERSION = "acu-retail-v1";
 
+export function applyRetailMarkup(providerCashCostCny: number, retailMarkupMultiplier: number): number {
+  if (!Number.isFinite(providerCashCostCny) || providerCashCostCny < 0) {
+    throw new Error("Provider cash cost must be a finite non-negative number");
+  }
+  if (!Number.isFinite(retailMarkupMultiplier) || retailMarkupMultiplier < 1) {
+    throw new Error("Retail markup multiplier must be a finite number greater than or equal to 1");
+  }
+  return providerCashCostCny * retailMarkupMultiplier;
+}
+
 export type RetailChargeInput = {
   successfulProviderCashCostCny: number;
   successfulJudgeCashCostCny: number;

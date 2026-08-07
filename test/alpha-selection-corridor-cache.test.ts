@@ -410,4 +410,32 @@ describe("selection corridor cache", () => {
       );
     }
   });
+
+  it("publishes independent cache read/write prices and payable prices without changing route cost", async () => {
+    const processor = new AlphaRequestProcessor({} as never);
+    const internal = processor as unknown as {
+      effectiveProfiles: () => Promise<{ profiles: AlphaExecutionProfile[]; probeClaims: [] }>;
+      withProfileRuntimeMetrics: (profiles: AlphaExecutionProfile[]) => Promise<AlphaExecutionProfile[]>;
+      calculateSelectionCorridor: (inputTokens: number, outputTokens: number, policy: Record<string, unknown>) => Promise<Record<string, unknown>>;
+    };
+    internal.effectiveProfiles = async () => ({ profiles: [{ ...lunaProfile, protocols: ["messages"], billingPrice: {
+      inputPricePerMillion: 1, outputPricePerMillion: 2, cachedInputPricePerMillion: 0.1, cacheWritePricePerMillion: 3,
+      currency: "USD_CREDIT", source: "test", observedAt: "2026-01-01", status: "estimated",
+    } }], probeClaims: [] });
+    internal.withProfileRuntimeMetrics = async (profiles) => profiles;
+    const corridor = await internal.calculateSelectionCorridor(10_000, 1_000, {
+      protocol: "messages", formulaMode: "active", routingPreference: "balanced",
+    }) as { effective: Array<{ difficulty: number; candidates: Array<Record<string, number>> }> };
+    const candidate = corridor.effective.find((point) => point.difficulty === 50)?.candidates[0];
+    expect(candidate).toBeDefined();
+    expect(candidate?.providerCashInputPriceCnyPerMillion).toBeGreaterThan(0);
+    expect(candidate?.payableInputPriceCnyPerMillion).toBeGreaterThanOrEqual(candidate?.providerCashInputPriceCnyPerMillion ?? 0);
+    if (candidate?.providerCashCachedInputPriceCnyPerMillion != null) {
+      expect(candidate.payableCachedInputPriceCnyPerMillion).toBeGreaterThanOrEqual(candidate.providerCashCachedInputPriceCnyPerMillion);
+    }
+    if (candidate?.providerCashCacheWritePriceCnyPerMillion != null) {
+      expect(candidate.payableCacheWritePriceCnyPerMillion).toBeGreaterThanOrEqual(candidate.providerCashCacheWritePriceCnyPerMillion);
+    }
+    expect(candidate?.estimatedCallCost).toBeGreaterThan(0);
+  });
 });

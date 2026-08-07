@@ -293,6 +293,14 @@ export type AlphaRouteDecision = {
     costUnit: "CNY" | "USD";
     effectiveInputPriceCnyPerMillion: number;
     effectiveOutputPriceCnyPerMillion: number;
+    providerCashInputPriceCnyPerMillion: number;
+    providerCashOutputPriceCnyPerMillion: number;
+    providerCashCachedInputPriceCnyPerMillion?: number;
+    providerCashCacheWritePriceCnyPerMillion?: number;
+    payableInputPriceCnyPerMillion?: number;
+    payableOutputPriceCnyPerMillion?: number;
+    payableCachedInputPriceCnyPerMillion?: number;
+    payableCacheWritePriceCnyPerMillion?: number;
     effectiveCostStatus: "verified" | "estimated" | "missing";
   }>;
   paretoFrontier: string[];
@@ -324,12 +332,17 @@ export type AlphaRouteDecision = {
   };
 };
 
-function nominalPrice(modelId: string): { inputPricePerMillion: number; outputPricePerMillion: number } {
+function nominalPrice(modelId: string): { inputPricePerMillion: number; outputPricePerMillion: number; cachedInputPricePerMillion?: number; cacheWritePricePerMillion?: number } {
   const model = getAcuModel(modelId);
   if (!model || model.inputPricePerMillion === null || model.outputPricePerMillion === null) {
     return { inputPricePerMillion: Number.POSITIVE_INFINITY, outputPricePerMillion: Number.POSITIVE_INFINITY };
   }
-  return { inputPricePerMillion: model.inputPricePerMillion, outputPricePerMillion: model.outputPricePerMillion };
+  return {
+    inputPricePerMillion: model.inputPricePerMillion,
+    outputPricePerMillion: model.outputPricePerMillion,
+    ...(model.cachedInputPricePerMillion == null ? {} : { cachedInputPricePerMillion: model.cachedInputPricePerMillion }),
+    ...(model.cacheWritePricePerMillion == null ? {} : { cacheWritePricePerMillion: model.cacheWritePricePerMillion }),
+  };
 }
 
 export function resolveProfileBillingPrice(profile: AlphaExecutionProfile): {
@@ -344,12 +357,20 @@ export function resolveProfileBillingPrice(profile: AlphaExecutionProfile): {
 function profileEffectivePrices(profile: AlphaExecutionProfile): {
   inputPricePerMillion: number;
   outputPricePerMillion: number;
+  cachedInputPricePerMillion?: number;
+  cacheWritePricePerMillion?: number;
 } {
   const nominal = resolveProfileBillingPrice(profile);
   const multiplier = profile.economics ? cashCnyPerNominalUsd(profile.economics) : 1;
   return {
     inputPricePerMillion: nominal.inputPricePerMillion * multiplier,
     outputPricePerMillion: nominal.outputPricePerMillion * multiplier,
+    ...(nominal.cachedInputPricePerMillion == null ? {} : {
+      cachedInputPricePerMillion: nominal.cachedInputPricePerMillion * multiplier,
+    }),
+    ...(nominal.cacheWritePricePerMillion == null ? {} : {
+      cacheWritePricePerMillion: nominal.cacheWritePricePerMillion * multiplier,
+    }),
   };
 }
 
@@ -998,12 +1019,17 @@ export function routeWithCurrentAcuFormula(input: AlphaRouteInput): AlphaRouteDe
       const plan = activeCandidatePlans?.get(estimate.candidateId);
       const bestProfile = bestProfileForCandidate(estimate);
       if (!bestProfile) throw new Error(`Candidate ${estimate.candidateId} has no selected execution Profile`);
+      const effectivePrices = profileEffectivePrices(bestProfile);
       return {
         ...estimate,
         bestExecutionProfileId: bestProfile.executionProfileId,
         costUnit: referenceEconomics ? "CNY" as const : "USD" as const,
-        effectiveInputPriceCnyPerMillion: profileEffectivePrices(bestProfile).inputPricePerMillion,
-        effectiveOutputPriceCnyPerMillion: profileEffectivePrices(bestProfile).outputPricePerMillion,
+        effectiveInputPriceCnyPerMillion: effectivePrices.inputPricePerMillion,
+        effectiveOutputPriceCnyPerMillion: effectivePrices.outputPricePerMillion,
+        providerCashInputPriceCnyPerMillion: effectivePrices.inputPricePerMillion,
+        providerCashOutputPriceCnyPerMillion: effectivePrices.outputPricePerMillion,
+        providerCashCachedInputPriceCnyPerMillion: effectivePrices.cachedInputPricePerMillion,
+        providerCashCacheWritePriceCnyPerMillion: effectivePrices.cacheWritePricePerMillion,
         effectiveCostStatus: bestProfile.effectiveCostStatus ?? "verified",
         executionProfileIds: (plan?.compatibleProfiles
           ?? eligibleProfiles.filter((profile) => profile.modelId === estimate.modelId))

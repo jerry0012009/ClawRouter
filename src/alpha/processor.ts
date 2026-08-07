@@ -66,6 +66,7 @@ import type { AcuJudgeResult } from "../acu/types.js";
 import { detectWorkPhase, type WorkPhaseDecision } from "./work-phase.js";
 import { canonicalReasoningEffort, decideReasoning, type ReasoningDecision } from "./reasoning-capability.js";
 import {
+  applyRetailMarkup,
   calculateRetailCharge,
   DEFAULT_BILLING_POLICY_VERSION,
   DEFAULT_RETAIL_MARKUP_MULTIPLIER,
@@ -970,6 +971,18 @@ export class AlphaRequestProcessor {
               estimatedCallCost: candidate.estimatedCallCost,
               effectiveInputPriceCnyPerMillion: candidate.effectiveInputPriceCnyPerMillion,
               effectiveOutputPriceCnyPerMillion: candidate.effectiveOutputPriceCnyPerMillion,
+              providerCashInputPriceCnyPerMillion: candidate.providerCashInputPriceCnyPerMillion,
+              providerCashOutputPriceCnyPerMillion: candidate.providerCashOutputPriceCnyPerMillion,
+              providerCashCachedInputPriceCnyPerMillion: candidate.providerCashCachedInputPriceCnyPerMillion,
+              providerCashCacheWritePriceCnyPerMillion: candidate.providerCashCacheWritePriceCnyPerMillion,
+              payableInputPriceCnyPerMillion: applyRetailMarkup(candidate.providerCashInputPriceCnyPerMillion, this.options.retailMarkupMultiplier ?? DEFAULT_RETAIL_MARKUP_MULTIPLIER),
+              payableOutputPriceCnyPerMillion: applyRetailMarkup(candidate.providerCashOutputPriceCnyPerMillion, this.options.retailMarkupMultiplier ?? DEFAULT_RETAIL_MARKUP_MULTIPLIER),
+              ...(candidate.providerCashCachedInputPriceCnyPerMillion == null ? {} : {
+                payableCachedInputPriceCnyPerMillion: applyRetailMarkup(candidate.providerCashCachedInputPriceCnyPerMillion, this.options.retailMarkupMultiplier ?? DEFAULT_RETAIL_MARKUP_MULTIPLIER),
+              }),
+              ...(candidate.providerCashCacheWritePriceCnyPerMillion == null ? {} : {
+                payableCacheWritePriceCnyPerMillion: applyRetailMarkup(candidate.providerCashCacheWritePriceCnyPerMillion, this.options.retailMarkupMultiplier ?? DEFAULT_RETAIL_MARKUP_MULTIPLIER),
+              }),
               effectiveCostStatus: candidate.effectiveCostStatus,
               quality: candidate.estimatedQuality * 100,
               costCny: candidate.estimatedCallCost,
@@ -1029,6 +1042,18 @@ export class AlphaRequestProcessor {
       executionProfileId: candidate.executionProfileId,
       inputPriceCnyPerMillion: candidate.effectiveInputPriceCnyPerMillion,
       outputPriceCnyPerMillion: candidate.effectiveOutputPriceCnyPerMillion,
+      providerCashInputPriceCnyPerMillion: candidate.providerCashInputPriceCnyPerMillion,
+      providerCashOutputPriceCnyPerMillion: candidate.providerCashOutputPriceCnyPerMillion,
+      providerCashCachedInputPriceCnyPerMillion: candidate.providerCashCachedInputPriceCnyPerMillion,
+      providerCashCacheWritePriceCnyPerMillion: candidate.providerCashCacheWritePriceCnyPerMillion,
+      payableInputPriceCnyPerMillion: applyRetailMarkup(candidate.providerCashInputPriceCnyPerMillion, this.options.retailMarkupMultiplier ?? DEFAULT_RETAIL_MARKUP_MULTIPLIER),
+      payableOutputPriceCnyPerMillion: applyRetailMarkup(candidate.providerCashOutputPriceCnyPerMillion, this.options.retailMarkupMultiplier ?? DEFAULT_RETAIL_MARKUP_MULTIPLIER),
+      ...(candidate.providerCashCachedInputPriceCnyPerMillion == null ? {} : {
+        payableCachedInputPriceCnyPerMillion: applyRetailMarkup(candidate.providerCashCachedInputPriceCnyPerMillion, this.options.retailMarkupMultiplier ?? DEFAULT_RETAIL_MARKUP_MULTIPLIER),
+      }),
+      ...(candidate.providerCashCacheWritePriceCnyPerMillion == null ? {} : {
+        payableCacheWritePriceCnyPerMillion: applyRetailMarkup(candidate.providerCashCacheWritePriceCnyPerMillion, this.options.retailMarkupMultiplier ?? DEFAULT_RETAIL_MARKUP_MULTIPLIER),
+      }),
       effectiveCostStatus: candidate.effectiveCostStatus,
       estimatedCallCost: candidate.estimatedCallCost,
       }]));

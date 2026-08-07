@@ -18,12 +18,15 @@
       "inputPricePerMillion": 10,
       "outputPricePerMillion": 50,
       "cachedInputPricePerMillion": 1,
-      "effectiveInputPriceCnyPerMillion": 3,
-      "effectiveOutputPriceCnyPerMillion": 15,
+      "effectiveInputPriceCnyPerMillion": 3.75,
+      "effectiveOutputPriceCnyPerMillion": 18.75,
+      "effectiveCachedInputPriceCnyPerMillion": 0.375,
       "payableByProtocol": {
         "messages": {
-          "inputCnyPerMillion": 3,
-          "outputCnyPerMillion": 15,
+          "inputCnyPerMillion": 3.75,
+          "outputCnyPerMillion": 18.75,
+          "cachedInputCnyPerMillion": 0.375,
+          "cacheWriteCnyPerMillion": 4.6875,
           "status": "estimated",
           "pricingPolicyVersion": "acu-retail-v1"
         }
@@ -31,8 +34,8 @@
       "costCurrency": "CNY",
       "costSemantics": "estimated_user_payable_price",
       "payable": {
-        "inputCnyPerMillion": 3,
-        "outputCnyPerMillion": 15,
+        "inputCnyPerMillion": 3.75,
+        "outputCnyPerMillion": 18.75,
         "status": "estimated",
         "pricingPolicyVersion": "acu-retail-v1"
       },
@@ -664,7 +667,7 @@
       "status": "routing_active",
       "currentlyEligible": true,
       "temporarilyUnavailableReason": null,
-      "healthyChannelCount": 3
+      "healthyChannelCount": 4
     },
     {
       "modelId": "claude-opus-4-8",
@@ -673,12 +676,14 @@
       "inputPricePerMillion": 5,
       "outputPricePerMillion": 25,
       "cachedInputPricePerMillion": 0.5,
-      "effectiveInputPriceCnyPerMillion": 1.5,
-      "effectiveOutputPriceCnyPerMillion": 7.5,
+      "effectiveInputPriceCnyPerMillion": 1.875,
+      "effectiveOutputPriceCnyPerMillion": 9.375,
+      "effectiveCachedInputPriceCnyPerMillion": 0.1875,
       "payableByProtocol": {
         "messages": {
-          "inputCnyPerMillion": 1.5,
-          "outputCnyPerMillion": 7.5,
+          "inputCnyPerMillion": 1.875,
+          "outputCnyPerMillion": 9.375,
+          "cachedInputCnyPerMillion": 0.1875,
           "status": "estimated",
           "pricingPolicyVersion": "acu-retail-v1"
         }
@@ -686,8 +691,8 @@
       "costCurrency": "CNY",
       "costSemantics": "estimated_user_payable_price",
       "payable": {
-        "inputCnyPerMillion": 1.5,
-        "outputCnyPerMillion": 7.5,
+        "inputCnyPerMillion": 1.875,
+        "outputCnyPerMillion": 9.375,
         "status": "estimated",
         "pricingPolicyVersion": "acu-retail-v1"
       },
@@ -1328,12 +1333,15 @@
       "inputPricePerMillion": 2,
       "outputPricePerMillion": 10,
       "cachedInputPricePerMillion": 0.2,
-      "effectiveInputPriceCnyPerMillion": 0.6,
-      "effectiveOutputPriceCnyPerMillion": 3,
+      "effectiveInputPriceCnyPerMillion": 0.75,
+      "effectiveOutputPriceCnyPerMillion": 3.75,
+      "effectiveCachedInputPriceCnyPerMillion": 0.075,
       "payableByProtocol": {
         "messages": {
-          "inputCnyPerMillion": 0.6,
-          "outputCnyPerMillion": 3,
+          "inputCnyPerMillion": 0.75,
+          "outputCnyPerMillion": 3.75,
+          "cachedInputCnyPerMillion": 0.075,
+          "cacheWriteCnyPerMillion": 0.9375,
           "status": "estimated",
           "pricingPolicyVersion": "acu-retail-v1"
         }
@@ -1341,8 +1349,8 @@
       "costCurrency": "CNY",
       "costSemantics": "estimated_user_payable_price",
       "payable": {
-        "inputCnyPerMillion": 0.6,
-        "outputCnyPerMillion": 3,
+        "inputCnyPerMillion": 0.75,
+        "outputCnyPerMillion": 3.75,
         "status": "estimated",
         "pricingPolicyVersion": "acu-retail-v1"
       },
@@ -2640,12 +2648,12 @@
       "inputPricePerMillion": 0.3,
       "outputPricePerMillion": 2.5,
       "cachedInputPricePerMillion": 0.03,
-      "effectiveInputPriceCnyPerMillion": 0.09,
-      "effectiveOutputPriceCnyPerMillion": 0.75,
+      "effectiveInputPriceCnyPerMillion": 0.11249999999999999,
+      "effectiveOutputPriceCnyPerMillion": 0.9375,
       "payableByProtocol": {
         "responses": {
-          "inputCnyPerMillion": 0.09,
-          "outputCnyPerMillion": 0.75,
+          "inputCnyPerMillion": 0.11249999999999999,
+          "outputCnyPerMillion": 0.9375,
           "status": "estimated",
           "pricingPolicyVersion": "acu-retail-v1"
         }
@@ -2653,8 +2661,8 @@
       "costCurrency": "CNY",
       "costSemantics": "estimated_user_payable_price",
       "payable": {
-        "inputCnyPerMillion": 0.09,
-        "outputCnyPerMillion": 0.75,
+        "inputCnyPerMillion": 0.11249999999999999,
+        "outputCnyPerMillion": 0.9375,
         "status": "estimated",
         "pricingPolicyVersion": "acu-retail-v1"
       },
@@ -3295,12 +3303,15 @@
       "inputPricePerMillion": 1.4,
       "outputPricePerMillion": 4.4,
       "cachedInputPricePerMillion": 0.26,
-      "effectiveInputPriceCnyPerMillion": 0.42,
-      "effectiveOutputPriceCnyPerMillion": 1.32,
+      "effectiveInputPriceCnyPerMillion": 0.525,
+      "effectiveOutputPriceCnyPerMillion": 1.6500000000000001,
+      "effectiveCachedInputPriceCnyPerMillion": 0.0975,
       "payableByProtocol": {
         "responses": {
-          "inputCnyPerMillion": 0.42,
-          "outputCnyPerMillion": 1.32,
+          "inputCnyPerMillion": 0.525,
+          "outputCnyPerMillion": 1.6500000000000001,
+          "cachedInputCnyPerMillion": 0.0975,
+          "cacheWriteCnyPerMillion": 0.525,
           "status": "estimated",
           "pricingPolicyVersion": "acu-retail-v1"
         }
@@ -3308,8 +3319,8 @@
       "costCurrency": "CNY",
       "costSemantics": "estimated_user_payable_price",
       "payable": {
-        "inputCnyPerMillion": 0.42,
-        "outputCnyPerMillion": 1.32,
+        "inputCnyPerMillion": 0.525,
+        "outputCnyPerMillion": 1.6500000000000001,
         "status": "estimated",
         "pricingPolicyVersion": "acu-retail-v1"
       },
@@ -3960,8 +3971,9 @@
           "pricingPolicyVersion": "acu-retail-v1"
         },
         "responses": {
-          "inputCnyPerMillion": 2.4,
-          "outputCnyPerMillion": 8.4,
+          "inputCnyPerMillion": 3,
+          "outputCnyPerMillion": 10.5,
+          "cachedInputCnyPerMillion": 0.75,
           "status": "estimated",
           "pricingPolicyVersion": "acu-retail-v1"
         }
@@ -4611,28 +4623,33 @@
       "inputPricePerMillion": 0.75,
       "outputPricePerMillion": 4.5,
       "cachedInputPricePerMillion": 0.075,
-      "effectiveInputPriceCnyPerMillion": 0.15000000000000002,
-      "effectiveOutputPriceCnyPerMillion": 0.9,
+      "effectiveInputPriceCnyPerMillion": 10.125000000000002,
+      "effectiveOutputPriceCnyPerMillion": 60.75,
+      "effectiveCachedInputPriceCnyPerMillion": 1.0125000000000002,
       "payableByProtocol": {
         "messages": {
-          "inputCnyPerMillion": 8.100000000000001,
-          "outputCnyPerMillion": 48.6,
+          "inputCnyPerMillion": 10.125000000000002,
+          "outputCnyPerMillion": 60.75,
+          "cachedInputCnyPerMillion": 1.0125000000000002,
+          "cacheWriteCnyPerMillion": 10.125000000000002,
           "status": "verified",
           "pricingPolicyVersion": "acu-retail-v1"
         },
         "responses": {
-          "inputCnyPerMillion": 0.15000000000000002,
-          "outputCnyPerMillion": 0.9,
-          "status": "estimated",
+          "inputCnyPerMillion": 10.125000000000002,
+          "outputCnyPerMillion": 60.75,
+          "cachedInputCnyPerMillion": 1.0125000000000002,
+          "cacheWriteCnyPerMillion": 10.125000000000002,
+          "status": "verified",
           "pricingPolicyVersion": "acu-retail-v1"
         }
       },
       "costCurrency": "CNY",
       "costSemantics": "estimated_user_payable_price",
       "payable": {
-        "inputCnyPerMillion": 0.15000000000000002,
-        "outputCnyPerMillion": 0.9,
-        "status": "estimated",
+        "inputCnyPerMillion": 10.125000000000002,
+        "outputCnyPerMillion": 60.75,
+        "status": "verified",
         "pricingPolicyVersion": "acu-retail-v1"
       },
       "reference": {
@@ -4645,7 +4662,7 @@
         "originalCurrency": "USD",
         "fxCnyPerUsd": 7.2
       },
-      "effectiveCostStatus": "estimated",
+      "effectiveCostStatus": "verified",
       "curveProfile": "efficient_fast",
       "profileConfidence": "low",
       "curve": [
@@ -5263,7 +5280,7 @@
       "status": "routing_active",
       "currentlyEligible": true,
       "temporarilyUnavailableReason": null,
-      "healthyChannelCount": 12
+      "healthyChannelCount": 10
     },
     {
       "modelId": "gpt-5.5",
@@ -5282,8 +5299,10 @@
           "pricingPolicyVersion": "acu-retail-v1"
         },
         "responses": {
-          "inputCnyPerMillion": 0.3,
-          "outputCnyPerMillion": 1.7999999999999998,
+          "inputCnyPerMillion": 0.375,
+          "outputCnyPerMillion": 2.25,
+          "cachedInputCnyPerMillion": 0.0375,
+          "cacheWriteCnyPerMillion": 0.375,
           "status": "estimated",
           "pricingPolicyVersion": "acu-retail-v1"
         }
@@ -5933,18 +5952,21 @@
       "inputPricePerMillion": 0.2,
       "outputPricePerMillion": 1.2,
       "cachedInputPricePerMillion": 0.02,
-      "effectiveInputPriceCnyPerMillion": 0.044000000000000004,
-      "effectiveOutputPriceCnyPerMillion": 0.264,
+      "effectiveInputPriceCnyPerMillion": 0.05000000000000001,
+      "effectiveOutputPriceCnyPerMillion": 0.3,
+      "effectiveCachedInputPriceCnyPerMillion": 0.005,
       "payableByProtocol": {
         "messages": {
-          "inputCnyPerMillion": 2.16,
-          "outputCnyPerMillion": 12.96,
-          "status": "verified",
+          "inputCnyPerMillion": 2.7,
+          "outputCnyPerMillion": 16.200000000000003,
+          "cachedInputCnyPerMillion": 0.27,
+          "status": "estimated",
           "pricingPolicyVersion": "acu-retail-v1"
         },
         "responses": {
-          "inputCnyPerMillion": 0.044000000000000004,
-          "outputCnyPerMillion": 0.264,
+          "inputCnyPerMillion": 0.05000000000000001,
+          "outputCnyPerMillion": 0.3,
+          "cachedInputCnyPerMillion": 0.005,
           "status": "estimated",
           "pricingPolicyVersion": "acu-retail-v1"
         }
@@ -5952,8 +5974,8 @@
       "costCurrency": "CNY",
       "costSemantics": "estimated_user_payable_price",
       "payable": {
-        "inputCnyPerMillion": 0.044000000000000004,
-        "outputCnyPerMillion": 0.264,
+        "inputCnyPerMillion": 0.05000000000000001,
+        "outputCnyPerMillion": 0.3,
         "status": "estimated",
         "pricingPolicyVersion": "acu-retail-v1"
       },
@@ -6585,7 +6607,7 @@
       "status": "routing_active",
       "currentlyEligible": true,
       "temporarilyUnavailableReason": null,
-      "healthyChannelCount": 8
+      "healthyChannelCount": 4
     },
     {
       "modelId": "gpt-5.6-sol",
@@ -6594,12 +6616,14 @@
       "inputPricePerMillion": 5,
       "outputPricePerMillion": 30,
       "cachedInputPricePerMillion": 0.5,
-      "effectiveInputPriceCnyPerMillion": 0.4,
-      "effectiveOutputPriceCnyPerMillion": 2.4,
+      "effectiveInputPriceCnyPerMillion": 0.5,
+      "effectiveOutputPriceCnyPerMillion": 3,
+      "effectiveCachedInputPriceCnyPerMillion": 0.05,
       "payableByProtocol": {
         "responses": {
-          "inputCnyPerMillion": 0.4,
-          "outputCnyPerMillion": 2.4,
+          "inputCnyPerMillion": 0.5,
+          "outputCnyPerMillion": 3,
+          "cachedInputCnyPerMillion": 0.05,
           "status": "estimated",
           "pricingPolicyVersion": "acu-retail-v1"
         }
@@ -6607,8 +6631,8 @@
       "costCurrency": "CNY",
       "costSemantics": "estimated_user_payable_price",
       "payable": {
-        "inputCnyPerMillion": 0.4,
-        "outputCnyPerMillion": 2.4,
+        "inputCnyPerMillion": 0.5,
+        "outputCnyPerMillion": 3,
         "status": "estimated",
         "pricingPolicyVersion": "acu-retail-v1"
       },
@@ -7240,7 +7264,7 @@
       "status": "routing_active",
       "currentlyEligible": true,
       "temporarilyUnavailableReason": null,
-      "healthyChannelCount": 15
+      "healthyChannelCount": 16
     },
     {
       "modelId": "gpt-5.6-terra",
@@ -7249,18 +7273,21 @@
       "inputPricePerMillion": 2,
       "outputPricePerMillion": 12,
       "cachedInputPricePerMillion": 0.2,
-      "effectiveInputPriceCnyPerMillion": 0.14,
-      "effectiveOutputPriceCnyPerMillion": 0.8400000000000001,
+      "effectiveInputPriceCnyPerMillion": 0.17500000000000002,
+      "effectiveOutputPriceCnyPerMillion": 1.05,
+      "effectiveCachedInputPriceCnyPerMillion": 0.0175,
       "payableByProtocol": {
         "messages": {
-          "inputCnyPerMillion": 21.6,
-          "outputCnyPerMillion": 129.60000000000002,
+          "inputCnyPerMillion": 27,
+          "outputCnyPerMillion": 162.00000000000003,
+          "cachedInputCnyPerMillion": 2.7,
           "status": "verified",
           "pricingPolicyVersion": "acu-retail-v1"
         },
         "responses": {
-          "inputCnyPerMillion": 0.14,
-          "outputCnyPerMillion": 0.8400000000000001,
+          "inputCnyPerMillion": 0.17500000000000002,
+          "outputCnyPerMillion": 1.05,
+          "cachedInputCnyPerMillion": 0.0175,
           "status": "estimated",
           "pricingPolicyVersion": "acu-retail-v1"
         }
@@ -7268,8 +7295,8 @@
       "costCurrency": "CNY",
       "costSemantics": "estimated_user_payable_price",
       "payable": {
-        "inputCnyPerMillion": 0.14,
-        "outputCnyPerMillion": 0.8400000000000001,
+        "inputCnyPerMillion": 0.17500000000000002,
+        "outputCnyPerMillion": 1.05,
         "status": "estimated",
         "pricingPolicyVersion": "acu-retail-v1"
       },
@@ -9204,12 +9231,14 @@
       "inputPricePerMillion": 20,
       "outputPricePerMillion": 100,
       "cachedInputPricePerMillion": 2,
-      "effectiveInputPriceCnyPerMillion": 8,
-      "effectiveOutputPriceCnyPerMillion": 40,
+      "effectiveInputPriceCnyPerMillion": 10,
+      "effectiveOutputPriceCnyPerMillion": 50,
+      "effectiveCachedInputPriceCnyPerMillion": 1,
       "payableByProtocol": {
         "responses": {
-          "inputCnyPerMillion": 8,
-          "outputCnyPerMillion": 40,
+          "inputCnyPerMillion": 10,
+          "outputCnyPerMillion": 50,
+          "cachedInputCnyPerMillion": 1,
           "status": "estimated",
           "pricingPolicyVersion": "acu-retail-v1"
         }
@@ -9217,8 +9246,8 @@
       "costCurrency": "CNY",
       "costSemantics": "estimated_user_payable_price",
       "payable": {
-        "inputCnyPerMillion": 8,
-        "outputCnyPerMillion": 40,
+        "inputCnyPerMillion": 10,
+        "outputCnyPerMillion": 50,
         "status": "estimated",
         "pricingPolicyVersion": "acu-retail-v1"
       },
@@ -9862,7 +9891,7 @@
         "active_responses",
         "active_messages"
       ],
-      "healthyChannelCount": 11,
+      "healthyChannelCount": 9,
       "temporarilyUnavailableReason": null,
       "effectiveCostStatuses": [
         "estimated",
@@ -9927,7 +9956,7 @@
       "statuses": [
         "active_messages"
       ],
-      "healthyChannelCount": 3,
+      "healthyChannelCount": 4,
       "temporarilyUnavailableReason": null,
       "effectiveCostStatuses": [
         "estimated"
@@ -9938,7 +9967,7 @@
       "statuses": [
         "active_responses"
       ],
-      "healthyChannelCount": 15,
+      "healthyChannelCount": 16,
       "temporarilyUnavailableReason": null,
       "effectiveCostStatuses": [
         "estimated",
@@ -9964,11 +9993,10 @@
         "active_responses",
         "active_messages"
       ],
-      "healthyChannelCount": 7,
+      "healthyChannelCount": 4,
       "temporarilyUnavailableReason": null,
       "effectiveCostStatuses": [
-        "estimated",
-        "verified"
+        "estimated"
       ]
     },
     {
@@ -10020,5 +10048,5 @@
   "displayMode": "comparison",
   "referenceFxCnyPerUsd": 7.2,
   "sourceCatalogGeneratedAt": "2026-08-02",
-  "runtimeRefreshedAt": "2026-08-07T01:06:21.811Z"
+  "runtimeRefreshedAt": "2026-08-07T07:08:06.375Z"
 }
